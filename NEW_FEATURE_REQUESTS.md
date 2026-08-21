@@ -31,6 +31,7 @@ Ordered by priority (highest impact / biggest current gap first).
 - **Commit graph visualization** — branch/merge graph column (like `git log --graph`) with lane layout and branch/tag labels, computed server-side in `history.rs` and returned from `get_log`.
 - **Discard changes per-file/per-hunk** — scoped "discard" action next to stage/unstage, not all-or-nothing.
 - files need file icons. use the ones from https://github.com/miguelsolorio/vscode-symbols for a very minimalistic, yet effective icon set that reacts to file/folder names
+- code syntax highlighting. Show syntax highlighting for code files, using the same colors as VS Code. only color the plus and minus signs in diff views in the red and green (or yellow and blue)
 - create an open-source ready short REAMDE for this project that explains how to get started, what features are available, and how to contribute. it should have a short introduction that is a bit of a "marketingy" pitch for the project.
 
 ## P1 — High-value quality of life
