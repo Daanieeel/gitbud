@@ -30,6 +30,7 @@ Ordered by priority (highest impact / biggest current gap first).
 - **Commit graph visualization** — branch/merge graph column (like `git log --graph`) with lane layout and branch/tag labels, computed server-side in `history.rs` and returned from `get_log`.
 - **Discard changes per-file/per-hunk** — scoped "discard" action next to stage/unstage, not all-or-nothing.
 - files need file icons. use the ones from https://github.com/miguelsolorio/vscode-symbols for a very minimalistic, yet effective icon set that reacts to file/folder names
+- create an open-source ready short REAMDE for this project that explains how to get started, what features are available, and how to contribute. it should have a short introduction that is a bit of a "marketingy" pitch for the project.
 
 ## P1 — High-value quality of life
 
@@ -41,6 +42,7 @@ Ordered by priority (highest impact / biggest current gap first).
 - **Cherry-pick & revert** — pick a commit from history and apply it to the current branch, or revert it, without a terminal.
 - **Inline blame view** — `git_blame(path)` command + gutter toggle in the diff/file view; click a blamed line to jump to that commit in `HistoryTab`.
 - **Tag management** — create, push, and delete tags from the UI; show tags alongside branch labels in history.
+- pre-filled commit message for single-file commits
 
 ## P2 — Nice to have
 
