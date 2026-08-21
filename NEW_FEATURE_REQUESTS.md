@@ -4,6 +4,7 @@ Ordered by priority (highest impact / biggest current gap first).
 
 ## P-1 — GitHub functionality
 
+- **Interactive GitHub Login** - instead of entering a client id manually, use the GitHub login flow to authenticate with GitHub.
 - **Pull Requests tab & 1-click local checkout** — Dedicated "Pull Requests" tab in `TabBar.tsx` to browse open, closed, and merged PRs for the current repository. Includes search/filter by author, review status, and labels, plus status badges (Draft, CI passing/failing, Approved). Double-click or click "Checkout PR" to automatically fetch (`refs/pull/{id}/head` for forks/branches) and switch to a local tracking branch to test changes locally.
 - **Create Pull Request workflow** — Quick "Create Pull Request" trigger from `Toolbar.tsx` or `BranchSwitcher.tsx` when the active branch is ahead of the upstream default branch. Modal includes base/compare branch selection, auto-loading `.github/PULL_REQUEST_TEMPLATE.md` (or recent commit messages) into the description editor, draft PR toggle, and preview of commits/diff before submission.
 - **CI / GitHub Actions status indicators & check details** — Build check status badges (passed, failed, pending) rendered directly on commit rows in `HistoryTab.tsx` / `CommitList.tsx` and in the PR view. Popover/tooltip showing individual check run names, durations, and direct deep-links to failing GitHub Action workflow runs.
@@ -42,7 +43,8 @@ Ordered by priority (highest impact / biggest current gap first).
 - **Cherry-pick & revert** — pick a commit from history and apply it to the current branch, or revert it, without a terminal.
 - **Inline blame view** — `git_blame(path)` command + gutter toggle in the diff/file view; click a blamed line to jump to that commit in `HistoryTab`.
 - **Tag management** — create, push, and delete tags from the UI; show tags alongside branch labels in history.
-- pre-filled commit message for single-file commits
+- pre-filled commit message (summary, not description) for single-file commits
+- commit message + description inputs must stay filled out even when files are added/removed/changed; currently resets when tabbing away, changing files and tabbing back
 
 ## P2 — Nice to have
 
