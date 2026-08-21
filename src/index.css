@@ -2,59 +2,76 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Palette sourced from .reference/color-pallette.json ("Vercel" VS Code theme):
+ * pure black surfaces, off-white text, #0070f3 blue accent, and green/pink/purple/
+ * yellow used for git + status semantics (green = added/modified, pink = deleted).
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.55 0.16 250);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.96 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.96 0 0);
-  --muted-foreground: oklch(0.5 0 0);
-  --accent: oklch(0.96 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.9 0 0);
-  --input: oklch(0.9 0 0);
-  --ring: oklch(0.55 0.16 250);
+  --background: #ffffff;
+  --foreground: #0a0a0a;
+  --card: #ffffff;
+  --card-foreground: #0a0a0a;
+  --popover: #ffffff;
+  --popover-foreground: #0a0a0a;
+  --primary: #0070f3;
+  --primary-foreground: #ffffff;
+  --secondary: #f2f2f2;
+  --secondary-foreground: #0a0a0a;
+  --muted: #f2f2f2;
+  --muted-foreground: #666666;
+  --accent: #ececec;
+  --accent-foreground: #0a0a0a;
+  --destructive: #d6336c;
+  --destructive-foreground: #ffffff;
+  --border: #e2e2e2;
+  --input: #d4d4d4;
+  --ring: #0070f3;
   --radius: 0.5rem;
 
-  --diff-add-bg: oklch(0.95 0.05 145);
-  --diff-add-fg: oklch(0.4 0.1 145);
-  --diff-del-bg: oklch(0.95 0.05 25);
-  --diff-del-fg: oklch(0.5 0.15 25);
+  --diff-add-bg: #e6f9ee;
+  --diff-add-fg: #00873d;
+  --diff-del-bg: #fde8ef;
+  --diff-del-fg: #c72360;
+
+  --accent-blue: #0070f3;
+  --accent-green: #00873d;
+  --accent-pink: #d6336c;
+  --accent-purple: #9147d6;
+  --accent-yellow: #ab7a00;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.96 0 0);
-  --card: oklch(0.18 0 0);
-  --card-foreground: oklch(0.96 0 0);
-  --popover: oklch(0.18 0 0);
-  --popover-foreground: oklch(0.96 0 0);
-  --primary: oklch(0.65 0.16 250);
-  --primary-foreground: oklch(0.145 0 0);
-  --secondary: oklch(0.25 0 0);
-  --secondary-foreground: oklch(0.96 0 0);
-  --muted: oklch(0.25 0 0);
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: oklch(0.28 0 0);
-  --accent-foreground: oklch(0.96 0 0);
-  --destructive: oklch(0.65 0.2 25);
-  --destructive-foreground: oklch(0.96 0 0);
-  --border: oklch(0.3 0 0);
-  --input: oklch(0.3 0 0);
-  --ring: oklch(0.65 0.16 250);
+  --background: #000000;
+  --foreground: #eeeeee;
+  --card: #000000;
+  --card-foreground: #eeeeee;
+  --popover: #000000;
+  --popover-foreground: #eeeeee;
+  --primary: #0070f3;
+  --primary-foreground: #ffffff;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #eeeeee;
+  --muted: #1a1a1a;
+  --muted-foreground: #a0a0a0;
+  --accent: #2a2a2a;
+  --accent-foreground: #eeeeee;
+  --destructive: #ff4d8d;
+  --destructive-foreground: #ffffff;
+  --border: #1a1a1a;
+  --input: #3a3a3a;
+  --ring: #0070f3;
 
-  --diff-add-bg: oklch(0.28 0.06 145);
-  --diff-add-fg: oklch(0.75 0.12 145);
-  --diff-del-bg: oklch(0.28 0.06 25);
-  --diff-del-fg: oklch(0.75 0.15 25);
+  --diff-add-bg: #052e18;
+  --diff-add-fg: #00cb50;
+  --diff-del-bg: #3a0a1e;
+  --diff-del-fg: #ff4d8d;
+
+  --accent-blue: #47a8ff;
+  --accent-green: #00cb50;
+  --accent-pink: #ff4d8d;
+  --accent-purple: #c473fc;
+  --accent-yellow: #ffcc47;
 }
 
 @theme inline {
@@ -77,6 +94,11 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-accent-blue: var(--accent-blue);
+  --color-accent-green: var(--accent-green);
+  --color-accent-pink: var(--accent-pink);
+  --color-accent-purple: var(--accent-purple);
+  --color-accent-yellow: var(--accent-yellow);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

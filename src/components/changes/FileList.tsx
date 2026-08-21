@@ -16,10 +16,10 @@ const STATUS_ICON: Record<ChangeKind, typeof FileIcon> = {
 };
 
 const STATUS_COLOR: Record<ChangeKind, string> = {
-  added: "text-[var(--diff-add-fg)]",
-  untracked: "text-[var(--diff-add-fg)]",
-  modified: "text-amber-500",
-  deleted: "text-[var(--diff-del-fg)]",
+  added: "text-accent-green",
+  untracked: "text-accent-green",
+  modified: "text-accent-green",
+  deleted: "text-accent-pink",
   renamed: "text-muted-foreground",
   type_change: "text-muted-foreground",
   conflicted: "text-destructive",

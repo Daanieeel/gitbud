@@ -3,6 +3,7 @@ mod diff;
 mod git_shell;
 mod history;
 mod repo;
+mod stash;
 mod watch;
 
 use std::collections::HashMap;
@@ -113,6 +114,33 @@ fn init_repo(path: String) -> Result<(), String> {
     Ok(())
 }
 
+// --- stash ---
+
+#[tauri::command]
+fn list_stashes(repo_path: String) -> Result<Vec<stash::StashEntry>, String> {
+    stash::list_stashes(&repo_path)
+}
+
+#[tauri::command]
+fn stash_save(repo_path: String, message: String, include_untracked: bool) -> Result<(), String> {
+    stash::stash_save(&repo_path, &message, include_untracked)
+}
+
+#[tauri::command]
+fn stash_apply(repo_path: String, index: usize) -> Result<(), String> {
+    stash::stash_apply(&repo_path, index)
+}
+
+#[tauri::command]
+fn stash_pop(repo_path: String, index: usize) -> Result<(), String> {
+    stash::stash_pop(&repo_path, index)
+}
+
+#[tauri::command]
+fn stash_drop(repo_path: String, index: usize) -> Result<(), String> {
+    stash::stash_drop(&repo_path, index)
+}
+
 // --- sync: fetch/pull/push/clone via system git ---
 
 #[tauri::command]
@@ -179,6 +207,11 @@ pub fn run() {
             stage_paths,
             unstage_paths,
             commit,
+            list_stashes,
+            stash_save,
+            stash_apply,
+            stash_pop,
+            stash_drop,
             get_file_diff,
             get_commit_files,
             get_commit_file_diff,
