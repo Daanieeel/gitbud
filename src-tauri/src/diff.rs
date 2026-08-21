@@ -99,6 +99,89 @@ pub fn get_file_diff(repo_path: &str, path: &str, staged: bool) -> Result<FileDi
     build_file_diff(path, None, &diff)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::repo;
+
+    struct ScratchRepo {
+        path: std::path::PathBuf,
+    }
+
+    impl ScratchRepo {
+        fn new(name: &str) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "gitbud-test-{name}-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            std::fs::create_dir_all(&path).unwrap();
+            let repo = Repository::init(&path).unwrap();
+            let mut config = repo.config().unwrap();
+            config.set_str("user.name", "Test").unwrap();
+            config.set_str("user.email", "test@example.com").unwrap();
+            Self { path }
+        }
+
+        fn path_str(&self) -> String {
+            self.path.to_string_lossy().to_string()
+        }
+    }
+
+    impl Drop for ScratchRepo {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+
+    #[test]
+    fn stage_commit_and_diff_roundtrip() {
+        let scratch = ScratchRepo::new("diff-roundtrip");
+        let repo_path = scratch.path_str();
+
+        std::fs::write(scratch.path.join("hello.txt"), "line one\n").unwrap();
+        repo::stage_paths(&repo_path, &["hello.txt".to_string()]).unwrap();
+        let oid = repo::commit(&repo_path, "initial commit", "").unwrap();
+
+        // Unstaged modification produces an index->workdir diff.
+        std::fs::write(scratch.path.join("hello.txt"), "line one\nline two\n").unwrap();
+        let unstaged = get_file_diff(&repo_path, "hello.txt", false).unwrap();
+        assert!(!unstaged.is_binary);
+        assert!(unstaged.hunks.iter().any(|h| h.lines.iter().any(|l| l.kind == LineKind::Addition)));
+
+        // Staging moves the same change into the HEAD->index diff.
+        repo::stage_paths(&repo_path, &["hello.txt".to_string()]).unwrap();
+        let staged = get_file_diff(&repo_path, "hello.txt", true).unwrap();
+        assert!(staged.hunks.iter().any(|h| h.lines.iter().any(|l| l.kind == LineKind::Addition)));
+
+        // The commit-diff path (used by History) sees the same content for the first commit.
+        let files = get_commit_files(&repo_path, &oid).unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].0, "hello.txt");
+    }
+
+    #[test]
+    fn unstage_reverts_index_to_head() {
+        let scratch = ScratchRepo::new("unstage");
+        let repo_path = scratch.path_str();
+
+        std::fs::write(scratch.path.join("a.txt"), "a\n").unwrap();
+        repo::stage_paths(&repo_path, &["a.txt".to_string()]).unwrap();
+        repo::commit(&repo_path, "add a", "").unwrap();
+
+        std::fs::write(scratch.path.join("a.txt"), "a\nb\n").unwrap();
+        repo::stage_paths(&repo_path, &["a.txt".to_string()]).unwrap();
+        let staged_before = repo::get_status(&repo_path).unwrap();
+        assert!(staged_before.files.iter().any(|f| f.path == "a.txt" && f.staged));
+
+        repo::unstage_paths(&repo_path, &["a.txt".to_string()]).unwrap();
+        let staged_after = repo::get_status(&repo_path).unwrap();
+        assert!(staged_after.files.iter().any(|f| f.path == "a.txt" && !f.staged));
+    }
+}
+
 /// List the files changed by a commit relative to its first parent (or the empty tree, for a root commit).
 pub fn get_commit_files(repo_path: &str, oid: &str) -> Result<Vec<(String, String)>, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;

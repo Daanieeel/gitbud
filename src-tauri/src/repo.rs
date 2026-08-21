@@ -234,6 +234,43 @@ pub fn unstage_paths(repo_path: &str, paths: &[String]) -> Result<(), String> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn this_repo() -> String {
+        // src-tauri/src/repo.rs -> repo root is two levels up from CARGO_MANIFEST_DIR (src-tauri)
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        std::path::Path::new(manifest_dir)
+            .parent()
+            .unwrap()
+            .to_string_lossy()
+            .to_string()
+    }
+
+    #[test]
+    fn reads_status_of_real_repo() {
+        let status = get_status(&this_repo()).expect("status should succeed");
+        // Just verifying it doesn't error and returns a well-formed list — the working
+        // tree's actual dirtiness varies run to run.
+        for f in &status.files {
+            assert!(!f.path.is_empty());
+        }
+    }
+
+    #[test]
+    fn reads_current_branch_of_real_repo() {
+        let branch = get_current_branch(&this_repo()).expect("branch should succeed");
+        assert!(!branch.is_empty());
+    }
+
+    #[test]
+    fn lists_branches_of_real_repo() {
+        let branches = list_branches(&this_repo()).expect("branches should succeed");
+        assert!(branches.iter().any(|b| b.is_head));
+    }
+}
+
 pub fn commit(repo_path: &str, summary: &str, description: &str) -> Result<String, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut index = repo.index().map_err(|e| e.message().to_string())?;

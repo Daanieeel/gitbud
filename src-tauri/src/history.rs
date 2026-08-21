@@ -35,3 +35,22 @@ pub fn get_log(repo_path: &str, limit: usize, skip: usize) -> Result<Vec<CommitE
     }
     Ok(entries)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_log_of_real_repo() {
+        let manifest_dir = env!("CARGO_MANIFEST_DIR");
+        let repo_root = std::path::Path::new(manifest_dir)
+            .parent()
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        let entries = get_log(&repo_root, 5, 0).expect("log should succeed");
+        assert!(!entries.is_empty());
+        assert!(entries[0].short_oid.len() == 7);
+    }
+}
