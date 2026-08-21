@@ -1,0 +1,132 @@
+use git2::Repository;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoEntry {
+    pub path: String,
+    pub name: String,
+    pub group: String,
+    pub is_private: bool,
+    #[serde(default)]
+    pub last_fetched: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct RepoConfig {
+    repos: Vec<RepoEntry>,
+}
+
+fn config_dir() -> Result<PathBuf, String> {
+    let base = dirs::config_dir().ok_or("could not resolve config directory")?;
+    let dir = base.join("gitbud");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+fn repos_file() -> Result<PathBuf, String> {
+    Ok(config_dir()?.join("repos.json"))
+}
+
+pub fn load_repos() -> Result<Vec<RepoEntry>, String> {
+    let file = repos_file()?;
+    if !file.exists() {
+        return Ok(Vec::new());
+    }
+    let contents = fs::read_to_string(&file).map_err(|e| e.to_string())?;
+    let config: RepoConfig = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+    Ok(config.repos)
+}
+
+fn save_repos(repos: &[RepoEntry]) -> Result<(), String> {
+    let file = repos_file()?;
+    let config = RepoConfig {
+        repos: repos.to_vec(),
+    };
+    let contents = serde_json::to_string_pretty(&config).map_err(|e| e.to_string())?;
+    fs::write(&file, contents).map_err(|e| e.to_string())
+}
+
+/// Derives an owner/group key from a remote URL, e.g. "git@github.com:owner/repo.git" -> "owner".
+/// Falls back to "Local" when there's no remote to key off of.
+fn group_from_remote(repo: &Repository) -> String {
+    let url = repo
+        .find_remote("origin")
+        .ok()
+        .and_then(|r| r.url().map(|u| u.to_string()));
+
+    let Some(url) = url else {
+        return "Local".to_string();
+    };
+
+    let trimmed = url.trim_end_matches(".git");
+    let path_part = if let Some(idx) = trimmed.find("://") {
+        &trimmed[idx + 3..]
+    } else if let Some(idx) = trimmed.find(':') {
+        &trimmed[idx + 1..]
+    } else {
+        trimmed
+    };
+    let path_part = path_part.splitn(2, '/').nth(1).unwrap_or(path_part);
+    path_part
+        .split('/')
+        .next()
+        .filter(|s| !s.is_empty())
+        .unwrap_or("Local")
+        .to_string()
+}
+
+pub fn add_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
+    let canonical = std::fs::canonicalize(path)
+        .map_err(|e| e.to_string())?
+        .to_string_lossy()
+        .to_string();
+
+    let mut repos = load_repos()?;
+    if repos.iter().any(|r| r.path == canonical) {
+        return Ok(repos);
+    }
+
+    let repo = Repository::open(&canonical).map_err(|e| e.message().to_string())?;
+    let name = std::path::Path::new(&canonical)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| canonical.clone());
+    let group = group_from_remote(&repo);
+
+    repos.push(RepoEntry {
+        path: canonical,
+        name,
+        group,
+        is_private: false,
+        last_fetched: None,
+    });
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
+pub fn remove_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
+    let mut repos = load_repos()?;
+    repos.retain(|r| r.path != path);
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
+pub fn set_repo_private(path: &str, is_private: bool) -> Result<Vec<RepoEntry>, String> {
+    let mut repos = load_repos()?;
+    if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
+        entry.is_private = is_private;
+    }
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
+pub fn touch_last_fetched(path: &str, timestamp: i64) -> Result<Vec<RepoEntry>, String> {
+    let mut repos = load_repos()?;
+    if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
+        entry.last_fetched = Some(timestamp);
+    }
+    save_repos(&repos)?;
+    Ok(repos)
+}
