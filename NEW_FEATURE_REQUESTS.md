@@ -29,6 +29,7 @@ Ordered by priority (highest impact / biggest current gap first).
   - Persist to a config file via `config.rs` so settings survive restarts.
 - **Commit graph visualization** — branch/merge graph column (like `git log --graph`) with lane layout and branch/tag labels, computed server-side in `history.rs` and returned from `get_log`.
 - **Discard changes per-file/per-hunk** — scoped "discard" action next to stage/unstage, not all-or-nothing.
+- files need file icons. use the ones from https://github.com/miguelsolorio/vscode-symbols for a very minimalistic, yet effective icon set that reacts to file/folder names
 
 ## P1 — High-value quality of life
 
