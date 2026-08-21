@@ -22,6 +22,11 @@ fn get_status(repo_path: String) -> Result<repo::RepoStatus, String> {
 }
 
 #[tauri::command]
+fn is_dirty(repo_path: String) -> Result<bool, String> {
+    repo::is_dirty(&repo_path)
+}
+
+#[tauri::command]
 fn get_current_branch(repo_path: String) -> Result<String, String> {
     repo::get_current_branch(&repo_path)
 }
@@ -163,8 +168,10 @@ pub fn run() {
     tauri::Builder::default()
         .manage(AppState::default())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             get_status,
+            is_dirty,
             get_current_branch,
             list_branches,
             checkout_branch,

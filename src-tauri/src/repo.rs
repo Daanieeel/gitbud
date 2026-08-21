@@ -125,6 +125,10 @@ pub fn get_status(repo_path: &str) -> Result<RepoStatus, String> {
     Ok(RepoStatus { files })
 }
 
+pub fn is_dirty(repo_path: &str) -> Result<bool, String> {
+    get_status(repo_path).map(|s| !s.files.is_empty())
+}
+
 pub fn get_current_branch(repo_path: &str) -> Result<String, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let head = repo.head().map_err(|e| e.message().to_string())?;
