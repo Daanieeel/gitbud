@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { LockIcon, XIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AddRepoMenu } from "./AddRepoMenu";
+import { AccountBar } from "@/components/github/AccountBar";
 import { useRepoStore } from "@/store/useRepoStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
@@ -122,6 +123,7 @@ export function RepoSidebar() {
           </div>
         ))}
       </div>
+      <AccountBar />
     </aside>
   );
 }

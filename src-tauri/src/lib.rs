@@ -1,7 +1,9 @@
 mod config;
 mod diff;
 mod git_shell;
+mod github;
 mod history;
+mod image_diff;
 mod repo;
 mod stash;
 mod watch;
@@ -77,6 +79,16 @@ fn get_commit_files(repo_path: String, oid: String) -> Result<Vec<(String, Strin
 #[tauri::command]
 fn get_commit_file_diff(repo_path: String, oid: String, path: String) -> Result<diff::FileDiff, String> {
     diff::get_commit_file_diff(&repo_path, &oid, &path)
+}
+
+#[tauri::command]
+fn get_image_diff(repo_path: String, path: String, staged: bool) -> Result<image_diff::ImageDiff, String> {
+    image_diff::get_image_diff(&repo_path, &path, staged)
+}
+
+#[tauri::command]
+fn get_commit_image_diff(repo_path: String, oid: String, path: String) -> Result<image_diff::ImageDiff, String> {
+    image_diff::get_commit_image_diff(&repo_path, &oid, &path)
 }
 
 // --- history ---
@@ -171,6 +183,137 @@ fn get_ahead_behind(repo_path: String) -> Result<git_shell::AheadBehind, String>
     git_shell::get_ahead_behind(&repo_path)
 }
 
+// --- github: auth ---
+
+#[tauri::command]
+fn github_get_client_id() -> Result<Option<String>, String> {
+    github::auth::get_client_id()
+}
+
+#[tauri::command]
+fn github_set_client_id(client_id: String) -> Result<(), String> {
+    github::auth::set_client_id(&client_id)
+}
+
+#[tauri::command]
+fn github_list_accounts() -> Result<Vec<github::auth::Account>, String> {
+    github::auth::list_accounts()
+}
+
+#[tauri::command]
+fn github_remove_account(login: String) -> Result<Vec<github::auth::Account>, String> {
+    github::auth::remove_account(&login)
+}
+
+#[tauri::command]
+async fn github_start_device_flow(client_id: String) -> Result<github::auth::DeviceCodeResponse, String> {
+    github::auth::start_device_flow(&client_id).await
+}
+
+#[tauri::command]
+async fn github_poll_device_flow(
+    client_id: String,
+    device_code: String,
+) -> Result<github::auth::PollResult, String> {
+    github::auth::poll_device_flow(&client_id, &device_code).await
+}
+
+// --- github: pull requests ---
+
+fn github_resolve(repo_path: &str, login: &str) -> Result<(String, String, String), String> {
+    let token = github::auth::get_token(login)?;
+    let (owner, repo) = config::remote_owner_repo(repo_path)
+        .ok_or("repository has no GitHub-style origin remote")?;
+    Ok((token, owner, repo))
+}
+
+#[tauri::command]
+fn github_remote_owner_repo(repo_path: String) -> Option<(String, String)> {
+    config::remote_owner_repo(&repo_path)
+}
+
+#[tauri::command]
+async fn github_list_pull_requests(
+    repo_path: String,
+    login: String,
+) -> Result<Vec<github::api::PullRequest>, String> {
+    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_pull_requests(&token, &owner, &repo).await
+}
+
+#[tauri::command]
+async fn github_get_pull_request(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<github::api::PullRequest, String> {
+    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_pull_request(&token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_create_pull_request(
+    repo_path: String,
+    login: String,
+    title: String,
+    head: String,
+    base: String,
+    body: String,
+) -> Result<github::api::PullRequest, String> {
+    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::create_pull_request(&token, &owner, &repo, &title, &head, &base, &body).await
+}
+
+#[tauri::command]
+async fn github_merge_pull_request(
+    repo_path: String,
+    login: String,
+    number: u64,
+    merge_method: String,
+) -> Result<(), String> {
+    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::merge_pull_request(&token, &owner, &repo, number, &merge_method).await
+}
+
+#[tauri::command]
+async fn github_list_pull_request_files(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<Vec<(String, String, diff::FileDiff)>, String> {
+    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_pull_request_files(&token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_list_review_comments(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<Vec<github::api::ReviewComment>, String> {
+    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_review_comments(&token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn github_create_review_comment(
+    repo_path: String,
+    login: String,
+    number: u64,
+    commit_id: String,
+    path: String,
+    line: u32,
+    side: String,
+    body: String,
+) -> Result<github::api::ReviewComment, String> {
+    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::create_review_comment(
+        &token, &owner, &repo, number, &commit_id, &path, line, &side, &body,
+    )
+    .await
+}
+
 // --- filesystem watch ---
 
 #[tauri::command]
@@ -215,6 +358,8 @@ pub fn run() {
             get_file_diff,
             get_commit_files,
             get_commit_file_diff,
+            get_image_diff,
+            get_commit_image_diff,
             get_log,
             load_repos,
             add_repo,
@@ -228,6 +373,20 @@ pub fn run() {
             get_ahead_behind,
             start_watch,
             stop_watch,
+            github_get_client_id,
+            github_set_client_id,
+            github_list_accounts,
+            github_remove_account,
+            github_start_device_flow,
+            github_poll_device_flow,
+            github_remote_owner_repo,
+            github_list_pull_requests,
+            github_get_pull_request,
+            github_create_pull_request,
+            github_merge_pull_request,
+            github_list_pull_request_files,
+            github_list_review_comments,
+            github_create_review_comment,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

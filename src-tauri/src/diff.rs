@@ -29,6 +29,7 @@ pub struct FileDiff {
     pub path: String,
     pub old_path: Option<String>,
     pub is_binary: bool,
+    pub is_image: bool,
     pub hunks: Vec<DiffHunk>,
 }
 
@@ -75,6 +76,7 @@ fn build_file_diff(path: &str, old_path: Option<&str>, diff: &Diff) -> Result<Fi
     .map_err(|e| e.message().to_string())?;
 
     Ok(FileDiff {
+        is_image: crate::image_diff::is_image_path(path),
         path: path.to_string(),
         old_path: old_path.map(|s| s.to_string()),
         is_binary: is_binary.into_inner(),

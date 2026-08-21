@@ -9,6 +9,7 @@ export function HistoryTab() {
   const selectedCommitFiles = useRepoStore((s) => s.selectedCommitFiles);
   const selectedCommitFilePath = useRepoStore((s) => s.selectedCommitFilePath);
   const selectedCommitDiff = useRepoStore((s) => s.selectedCommitDiff);
+  const selectedCommitImageDiff = useRepoStore((s) => s.selectedCommitImageDiff);
   const selectCommit = useRepoStore((s) => s.selectCommit);
   const selectCommitFile = useRepoStore((s) => s.selectCommitFile);
   const loadMoreHistory = useRepoStore((s) => s.loadMoreHistory);
@@ -47,7 +48,11 @@ export function HistoryTab() {
         ))}
       </div>
       <div className="min-w-0 flex-1">
-        <DiffView path={selectedCommitFilePath} diff={selectedCommitDiff} />
+        <DiffView
+          path={selectedCommitFilePath}
+          diff={selectedCommitDiff}
+          imageDiff={selectedCommitImageDiff}
+        />
       </div>
     </div>
   );

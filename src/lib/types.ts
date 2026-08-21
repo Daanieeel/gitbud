@@ -42,7 +42,13 @@ export interface FileDiff {
   path: string;
   old_path: string | null;
   is_binary: boolean;
+  is_image: boolean;
   hunks: DiffHunk[];
+}
+
+export interface ImageDiff {
+  old: string | null;
+  new: string | null;
 }
 
 export interface CommitEntry {
@@ -70,4 +76,63 @@ export interface AheadBehind {
 export interface GitOutputLine {
   stream: "stdout" | "stderr";
   line: string;
+}
+
+export interface StashEntry {
+  index: number;
+  message: string;
+}
+
+// --- GitHub ---
+
+export interface GitHubAccount {
+  login: string;
+  name: string | null;
+  avatar_url: string;
+}
+
+export interface DeviceCodeResponse {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  expires_in: number;
+  interval: number;
+}
+
+export type PollResult =
+  | { status: "pending" }
+  | { status: "success"; account: GitHubAccount }
+  | { status: "denied" }
+  | { status: "expired" };
+
+export interface PullRequest {
+  number: number;
+  title: string;
+  body: string | null;
+  state: string;
+  draft: boolean;
+  html_url: string;
+  author_login: string;
+  head_ref: string;
+  head_sha: string;
+  base_ref: string;
+  merged: boolean;
+  mergeable: boolean | null;
+}
+
+export interface ReviewComment {
+  id: number;
+  path: string;
+  line: number | null;
+  side: "LEFT" | "RIGHT" | null;
+  body: string;
+  user_login: string;
+  created_at: string;
+  in_reply_to_id: number | null;
+}
+
+export interface PullRequestFile {
+  filename: string;
+  status: string;
+  diff: FileDiff;
 }

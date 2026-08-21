@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useRepoStore } from "@/store/useRepoStore";
 import { FileList } from "./FileList";
+import { StashPanel } from "./StashPanel";
 import { DiffView } from "@/components/diff/DiffView";
 import { CommitBox } from "@/components/commit/CommitBox";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,6 +11,7 @@ export function ChangesTab() {
   const files = useRepoStore((s) => s.status?.files ?? null);
   const selectedFilePath = useRepoStore((s) => s.selectedFilePath);
   const selectedFileDiff = useRepoStore((s) => s.selectedFileDiff);
+  const selectedFileImageDiff = useRepoStore((s) => s.selectedFileImageDiff);
   const branch = useRepoStore((s) => s.branch);
   const selectFile = useRepoStore((s) => s.selectFile);
   const toggleStaged = useRepoStore((s) => s.toggleStaged);
@@ -38,6 +40,9 @@ export function ChangesTab() {
   return (
     <div className="flex h-full min-w-0 flex-1">
       <div className="flex w-72 shrink-0 flex-col border-r border-border">
+        <div className="flex shrink-0 items-center justify-end border-b border-border p-2">
+          <StashPanel hasChanges={files.length > 0} />
+        </div>
         {files.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-4 text-center text-sm text-muted-foreground">
             No local changes
@@ -75,7 +80,7 @@ export function ChangesTab() {
         />
       </div>
       <div className="min-w-0 flex-1">
-        <DiffView path={selectedFilePath} diff={selectedFileDiff} />
+        <DiffView path={selectedFilePath} diff={selectedFileDiff} imageDiff={selectedFileImageDiff} />
       </div>
     </div>
   );

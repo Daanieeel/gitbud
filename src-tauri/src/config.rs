@@ -48,19 +48,13 @@ fn save_repos(repos: &[RepoEntry]) -> Result<(), String> {
     fs::write(&file, contents).map_err(|e| e.to_string())
 }
 
-/// Derives an owner/group key from a remote URL, e.g. "git@github.com:owner/repo.git" -> "owner".
-/// Falls back to "Local" when there's no remote to key off of.
-fn group_from_remote(repo: &Repository) -> String {
-    let url = repo
-        .find_remote("origin")
-        .ok()
-        .and_then(|r| r.url().map(|u| u.to_string()));
+/// Parses "owner/repo" out of an `origin` remote URL, handling both
+/// "git@host:owner/repo.git" and "https://host/owner/repo.git" forms.
+pub fn remote_owner_repo(repo_path: &str) -> Option<(String, String)> {
+    let repo = Repository::open(repo_path).ok()?;
+    let url = repo.find_remote("origin").ok()?.url()?.to_string();
 
-    let Some(url) = url else {
-        return "Local".to_string();
-    };
-
-    let trimmed = url.trim_end_matches(".git");
+    let trimmed = url.trim_end_matches(".git").trim_end_matches('/');
     let path_part = if let Some(idx) = trimmed.find("://") {
         &trimmed[idx + 3..]
     } else if let Some(idx) = trimmed.find(':') {
@@ -68,13 +62,23 @@ fn group_from_remote(repo: &Repository) -> String {
     } else {
         trimmed
     };
-    let path_part = path_part.splitn(2, '/').nth(1).unwrap_or(path_part);
-    path_part
-        .split('/')
-        .next()
-        .filter(|s| !s.is_empty())
-        .unwrap_or("Local")
-        .to_string()
+    // Drop the host segment (everything up to the first '/').
+    let path_part = path_part.splitn(2, '/').nth(1)?;
+    let mut segments = path_part.rsplitn(2, '/');
+    let repo_name = segments.next()?.to_string();
+    let owner = segments.next()?.to_string();
+    if owner.is_empty() || repo_name.is_empty() {
+        return None;
+    }
+    Some((owner, repo_name))
+}
+
+/// Derives an owner/group key from a remote URL, e.g. "git@github.com:owner/repo.git" -> "owner".
+/// Falls back to "Local" when there's no remote to key off of.
+fn group_from_remote(repo_path: &str) -> String {
+    remote_owner_repo(repo_path)
+        .map(|(owner, _)| owner)
+        .unwrap_or_else(|| "Local".to_string())
 }
 
 pub fn add_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
@@ -88,12 +92,12 @@ pub fn add_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
         return Ok(repos);
     }
 
-    let repo = Repository::open(&canonical).map_err(|e| e.message().to_string())?;
+    Repository::open(&canonical).map_err(|e| e.message().to_string())?;
     let name = std::path::Path::new(&canonical)
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| canonical.clone());
-    let group = group_from_remote(&repo);
+    let group = group_from_remote(&canonical);
 
     repos.push(RepoEntry {
         path: canonical,

@@ -7,6 +7,7 @@ import type {
   CommitEntry,
   FileDiff,
   GitOutputLine,
+  ImageDiff,
   RepoEntry,
   RepoStatus,
 } from "@/lib/types";
@@ -21,6 +22,7 @@ interface RepoState {
   status: RepoStatus | null;
   selectedFilePath: string | null;
   selectedFileDiff: FileDiff | null;
+  selectedFileImageDiff: ImageDiff | null;
 
   activeTab: "changes" | "history";
 
@@ -30,6 +32,7 @@ interface RepoState {
   selectedCommitFiles: [string, string][];
   selectedCommitFilePath: string | null;
   selectedCommitDiff: FileDiff | null;
+  selectedCommitImageDiff: ImageDiff | null;
 
   aheadBehind: AheadBehind;
   syncing: boolean;
@@ -75,6 +78,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   status: null,
   selectedFilePath: null,
   selectedFileDiff: null,
+  selectedFileImageDiff: null,
 
   activeTab: "changes",
 
@@ -84,6 +88,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   selectedCommitFiles: [],
   selectedCommitFilePath: null,
   selectedCommitDiff: null,
+  selectedCommitImageDiff: null,
 
   aheadBehind: { ahead: 0, behind: 0 },
   syncing: false,
@@ -119,12 +124,14 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       status: null,
       selectedFilePath: null,
       selectedFileDiff: null,
+      selectedFileImageDiff: null,
       commits: [],
       historyExhausted: false,
       selectedCommitOid: null,
       selectedCommitFiles: [],
       selectedCommitFilePath: null,
       selectedCommitDiff: null,
+      selectedCommitImageDiff: null,
       aheadBehind: { ahead: 0, behind: 0 },
     });
 
@@ -145,7 +152,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
 
     const selected = get().selectedFilePath;
     if (selected && !status.files.some((f) => f.path === selected)) {
-      set({ selectedFilePath: null, selectedFileDiff: null });
+      set({ selectedFilePath: null, selectedFileDiff: null, selectedFileImageDiff: null });
     } else if (selected) {
       await get().selectFile(selected);
     }
@@ -186,7 +193,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   },
 
   selectFile: async (path) => {
-    set({ selectedFilePath: path });
+    set({ selectedFilePath: path, selectedFileImageDiff: null });
     const repoPath = get().selectedRepo;
     if (!repoPath || !path) {
       set({ selectedFileDiff: null });
@@ -196,7 +203,12 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     const staged = entry?.staged ?? false;
     try {
       const diff = await api.getFileDiff(repoPath, path, staged);
-      if (get().selectedFilePath === path) set({ selectedFileDiff: diff });
+      if (get().selectedFilePath !== path) return;
+      set({ selectedFileDiff: diff });
+      if (diff.is_image) {
+        const imageDiff = await api.getImageDiff(repoPath, path, staged);
+        if (get().selectedFilePath === path) set({ selectedFileImageDiff: imageDiff });
+      }
     } catch {
       if (get().selectedFilePath === path) set({ selectedFileDiff: null });
     }
@@ -206,7 +218,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
     await api.commit(repoPath, summary, description);
-    set({ selectedFilePath: null, selectedFileDiff: null });
+    set({ selectedFilePath: null, selectedFileDiff: null, selectedFileImageDiff: null });
     await Promise.all([get().refreshStatus(), get().resetHistory()]);
   },
 
@@ -249,6 +261,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       selectedCommitFiles: [],
       selectedCommitFilePath: null,
       selectedCommitDiff: null,
+      selectedCommitImageDiff: null,
     });
     const repoPath = get().selectedRepo;
     if (!repoPath || !oid) return;
@@ -259,7 +272,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   },
 
   selectCommitFile: async (path) => {
-    set({ selectedCommitFilePath: path });
+    set({ selectedCommitFilePath: path, selectedCommitImageDiff: null });
     const repoPath = get().selectedRepo;
     const oid = get().selectedCommitOid;
     if (!repoPath || !oid || !path) {
@@ -268,7 +281,12 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     }
     try {
       const diff = await api.getCommitFileDiff(repoPath, oid, path);
-      if (get().selectedCommitFilePath === path) set({ selectedCommitDiff: diff });
+      if (get().selectedCommitFilePath !== path) return;
+      set({ selectedCommitDiff: diff });
+      if (diff.is_image) {
+        const imageDiff = await api.getCommitImageDiff(repoPath, oid, path);
+        if (get().selectedCommitFilePath === path) set({ selectedCommitImageDiff: imageDiff });
+      }
     } catch {
       if (get().selectedCommitFilePath === path) set({ selectedCommitDiff: null });
     }
