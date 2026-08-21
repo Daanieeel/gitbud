@@ -45,6 +45,7 @@ Ordered by priority (highest impact / biggest current gap first).
 - **Tag management** — create, push, and delete tags from the UI; show tags alongside branch labels in history.
 - pre-filled commit message (summary, not description) for single-file commits
 - commit message + description inputs must stay filled out even when files are added/removed/changed; currently resets when tabbing away, changing files and tabbing back
+- tooltips on all buttons in the UI to explain what they do (optionally showing a shortcut)
 
 ## P2 — Nice to have
 
