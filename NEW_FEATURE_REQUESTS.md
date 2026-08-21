@@ -37,7 +37,7 @@ Ordered by priority (highest impact / biggest current gap first).
 
 - **Command palette (`Cmd+P`)** — fuzzy-search branches, commits (message/hash/author), and files in the current repo, jump straight to the relevant tab/view. Extend to jump between repos too, via `RepoSidebar.tsx`.
 - **General keyboard shortcuts** — `Cmd+Enter` to commit, `Cmd+Shift+P` to pull, `Cmd+K` to switch repos, arrow-key navigation through file/commit lists.
-- **Right-click context menus** — repos: "Open in Terminal", "Open in Finder", "Copy Path", "Remove from Sidebar". Files: "Copy Path", "Open in Terminal", "Reveal in Finder". Commits: "Copy SHA", "Cherry-pick", "Revert", "Create branch here". Branches: "Copy Name", "Rename", "Delete", "Merge into current".
+- **Right-click context menus** on different elements in the app (decide what makes sense where): "Open in Terminal", "Open in Finder", "Copy Path", "Remove from Sidebar". Files: "Copy Path", "Open in Terminal", "Reveal in Finder". Commits: "Copy SHA", "Cherry-pick", "Revert", "Create branch here". Branches: "Copy Name", "Rename", "Delete", "Merge into current".
 - **Amend last commit** — checkbox/toggle in `CommitBox.tsx` to amend instead of creating a new commit.
 - **Ahead/behind badges** in the sidebar per repo, so sync state is visible without opening it.
 - **Cherry-pick & revert** — pick a commit from history and apply it to the current branch, or revert it, without a terminal.
