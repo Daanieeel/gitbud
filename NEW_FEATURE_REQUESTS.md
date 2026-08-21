@@ -2,6 +2,20 @@
 
 Ordered by priority (highest impact / biggest current gap first).
 
+## P-1 — GitHub functionality
+
+- **Pull Requests tab & 1-click local checkout** — Dedicated "Pull Requests" tab in `TabBar.tsx` to browse open, closed, and merged PRs for the current repository. Includes search/filter by author, review status, and labels, plus status badges (Draft, CI passing/failing, Approved). Double-click or click "Checkout PR" to automatically fetch (`refs/pull/{id}/head` for forks/branches) and switch to a local tracking branch to test changes locally.
+- **Create Pull Request workflow** — Quick "Create Pull Request" trigger from `Toolbar.tsx` or `BranchSwitcher.tsx` when the active branch is ahead of the upstream default branch. Modal includes base/compare branch selection, auto-loading `.github/PULL_REQUEST_TEMPLATE.md` (or recent commit messages) into the description editor, draft PR toggle, and preview of commits/diff before submission.
+- **CI / GitHub Actions status indicators & check details** — Build check status badges (passed, failed, pending) rendered directly on commit rows in `HistoryTab.tsx` / `CommitList.tsx` and in the PR view. Popover/tooltip showing individual check run names, durations, and direct deep-links to failing GitHub Action workflow runs.
+- **"Clone from GitHub" repository browser** — Expand `CloneDialog.tsx` to list the authenticated user's repositories, organization repos, and starred projects with a live search/filter, eliminating the need to manually copy-paste clone URLs.
+- **Fork sync & upstream tracking** — Automatic detection of fork remotes; surface an "Upstream is X commits ahead" status banner with a 1-click "Fetch Upstream & Fast-Forward" button to keep forks up-to-date without terminal commands.
+- **"Open on GitHub" deep-links & permalinks** — Context menu actions on commits, branches, files, and diff line gutters: "Open Commit on GitHub", "View File at this Revision", "Copy GitHub Permalink to Line", and "Open Repository in Browser".
+- **Zero-config GitHub CLI (`gh`) auth detection** — Automatically detect existing authentication from the local GitHub CLI (`gh auth token` or `~/.config/gh/hosts.yml`) so developers using `gh` are logged in immediately without manual token generation.
+- **Merged branch pruner & remote cleanup** — Surface branches whose associated PRs have been merged on GitHub with a 1-click "Prune Merged Branches" action to safely delete local and remote-tracking branches.
+- **Protected branch guard / commit warning** — Visual indicator and safety prompt when uncommitted changes or new commits are being made directly on protected default branches (e.g. `main`/`master`) instead of a feature branch.
+- **Commit signature verification (`Verified` badges)** — Surface GPG / SSH / S-MIME signature verification status badges next to commit authors in `HistoryTab.tsx` as verified by GitHub.
+- **GitHub Enterprise Server (GHES) support** — Configurable custom GitHub domain/host endpoint for enterprise on-premise deployments.
+
 ## P0 — Core gaps
 
 - **Hunk / line-level staging** — stage/unstage individual hunks or lines from `DiffView.tsx`, not just whole files. Needs `stage_hunk`/`unstage_hunk` Tauri commands (patch + `git apply --cached`). Table-stakes vs GitHub Desktop, Fork, Tower.
