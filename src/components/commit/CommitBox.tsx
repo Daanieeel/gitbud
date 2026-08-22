@@ -6,7 +6,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
-import { isProtectedBranch } from "@/lib/utils";
+import { cn, isProtectedBranch } from "@/lib/utils";
+import { useBusyAction } from "@/hooks/useBusyAction";
 
 export function CommitBox() {
   const branch = useRepoStore((s) => s.branch);
@@ -21,6 +22,7 @@ export function CommitBox() {
   const doCommit = useRepoStore((s) => s.doCommit);
   const doAmendCommit = useRepoStore((s) => s.doAmendCommit);
 
+  const [committing, runCommit] = useBusyAction();
   const stagedFiles = status?.files.filter((f) => f.staged) ?? [];
   const hasStagedChanges = stagedFiles.length > 0;
   const lastCommit = commits[0];
@@ -51,12 +53,14 @@ export function CommitBox() {
     : !hasStagedChanges || summary.trim().length === 0;
 
   const submit = async () => {
-    if (disabled) return;
-    if (amending) {
-      await doAmendCommit(summary.trim(), description.trim());
-    } else {
-      await doCommit(summary.trim(), description.trim());
-    }
+    if (disabled || committing) return;
+    await runCommit(async () => {
+      if (amending) {
+        await doAmendCommit(summary.trim(), description.trim());
+      } else {
+        await doCommit(summary.trim(), description.trim());
+      }
+    });
   };
 
   const protectedWarning = branch && isProtectedBranch(branch);
@@ -100,12 +104,18 @@ export function CommitBox() {
         </div>
       )}
       <Button
-        disabled={disabled}
+        disabled={disabled || committing}
         title={amending ? "Rewrite the last commit with this message and any staged changes" : "Cmd+Enter"}
         onClick={() => void submit()}
       >
-        <GitCommitIcon className="size-3.5" />
-        {amending ? "Amend Last Commit" : `Commit to ${branch ?? "…"}`}
+        <GitCommitIcon className={cn("size-3.5", committing && "animate-spin")} />
+        {committing
+          ? amending
+            ? "Amending…"
+            : "Committing…"
+          : amending
+            ? "Amend Last Commit"
+            : `Commit to ${branch ?? "…"}`}
       </Button>
     </div>
   );

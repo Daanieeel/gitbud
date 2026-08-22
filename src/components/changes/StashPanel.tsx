@@ -126,7 +126,7 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
                   disabled={applyingPath === path}
                   onClick={() => void applyFile(path)}
                 >
-                  <Undo2Icon className="size-3.5" />
+                  <Undo2Icon className={cn("size-3.5", applyingPath === path && "animate-spin")} />
                 </button>
               </TooltipTrigger>
               <TooltipContent>Restore this file from the stash, without popping it</TooltipContent>
@@ -156,6 +156,7 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
   const [saving, setSaving] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailIndex, setDetailIndex] = useState<number | null>(null);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && repoPath) void load(repoPath);
@@ -170,6 +171,18 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
       await refreshStatus();
     } finally {
       setSaving(false);
+    }
+  };
+
+  const runRowAction = async (key: string, fn: () => Promise<void>) => {
+    const startedAt = Date.now();
+    setBusyKey(key);
+    try {
+      await fn();
+    } finally {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
+      setBusyKey(null);
     }
   };
 
@@ -196,8 +209,8 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
               disabled={!hasChanges || saving}
               onClick={() => void doSave()}
             >
-              <ArchiveIcon className="size-3.5" />
-              Stash All Changes
+              <ArchiveIcon className={cn("size-3.5", saving && "animate-spin")} />
+              {saving ? "Stashing…" : "Stash All Changes"}
             </Button>
           </div>
           <div className="max-h-64 overflow-auto p-1">
@@ -228,7 +241,8 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                      disabled={busyKey !== null}
                       onClick={(e) => {
                         e.stopPropagation();
                         setDetailIndex(s.index);
@@ -244,13 +258,20 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                      className={cn(
+                        "text-muted-foreground hover:text-foreground disabled:opacity-50",
+                        busyKey === `${s.index}:apply` ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                      )}
+                      disabled={busyKey !== null}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void apply(repoPath, s.index).then(() => refreshStatus());
+                        void runRowAction(`${s.index}:apply`, async () => {
+                          await apply(repoPath, s.index);
+                          await refreshStatus();
+                        });
                       }}
                     >
-                      <Undo2Icon className="size-3.5" />
+                      <Undo2Icon className={cn("size-3.5", busyKey === `${s.index}:apply` && "animate-spin")} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>Apply (keep stash)</TooltipContent>
@@ -258,13 +279,20 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                      className={cn(
+                        "text-muted-foreground hover:text-foreground disabled:opacity-50",
+                        busyKey === `${s.index}:pop` ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                      )}
+                      disabled={busyKey !== null}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void pop(repoPath, s.index).then(() => refreshStatus());
+                        void runRowAction(`${s.index}:pop`, async () => {
+                          await pop(repoPath, s.index);
+                          await refreshStatus();
+                        });
                       }}
                     >
-                      <ArchiveIcon className="size-3.5" />
+                      <ArchiveIcon className={cn("size-3.5", busyKey === `${s.index}:pop` && "animate-spin")} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>Pop (apply and remove)</TooltipContent>
@@ -272,13 +300,17 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                      className={cn(
+                        "text-muted-foreground hover:text-destructive disabled:opacity-50",
+                        busyKey === `${s.index}:drop` ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                      )}
+                      disabled={busyKey !== null}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void drop(repoPath, s.index);
+                        void runRowAction(`${s.index}:drop`, () => drop(repoPath, s.index));
                       }}
                     >
-                      <Trash2Icon className="size-3.5" />
+                      <Trash2Icon className={cn("size-3.5", busyKey === `${s.index}:drop` && "animate-spin")} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>Drop</TooltipContent>
