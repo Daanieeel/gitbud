@@ -8,6 +8,7 @@ import { PRTab } from "@/components/pr/PRTab";
 import { UpstreamBanner } from "@/components/pr/UpstreamBanner";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useIdentityStore } from "@/store/useIdentityStore";
@@ -88,6 +89,7 @@ function App() {
   }, [pull]);
 
   return (
+    <TooltipProvider delayDuration={300}>
     <div className="flex h-screen w-screen gap-3 bg-background p-3 text-foreground">
       <RepoSidebar />
       <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -121,6 +123,7 @@ function App() {
         onOpenChange={(open) => setPalette((p) => ({ ...p, open }))}
       />
     </div>
+    </TooltipProvider>
   );
 }
 
