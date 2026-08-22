@@ -1,3 +1,4 @@
+mod blame;
 mod config;
 mod diff;
 mod git_shell;
@@ -9,6 +10,7 @@ mod repo;
 mod settings;
 mod stash;
 mod system;
+mod tags;
 mod watch;
 
 use std::collections::HashMap;
@@ -164,6 +166,40 @@ fn get_commit_image_diff(repo_path: String, oid: String, path: String) -> Result
 #[tauri::command]
 fn get_log(repo_path: String, limit: usize, skip: usize) -> Result<Vec<history::CommitEntry>, String> {
     history::get_log(&repo_path, limit, skip)
+}
+
+#[tauri::command]
+fn search_commits(repo_path: String, query: String, limit: usize) -> Result<Vec<history::CommitSearchResult>, String> {
+    history::search_commits(&repo_path, &query, limit)
+}
+
+// --- tags ---
+
+#[tauri::command]
+fn list_tags(repo_path: String) -> Result<Vec<tags::TagInfo>, String> {
+    tags::list_tags(&repo_path)
+}
+
+#[tauri::command]
+fn create_tag(repo_path: String, name: String, message: String) -> Result<(), String> {
+    tags::create_tag(&repo_path, &name, &message)
+}
+
+#[tauri::command]
+fn delete_tag(repo_path: String, name: String) -> Result<(), String> {
+    tags::delete_tag(&repo_path, &name)
+}
+
+#[tauri::command]
+fn push_tag(app: AppHandle, repo_path: String, name: String) -> Result<(), String> {
+    git_shell::push_ref(&app, &repo_path, &name, &repo_path)
+}
+
+// --- blame ---
+
+#[tauri::command]
+fn blame_file(repo_path: String, path: String) -> Result<Vec<blame::BlameLine>, String> {
+    blame::blame_file(&repo_path, &path)
 }
 
 // --- repo list config ---
@@ -561,6 +597,12 @@ pub fn run() {
             get_image_diff,
             get_commit_image_diff,
             get_log,
+            search_commits,
+            list_tags,
+            create_tag,
+            delete_tag,
+            push_tag,
+            blame_file,
             load_repos,
             add_repo,
             remove_repo,

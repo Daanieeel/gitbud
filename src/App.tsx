@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { RepoSidebar } from "@/components/repo/RepoSidebar";
 import { Toolbar } from "@/components/layout/Toolbar";
 import { TabBar } from "@/components/layout/TabBar";
@@ -7,6 +7,7 @@ import { HistoryTab } from "@/components/history/HistoryTab";
 import { PRTab } from "@/components/pr/PRTab";
 import { UpstreamBanner } from "@/components/pr/UpstreamBanner";
 import { SyncLogToast } from "@/components/sync/SyncLogToast";
+import { CommandPalette } from "@/components/palette/CommandPalette";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 
@@ -18,12 +19,39 @@ function App() {
   const activeTab = useRepoStore((s) => s.activeTab);
   const repos = useRepoStore((s) => s.repos);
   const loadSettings = useSettingsStore((s) => s.load);
+  const pull = useRepoStore((s) => s.pull);
+
+  const [palette, setPalette] = useState<{ open: boolean; mode: "all" | "repos" }>({
+    open: false,
+    mode: "all",
+  });
 
   useEffect(() => {
     void initGlobalListeners();
     void loadRepos();
     void loadSettings();
   }, [initGlobalListeners, loadRepos, loadSettings]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+      const key = e.key.toLowerCase();
+
+      if (key === "p" && e.shiftKey) {
+        e.preventDefault();
+        void pull();
+      } else if (key === "p") {
+        e.preventDefault();
+        setPalette({ open: true, mode: "all" });
+      } else if (key === "k") {
+        e.preventDefault();
+        setPalette({ open: true, mode: "repos" });
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [pull]);
 
   return (
     <div className="flex h-screen w-screen bg-background text-foreground">
@@ -49,6 +77,11 @@ function App() {
         )}
       </div>
       <SyncLogToast />
+      <CommandPalette
+        open={palette.open}
+        mode={palette.mode}
+        onOpenChange={(open) => setPalette((p) => ({ ...p, open }))}
+      />
     </div>
   );
 }

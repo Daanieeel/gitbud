@@ -64,6 +64,28 @@ export interface CommitEntry {
   active_lanes: number[];
 }
 
+export interface CommitSearchResult {
+  oid: string;
+  short_oid: string;
+  summary: string;
+  author_name: string;
+  timestamp: number;
+}
+
+export interface TagInfo {
+  name: string;
+  oid: string;
+  message: string | null;
+}
+
+export interface BlameLine {
+  line_no: number;
+  oid: string;
+  author_name: string;
+  summary: string;
+  timestamp: number;
+}
+
 export interface RepoEntry {
   path: string;
   name: string;

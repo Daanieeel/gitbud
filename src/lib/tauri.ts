@@ -1,10 +1,12 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AheadBehind,
+  BlameLine,
   BranchInfo,
   CheckRun,
   CherryPickResult,
   CommitEntry,
+  CommitSearchResult,
   CommitVerification,
   DeviceCodeResponse,
   FileDiff,
@@ -19,6 +21,7 @@ import type {
   ReviewComment,
   Settings,
   StashEntry,
+  TagInfo,
 } from "./types";
 
 export const api = {
@@ -83,6 +86,17 @@ export const api = {
 
   getLog: (repoPath: string, limit: number, skip: number) =>
     invoke<CommitEntry[]>("get_log", { repoPath, limit, skip }),
+  searchCommits: (repoPath: string, query: string, limit: number) =>
+    invoke<CommitSearchResult[]>("search_commits", { repoPath, query, limit }),
+
+  listTags: (repoPath: string) => invoke<TagInfo[]>("list_tags", { repoPath }),
+  createTag: (repoPath: string, name: string, message: string) =>
+    invoke<void>("create_tag", { repoPath, name, message }),
+  deleteTag: (repoPath: string, name: string) => invoke<void>("delete_tag", { repoPath, name }),
+  pushTag: (repoPath: string, name: string) => invoke<void>("push_tag", { repoPath, name }),
+
+  blameFile: (repoPath: string, path: string) =>
+    invoke<BlameLine[]>("blame_file", { repoPath, path }),
 
   loadRepos: () => invoke<RepoEntry[]>("load_repos"),
   addRepo: (path: string) => invoke<RepoEntry[]>("add_repo", { path }),

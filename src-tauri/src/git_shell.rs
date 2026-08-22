@@ -75,6 +75,11 @@ pub fn push(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), Stri
     run_streaming(app, repo_path, &["push"], event_id)
 }
 
+/// Pushes a single ref (e.g. a tag name) to `origin`.
+pub fn push_ref(app: &AppHandle, repo_path: &str, ref_name: &str, event_id: &str) -> Result<(), String> {
+    run_streaming(app, repo_path, &["push", "origin", ref_name], event_id)
+}
+
 pub fn clone(app: &AppHandle, url: &str, dest: &str, event_id: &str) -> Result<(), String> {
     let mut child = Command::new(crate::settings::git_binary())
         .args(["clone", "--progress", url, dest])

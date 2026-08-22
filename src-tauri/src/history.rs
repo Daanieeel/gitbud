@@ -81,6 +81,55 @@ fn assign_lanes(commits: &mut [CommitEntry]) {
 /// walks from the top of history through `skip + limit` commits each call and returns only
 /// the requested page — simplest way to stay stateless across paginated Tauri calls while
 /// keeping lanes consistent from page to page.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitSearchResult {
+    pub oid: String,
+    pub short_oid: String,
+    pub summary: String,
+    pub author_name: String,
+    pub timestamp: i64,
+}
+
+/// Searches the full commit history (not just what's paginated into the frontend's `commits`
+/// list) for a case-insensitive substring match against summary, author name, or full/short
+/// oid — backs the command palette's commit search.
+pub fn search_commits(repo_path: &str, query: &str, limit: usize) -> Result<Vec<CommitSearchResult>, String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let mut revwalk = repo.revwalk().map_err(|e| e.message().to_string())?;
+    revwalk.push_head().map_err(|e| e.message().to_string())?;
+    revwalk
+        .set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)
+        .map_err(|e| e.message().to_string())?;
+
+    let needle = query.to_lowercase();
+    let mut results = Vec::with_capacity(limit);
+
+    for oid in revwalk {
+        if results.len() >= limit {
+            break;
+        }
+        let oid = oid.map_err(|e| e.message().to_string())?;
+        let commit = repo.find_commit(oid).map_err(|e| e.message().to_string())?;
+        let oid_str = oid.to_string();
+        let summary = commit.summary().unwrap_or("").to_string();
+        let author_name = commit.author().name().unwrap_or("").to_string();
+
+        let matches = summary.to_lowercase().contains(&needle)
+            || author_name.to_lowercase().contains(&needle)
+            || oid_str.starts_with(&needle);
+        if matches {
+            results.push(CommitSearchResult {
+                short_oid: oid_str.chars().take(7).collect(),
+                oid: oid_str,
+                summary,
+                author_name,
+                timestamp: commit.time().seconds(),
+            });
+        }
+    }
+    Ok(results)
+}
+
 pub fn get_log(repo_path: &str, limit: usize, skip: usize) -> Result<Vec<CommitEntry>, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut revwalk = repo.revwalk().map_err(|e| e.message().to_string())?;

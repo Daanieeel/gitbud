@@ -33,14 +33,14 @@ Mark as done when the feature is implemented.
 
 - [ ] **Command palette (`Cmd+P`)** — fuzzy-search branches, commits (message/hash/author), and files in the current repo, jump straight to the relevant tab/view. Extend to jump between repos too, via `RepoSidebar.tsx`.
 - [ ] **General keyboard shortcuts** — `Cmd+Enter` to commit, `Cmd+Shift+P` to pull, `Cmd+K` to switch repos, arrow-key navigation through file/commit lists.
-- [ ] **Right-click context menus** on different elements in the app (decide what makes sense where): "Open in Terminal", "Open in Finder", "Copy Path", "Remove from Sidebar". Files: "Copy Path", "Open in Terminal", "Reveal in Finder". Commits: "Copy SHA", "Cherry-pick", "Revert", "Create branch here". Branches: "Copy Name", "Rename", "Delete", "Merge into current".
-- [ ] **Amend last commit** — checkbox/toggle in `CommitBox.tsx` to amend instead of creating a new commit.
-- [ ] **Ahead/behind badges** in the sidebar per repo, so sync state is visible without opening it.
-- [ ] **Cherry-pick & revert** — pick a commit from history and apply it to the current branch, or revert it, without a terminal.
+- [x] **Right-click context menus** — repos (`RepoSidebar.tsx`): Open in Terminal/Finder, Copy Path, Remove from Sidebar. Files (`FileList.tsx`): Copy Path, Reveal in Finder, Open in Terminal, View on GitHub, Discard Changes. Commits (`CommitList.tsx`): Copy SHA, Open on GitHub, Cherry-pick, Revert, Create Branch Here. Branches (`BranchSwitcher.tsx`): Copy Name, Open on GitHub, Rename, Merge into Current, Delete.
+- [x] **Amend last commit** — checkbox in `CommitBox.tsx`, pre-fills the last commit's message.
+- [x] **Ahead/behind badges** in the sidebar (`RepoSidebar.tsx`), toggleable in Settings.
+- [x] **Cherry-pick & revert** — `repo::cherry_pick`/`repo::revert_commit`, from the commit context menu.
 - [ ] **Inline blame view** — `git_blame(path)` command + gutter toggle in the diff/file view; click a blamed line to jump to that commit in `HistoryTab`.
 - [ ] **Tag management** — create, push, and delete tags from the UI; show tags alongside branch labels in history.
-- [ ] pre-filled commit message (summary, not description) for single-file commits
-- [ ] commit message + description inputs must stay filled out even when files are added/removed/changed; currently resets when tabbing away, changing files and tabbing back
+- [x] pre-filled commit message (summary, not description) for single-file commits — `CommitBox.tsx`, "Update {filename}", only when the summary field is empty.
+- [x] commit message + description inputs must stay filled out — lifted to `useRepoStore` (`commitSummary`/`commitDescription`) instead of `CommitBox` local state, so switching Changes/History/PRs tabs (which unmounts `CommitBox`) no longer loses the draft.
 - [ ] tooltips on all buttons in the UI to explain what they do (optionally showing a shortcut)
 
 ## P2 — Nice to have

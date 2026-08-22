@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { TriangleAlertIcon } from "lucide-react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -17,6 +17,7 @@ import { githubFileUrl } from "@/lib/github-links";
 import { getFileIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { BlameDialog } from "./BlameDialog";
 
 const STATUS_DOT_COLOR: Record<ChangeKind, string> = {
   added: "bg-accent-green",
@@ -40,6 +41,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const branch = useRepoStore((s) => s.branch);
   const discardFile = useRepoStore((s) => s.discardFile);
+  const [blamePath, setBlamePath] = useState<string | null>(null);
 
   const virtualizer = useVirtualizer({
     count: files.length,
@@ -126,6 +128,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                     View File on GitHub
                   </ContextMenuItem>
                 )}
+                <ContextMenuItem onSelect={() => setBlamePath(file.path)}>Blame File</ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
                   variant="destructive"
@@ -138,6 +141,13 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
           );
         })}
       </div>
+      {repoPath && (
+        <BlameDialog
+          repoPath={repoPath}
+          path={blamePath}
+          onOpenChange={(open) => !open && setBlamePath(null)}
+        />
+      )}
     </div>
   );
 }

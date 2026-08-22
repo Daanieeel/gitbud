@@ -58,6 +58,18 @@ export function CommitList({ commits, selectedOid, onSelect, onNeedMore, onCreat
   const cherryPick = useRepoStore((s) => s.cherryPick);
   const revertCommit = useRepoStore((s) => s.revertCommit);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
+  const [tagsByOid, setTagsByOid] = useState<Map<string, string[]>>(new Map());
+
+  useEffect(() => {
+    if (!repoPath) return;
+    void api.listTags(repoPath).then((tags) => {
+      const map = new Map<string, string[]>();
+      for (const tag of tags) {
+        map.set(tag.oid, [...(map.get(tag.oid) ?? []), tag.name]);
+      }
+      setTagsByOid(map);
+    });
+  }, [repoPath]);
 
   const virtualizer = useVirtualizer({
     count: commits.length,
@@ -119,7 +131,17 @@ export function CommitList({ commits, selectedOid, onSelect, onNeedMore, onCreat
                     {initial}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-sm">{commit.summary}</div>
+                    <div className="flex items-center gap-1 truncate text-sm">
+                      {(tagsByOid.get(commit.oid) ?? []).map((tag) => (
+                        <span
+                          key={tag}
+                          className="shrink-0 rounded bg-secondary px-1 py-0.5 font-mono text-[10px] text-secondary-foreground"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      <span className="truncate">{commit.summary}</span>
+                    </div>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <span className="truncate">
                         {formatDistanceToNow(new Date(commit.timestamp * 1000), { addSuffix: true })}
