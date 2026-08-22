@@ -2,12 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import { KeyRoundIcon, LogInIcon, MapPinIcon, PlusIcon, SettingsIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { GitHubMark } from "./GitHubMark";
+import { GitLabMark } from "./GitLabMark";
+import { BitbucketMark } from "./BitbucketMark";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -15,8 +19,8 @@ import { useGitHubStore } from "@/store/useGitHubStore";
 import { useIdentityStore, githubIdentityId, sshIdentityId, type UnifiedIdentity } from "@/store/useIdentityStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useRepoStore } from "@/store/useRepoStore";
-import { SignInDialog } from "./SignInDialog";
 import { AddSshIdentityDialog } from "./AddSshIdentityDialog";
+import { DeviceFlowDialog } from "./DeviceFlowDialog";
 import { cn } from "@/lib/utils";
 
 function IdentityAvatar({ identity }: { identity: UnifiedIdentity }) {
@@ -41,14 +45,12 @@ function identityLabel(identity: UnifiedIdentity): string {
 
 export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
   const init = useGitHubStore((s) => s.init);
+  const startSignIn = useGitHubStore((s) => s.startSignIn);
   const removeAccount = useGitHubStore((s) => s.removeAccount);
   const removeSshIdentity = useIdentityStore((s) => s.removeSshIdentity);
   const setActive = useIdentityStore((s) => s.setActive);
   const accounts = useGitHubStore((s) => s.accounts);
   const brokenLogin = useGitHubStore((s) => s.brokenLogin);
-  const signInOpen = useGitHubStore((s) => s.signInOpen);
-  const openSignIn = useGitHubStore((s) => s.openSignIn);
-  const closeSignIn = useGitHubStore((s) => s.closeSignIn);
   const reauth = useGitHubStore((s) => s.reauth);
   const sshIdentities = useIdentityStore((s) => s.sshIdentities);
   const identities = useMemo<UnifiedIdentity[]>(
@@ -148,10 +150,21 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
             )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem onSelect={openSignIn}>
-              <GitHubMark className="size-3.5" />
-              GitHub account
+            <DropdownMenuItem disabled>
+              <BitbucketMark className="size-3.5" />
+              Bitbucket
+              <Badge className="ml-auto">Coming soon</Badge>
             </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void startSignIn()}>
+              <GitHubMark className="size-3.5" />
+              GitHub
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled>
+              <GitLabMark className="size-3.5" />
+              GitLab
+              <Badge className="ml-auto">Coming soon</Badge>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={() => setSshDialogOpen(true)}>
               <KeyRoundIcon className="size-3.5" />
               SSH identity
@@ -263,15 +276,26 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
+                  <DropdownMenuItem disabled>
+                    <BitbucketMark className="size-3.5" />
+                    Bitbucket
+                    <Badge className="ml-auto">Coming soon</Badge>
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onSelect={() => {
                       setSwitcherOpen(false);
-                      openSignIn();
+                      void startSignIn();
                     }}
                   >
                     <GitHubMark className="size-3.5" />
-                    GitHub account
+                    GitHub
                   </DropdownMenuItem>
+                  <DropdownMenuItem disabled>
+                    <GitLabMark className="size-3.5" />
+                    GitLab
+                    <Badge className="ml-auto">Coming soon</Badge>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onSelect={() => {
                       setSwitcherOpen(false);
@@ -301,9 +325,9 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
         <TooltipContent>Settings</TooltipContent>
       </Tooltip>
       </div>
-      <SignInDialog open={signInOpen} onOpenChange={(open) => (open ? openSignIn() : closeSignIn())} />
       <AddSshIdentityDialog open={sshDialogOpen} onOpenChange={setSshDialogOpen} />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <DeviceFlowDialog />
     </div>
   );
 }

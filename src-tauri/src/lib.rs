@@ -573,7 +573,9 @@ fn github_remove_account(login: String) -> Result<Vec<github::auth::Account>, St
 
 #[tauri::command]
 fn github_has_token(login: String) -> bool {
-    github::auth::has_token(&login)
+    let has = github::auth::has_token(&login);
+    println!("github_has_token({}): {}", login, has);
+    has
 }
 
 #[tauri::command]

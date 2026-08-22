@@ -29,10 +29,7 @@ interface GitHubState {
   // rather than a raw error string wherever the failing call happened to be.
   brokenLogin: string | null;
   setBrokenLogin: (login: string | null) => void;
-  signInOpen: boolean;
-  openSignIn: () => void;
-  closeSignIn: () => void;
-  /** Drops the broken account and opens sign-in so the user can reconnect it in one click. */
+  /** Drops the broken account and starts the device-flow sign-in so the user can reconnect it in one click. */
   reauth: (login: string) => Promise<void>;
 
   init: () => Promise<void>;
@@ -68,15 +65,7 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
       api.githubListAccounts(),
       api.githubGetClientId(),
     ]);
-    // An account can outlive its keychain entry (removed via Keychain Access, restored from
-    // a backup on another machine, etc). Prune those up front rather than letting every PR
-    // load fail with a "could not read stored token" error.
-    const validity = await Promise.all(
-      storedAccounts.map((a) => api.githubHasToken(a.login).catch(() => false)),
-    );
-    const stale = storedAccounts.filter((_, i) => !validity[i]);
-    const accounts = storedAccounts.filter((_, i) => validity[i]);
-    await Promise.all(stale.map((a) => api.githubRemoveAccount(a.login).catch(() => {})));
+    const accounts = storedAccounts; // Temporary: stop aggressive pruning
 
     set({
       accounts,

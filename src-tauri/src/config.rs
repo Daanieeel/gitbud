@@ -87,14 +87,15 @@ pub fn remote_owner_repo(repo_path: &str) -> Option<(String, String)> {
 
     let trimmed = url.trim_end_matches(".git").trim_end_matches('/');
     let path_part = if let Some(idx) = trimmed.find("://") {
-        &trimmed[idx + 3..]
+        let after_scheme = &trimmed[idx + 3..];
+        // Drop the host segment
+        after_scheme.splitn(2, '/').nth(1)?
     } else if let Some(idx) = trimmed.find(':') {
         &trimmed[idx + 1..]
     } else {
         trimmed
     };
-    // Drop the host segment (everything up to the first '/').
-    let path_part = path_part.splitn(2, '/').nth(1)?;
+    
     let mut segments = path_part.rsplitn(2, '/');
     let repo_name = segments.next()?.to_string();
     let owner = segments.next()?.to_string();

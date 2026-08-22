@@ -144,6 +144,11 @@
     padding: 0.1em 0.4em;
     font-size: 0.85em;
   }
+  input::placeholder,
+  textarea::placeholder {
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }
 
 /* Subtle dot-grid texture for large empty-state areas, so they read as intentional

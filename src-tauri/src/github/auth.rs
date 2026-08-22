@@ -3,6 +3,9 @@ use std::fs;
 use std::path::PathBuf;
 
 const KEYRING_SERVICE: &str = "com.gitbud.app";
+/// GitBud's own GitHub App client ID — public (not secret), used unless the user configures
+/// their own in Settings. Device flow needs no client secret at all.
+const DEFAULT_CLIENT_ID: &str = "Iv23linB9DSLgZOpdqWr";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Account {
@@ -57,11 +60,11 @@ fn client_id_file() -> Result<PathBuf, String> {
 pub fn get_client_id() -> Result<Option<String>, String> {
     let file = client_id_file()?;
     if !file.exists() {
-        return Ok(None);
+        return Ok(Some(DEFAULT_CLIENT_ID.to_string()));
     }
     let contents = fs::read_to_string(&file).map_err(|e| e.to_string())?;
     let trimmed = contents.trim().to_string();
-    Ok(if trimmed.is_empty() { None } else { Some(trimmed) })
+    Ok(Some(if trimmed.is_empty() { DEFAULT_CLIENT_ID.to_string() } else { trimmed }))
 }
 
 pub fn set_client_id(client_id: &str) -> Result<(), String> {
@@ -126,9 +129,11 @@ pub fn get_token(login: &str) -> Result<String, String> {
 /// gone missing (e.g. removed via Keychain Access, or restored from a backup on another
 /// machine) before they can surface a confusing error in the UI.
 pub fn has_token(login: &str) -> bool {
-    keyring::Entry::new(KEYRING_SERVICE, login)
-        .and_then(|entry| entry.get_password())
-        .is_ok()
+    let res = keyring::Entry::new(KEYRING_SERVICE, login).and_then(|entry| entry.get_password());
+    if let Err(e) = &res {
+        println!("has_token error for {}: {:?}", login, e);
+    }
+    res.is_ok()
 }
 
 pub fn remove_account(login: &str) -> Result<Vec<Account>, String> {
@@ -275,3 +280,4 @@ pub async fn poll_device_flow(
         None => Err("GitHub auth: no token and no error in response".to_string()),
     }
 }
+
