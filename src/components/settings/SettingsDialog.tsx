@@ -89,6 +89,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [gitName, setGitName] = useState("");
   const [gitEmail, setGitEmail] = useState("");
   const [gitScope, setGitScope] = useState<"global" | "repo">("global");
+  const [savingIdentity, setSavingIdentity] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -103,7 +104,15 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   const saveGitIdentity = async () => {
     if (!repoPath) return;
-    await api.setGitIdentity(repoPath, gitName, gitEmail, gitScope === "global");
+    const startedAt = Date.now();
+    setSavingIdentity(true);
+    try {
+      await api.setGitIdentity(repoPath, gitName, gitEmail, gitScope === "global");
+    } finally {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
+      setSavingIdentity(false);
+    }
   };
 
   const exportSettings = async () => {
@@ -199,9 +208,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   />
                 </Row>
                 <div className="flex justify-end py-2">
-                  <Button size="sm" onClick={() => void saveGitIdentity()}>
-                    <SaveIcon className="size-3.5" />
-                    Save Identity
+                  <Button size="sm" disabled={savingIdentity} onClick={() => void saveGitIdentity()}>
+                    <SaveIcon className={cn("size-3.5", savingIdentity && "animate-spin")} />
+                    {savingIdentity ? "Saving…" : "Save Identity"}
                   </Button>
                 </div>
                 <div className="py-2">

@@ -68,6 +68,8 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
   const [sshDialogOpen, setSshDialogOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const [reauthing, setReauthing] = useState(false);
 
   useEffect(() => {
     void init();
@@ -76,9 +78,23 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
   const effectiveId = repoOverride ?? defaultIdentityId;
   const current = identities.find((i) => i.id === effectiveId) ?? identities[0];
 
-  const remove = (identity: UnifiedIdentity) => {
-    if (identity.kind === "github") void removeAccount(identity.login);
-    else void removeSshIdentity(identity.id.replace(/^ssh:/, ""));
+  const remove = async (identity: UnifiedIdentity) => {
+    setRemovingId(identity.id);
+    try {
+      if (identity.kind === "github") await removeAccount(identity.login);
+      else await removeSshIdentity(identity.id.replace(/^ssh:/, ""));
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const doReauth = async (login: string) => {
+    setReauthing(true);
+    try {
+      await reauth(login);
+    } finally {
+      setReauthing(false);
+    }
   };
 
   const brokenIdentity = identities.find(
@@ -94,8 +110,13 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
             GitHub sign-in expired
           </span>
           <span>Token for <code>{identityLabel(brokenIdentity)}</code> is missing from the system keychain — reconnect to keep using it.</span>
-          <Button size="sm" variant="secondary" onClick={() => void reauth(brokenLogin as string)}>
-            Reconnect GitHub
+          <Button
+            size="sm"
+            variant="secondary"
+            disabled={reauthing}
+            onClick={() => void doReauth(brokenLogin as string)}
+          >
+            {reauthing ? "Reconnecting…" : "Reconnect GitHub"}
           </Button>
         </div>
       )}
@@ -210,13 +231,14 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
-                      className="shrink-0 rounded-md bg-destructive/10 p-1.5 text-destructive hover:bg-destructive/20"
+                      className="shrink-0 rounded-md bg-destructive/10 p-1.5 text-destructive hover:bg-destructive/20 disabled:opacity-50"
+                      disabled={removingId !== null}
                       onClick={(e) => {
                         e.stopPropagation();
-                        remove(identity);
+                        void remove(identity);
                       }}
                     >
-                      <XIcon className="size-4" />
+                      <XIcon className={cn("size-4", removingId === identity.id && "animate-spin")} />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>{`Remove ${identityLabel(identity)}`}</TooltipContent>

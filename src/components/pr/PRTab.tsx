@@ -34,6 +34,7 @@ export function PRTab() {
 
   const [hasRemote, setHasRemote] = useState<boolean | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [reauthing, setReauthing] = useState(false);
   const { width, onPointerDown } = useResizableWidth("panel-width:pr-list", 320, 240, 640);
 
   useEffect(() => {
@@ -64,8 +65,15 @@ export function PRTab() {
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-dot-grid text-center text-sm text-muted-foreground">
         <TriangleAlertIcon className="size-8 text-destructive" />
         <p className="max-w-sm">{loadError}</p>
-        <Button variant="secondary" onClick={() => void reauth(currentLogin)}>
-          Reconnect GitHub
+        <Button
+          variant="secondary"
+          disabled={reauthing}
+          onClick={() => {
+            setReauthing(true);
+            void reauth(currentLogin).finally(() => setReauthing(false));
+          }}
+        >
+          {reauthing ? "Reconnecting…" : "Reconnect GitHub"}
         </Button>
       </div>
     );
