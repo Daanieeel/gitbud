@@ -73,6 +73,16 @@ fn discard_file(repo_path: String, path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn resolve_conflict(repo_path: String, path: String, side: String) -> Result<(), String> {
+    repo::resolve_conflict(&repo_path, &path, &side)
+}
+
+#[tauri::command]
+fn read_working_file(repo_path: String, path: String) -> Result<String, String> {
+    std::fs::read_to_string(std::path::Path::new(&repo_path).join(&path)).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn stage_hunk(repo_path: String, path: String, hunk_index: usize) -> Result<(), String> {
     hunk::stage_hunk(&repo_path, &path, hunk_index)
 }
@@ -528,6 +538,8 @@ pub fn run() {
             stage_paths,
             unstage_paths,
             discard_file,
+            resolve_conflict,
+            read_working_file,
             stage_hunk,
             unstage_hunk,
             discard_hunk,

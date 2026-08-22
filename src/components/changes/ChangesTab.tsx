@@ -2,12 +2,14 @@ import { useMemo, useState } from "react";
 import { useRepoStore } from "@/store/useRepoStore";
 import { FileList } from "./FileList";
 import { StashPanel } from "./StashPanel";
+import { ConflictResolutionPanel } from "./ConflictResolutionPanel";
 import { DiffView } from "@/components/diff/DiffView";
 import { CommitBox } from "@/components/commit/CommitBox";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 
 export function ChangesTab() {
+  const repoPath = useRepoStore((s) => s.selectedRepo);
   const files = useRepoStore((s) => s.status?.files ?? null);
   const selectedFilePath = useRepoStore((s) => s.selectedFilePath);
   const selectedFileDiff = useRepoStore((s) => s.selectedFileDiff);
@@ -76,21 +78,27 @@ export function ChangesTab() {
         <CommitBox />
       </div>
       <div className="min-w-0 flex-1">
-        <DiffView
-          path={selectedFilePath}
-          diff={selectedFileDiff}
-          imageDiff={selectedFileImageDiff}
-          hunkActions={
-            selectedFilePath
-              ? {
-                  staged: files.find((f) => f.path === selectedFilePath)?.staged ?? false,
-                  onStage: (i) => void stageHunk(selectedFilePath, i),
-                  onUnstage: (i) => void unstageHunk(selectedFilePath, i),
-                  onDiscard: (i) => void discardHunk(selectedFilePath, i),
-                }
-              : undefined
-          }
-        />
+        {selectedFilePath &&
+        repoPath &&
+        files.find((f) => f.path === selectedFilePath)?.status === "conflicted" ? (
+          <ConflictResolutionPanel repoPath={repoPath} path={selectedFilePath} />
+        ) : (
+          <DiffView
+            path={selectedFilePath}
+            diff={selectedFileDiff}
+            imageDiff={selectedFileImageDiff}
+            hunkActions={
+              selectedFilePath
+                ? {
+                    staged: files.find((f) => f.path === selectedFilePath)?.staged ?? false,
+                    onStage: (i) => void stageHunk(selectedFilePath, i),
+                    onUnstage: (i) => void unstageHunk(selectedFilePath, i),
+                    onDiscard: (i) => void discardHunk(selectedFilePath, i),
+                  }
+                : undefined
+            }
+          />
+        )}
       </div>
     </div>
   );

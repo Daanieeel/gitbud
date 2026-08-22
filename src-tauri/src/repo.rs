@@ -296,6 +296,42 @@ pub fn discard_file(repo_path: &str, path: &str) -> Result<(), String> {
     }
 }
 
+/// Resolves a merge conflict on `path` by taking one side wholesale: writes that side's
+/// blob content to the working tree and stages it, clearing the conflict.
+pub fn resolve_conflict(repo_path: &str, path: &str, side: &str) -> Result<(), String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let mut index = repo.index().map_err(|e| e.message().to_string())?;
+
+    let target_path = std::path::Path::new(path);
+    let conflicts = index.conflicts().map_err(|e| e.message().to_string())?;
+    let conflict = conflicts
+        .filter_map(|c| c.ok())
+        .find(|c| {
+            let candidate = c.our.as_ref().or(c.their.as_ref()).or(c.ancestor.as_ref());
+            candidate.map(|e| e.path == target_path.to_string_lossy().as_bytes()).unwrap_or(false)
+        })
+        .ok_or_else(|| format!("{path} is not conflicted"))?;
+
+    let entry = match side {
+        "ours" => conflict
+            .our
+            .ok_or("no 'ours' side for this conflict (e.g. the file was deleted on this branch)")?,
+        "theirs" => conflict
+            .their
+            .ok_or("no 'theirs' side for this conflict (e.g. the file was deleted on the other branch)")?,
+        other => return Err(format!("side must be 'ours' or 'theirs', got '{other}'")),
+    };
+
+    let blob = repo.find_blob(entry.id).map_err(|e| e.message().to_string())?;
+    let full_path = std::path::Path::new(repo_path).join(path);
+    std::fs::write(&full_path, blob.content()).map_err(|e| e.to_string())?;
+
+    // `remove_path` clears every stage (0 plus the 1/2/3 conflict stages) for this path.
+    index.remove_path(target_path).map_err(|e| e.message().to_string())?;
+    index.add_path(target_path).map_err(|e| e.message().to_string())?;
+    index.write().map_err(|e| e.message().to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -458,6 +494,32 @@ mod tests {
         assert_eq!(contents, "original\n");
         let status = get_status(&repo_path).unwrap();
         assert!(status.files.is_empty());
+    }
+
+    #[test]
+    fn resolve_conflict_picks_ours_or_theirs() {
+        let scratch = ScratchRepo::new("resolve-conflict");
+        let repo_path = scratch.path_str();
+        scratch.write_and_commit("a.txt", "base\n", "base");
+        let main_branch = get_current_branch(&repo_path).unwrap();
+
+        create_branch(&repo_path, "feature", true).unwrap();
+        scratch.write_and_commit("a.txt", "theirs\n", "theirs change");
+
+        checkout_branch(&repo_path, &main_branch).unwrap();
+        scratch.write_and_commit("a.txt", "ours\n", "ours change");
+
+        let result = merge_branch(&repo_path, "feature").unwrap();
+        assert!(result.conflicted);
+
+        resolve_conflict(&repo_path, "a.txt", "theirs").unwrap();
+        let contents = std::fs::read_to_string(scratch.path.join("a.txt")).unwrap();
+        assert_eq!(contents, "theirs\n");
+
+        let status = get_status(&repo_path).unwrap();
+        let entry = status.files.iter().find(|f| f.path == "a.txt").unwrap();
+        assert_eq!(entry.status, ChangeKind::Modified);
+        assert!(entry.staged);
     }
 }
 
