@@ -96,20 +96,18 @@ function App() {
           <Toolbar />
           {selectedRepo && branch && <UpstreamBanner repoPath={selectedRepo} branch={branch} />}
         </div>
-        {selectedRepo && (
-          <div className="shrink-0 overflow-hidden rounded-xl bg-card shadow-md">
-            <TabBar />
-          </div>
-        )}
-        <div className="flex min-h-0 flex-1 flex-col">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-card shadow-md">
           {selectedRepo ? (
             <>
-              {activeTab === "changes" && <ChangesTab />}
-              {activeTab === "history" && <HistoryTab />}
-              {activeTab === "pulls" && <PRTab />}
+              <TabBar />
+              <div className="min-h-0 flex-1">
+                {activeTab === "changes" && <ChangesTab />}
+                {activeTab === "history" && <HistoryTab />}
+                {activeTab === "pulls" && <PRTab />}
+              </div>
             </>
           ) : (
-            <div className="flex flex-1 items-center justify-center overflow-hidden rounded-xl bg-card bg-dot-grid text-sm text-muted-foreground shadow-md">
+            <div className="flex flex-1 items-center justify-center bg-dot-grid text-sm text-muted-foreground">
               {repos.length === 0
                 ? 'No repositories yet — use the "+" button to add one'
                 : "Select a repository"}
