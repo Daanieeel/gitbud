@@ -30,7 +30,6 @@ import { githubBranchUrl } from "@/lib/github-links";
 export function BranchSwitcher() {
   const branch = useRepoStore((s) => s.branch);
   const branches = useRepoStore((s) => s.branches);
-  const aheadBehind = useRepoStore((s) => s.aheadBehind);
   const checkoutBranch = useRepoStore((s) => s.checkoutBranch);
   const createBranch = useRepoStore((s) => s.createBranch);
   const deleteBranch = useRepoStore((s) => s.deleteBranch);
@@ -47,11 +46,13 @@ export function BranchSwitcher() {
     () => branches.filter((b) => !b.is_remote && b.name.toLowerCase().includes(filter.toLowerCase())),
     [branches, filter],
   );
-  const remote = useMemo(
-    () => branches.filter((b) => b.is_remote && b.name.toLowerCase().includes(filter.toLowerCase())),
-    [branches, filter],
+  // A local branch with no matching origin/<name> remote branch has never been pushed —
+  // labeled "local" so it stands out from regular (tracked) branches, which need no label.
+  const remoteBranchNames = useMemo(
+    () => new Set(branches.filter((b) => b.is_remote).map((b) => b.name)),
+    [branches],
   );
-  const upstreamName = branch && aheadBehind.published ? `origin/${branch}` : null;
+  const isLocalOnly = (name: string) => !remoteBranchNames.has(`origin/${name}`);
 
   const exactMatch = branches.some((b) => !b.is_remote && b.name === filter.trim());
   const canCreate = filter.trim().length > 0 && !exactMatch;
@@ -87,8 +88,8 @@ export function BranchSwitcher() {
                 <TriangleAlertIcon className="size-3.5 shrink-0 text-accent-yellow" />
               </span>
             )}
-            {branch && !aheadBehind.published && (
-              <span title={`${branch} has never been pushed — not published to origin`}>
+            {branch && isLocalOnly(branch) && (
+              <span title={`${branch} has never been pushed — local only, not published to origin`}>
                 <CloudUploadIcon className="size-3.5 shrink-0 text-accent-blue" />
               </span>
             )}
@@ -107,9 +108,6 @@ export function BranchSwitcher() {
           />
         </div>
         <div className="max-h-64 overflow-auto p-1">
-          {local.length > 0 && (
-            <div className="px-2 pt-1 pb-0.5 text-xs font-medium text-muted-foreground">Local</div>
-          )}
           {local.map((b) =>
             renaming === b.name ? (
               <Input
@@ -138,9 +136,12 @@ export function BranchSwitcher() {
                     }}
                   >
                     <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                    {b.is_head && upstreamName && (
-                      <span className="shrink-0 truncate text-xs text-muted-foreground" title={`Tracking ${upstreamName}`}>
-                        → {upstreamName}
+                    {isLocalOnly(b.name) && (
+                      <span
+                        className="shrink-0 rounded-full bg-accent-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-blue"
+                        title={`${b.name} has never been pushed — local only`}
+                      >
+                        local
                       </span>
                     )}
                   </div>
@@ -203,21 +204,6 @@ export function BranchSwitcher() {
               <span className="truncate">Create branch "{filter.trim()}"</span>
             </div>
           )}
-          {remote.length > 0 && (
-            <div className="px-2 pt-2 pb-0.5 text-xs font-medium text-muted-foreground">Origin</div>
-          )}
-          {remote.map((b) => (
-            <div
-              key={b.name}
-              className={cn(
-                "flex items-center rounded-sm px-2 py-1.5 text-sm text-muted-foreground",
-                b.name === upstreamName && "bg-accent text-foreground",
-              )}
-              title={b.name === upstreamName ? `${b.name} — upstream of ${branch}` : b.name}
-            >
-              <span className="truncate">{b.name}</span>
-            </div>
-          ))}
         </div>
       </PopoverContent>
     </Popover>
