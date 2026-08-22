@@ -56,6 +56,7 @@ mod tests {
             let mut config = repo.config().unwrap();
             config.set_str("user.name", "Test").unwrap();
             config.set_str("user.email", "test@example.com").unwrap();
+            config.set_bool("core.autocrlf", false).unwrap();
             Self { path }
         }
 
