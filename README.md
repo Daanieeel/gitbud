@@ -1,12 +1,36 @@
+<div align="center">
+
 # GitBud
 
 **A Git client that doesn't eat your RAM.**
+
+[![CI](https://github.com/Daanieeel/gitbud/actions/workflows/ci.yml/badge.svg)](https://github.com/Daanieeel/gitbud/actions/workflows/ci.yml)
+[![Release](https://github.com/Daanieeel/gitbud/actions/workflows/release.yml/badge.svg)](https://github.com/Daanieeel/gitbud/actions/workflows/release.yml)
+[![License: AGPL v3](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![macOS · Windows · Linux](https://img.shields.io/badge/platform-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-lightgrey)](#getting-started)
+
+</div>
 
 GitBud is a desktop Git client with the workflow you already know from GitHub Desktop — repo sidebar, changes/history/PRs, stage-and-commit, one-click sync — rebuilt on Tauri instead of Electron. No bundled Chromium, no idle gigabyte of RAM, no multi-second cold start. Just your repos, fast.
 
 It's also not trying to be GitHub-branded. Distinct dark-first design, a Vercel-inspired palette, and a git core written in Rust (`git2` + shelling out to your real `git`/`gh` for anything auth-related) so it never gets in the way of your actual toolchain.
 
-![Preview Screenshots](resources/screenshots.png)
+<div align="center">
+<img src="resources/screenshots.png" alt="GitBud screenshots" width="900">
+</div>
+
+> **Status: early and moving fast.** GitBud is pre-1.0 and under active development — the core workflow (stage, commit, branch, sync, review PRs) is solid daily-driver territory, but expect rough edges elsewhere. This is a good time to open issues, suggest features, or send a PR that shapes where it goes next.
+
+## Contents
+
+- [Features](#features)
+- [Performance, not as an afterthought](#performance-not-as-an-afterthought)
+- [Getting Started](#getting-started)
+  - [Download](#download)
+  - [Build from source](#build-from-source)
+- [Architecture](#architecture)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
@@ -32,6 +56,12 @@ These are the actual reasons this project exists:
 - Diffs are computed in Rust and shipped as structured hunks, never raw file blobs
 
 ## Getting Started
+
+### Download
+
+Pre-built installers for macOS, Windows, and Linux are published on the [Releases page](https://github.com/Daanieeel/gitbud/releases) whenever a new version ships. They aren't code-signed yet, so your OS will warn you before the first launch — that's expected for a project this early, not a red flag.
+
+### Build from source
 
 **Prerequisites:** [Node.js](https://nodejs.org/) 18+, [Rust](https://rustup.rs/), and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.
 
@@ -65,12 +95,14 @@ Pull requests, checks, and review comments need a signed-in GitHub account. GitB
 
 ## Contributing
 
-Issues and PRs welcome. A few ground rules to keep this project on-mission:
+Issues and PRs welcome — this is early enough that a well-argued PR can genuinely shape the roadmap. Please also read the [Code of Conduct](CODE_OF_CONDUCT.md). A few ground rules to keep this project on-mission:
 
 1. **RAM and cold-start numbers are acceptance criteria, not vibes.** If a change adds meaningful idle memory or startup time, it needs a reason.
 2. **No polling.** State changes should be event-driven (filesystem watcher, Tauri events), not timers.
 3. **Auth stays out of Rust.** Anything that needs a user's GitHub credentials for git operations (fetch/pull/push/clone) shells out to system `git`; only the GitHub *API* (PRs, checks, comments) talks HTTP directly, using tokens from Device Flow or `gh`.
 4. **Keep the frontend dumb.** Git logic belongs in `src-tauri/`, not in a Zustand store.
+
+Every push and PR runs through [CI](.github/workflows/ci.yml) — `cargo check` + `cargo test` on macOS, Windows, and Linux, plus a frontend typecheck and build. Keep it green.
 
 ## License
 
