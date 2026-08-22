@@ -18,7 +18,7 @@ Mark as done when the feature is implemented. Commit after every TODO, do not pu
 - [ ] remove the "Clear pin — use …" button in the account switcher and design a more intuitive replacement.
 - [ ] move the batch-actions dropdown (currently at the top) to the bottom of the project/repo explorer, as its own side-by-side buttons instead of a dropdown.
 - [ ] move the search bar — TODO: user's request cut off mid-sentence ("move the search bar to where "), needs clarification on destination.
-- [ ] "Stage Hunk" and "Discard Hunk" buttons need real button look, not just clickable text.
+- [x] "Stage Hunk" and "Discard Hunk" buttons need real button look, not just clickable text — now rendered with the shared `Button` component (outline, small).
 - [ ] in branches list, show the current branch's upstream branch name (if any) next to the branch name. also show two lists: local and origin branches, with the current branch highlighted.
 
 ## After all others are done
