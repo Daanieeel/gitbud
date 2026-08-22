@@ -11,6 +11,7 @@ import { CreatePRDialog } from "./CreatePRDialog";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { api } from "@/lib/tauri";
+import { openUrl } from "@tauri-apps/plugin-opener";
 
 const FILTERS: { key: PRFilter; label: string }[] = [
   { key: "open", label: "Open" },
@@ -75,6 +76,30 @@ export function PRTab() {
         >
           {reauthing ? "Reconnecting…" : "Reconnect GitHub"}
         </Button>
+      </div>
+    );
+  }
+
+  if (loadError && loadError.includes("404")) {
+    return (
+      <div className="flex h-full items-center justify-center bg-dot-grid p-6">
+        <div className="flex w-full max-w-sm flex-col items-center gap-2 rounded-md border border-destructive/20 bg-destructive/10 p-4 text-center text-destructive">
+          <span className="flex items-center justify-center gap-1.5 font-medium">
+            <TriangleAlertIcon className="size-4 shrink-0" />
+            Repository Not Found
+          </span>
+          <p className="text-xs leading-relaxed">
+            GitHub returned a 404 error. If this repository belongs to an organization, an admin must install the GitBud GitHub App on the organization before it can be accessed.
+          </p>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="mt-2 text-foreground"
+            onClick={() => void openUrl("https://github.com/apps/gitbud/installations/new")}
+          >
+            Install on Organization
+          </Button>
+        </div>
       </div>
     );
   }
