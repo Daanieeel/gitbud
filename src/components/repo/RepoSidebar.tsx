@@ -174,11 +174,11 @@ export function RepoSidebar() {
   };
 
   return (
-    <>
+    <div className="flex h-full shrink-0">
     <aside
       style={{ width }}
       className={cn(
-        "flex h-full shrink-0 flex-col bg-card shadow-sm",
+        "flex h-full shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md",
         dragOver && "ring-2 ring-inset ring-primary",
       )}
     >
@@ -316,6 +316,6 @@ export function RepoSidebar() {
       <AccountBar />
     </aside>
     <ResizeHandle onPointerDown={onPointerDown} />
-    </>
+    </div>
   );
 }

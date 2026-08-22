@@ -7,6 +7,8 @@ import { DiffView } from "@/components/diff/DiffView";
 import { CommitBox } from "@/components/commit/CommitBox";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { ResizeHandle } from "@/components/layout/ResizeHandle";
+import { useResizableWidth } from "@/hooks/useResizableWidth";
 
 export function ChangesTab() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -21,6 +23,7 @@ export function ChangesTab() {
   const discardHunk = useRepoStore((s) => s.discardHunk);
 
   const [filter, setFilter] = useState("");
+  const { width, onPointerDown } = useResizableWidth("panel-width:changes-files", 288, 200, 560);
 
   const filtered = useMemo(() => {
     if (!files) return [];
@@ -41,7 +44,7 @@ export function ChangesTab() {
 
   return (
     <div className="flex h-full min-w-0 flex-1">
-      <div className="flex w-72 shrink-0 flex-col border-r border-border">
+      <div style={{ width }} className="flex shrink-0 flex-col">
         <div className="flex shrink-0 items-center justify-end border-b border-border p-2">
           <StashPanel hasChanges={files.length > 0} />
         </div>
@@ -78,6 +81,7 @@ export function ChangesTab() {
         )}
         <CommitBox />
       </div>
+      <ResizeHandle onPointerDown={onPointerDown} />
       <div className="min-w-0 flex-1">
         {selectedFilePath &&
         repoPath &&

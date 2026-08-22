@@ -24,7 +24,7 @@ export function Toolbar() {
   const [previewPrOpen, setPreviewPrOpen] = useState(false);
 
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-card px-2 shadow-sm">
+    <header className="flex h-12 shrink-0 items-center gap-2 px-3">
       <span className="truncate px-1 text-sm font-medium">{currentName}</span>
       <BranchSwitcher />
       <BranchPruner />
