@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { KeyRoundIcon, MapPinIcon, PlusIcon, SettingsIcon, TriangleAlertIcon, XIcon } from "lucide-react";
+import { KeyRoundIcon, LogInIcon, MapPinIcon, PlusIcon, SettingsIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { GitHubMark } from "./GitHubMark";
 import { Button } from "@/components/ui/button";
@@ -101,7 +101,7 @@ export function AccountBar() {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm" className="min-w-0 flex-1">
-              <PlusIcon className="size-3.5" />
+              <LogInIcon className="size-3.5" />
               Add identity
             </Button>
           </DropdownMenuTrigger>
@@ -219,7 +219,7 @@ export function AccountBar() {
         </Popover>
       )}
       <Button
-        variant="ghost"
+        variant="outline"
         size="icon"
         title="Settings"
         className="shrink-0"
