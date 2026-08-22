@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
 import { GitPullRequestCreateArrow, GitPullRequestDraftIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +23,7 @@ import { useGitHubStore } from "@/store/useGitHubStore";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
-import type { FileDiff, Label, AssignableUser, Milestone, Project } from "@/lib/types";
+import type { FileDiff, Label, AssignableUser, Milestone, Project, CommitSearchResult } from "@/lib/types";
 
 interface CreatePRDialogProps {
   open: boolean;
@@ -46,7 +47,6 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const branch = useRepoStore((s) => s.branch);
   const branches = useRepoStore((s) => s.branches);
-  const commits = useRepoStore((s) => s.commits);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const createPR = usePRStore((s) => s.createPR);
 
@@ -71,10 +71,13 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const [selectedMilestone, setSelectedMilestone] = useState<string>("");
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
 
+  const [mainView, setMainView] = useState<"files" | "commits">("files");
   const [diffFiles, setDiffFiles] = useState<[string, string][]>([]);
   const [diffLoading, setDiffLoading] = useState(false);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [selectedDiff, setSelectedDiff] = useState<FileDiff | null>(null);
+  const [branchCommits, setBranchCommits] = useState<CommitSearchResult[]>([]);
+  const [branchCommitsLoading, setBranchCommitsLoading] = useState(false);
 
   // Reset per-open state and pick a sane default base once the dialog is (re)opened.
   useEffect(() => {
@@ -82,14 +85,12 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
     setBase((prev) => (localBranches.some((b) => b.name === prev) ? prev : defaultBase));
   }, [open]);
 
-  // Prefill the title from the branch's most recent commit so there's rarely a blank field
-  // to fill in — the user can still edit or replace it before creating the PR.
+  // Prefill the title with the branch name so there's rarely a blank field to fill in — the
+  // user can still edit or replace it before creating the PR.
   useEffect(() => {
-    if (!open || title) return;
-    const lastSummary = commits[0]?.summary;
-    if (lastSummary) setTitle(lastSummary);
-    else if (branch) setTitle(branch);
-  }, [open, title, commits, branch]);
+    if (!open || title || !branch) return;
+    setTitle(branch);
+  }, [open, title, branch]);
 
   useEffect(() => {
     if (!open || !repoPath || body) return;
@@ -121,6 +122,13 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
       .then(setDiffFiles)
       .catch(() => setDiffFiles([]))
       .finally(() => setDiffLoading(false));
+
+    setBranchCommitsLoading(true);
+    void api
+      .getBranchCommits(repoPath, base, branch)
+      .then(setBranchCommits)
+      .catch(() => setBranchCommits([]))
+      .finally(() => setBranchCommitsLoading(false));
   }, [open, repoPath, branch, base]);
 
   useEffect(() => {
@@ -218,51 +226,99 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
               rows={4}
               className="shrink-0"
             />
-            <div className="flex min-h-0 flex-1 overflow-hidden rounded-md border border-border">
-              <div
-                ref={fileListRef}
-                tabIndex={0}
-                onKeyDown={handleArrowNav}
-                className="w-56 shrink-0 overflow-auto border-r border-border outline-none"
+            <div className="flex shrink-0 gap-1 border-b border-border text-sm">
+              <button
+                onClick={() => setMainView("files")}
+                className={cn(
+                  "border-b-2 px-2 py-1.5 text-muted-foreground hover:text-foreground",
+                  mainView === "files" ? "border-primary text-foreground" : "border-transparent",
+                )}
               >
-                {diffLoading ? (
+                Files changed{diffFiles.length > 0 && ` (${diffFiles.length})`}
+              </button>
+              <button
+                onClick={() => setMainView("commits")}
+                className={cn(
+                  "border-b-2 px-2 py-1.5 text-muted-foreground hover:text-foreground",
+                  mainView === "commits" ? "border-primary text-foreground" : "border-transparent",
+                )}
+              >
+                Commits{branchCommits.length > 0 && ` (${branchCommits.length})`}
+              </button>
+            </div>
+            {mainView === "files" ? (
+              <div className="flex min-h-0 flex-1 overflow-hidden rounded-md border border-border">
+                <div
+                  ref={fileListRef}
+                  tabIndex={0}
+                  onKeyDown={handleArrowNav}
+                  className="w-56 shrink-0 overflow-auto border-r border-border outline-none"
+                >
+                  {diffLoading ? (
+                    <div className="p-2 text-center text-xs text-muted-foreground">Loading…</div>
+                  ) : diffFiles.length === 0 ? (
+                    <div className="p-2 text-center text-xs text-muted-foreground">
+                      No changes between {base} and {branch}
+                    </div>
+                  ) : (
+                    diffFiles.map(([path, status]) => (
+                      <Tooltip key={path}>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={cn(
+                              "flex cursor-pointer select-none items-center gap-2 px-2 py-1 text-sm hover:bg-accent",
+                              selectedFilePath === path && "bg-accent",
+                            )}
+                            onClick={() => setSelectedFilePath(path)}
+                          >
+                            <span className="relative shrink-0">
+                              <FileTypeIcon path={path} className="size-3.5" />
+                              <span
+                                className={cn(
+                                  "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
+                                  BRANCH_DIFF_STATUS_COLOR[status] || "bg-muted-foreground",
+                                )}
+                              />
+                            </span>
+                            <FilePathLabel path={path} />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent>{`${path} (${status})`}</TooltipContent>
+                      </Tooltip>
+                    ))
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <DiffView path={selectedFilePath} diff={selectedDiff} imageDiff={null} />
+                </div>
+              </div>
+            ) : (
+              <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border">
+                {branchCommitsLoading ? (
                   <div className="p-2 text-center text-xs text-muted-foreground">Loading…</div>
-                ) : diffFiles.length === 0 ? (
+                ) : branchCommits.length === 0 ? (
                   <div className="p-2 text-center text-xs text-muted-foreground">
-                    No changes between {base} and {branch}
+                    No commits between {base} and {branch}
                   </div>
                 ) : (
-                  diffFiles.map(([path, status]) => (
-                    <Tooltip key={path}>
-                      <TooltipTrigger asChild>
-                        <div
-                          className={cn(
-                            "flex cursor-pointer select-none items-center gap-2 px-2 py-1 text-sm hover:bg-accent",
-                            selectedFilePath === path && "bg-accent",
-                          )}
-                          onClick={() => setSelectedFilePath(path)}
-                        >
-                          <span className="relative shrink-0">
-                            <FileTypeIcon path={path} className="size-3.5" />
-                            <span
-                              className={cn(
-                                "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                                BRANCH_DIFF_STATUS_COLOR[status] || "bg-muted-foreground",
-                              )}
-                            />
-                          </span>
-                          <FilePathLabel path={path} />
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent>{`${path} (${status})`}</TooltipContent>
-                    </Tooltip>
+                  branchCommits.map((commit) => (
+                    <div
+                      key={commit.oid}
+                      className="flex items-center gap-2 border-b border-border/50 px-2 py-1.5 text-sm last:border-b-0"
+                    >
+                      <span className="min-w-0 flex-1 truncate">{commit.summary}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">{commit.author_name}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(commit.timestamp * 1000), { addSuffix: true })}
+                      </span>
+                      <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-secondary-foreground">
+                        {commit.short_oid}
+                      </span>
+                    </div>
                   ))
                 )}
               </div>
-              <div className="min-w-0 flex-1">
-                <DiffView path={selectedFilePath} diff={selectedDiff} imageDiff={null} />
-              </div>
-            </div>
+            )}
           </div>
           <div className="flex w-56 shrink-0 flex-col gap-4 overflow-auto border-l border-border pl-4">
             <MultiSelectField

@@ -130,6 +130,47 @@ pub fn search_commits(repo_path: &str, query: &str, limit: usize) -> Result<Vec<
     Ok(results)
 }
 
+/// Lists commits reachable from `head` but not from `base` (`git log base..head`) — the same
+/// two-dot comparison GitHub's PR "Commits" tab shows, newest first. No lane/graph info since
+/// this is a flat linear list, not the full-history graph view.
+pub fn get_branch_commits(repo_path: &str, base: &str, head: &str) -> Result<Vec<CommitSearchResult>, String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let base_oid = repo
+        .revparse_single(base)
+        .map_err(|e| e.message().to_string())?
+        .peel_to_commit()
+        .map_err(|e| e.message().to_string())?
+        .id();
+    let head_oid = repo
+        .revparse_single(head)
+        .map_err(|e| e.message().to_string())?
+        .peel_to_commit()
+        .map_err(|e| e.message().to_string())?
+        .id();
+
+    let mut revwalk = repo.revwalk().map_err(|e| e.message().to_string())?;
+    revwalk.push(head_oid).map_err(|e| e.message().to_string())?;
+    revwalk.hide(base_oid).map_err(|e| e.message().to_string())?;
+    revwalk
+        .set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)
+        .map_err(|e| e.message().to_string())?;
+
+    let mut results = Vec::new();
+    for oid in revwalk {
+        let oid = oid.map_err(|e| e.message().to_string())?;
+        let commit = repo.find_commit(oid).map_err(|e| e.message().to_string())?;
+        let oid_str = oid.to_string();
+        results.push(CommitSearchResult {
+            short_oid: oid_str.chars().take(7).collect(),
+            oid: oid_str,
+            summary: commit.summary().unwrap_or("").to_string(),
+            author_name: commit.author().name().unwrap_or("").to_string(),
+            timestamp: commit.time().seconds(),
+        });
+    }
+    Ok(results)
+}
+
 pub fn get_log(repo_path: &str, limit: usize, skip: usize) -> Result<Vec<CommitEntry>, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut revwalk = repo.revwalk().map_err(|e| e.message().to_string())?;

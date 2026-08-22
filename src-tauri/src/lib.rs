@@ -261,6 +261,13 @@ async fn search_commits(repo_path: String, query: String, limit: usize) -> Resul
         .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn get_branch_commits(repo_path: String, base: String, head: String) -> Result<Vec<history::CommitSearchResult>, String> {
+    tauri::async_runtime::spawn_blocking(move || history::get_branch_commits(&repo_path, &base, &head))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 // --- tags ---
 
 #[tauri::command]
@@ -1288,6 +1295,7 @@ pub fn run() {
             get_image_diff,
             get_commit_image_diff,
             get_log,
+            get_branch_commits,
             search_commits,
             list_tags,
             create_tag,

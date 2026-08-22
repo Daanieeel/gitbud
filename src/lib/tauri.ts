@@ -123,6 +123,8 @@ export const api = {
     invoke<CommitEntry[]>("get_log", { repoPath, limit, skip }),
   searchCommits: (repoPath: string, query: string, limit: number) =>
     invoke<CommitSearchResult[]>("search_commits", { repoPath, query, limit }),
+  getBranchCommits: (repoPath: string, base: string, head: string) =>
+    invoke<CommitSearchResult[]>("get_branch_commits", { repoPath, base, head }),
 
   listTags: (repoPath: string) => invoke<TagInfo[]>("list_tags", { repoPath }),
   createTag: (repoPath: string, name: string, message: string) =>
