@@ -1,5 +1,5 @@
 import { memo, useState } from "react";
-import { MessageSquarePlusIcon } from "lucide-react";
+import { LinkIcon, MessageSquarePlusIcon } from "lucide-react";
 import type { FileDiff, ImageDiff, ReviewComment } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ImageDiffView } from "./ImageDiffView";
@@ -11,6 +11,7 @@ interface DiffViewProps {
   imageDiff?: ImageDiff | null;
   comments?: ReviewComment[];
   onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
+  onCopyPermalink?: (line: number) => void;
 }
 
 function commentsForLine(
@@ -86,7 +87,7 @@ function AddCommentComposer({
   );
 }
 
-function DiffViewImpl({ path, diff, imageDiff, comments, onAddComment }: DiffViewProps) {
+function DiffViewImpl({ path, diff, imageDiff, comments, onAddComment, onCopyPermalink }: DiffViewProps) {
   const [composerKey, setComposerKey] = useState<string | null>(null);
 
   if (!path) {
@@ -157,6 +158,15 @@ function DiffViewImpl({ path, diff, imageDiff, comments, onAddComment }: DiffVie
                     {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
                   </span>
                   <span className="min-w-0 flex-1">{line.content}</span>
+                  {onCopyPermalink && line.new_lineno != null && (
+                    <button
+                      title="Copy GitHub permalink to this line"
+                      className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
+                      onClick={() => onCopyPermalink(line.new_lineno as number)}
+                    >
+                      <LinkIcon className="size-3.5" />
+                    </button>
+                  )}
                   {canComment && (
                     <button
                       title="Add comment"

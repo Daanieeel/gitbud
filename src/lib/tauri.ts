@@ -3,6 +3,7 @@ import type {
   AheadBehind,
   BranchInfo,
   CheckRun,
+  CherryPickResult,
   CommitEntry,
   CommitVerification,
   DeviceCodeResponse,
@@ -28,12 +29,27 @@ export const api = {
     invoke<void>("checkout_branch", { repoPath, branch }),
   createBranch: (repoPath: string, name: string, checkout: boolean) =>
     invoke<void>("create_branch", { repoPath, name, checkout }),
+  createBranchAt: (repoPath: string, name: string, oid: string, checkout: boolean) =>
+    invoke<void>("create_branch_at", { repoPath, name, oid, checkout }),
   stagePaths: (repoPath: string, paths: string[]) =>
     invoke<void>("stage_paths", { repoPath, paths }),
   unstagePaths: (repoPath: string, paths: string[]) =>
     invoke<void>("unstage_paths", { repoPath, paths }),
+  discardFile: (repoPath: string, path: string) => invoke<void>("discard_file", { repoPath, path }),
   commit: (repoPath: string, summary: string, description: string) =>
     invoke<string>("commit", { repoPath, summary, description }),
+  amendCommit: (repoPath: string, summary: string, description: string) =>
+    invoke<string>("amend_commit", { repoPath, summary, description }),
+  cherryPick: (repoPath: string, oid: string) =>
+    invoke<CherryPickResult>("cherry_pick", { repoPath, oid }),
+  revertCommit: (repoPath: string, oid: string) =>
+    invoke<CherryPickResult>("revert_commit", { repoPath, oid }),
+  deleteBranch: (repoPath: string, name: string) =>
+    invoke<void>("delete_branch", { repoPath, name }),
+  renameBranch: (repoPath: string, oldName: string, newName: string) =>
+    invoke<void>("rename_branch", { repoPath, oldName, newName }),
+  mergeBranch: (repoPath: string, branchName: string) =>
+    invoke<CherryPickResult>("merge_branch", { repoPath, branchName }),
 
   listStashes: (repoPath: string) => invoke<StashEntry[]>("list_stashes", { repoPath }),
   stashSave: (repoPath: string, message: string, includeUntracked: boolean) =>
@@ -77,6 +93,7 @@ export const api = {
   checkoutPullRequest: (repoPath: string, number: number) =>
     invoke<string>("checkout_pull_request", { repoPath, number }),
 
+  openInTerminal: (path: string) => invoke<void>("open_in_terminal", { path }),
   startWatch: (repoPath: string) => invoke<void>("start_watch", { repoPath }),
   stopWatch: (repoPath: string) => invoke<void>("stop_watch", { repoPath }),
 
@@ -84,6 +101,8 @@ export const api = {
   githubDetectGhCli: () => invoke<GitHubAccount | null>("github_detect_gh_cli"),
   githubGetClientId: () => invoke<string | null>("github_get_client_id"),
   githubSetClientId: (clientId: string) => invoke<void>("github_set_client_id", { clientId }),
+  githubGetHost: () => invoke<string>("github_get_host"),
+  githubSetHost: (host: string) => invoke<void>("github_set_host", { host }),
   githubListAccounts: () => invoke<GitHubAccount[]>("github_list_accounts"),
   githubRemoveAccount: (login: string) =>
     invoke<GitHubAccount[]>("github_remove_account", { login }),
@@ -93,8 +112,8 @@ export const api = {
     invoke<PollResult>("github_poll_device_flow", { clientId, deviceCode }),
   githubRemoteOwnerRepo: (repoPath: string) =>
     invoke<[string, string] | null>("github_remote_owner_repo", { repoPath }),
-  githubListPullRequests: (repoPath: string, login: string) =>
-    invoke<PullRequest[]>("github_list_pull_requests", { repoPath, login }),
+  githubListPullRequests: (repoPath: string, login: string, state: "open" | "closed" | "all") =>
+    invoke<PullRequest[]>("github_list_pull_requests", { repoPath, login, state }),
   githubGetPullRequest: (repoPath: string, login: string, number: number) =>
     invoke<PullRequest>("github_get_pull_request", { repoPath, login, number }),
   githubCreatePullRequest: (

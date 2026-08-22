@@ -1,23 +1,50 @@
 use serde::{Deserialize, Serialize};
 
+use super::auth::api_base;
 use crate::diff::{DiffHunk, DiffLine, FileDiff, LineKind};
 use crate::image_diff::is_image_path;
 
 const USER_AGENT: &str = "GitBud";
 
-fn client(token: &str) -> Result<reqwest::Client, String> {
-    use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT as UA};
-    let mut headers = HeaderMap::new();
-    headers.insert(
-        AUTHORIZATION,
-        HeaderValue::from_str(&format!("Bearer {token}")).map_err(|e| e.to_string())?,
-    );
-    headers.insert(ACCEPT, HeaderValue::from_static("application/vnd.github+json"));
-    headers.insert(UA, HeaderValue::from_static(USER_AGENT));
-    reqwest::Client::builder()
-        .default_headers(headers)
-        .build()
-        .map_err(|e| e.to_string())
+/// A REST client bound to one GitHub host (github.com or a GHES instance) and one token.
+/// `get`/`post`/`put` take a path relative to the API base, e.g. "/repos/{owner}/{repo}/pulls".
+struct GhClient {
+    http: reqwest::Client,
+    base: String,
+}
+
+impl GhClient {
+    fn new(host: &str, token: &str) -> Result<Self, String> {
+        use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, USER_AGENT as UA};
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            AUTHORIZATION,
+            HeaderValue::from_str(&format!("Bearer {token}")).map_err(|e| e.to_string())?,
+        );
+        headers.insert(ACCEPT, HeaderValue::from_static("application/vnd.github+json"));
+        headers.insert(UA, HeaderValue::from_static(USER_AGENT));
+        let http = reqwest::Client::builder()
+            .default_headers(headers)
+            .build()
+            .map_err(|e| e.to_string())?;
+        Ok(Self { http, base: api_base(host) })
+    }
+
+    fn url(&self, path: &str) -> String {
+        format!("{}{}", self.base, path)
+    }
+
+    fn get(&self, path: &str) -> reqwest::RequestBuilder {
+        self.http.get(self.url(path))
+    }
+
+    fn post(&self, path: &str) -> reqwest::RequestBuilder {
+        self.http.post(self.url(path))
+    }
+
+    fn put(&self, path: &str) -> reqwest::RequestBuilder {
+        self.http.put(self.url(path))
+    }
 }
 
 async fn check(res: reqwest::Response) -> Result<reqwest::Response, String> {
@@ -44,6 +71,7 @@ pub struct PullRequest {
     pub base_ref: String,
     pub merged: bool,
     pub mergeable: Option<bool>,
+    pub labels: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -56,6 +84,11 @@ struct RawRef {
     #[serde(rename = "ref")]
     ref_name: String,
     sha: String,
+}
+
+#[derive(Deserialize)]
+struct RawLabel {
+    name: String,
 }
 
 #[derive(Deserialize)]
@@ -73,6 +106,8 @@ struct RawPullRequest {
     merged: bool,
     #[serde(default)]
     mergeable: Option<bool>,
+    #[serde(default)]
+    labels: Vec<RawLabel>,
 }
 
 impl From<RawPullRequest> for PullRequest {
@@ -90,29 +125,37 @@ impl From<RawPullRequest> for PullRequest {
             base_ref: raw.base.ref_name,
             merged: raw.merged,
             mergeable: raw.mergeable,
+            labels: raw.labels.into_iter().map(|l| l.name).collect(),
         }
     }
 }
 
+/// `state` is one of "open", "closed", or "all" (GitHub's PR-list convention — "closed"
+/// includes both merged and unmerged-but-closed PRs, distinguished by `merged`).
 pub async fn list_pull_requests(
+    host: &str,
     token: &str,
     owner: &str,
     repo: &str,
+    state: &str,
 ) -> Result<Vec<PullRequest>, String> {
-    let url = format!("https://api.github.com/repos/{owner}/{repo}/pulls?state=open&per_page=50");
-    let res = check(client(token)?.get(url).send().await.map_err(|e| e.to_string())?).await?;
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls?state={state}&per_page=50");
+    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
     let raw: Vec<RawPullRequest> = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into_iter().map(PullRequest::from).collect())
 }
 
 pub async fn get_pull_request(
+    host: &str,
     token: &str,
     owner: &str,
     repo: &str,
     number: u64,
 ) -> Result<PullRequest, String> {
-    let url = format!("https://api.github.com/repos/{owner}/{repo}/pulls/{number}");
-    let res = check(client(token)?.get(url).send().await.map_err(|e| e.to_string())?).await?;
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}");
+    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
     let raw: RawPullRequest = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into())
 }
@@ -128,6 +171,7 @@ struct CreatePrBody<'a> {
 
 #[allow(clippy::too_many_arguments)]
 pub async fn create_pull_request(
+    host: &str,
     token: &str,
     owner: &str,
     repo: &str,
@@ -137,10 +181,10 @@ pub async fn create_pull_request(
     body: &str,
     draft: bool,
 ) -> Result<PullRequest, String> {
-    let url = format!("https://api.github.com/repos/{owner}/{repo}/pulls");
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls");
     let res = check(
-        client(token)?
-            .post(url)
+        gh.post(&path)
             .json(&CreatePrBody { title, head, base, body, draft })
             .send()
             .await
@@ -157,16 +201,17 @@ struct MergeBody<'a> {
 }
 
 pub async fn merge_pull_request(
+    host: &str,
     token: &str,
     owner: &str,
     repo: &str,
     number: u64,
     merge_method: &str,
 ) -> Result<(), String> {
-    let url = format!("https://api.github.com/repos/{owner}/{repo}/pulls/{number}/merge");
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/merge");
     check(
-        client(token)?
-            .put(url)
+        gh.put(&path)
             .json(&MergeBody { merge_method })
             .send()
             .await
@@ -186,13 +231,15 @@ struct RawPullRequestFile {
 /// Fetches the files changed by a PR and returns them as our shared `FileDiff` shape
 /// (parsed from GitHub's unified-diff `patch` text) so the same DiffView renders them.
 pub async fn list_pull_request_files(
+    host: &str,
     token: &str,
     owner: &str,
     repo: &str,
     number: u64,
 ) -> Result<Vec<(String, String, FileDiff)>, String> {
-    let url = format!("https://api.github.com/repos/{owner}/{repo}/pulls/{number}/files?per_page=100");
-    let res = check(client(token)?.get(url).send().await.map_err(|e| e.to_string())?).await?;
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/files?per_page=100");
+    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
     let raw: Vec<RawPullRequestFile> = res.json().await.map_err(|e| e.to_string())?;
 
     Ok(raw
@@ -318,15 +365,15 @@ impl From<RawReviewComment> for ReviewComment {
 }
 
 pub async fn list_review_comments(
+    host: &str,
     token: &str,
     owner: &str,
     repo: &str,
     number: u64,
 ) -> Result<Vec<ReviewComment>, String> {
-    let url = format!(
-        "https://api.github.com/repos/{owner}/{repo}/pulls/{number}/comments?per_page=100"
-    );
-    let res = check(client(token)?.get(url).send().await.map_err(|e| e.to_string())?).await?;
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/comments?per_page=100");
+    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
     let raw: Vec<RawReviewComment> = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into_iter().map(ReviewComment::from).collect())
 }
@@ -342,6 +389,7 @@ struct CreateReviewCommentBody<'a> {
 
 #[allow(clippy::too_many_arguments)]
 pub async fn create_review_comment(
+    host: &str,
     token: &str,
     owner: &str,
     repo: &str,
@@ -352,10 +400,10 @@ pub async fn create_review_comment(
     side: &str,
     body: &str,
 ) -> Result<ReviewComment, String> {
-    let url = format!("https://api.github.com/repos/{owner}/{repo}/pulls/{number}/comments");
+    let gh = GhClient::new(host, token)?;
+    let url_path = format!("/repos/{owner}/{repo}/pulls/{number}/comments");
     let res = check(
-        client(token)?
-            .post(url)
+        gh.post(&url_path)
             .json(&CreateReviewCommentBody { body, commit_id, path, line, side })
             .send()
             .await
@@ -384,13 +432,15 @@ struct CheckRunsResponse {
 /// Fetches GitHub Actions check-run results for a commit sha (used for CI status badges
 /// on PR rows and commit rows).
 pub async fn list_check_runs(
+    host: &str,
     token: &str,
     owner: &str,
     repo: &str,
     sha: &str,
 ) -> Result<Vec<CheckRun>, String> {
-    let url = format!("https://api.github.com/repos/{owner}/{repo}/commits/{sha}/check-runs?per_page=50");
-    let res = check(client(token)?.get(url).send().await.map_err(|e| e.to_string())?).await?;
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/commits/{sha}/check-runs?per_page=50");
+    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
     let parsed: CheckRunsResponse = res.json().await.map_err(|e| e.to_string())?;
     Ok(parsed.check_runs)
 }
@@ -413,13 +463,15 @@ struct CommitDetailInner {
 
 /// Looks up GPG/SSH signature verification for a commit already pushed to GitHub.
 pub async fn get_commit_verification(
+    host: &str,
     token: &str,
     owner: &str,
     repo: &str,
     sha: &str,
 ) -> Result<CommitVerification, String> {
-    let url = format!("https://api.github.com/repos/{owner}/{repo}/commits/{sha}");
-    let res = check(client(token)?.get(url).send().await.map_err(|e| e.to_string())?).await?;
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/commits/{sha}");
+    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
     let parsed: CommitDetailResponse = res.json().await.map_err(|e| e.to_string())?;
     Ok(parsed.commit.verification)
 }
@@ -436,9 +488,10 @@ pub struct GitHubRepo {
 
 /// Lists the authenticated user's own repos, plus org repos they have access to, newest first —
 /// backs the "browse your repos" clone picker.
-pub async fn list_user_repos(token: &str) -> Result<Vec<GitHubRepo>, String> {
-    let url = "https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member";
-    let res = check(client(token)?.get(url).send().await.map_err(|e| e.to_string())?).await?;
+pub async fn list_user_repos(host: &str, token: &str) -> Result<Vec<GitHubRepo>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = "/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member";
+    let res = check(gh.get(path).send().await.map_err(|e| e.to_string())?).await?;
     res.json().await.map_err(|e| e.to_string())
 }
 

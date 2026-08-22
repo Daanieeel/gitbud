@@ -65,7 +65,22 @@ export function PRList({ repoPath, login, pulls, selectedNumber, onSelect }: PRL
                     #{pr.number} by {pr.author_login}
                   </span>
                   <CIBadge repoPath={repoPath} login={login} sha={pr.head_sha} />
+                  {pr.merged && (
+                    <span className="rounded bg-accent-purple/20 px-1 text-accent-purple">merged</span>
+                  )}
                 </div>
+                {pr.labels.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {pr.labels.map((label) => (
+                      <span
+                        key={label}
+                        className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground"
+                      >
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           );

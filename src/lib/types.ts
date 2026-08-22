@@ -83,6 +83,11 @@ export interface StashEntry {
   message: string;
 }
 
+export interface CherryPickResult {
+  conflicted: boolean;
+  new_oid: string | null;
+}
+
 // --- GitHub ---
 
 export interface GitHubAccount {
@@ -118,6 +123,7 @@ export interface PullRequest {
   base_ref: string;
   merged: boolean;
   mergeable: boolean | null;
+  labels: string[];
 }
 
 export interface ReviewComment {

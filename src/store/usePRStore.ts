@@ -2,16 +2,20 @@ import { create } from "zustand";
 import { api } from "@/lib/tauri";
 import type { PullRequest, PullRequestFile, ReviewComment } from "@/lib/types";
 
+export type PRFilter = "open" | "closed" | "all";
+
 interface PRState {
   pulls: PullRequest[];
   loading: boolean;
   loadError: string | null;
+  filter: PRFilter;
 
   selectedNumber: number | null;
   files: PullRequestFile[];
   selectedFilePath: string | null;
   comments: ReviewComment[];
 
+  setFilter: (filter: PRFilter) => void;
   load: (repoPath: string, login: string) => Promise<void>;
   selectPR: (repoPath: string, login: string, number: number | null) => Promise<void>;
   selectFile: (path: string | null) => void;
@@ -38,16 +42,19 @@ export const usePRStore = create<PRState>((set, get) => ({
   pulls: [],
   loading: false,
   loadError: null,
+  filter: "open",
 
   selectedNumber: null,
   files: [],
   selectedFilePath: null,
   comments: [],
 
+  setFilter: (filter) => set({ filter }),
+
   load: async (repoPath, login) => {
     set({ loading: true, loadError: null });
     try {
-      const pulls = await api.githubListPullRequests(repoPath, login);
+      const pulls = await api.githubListPullRequests(repoPath, login, get().filter);
       set({ pulls, loading: false });
     } catch (err) {
       set({ loading: false, loadError: String(err) });

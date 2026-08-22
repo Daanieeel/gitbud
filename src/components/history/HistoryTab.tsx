@@ -1,9 +1,14 @@
+import { useState } from "react";
 import { useRepoStore } from "@/store/useRepoStore";
 import { CommitList } from "./CommitList";
+import { CreateBranchAtDialog } from "./CreateBranchAtDialog";
 import { DiffView } from "@/components/diff/DiffView";
 import { cn } from "@/lib/utils";
+import { copyToClipboard } from "@/lib/clipboard";
+import { githubFileUrl } from "@/lib/github-links";
 
 export function HistoryTab() {
+  const repoPath = useRepoStore((s) => s.selectedRepo);
   const commits = useRepoStore((s) => s.commits);
   const selectedCommitOid = useRepoStore((s) => s.selectedCommitOid);
   const selectedCommitFiles = useRepoStore((s) => s.selectedCommitFiles);
@@ -13,6 +18,8 @@ export function HistoryTab() {
   const selectCommit = useRepoStore((s) => s.selectCommit);
   const selectCommitFile = useRepoStore((s) => s.selectCommitFile);
   const loadMoreHistory = useRepoStore((s) => s.loadMoreHistory);
+
+  const [branchAtOid, setBranchAtOid] = useState<string | null>(null);
 
   if (commits.length === 0) {
     return (
@@ -30,6 +37,7 @@ export function HistoryTab() {
           selectedOid={selectedCommitOid}
           onSelect={(oid) => void selectCommit(oid)}
           onNeedMore={() => void loadMoreHistory()}
+          onCreateBranchHere={setBranchAtOid}
         />
       </div>
       <div className="w-56 shrink-0 border-r border-border overflow-auto">
@@ -52,8 +60,17 @@ export function HistoryTab() {
           path={selectedCommitFilePath}
           diff={selectedCommitDiff}
           imageDiff={selectedCommitImageDiff}
+          onCopyPermalink={(line) => {
+            if (!repoPath || !selectedCommitOid || !selectedCommitFilePath) return;
+            void githubFileUrl(repoPath, selectedCommitOid, selectedCommitFilePath, line).then(
+              (url) => {
+                if (url) void copyToClipboard(url);
+              },
+            );
+          }}
         />
       </div>
+      <CreateBranchAtDialog oid={branchAtOid} onOpenChange={(open) => !open && setBranchAtOid(null)} />
     </div>
   );
 }

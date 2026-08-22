@@ -4,6 +4,7 @@ import { api } from "@/lib/tauri";
 import type {
   AheadBehind,
   BranchInfo,
+  CherryPickResult,
   CommitEntry,
   FileDiff,
   GitOutputLine,
@@ -23,6 +24,12 @@ interface RepoState {
   selectedFilePath: string | null;
   selectedFileDiff: FileDiff | null;
   selectedFileImageDiff: ImageDiff | null;
+
+  // Lives here (not as local component state) so it survives switching away from the
+  // Changes tab and back — CommitBox unmounts on tab switch, local state wouldn't.
+  commitSummary: string;
+  commitDescription: string;
+  amending: boolean;
 
   activeTab: "changes" | "history" | "pulls";
 
@@ -49,11 +56,21 @@ interface RepoState {
   setActiveTab: (tab: "changes" | "history" | "pulls") => void;
 
   toggleStaged: (paths: string[], staged: boolean) => Promise<void>;
+  discardFile: (path: string) => Promise<void>;
   selectFile: (path: string | null) => Promise<void>;
   doCommit: (summary: string, description: string) => Promise<void>;
+  doAmendCommit: (summary: string, description: string) => Promise<void>;
+  setCommitSummary: (value: string) => void;
+  setCommitDescription: (value: string) => void;
+  setAmending: (value: boolean) => void;
 
   checkoutBranch: (branch: string) => Promise<void>;
   createBranch: (name: string, checkout: boolean) => Promise<void>;
+  deleteBranch: (name: string) => Promise<void>;
+  renameBranch: (oldName: string, newName: string) => Promise<void>;
+  mergeBranch: (name: string) => Promise<CherryPickResult>;
+  cherryPick: (oid: string) => Promise<CherryPickResult>;
+  revertCommit: (oid: string) => Promise<CherryPickResult>;
 
   resetHistory: () => Promise<void>;
   loadMoreHistory: () => Promise<void>;
@@ -79,6 +96,10 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   selectedFilePath: null,
   selectedFileDiff: null,
   selectedFileImageDiff: null,
+
+  commitSummary: "",
+  commitDescription: "",
+  amending: false,
 
   activeTab: "changes",
 
@@ -192,6 +213,16 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     await get().refreshStatus();
   },
 
+  discardFile: async (path) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    await api.discardFile(repoPath, path);
+    if (get().selectedFilePath === path) {
+      set({ selectedFilePath: null, selectedFileDiff: null, selectedFileImageDiff: null });
+    }
+    await get().refreshStatus();
+  },
+
   selectFile: async (path) => {
     set({ selectedFilePath: path, selectedFileImageDiff: null });
     const repoPath = get().selectedRepo;
@@ -214,11 +245,36 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     }
   },
 
+  setCommitSummary: (value) => set({ commitSummary: value }),
+  setCommitDescription: (value) => set({ commitDescription: value }),
+  setAmending: (value) => set({ amending: value }),
+
   doCommit: async (summary, description) => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
     await api.commit(repoPath, summary, description);
-    set({ selectedFilePath: null, selectedFileDiff: null, selectedFileImageDiff: null });
+    set({
+      selectedFilePath: null,
+      selectedFileDiff: null,
+      selectedFileImageDiff: null,
+      commitSummary: "",
+      commitDescription: "",
+    });
+    await Promise.all([get().refreshStatus(), get().resetHistory()]);
+  },
+
+  doAmendCommit: async (summary, description) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    await api.amendCommit(repoPath, summary, description);
+    set({
+      selectedFilePath: null,
+      selectedFileDiff: null,
+      selectedFileImageDiff: null,
+      commitSummary: "",
+      commitDescription: "",
+      amending: false,
+    });
     await Promise.all([get().refreshStatus(), get().resetHistory()]);
   },
 
@@ -237,6 +293,44 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     if (checkout) {
       await Promise.all([get().refreshStatus(), get().resetHistory()]);
     }
+  },
+
+  deleteBranch: async (name) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    await api.deleteBranch(repoPath, name);
+    await get().refreshBranches();
+  },
+
+  renameBranch: async (oldName, newName) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    await api.renameBranch(repoPath, oldName, newName);
+    await get().refreshBranches();
+  },
+
+  mergeBranch: async (name) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return { conflicted: false, new_oid: null } satisfies CherryPickResult;
+    const result = await api.mergeBranch(repoPath, name);
+    await Promise.all([get().refreshStatus(), get().resetHistory(), get().refreshBranches()]);
+    return result;
+  },
+
+  cherryPick: async (oid) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return { conflicted: false, new_oid: null } satisfies CherryPickResult;
+    const result = await api.cherryPick(repoPath, oid);
+    await Promise.all([get().refreshStatus(), get().resetHistory()]);
+    return result;
+  },
+
+  revertCommit: async (oid) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return { conflicted: false, new_oid: null } satisfies CherryPickResult;
+    const result = await api.revertCommit(repoPath, oid);
+    await Promise.all([get().refreshStatus(), get().resetHistory()]);
+    return result;
   },
 
   resetHistory: async () => {

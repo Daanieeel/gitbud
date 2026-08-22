@@ -6,6 +6,7 @@ mod history;
 mod image_diff;
 mod repo;
 mod stash;
+mod system;
 mod watch;
 
 use std::collections::HashMap;
@@ -50,6 +51,11 @@ fn create_branch(repo_path: String, name: String, checkout: bool) -> Result<(), 
 }
 
 #[tauri::command]
+fn create_branch_at(repo_path: String, name: String, oid: String, checkout: bool) -> Result<(), String> {
+    repo::create_branch_at(&repo_path, &name, &oid, checkout)
+}
+
+#[tauri::command]
 fn stage_paths(repo_path: String, paths: Vec<String>) -> Result<(), String> {
     repo::stage_paths(&repo_path, &paths)
 }
@@ -60,8 +66,43 @@ fn unstage_paths(repo_path: String, paths: Vec<String>) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn discard_file(repo_path: String, path: String) -> Result<(), String> {
+    repo::discard_file(&repo_path, &path)
+}
+
+#[tauri::command]
 fn commit(repo_path: String, summary: String, description: String) -> Result<String, String> {
     repo::commit(&repo_path, &summary, &description)
+}
+
+#[tauri::command]
+fn amend_commit(repo_path: String, summary: String, description: String) -> Result<String, String> {
+    repo::amend_commit(&repo_path, &summary, &description)
+}
+
+#[tauri::command]
+fn cherry_pick(repo_path: String, oid: String) -> Result<repo::CherryPickResult, String> {
+    repo::cherry_pick(&repo_path, &oid)
+}
+
+#[tauri::command]
+fn revert_commit(repo_path: String, oid: String) -> Result<repo::CherryPickResult, String> {
+    repo::revert_commit(&repo_path, &oid)
+}
+
+#[tauri::command]
+fn delete_branch(repo_path: String, name: String) -> Result<(), String> {
+    repo::delete_branch(&repo_path, &name)
+}
+
+#[tauri::command]
+fn rename_branch(repo_path: String, old_name: String, new_name: String) -> Result<(), String> {
+    repo::rename_branch(&repo_path, &old_name, &new_name)
+}
+
+#[tauri::command]
+fn merge_branch(repo_path: String, branch_name: String) -> Result<repo::CherryPickResult, String> {
+    repo::merge_branch(&repo_path, &branch_name)
 }
 
 // --- diffs ---
@@ -219,6 +260,16 @@ fn github_set_client_id(client_id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn github_get_host() -> Result<String, String> {
+    github::auth::get_host()
+}
+
+#[tauri::command]
+fn github_set_host(host: String) -> Result<(), String> {
+    github::auth::set_host(&host)
+}
+
+#[tauri::command]
 fn github_list_accounts() -> Result<Vec<github::auth::Account>, String> {
     github::auth::list_accounts()
 }
@@ -235,7 +286,8 @@ async fn github_detect_gh_cli() -> Result<Option<github::auth::Account>, String>
 
 #[tauri::command]
 async fn github_start_device_flow(client_id: String) -> Result<github::auth::DeviceCodeResponse, String> {
-    github::auth::start_device_flow(&client_id).await
+    let host = github::auth::get_host()?;
+    github::auth::start_device_flow(&host, &client_id).await
 }
 
 #[tauri::command]
@@ -243,16 +295,18 @@ async fn github_poll_device_flow(
     client_id: String,
     device_code: String,
 ) -> Result<github::auth::PollResult, String> {
-    github::auth::poll_device_flow(&client_id, &device_code).await
+    let host = github::auth::get_host()?;
+    github::auth::poll_device_flow(&host, &client_id, &device_code).await
 }
 
 // --- github: pull requests ---
 
-fn github_resolve(repo_path: &str, login: &str) -> Result<(String, String, String), String> {
+fn github_resolve(repo_path: &str, login: &str) -> Result<(String, String, String, String), String> {
+    let host = github::auth::get_host()?;
     let token = github::auth::get_token(login)?;
     let (owner, repo) = config::remote_owner_repo(repo_path)
         .ok_or("repository has no GitHub-style origin remote")?;
-    Ok((token, owner, repo))
+    Ok((host, token, owner, repo))
 }
 
 #[tauri::command]
@@ -264,9 +318,10 @@ fn github_remote_owner_repo(repo_path: String) -> Option<(String, String)> {
 async fn github_list_pull_requests(
     repo_path: String,
     login: String,
+    state: String,
 ) -> Result<Vec<github::api::PullRequest>, String> {
-    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::list_pull_requests(&token, &owner, &repo).await
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_pull_requests(&host, &token, &owner, &repo, &state).await
 }
 
 #[tauri::command]
@@ -275,8 +330,8 @@ async fn github_get_pull_request(
     login: String,
     number: u64,
 ) -> Result<github::api::PullRequest, String> {
-    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::get_pull_request(&token, &owner, &repo, number).await
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_pull_request(&host, &token, &owner, &repo, number).await
 }
 
 #[tauri::command]
@@ -289,8 +344,8 @@ async fn github_create_pull_request(
     body: String,
     draft: bool,
 ) -> Result<github::api::PullRequest, String> {
-    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::create_pull_request(&token, &owner, &repo, &title, &head, &base, &body, draft).await
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::create_pull_request(&host, &token, &owner, &repo, &title, &head, &base, &body, draft).await
 }
 
 #[tauri::command]
@@ -299,8 +354,8 @@ async fn github_list_check_runs(
     login: String,
     sha: String,
 ) -> Result<Vec<github::api::CheckRun>, String> {
-    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::list_check_runs(&token, &owner, &repo, &sha).await
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_check_runs(&host, &token, &owner, &repo, &sha).await
 }
 
 #[tauri::command]
@@ -309,14 +364,15 @@ async fn github_get_commit_verification(
     login: String,
     sha: String,
 ) -> Result<github::api::CommitVerification, String> {
-    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::get_commit_verification(&token, &owner, &repo, &sha).await
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_commit_verification(&host, &token, &owner, &repo, &sha).await
 }
 
 #[tauri::command]
 async fn github_list_user_repos(login: String) -> Result<Vec<github::api::GitHubRepo>, String> {
+    let host = github::auth::get_host()?;
     let token = github::auth::get_token(&login)?;
-    github::api::list_user_repos(&token).await
+    github::api::list_user_repos(&host, &token).await
 }
 
 #[tauri::command]
@@ -340,8 +396,8 @@ async fn github_merge_pull_request(
     number: u64,
     merge_method: String,
 ) -> Result<(), String> {
-    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::merge_pull_request(&token, &owner, &repo, number, &merge_method).await
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::merge_pull_request(&host, &token, &owner, &repo, number, &merge_method).await
 }
 
 #[tauri::command]
@@ -350,8 +406,8 @@ async fn github_list_pull_request_files(
     login: String,
     number: u64,
 ) -> Result<Vec<(String, String, diff::FileDiff)>, String> {
-    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::list_pull_request_files(&token, &owner, &repo, number).await
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_pull_request_files(&host, &token, &owner, &repo, number).await
 }
 
 #[tauri::command]
@@ -360,8 +416,8 @@ async fn github_list_review_comments(
     login: String,
     number: u64,
 ) -> Result<Vec<github::api::ReviewComment>, String> {
-    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::list_review_comments(&token, &owner, &repo, number).await
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_review_comments(&host, &token, &owner, &repo, number).await
 }
 
 #[tauri::command]
@@ -376,11 +432,16 @@ async fn github_create_review_comment(
     side: String,
     body: String,
 ) -> Result<github::api::ReviewComment, String> {
-    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
     github::api::create_review_comment(
-        &token, &owner, &repo, number, &commit_id, &path, line, &side, &body,
+        &host, &token, &owner, &repo, number, &commit_id, &path, line, &side, &body,
     )
     .await
+}
+
+#[tauri::command]
+fn open_in_terminal(path: String) -> Result<(), String> {
+    system::open_in_terminal(&path)
 }
 
 // --- filesystem watch ---
@@ -416,9 +477,17 @@ pub fn run() {
             list_branches,
             checkout_branch,
             create_branch,
+            create_branch_at,
             stage_paths,
             unstage_paths,
+            discard_file,
             commit,
+            amend_commit,
+            cherry_pick,
+            revert_commit,
+            delete_branch,
+            rename_branch,
+            merge_branch,
             list_stashes,
             stash_save,
             stash_apply,
@@ -444,10 +513,13 @@ pub fn run() {
             get_upstream_ahead_behind,
             sync_upstream,
             checkout_pull_request,
+            open_in_terminal,
             start_watch,
             stop_watch,
             github_get_client_id,
             github_set_client_id,
+            github_get_host,
+            github_set_host,
             github_list_accounts,
             github_remove_account,
             github_detect_gh_cli,

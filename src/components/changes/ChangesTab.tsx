@@ -12,10 +12,8 @@ export function ChangesTab() {
   const selectedFilePath = useRepoStore((s) => s.selectedFilePath);
   const selectedFileDiff = useRepoStore((s) => s.selectedFileDiff);
   const selectedFileImageDiff = useRepoStore((s) => s.selectedFileImageDiff);
-  const branch = useRepoStore((s) => s.branch);
   const selectFile = useRepoStore((s) => s.selectFile);
   const toggleStaged = useRepoStore((s) => s.toggleStaged);
-  const doCommit = useRepoStore((s) => s.doCommit);
 
   const [filter, setFilter] = useState("");
 
@@ -35,7 +33,6 @@ export function ChangesTab() {
   }
 
   const allStaged = filtered.length > 0 && filtered.every((f) => f.staged);
-  const hasStagedChanges = files.some((f) => f.staged);
 
   return (
     <div className="flex h-full min-w-0 flex-1">
@@ -73,11 +70,7 @@ export function ChangesTab() {
             </div>
           </>
         )}
-        <CommitBox
-          branch={branch}
-          hasStagedChanges={hasStagedChanges}
-          onCommit={(summary, description) => doCommit(summary, description)}
-        />
+        <CommitBox />
       </div>
       <div className="min-w-0 flex-1">
         <DiffView path={selectedFilePath} diff={selectedFileDiff} imageDiff={selectedFileImageDiff} />

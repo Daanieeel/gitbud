@@ -1,34 +1,80 @@
-import { useState } from "react";
+import { useEffect } from "react";
+import { TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useRepoStore } from "@/store/useRepoStore";
+import { isProtectedBranch } from "@/lib/utils";
 
-interface CommitBoxProps {
-  branch: string | null;
-  hasStagedChanges: boolean;
-  onCommit: (summary: string, description: string) => Promise<void>;
-}
+export function CommitBox() {
+  const branch = useRepoStore((s) => s.branch);
+  const status = useRepoStore((s) => s.status);
+  const commits = useRepoStore((s) => s.commits);
+  const summary = useRepoStore((s) => s.commitSummary);
+  const description = useRepoStore((s) => s.commitDescription);
+  const amending = useRepoStore((s) => s.amending);
+  const setSummary = useRepoStore((s) => s.setCommitSummary);
+  const setDescription = useRepoStore((s) => s.setCommitDescription);
+  const setAmending = useRepoStore((s) => s.setAmending);
+  const doCommit = useRepoStore((s) => s.doCommit);
+  const doAmendCommit = useRepoStore((s) => s.doAmendCommit);
 
-export function CommitBox({ branch, hasStagedChanges, onCommit }: CommitBoxProps) {
-  const [summary, setSummary] = useState("");
-  const [description, setDescription] = useState("");
-  const [committing, setCommitting] = useState(false);
+  const stagedFiles = status?.files.filter((f) => f.staged) ?? [];
+  const hasStagedChanges = stagedFiles.length > 0;
+  const lastCommit = commits[0];
 
-  const disabled = !hasStagedChanges || summary.trim().length === 0 || committing;
+  // Pre-fill a sensible summary for the common single-file-change case, without
+  // clobbering anything the user has already typed.
+  useEffect(() => {
+    if (summary.trim() || amending) return;
+    if (stagedFiles.length === 1) {
+      const name = stagedFiles[0].path.split("/").pop();
+      setSummary(`Update ${name}`);
+    }
+    // Only re-run when the staged set changes, not on every keystroke.
+  }, [stagedFiles.map((f) => f.path).join("|")]);
 
-  const submit = async () => {
-    if (disabled) return;
-    setCommitting(true);
-    try {
-      await onCommit(summary.trim(), description.trim());
+  const toggleAmend = (next: boolean) => {
+    setAmending(next);
+    if (next && lastCommit) {
+      setSummary(lastCommit.summary);
+    } else if (!next) {
       setSummary("");
       setDescription("");
-    } finally {
-      setCommitting(false);
     }
   };
 
+  const disabled = amending
+    ? summary.trim().length === 0
+    : !hasStagedChanges || summary.trim().length === 0;
+
+  const submit = async () => {
+    if (disabled) return;
+    if (amending) {
+      await doAmendCommit(summary.trim(), description.trim());
+    } else {
+      await doCommit(summary.trim(), description.trim());
+    }
+  };
+
+  const protectedWarning = branch && isProtectedBranch(branch);
+
   return (
     <div className="flex shrink-0 flex-col gap-2 border-t border-border p-2">
+      {protectedWarning && (
+        <div className="flex items-center gap-1.5 rounded-md bg-accent-yellow/10 px-2 py-1 text-xs text-accent-yellow">
+          <TriangleAlertIcon className="size-3.5 shrink-0" />
+          You're committing directly to {branch}
+        </div>
+      )}
+      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={amending}
+          disabled={!lastCommit}
+          onChange={(e) => toggleAmend(e.target.checked)}
+        />
+        Amend last commit
+      </label>
       <Input
         placeholder="Summary (required)"
         value={summary}
@@ -45,7 +91,7 @@ export function CommitBox({ branch, hasStagedChanges, onCommit }: CommitBoxProps
         className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
       />
       <Button disabled={disabled} onClick={() => void submit()}>
-        Commit to {branch ?? "…"}
+        {amending ? "Amend Last Commit" : `Commit to ${branch ?? "…"}`}
       </Button>
     </div>
   );

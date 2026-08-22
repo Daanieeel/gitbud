@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
-import { usePRStore } from "@/store/usePRStore";
+import { usePRStore, type PRFilter } from "@/store/usePRStore";
 import { PRList } from "./PRList";
 import { PRDetail } from "./PRDetail";
 import { CreatePRDialog } from "./CreatePRDialog";
 import { api } from "@/lib/tauri";
+
+const FILTERS: { key: PRFilter; label: string }[] = [
+  { key: "open", label: "Open" },
+  { key: "closed", label: "Closed" },
+  { key: "all", label: "All" },
+];
 
 export function PRTab() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -14,6 +21,8 @@ export function PRTab() {
   const pulls = usePRStore((s) => s.pulls);
   const loading = usePRStore((s) => s.loading);
   const loadError = usePRStore((s) => s.loadError);
+  const filter = usePRStore((s) => s.filter);
+  const setFilter = usePRStore((s) => s.setFilter);
   const selectedNumber = usePRStore((s) => s.selectedNumber);
   const load = usePRStore((s) => s.load);
   const selectPR = usePRStore((s) => s.selectPR);
@@ -28,7 +37,7 @@ export function PRTab() {
 
   useEffect(() => {
     if (repoPath && currentLogin && hasRemote) void load(repoPath, currentLogin);
-  }, [repoPath, currentLogin, hasRemote, load]);
+  }, [repoPath, currentLogin, hasRemote, filter, load]);
 
   if (!repoPath) return null;
 
@@ -54,12 +63,26 @@ export function PRTab() {
     <div className="flex h-full min-w-0 flex-1">
       <div className="flex w-80 shrink-0 flex-col border-r border-border">
         <div className="flex shrink-0 items-center justify-between border-b border-border p-2">
-          <span className="text-xs font-medium text-muted-foreground">
-            {loading ? "Loading…" : `${pulls.length} open`}
-          </span>
+          <div className="flex gap-1">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => setFilter(f.key)}
+                className={cn(
+                  "rounded-md px-2 py-1 text-xs hover:bg-accent",
+                  filter === f.key && "bg-accent font-medium",
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
             New Pull Request
           </Button>
+        </div>
+        <div className="border-b border-border px-2 py-1 text-xs text-muted-foreground">
+          {loading ? "Loading…" : `${pulls.length} ${filter}`}
         </div>
         {loadError && <div className="p-2 text-xs text-destructive">{loadError}</div>}
         <div className="min-h-0 flex-1">

@@ -62,6 +62,40 @@ pub fn set_client_id(client_id: &str) -> Result<(), String> {
     fs::write(client_id_file()?, client_id.trim()).map_err(|e| e.to_string())
 }
 
+fn host_file() -> Result<PathBuf, String> {
+    Ok(config_dir()?.join("github_host.txt"))
+}
+
+/// GitHub host — "github.com" by default, or a GitHub Enterprise Server hostname.
+pub fn get_host() -> Result<String, String> {
+    let file = host_file()?;
+    if !file.exists() {
+        return Ok("github.com".to_string());
+    }
+    let contents = fs::read_to_string(&file).map_err(|e| e.to_string())?;
+    let trimmed = contents.trim().to_string();
+    Ok(if trimmed.is_empty() { "github.com".to_string() } else { trimmed })
+}
+
+pub fn set_host(host: &str) -> Result<(), String> {
+    let trimmed = host.trim().trim_start_matches("https://").trim_start_matches("http://");
+    fs::write(host_file()?, trimmed).map_err(|e| e.to_string())
+}
+
+/// REST API base for a GitHub host: api.github.com for github.com itself, or
+/// `https://{host}/api/v3` for GitHub Enterprise Server.
+pub fn api_base(host: &str) -> String {
+    if host == "github.com" {
+        "https://api.github.com".to_string()
+    } else {
+        format!("https://{host}/api/v3")
+    }
+}
+
+pub fn web_base(host: &str) -> String {
+    format!("https://{host}")
+}
+
 pub fn list_accounts() -> Result<Vec<Account>, String> {
     let file = accounts_file()?;
     if !file.exists() {
@@ -108,10 +142,10 @@ const USER_AGENT: &str = "GitBud";
 
 /// Fetches the account for a token and persists it (keychain + accounts.json). Shared by
 /// both the device-flow success path and `gh` CLI token detection.
-async fn complete_login(token: &str) -> Result<Account, String> {
+async fn complete_login(host: &str, token: &str) -> Result<Account, String> {
     let client = reqwest::Client::new();
     let user = client
-        .get("https://api.github.com/user")
+        .get(format!("{}/user", api_base(host)))
         .header("Authorization", format!("Bearer {token}"))
         .header("User-Agent", USER_AGENT)
         .send()
@@ -133,9 +167,13 @@ async fn complete_login(token: &str) -> Result<Account, String> {
 /// Looks for an existing `gh` CLI login (`gh auth token`) and, if found, adopts it as a
 /// GitBud account — zero-config sign-in for developers who already use the GitHub CLI.
 pub async fn detect_gh_cli() -> Result<Option<Account>, String> {
-    let output = std::process::Command::new("gh")
-        .args(["auth", "token"])
-        .output();
+    let host = get_host()?;
+    let mut cmd = std::process::Command::new("gh");
+    cmd.args(["auth", "token"]);
+    if host != "github.com" {
+        cmd.args(["--hostname", &host]);
+    }
+    let output = cmd.output();
 
     let Ok(output) = output else { return Ok(None) };
     if !output.status.success() {
@@ -145,13 +183,13 @@ pub async fn detect_gh_cli() -> Result<Option<Account>, String> {
     if token.is_empty() {
         return Ok(None);
     }
-    complete_login(&token).await.map(Some)
+    complete_login(&host, &token).await.map(Some)
 }
 
-pub async fn start_device_flow(client_id: &str) -> Result<DeviceCodeResponse, String> {
+pub async fn start_device_flow(host: &str, client_id: &str) -> Result<DeviceCodeResponse, String> {
     let client = reqwest::Client::new();
     let res = client
-        .post("https://github.com/login/device/code")
+        .post(format!("{}/login/device/code", web_base(host)))
         .header("Accept", "application/json")
         .header("User-Agent", USER_AGENT)
         .form(&[("client_id", client_id), ("scope", "repo")])
@@ -181,10 +219,14 @@ struct GitHubUserResponse {
 /// Polls the token endpoint once. The caller (frontend) is responsible for waiting
 /// `interval` seconds between calls and giving up after `expires_in`, so this never
 /// blocks for long — it's a single request/response round trip.
-pub async fn poll_device_flow(client_id: &str, device_code: &str) -> Result<PollResult, String> {
+pub async fn poll_device_flow(
+    host: &str,
+    client_id: &str,
+    device_code: &str,
+) -> Result<PollResult, String> {
     let client = reqwest::Client::new();
     let res = client
-        .post("https://github.com/login/oauth/access_token")
+        .post(format!("{}/login/oauth/access_token", web_base(host)))
         .header("Accept", "application/json")
         .header("User-Agent", USER_AGENT)
         .form(&[
@@ -200,7 +242,7 @@ pub async fn poll_device_flow(client_id: &str, device_code: &str) -> Result<Poll
         .map_err(|e| e.to_string())?;
 
     if let Some(token) = res.access_token {
-        let account = complete_login(&token).await?;
+        let account = complete_login(host, &token).await?;
         return Ok(PollResult::Success { account });
     }
 
