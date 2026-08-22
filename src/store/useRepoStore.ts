@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/tauri";
 import { notify } from "@/lib/notify";
 import { useNetworkStore } from "./useNetworkStore";
+import { useStashStore } from "./useStashStore";
 import type {
   AheadBehind,
   BranchInfo,
@@ -129,6 +130,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     await listen<string>("repo-changed", (event) => {
       if (event.payload === get().selectedRepo) {
         void get().refreshStatus();
+        void useStashStore.getState().load(event.payload);
       }
     });
   },
@@ -168,6 +170,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       get().refreshBranches(),
       get().loadMoreHistory(),
       get().refreshAheadBehind(),
+      useStashStore.getState().load(path),
     ]);
   },
 
@@ -523,7 +526,17 @@ async function runSync(
   const startedAt = Date.now();
   set({ syncing: true });
   const label = opts?.description ?? "Working…";
-  const cancelAction = { label: "Cancel", onClick: () => void api.cancelGitOperation(eventId) };
+  let resolveCancelled: () => void;
+  const cancelled = new Promise<"cancelled">((resolve) => {
+    resolveCancelled = () => resolve("cancelled");
+  });
+  const cancelAction = {
+    label: "Cancel",
+    onClick: () => {
+      void api.cancelGitOperation(eventId).catch(() => {});
+      resolveCancelled();
+    },
+  };
   toast.loading(label, { id: eventId, description: undefined, cancel: cancelAction });
 
   const unlisten = await listen<GitOutputLine>(`git://${eventId}`, (event) => {
@@ -537,8 +550,12 @@ async function runSync(
     const timedOut = new Promise<"timeout">((resolve) => {
       setTimeout(() => resolve("timeout"), SYNC_TIMEOUT_MS);
     });
-    const outcome = await Promise.race([settled, timedOut]);
+    const outcome = await Promise.race([settled, timedOut, cancelled]);
 
+    if (outcome === "cancelled") {
+      toast(`${label.replace(/…$/, "")} cancelled`, { id: eventId });
+      return;
+    }
     if (outcome === "timeout") {
       void api.cancelGitOperation(eventId).catch(() => {});
       const message = `${label.replace(/…$/, "")} timed out after ${SYNC_TIMEOUT_MS / 1000}s with no response and was cancelled.`;
