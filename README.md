@@ -34,6 +34,7 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 ## Roadmap
 
 - [ ] Auto-updater
+- [ ] Bring uncommitted changes to other branch feature
 - [ ] GitHub profile pictures in commit history
 - [ ] Settings redesign
 - [ ] ...and more to come
