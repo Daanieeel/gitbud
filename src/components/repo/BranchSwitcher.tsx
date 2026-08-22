@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   ChevronsUpDownIcon,
+  CloudUploadIcon,
   CopyIcon,
   ExternalLinkIcon,
   GitBranchIcon,
@@ -29,6 +30,7 @@ import { githubBranchUrl } from "@/lib/github-links";
 export function BranchSwitcher() {
   const branch = useRepoStore((s) => s.branch);
   const branches = useRepoStore((s) => s.branches);
+  const aheadBehind = useRepoStore((s) => s.aheadBehind);
   const checkoutBranch = useRepoStore((s) => s.checkoutBranch);
   const createBranch = useRepoStore((s) => s.createBranch);
   const deleteBranch = useRepoStore((s) => s.deleteBranch);
@@ -78,6 +80,11 @@ export function BranchSwitcher() {
             {branch && isProtectedBranch(branch) && (
               <span title={`${branch} is a protected default branch`}>
                 <TriangleAlertIcon className="size-3.5 shrink-0 text-accent-yellow" />
+              </span>
+            )}
+            {branch && !aheadBehind.published && (
+              <span title={`${branch} has never been pushed — not published to origin`}>
+                <CloudUploadIcon className="size-3.5 shrink-0 text-accent-blue" />
               </span>
             )}
           </span>

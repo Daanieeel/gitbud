@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::io::Read;
 use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -17,6 +17,10 @@ pub struct GitOutputLine {
 pub struct AheadBehind {
     pub ahead: usize,
     pub behind: usize,
+    /// Whether the current branch has an `origin` upstream at all. `false` means the branch
+    /// has never been pushed (`git push` would fail without `-u`) — distinct from being merely
+    /// up to date, which also reports `ahead: 0, behind: 0`.
+    pub published: bool,
 }
 
 /// How long a streamed git operation can go with zero output before we assume it's stuck
@@ -53,6 +57,48 @@ fn kill_pid(pid: u32) {
 #[cfg(not(target_os = "windows"))]
 fn kill_pid(pid: u32) {
     let _ = Command::new("kill").args(["-9", &pid.to_string()]).status();
+}
+
+/// Reads raw bytes from `reader` (rather than `BufRead::lines()`), splitting on `\n` OR `\r`
+/// so that git's carriage-return-driven progress meter (`Receiving objects: 45% (.../...)\r`)
+/// counts as activity too — not just newline-terminated lines. Line-based reading would leave
+/// the idle-activity timestamp stale for the entire duration of a large transfer (git's
+/// progress meter never emits a trailing `\n` until each phase completes), which could trip
+/// `IDLE_TIMEOUT` and kill a slow-but-perfectly-healthy fetch/pull/push.
+fn stream_reader(
+    mut reader: impl Read + Send + 'static,
+    activity: Arc<Mutex<Instant>>,
+    app: AppHandle,
+    event: String,
+    stream_name: &'static str,
+) -> std::thread::JoinHandle<()> {
+    std::thread::spawn(move || {
+        let mut pending = Vec::new();
+        let mut buf = [0u8; 4096];
+        let emit = |app: &AppHandle, segment: &[u8]| {
+            let line = String::from_utf8_lossy(segment).trim().to_string();
+            if !line.is_empty() {
+                let _ = app.emit(&event, GitOutputLine { stream: stream_name.into(), line });
+            }
+        };
+        loop {
+            match reader.read(&mut buf) {
+                Ok(0) => break,
+                Ok(n) => {
+                    *activity.lock().unwrap() = Instant::now();
+                    pending.extend_from_slice(&buf[..n]);
+                    while let Some(pos) = pending.iter().position(|&b| b == b'\n' || b == b'\r') {
+                        let segment: Vec<u8> = pending.drain(..=pos).collect();
+                        emit(&app, &segment[..segment.len() - 1]);
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+        if !pending.is_empty() {
+            emit(&app, &pending);
+        }
+    })
 }
 
 /// Runs a system `git` subcommand, streaming each output line to the frontend as a
@@ -92,25 +138,8 @@ fn run_streaming(app: &AppHandle, cwd: Option<&str>, args: &[&str], event_id: &s
         .map_err(|_| "internal lock error".to_string())?
         .insert(event_id.to_string(), RunningOp { pid: child.id(), cancelled: Arc::clone(&cancelled) });
 
-    let app_out = app.clone();
-    let event_out = format!("git://{event_id}");
-    let activity_out = Arc::clone(&last_activity);
-    let out_handle = std::thread::spawn(move || {
-        for line in BufReader::new(stdout).lines().map_while(Result::ok) {
-            *activity_out.lock().unwrap() = Instant::now();
-            let _ = app_out.emit(&event_out, GitOutputLine { stream: "stdout".into(), line });
-        }
-    });
-
-    let app_err = app.clone();
-    let event_err = format!("git://{event_id}");
-    let activity_err = Arc::clone(&last_activity);
-    let err_handle = std::thread::spawn(move || {
-        for line in BufReader::new(stderr).lines().map_while(Result::ok) {
-            *activity_err.lock().unwrap() = Instant::now();
-            let _ = app_err.emit(&event_err, GitOutputLine { stream: "stderr".into(), line });
-        }
-    });
+    let out_handle = stream_reader(stdout, Arc::clone(&last_activity), app.clone(), format!("git://{event_id}"), "stdout");
+    let err_handle = stream_reader(stderr, Arc::clone(&last_activity), app.clone(), format!("git://{event_id}"), "stderr");
 
     let done = Arc::new(AtomicBool::new(false));
     let watchdog_done = Arc::clone(&done);
@@ -154,22 +183,28 @@ fn run_streaming(app: &AppHandle, cwd: Option<&str>, args: &[&str], event_id: &s
 }
 
 pub fn fetch(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
-    run_streaming(app, Some(repo_path), &["fetch", "--prune"], event_id)
+    run_streaming(app, Some(repo_path), &["fetch", "--prune", "--progress"], event_id)
 }
 
 pub fn pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
     use crate::settings::PullStrategy;
     let strategy = crate::settings::get_settings().map(|s| s.pull_strategy).unwrap_or(PullStrategy::Merge);
     let args: &[&str] = match strategy {
-        PullStrategy::Merge => &["pull"],
-        PullStrategy::Rebase => &["pull", "--rebase"],
-        PullStrategy::FfOnly => &["pull", "--ff-only"],
+        PullStrategy::Merge => &["pull", "--progress"],
+        PullStrategy::Rebase => &["pull", "--rebase", "--progress"],
+        PullStrategy::FfOnly => &["pull", "--ff-only", "--progress"],
     };
     run_streaming(app, Some(repo_path), args, event_id)
 }
 
+/// Always passes `-u origin HEAD` rather than a bare `git push` — harmless once a branch is
+/// already tracking `origin`, but means a never-before-pushed ("unpublished") branch gets a
+/// tracking branch set up on its very first push instead of failing with "no upstream branch".
+/// `--progress` keeps a steady trickle of output flowing on a slow push instead of git going
+/// silent for the whole transfer (git suppresses its progress meter by default on a non-tty
+/// pipe, which is exactly what we give it here).
 pub fn push(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
-    run_streaming(app, Some(repo_path), &["push"], event_id)
+    run_streaming(app, Some(repo_path), &["push", "-u", "origin", "HEAD", "--progress"], event_id)
 }
 
 pub fn lfs_pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
@@ -243,13 +278,13 @@ pub fn get_ahead_behind(repo_path: &str) -> Result<AheadBehind, String> {
     let upstream_ref = format!("refs/remotes/origin/{branch_name}");
     let upstream_oid = match repo.refname_to_id(&upstream_ref) {
         Ok(oid) => oid,
-        Err(_) => return Ok(AheadBehind { ahead: 0, behind: 0 }),
+        Err(_) => return Ok(AheadBehind { ahead: 0, behind: 0, published: false }),
     };
 
     let (ahead, behind) = repo
         .graph_ahead_behind(local_oid, upstream_oid)
         .map_err(|e| e.message().to_string())?;
-    Ok(AheadBehind { ahead, behind })
+    Ok(AheadBehind { ahead, behind, published: true })
 }
 
 /// Ahead/behind of the local branch vs. `upstream/{branch}` (the fork's origin, as opposed
@@ -271,7 +306,7 @@ pub fn get_upstream_ahead_behind(repo_path: &str, branch: &str) -> Result<Option
     let (ahead, behind) = repo
         .graph_ahead_behind(local_oid, upstream_oid)
         .map_err(|e| e.message().to_string())?;
-    Ok(Some(AheadBehind { ahead, behind }))
+    Ok(Some(AheadBehind { ahead, behind, published: true }))
 }
 
 // `run_streaming` (and everything built on it — fetch/pull/push/clone/lfs_pull/etc, plus the

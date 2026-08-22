@@ -163,6 +163,8 @@ export interface Workspace {
 export interface AheadBehind {
   ahead: number;
   behind: number;
+  /** False means the branch has never been pushed — no upstream on `origin` yet. */
+  published: boolean;
 }
 
 export interface GitOutputLine {

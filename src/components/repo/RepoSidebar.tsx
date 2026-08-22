@@ -77,7 +77,7 @@ export function RepoSidebar() {
     void Promise.all(
       repos.map(
         async (r) =>
-          [r.path, await api.getAheadBehind(r.path).catch(() => ({ ahead: 0, behind: 0 }))] as const,
+          [r.path, await api.getAheadBehind(r.path).catch(() => ({ ahead: 0, behind: 0, published: true }))] as const,
       ),
     ).then((results) => {
       if (cancelled) return;

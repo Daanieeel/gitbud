@@ -49,6 +49,7 @@ interface RepoState {
   syncLog: GitOutputLine[];
   syncError: string | null;
   syncEventId: string | null;
+  syncDescription: string | null;
 
   globalListenersReady: boolean;
 
@@ -122,11 +123,12 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   selectedCommitDiff: null,
   selectedCommitImageDiff: null,
 
-  aheadBehind: { ahead: 0, behind: 0 },
+  aheadBehind: { ahead: 0, behind: 0, published: true },
   syncing: false,
   syncLog: [],
   syncError: null,
   syncEventId: null,
+  syncDescription: null,
 
   globalListenersReady: false,
 
@@ -166,7 +168,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       selectedCommitFilePath: null,
       selectedCommitDiff: null,
       selectedCommitImageDiff: null,
-      aheadBehind: { ahead: 0, behind: 0 },
+      aheadBehind: { ahead: 0, behind: 0, published: true },
     });
 
     await api.startWatch(path).catch(() => {});
@@ -209,7 +211,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       const aheadBehind = await api.getAheadBehind(repoPath);
       if (get().selectedRepo === repoPath) set({ aheadBehind });
     } catch {
-      if (get().selectedRepo === repoPath) set({ aheadBehind: { ahead: 0, behind: 0 } });
+      if (get().selectedRepo === repoPath) set({ aheadBehind: { ahead: 0, behind: 0, published: true } });
     }
   },
 
@@ -286,6 +288,8 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   doCommit: async (summary, description) => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
+    const stagedCount = get().status?.files.filter((f) => f.staged).length ?? 0;
+    const branch = get().branch ?? "current branch";
     await api.commit(repoPath, summary, description);
     pushRecentCommitMessage(summary);
     set({
@@ -296,11 +300,14 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       commitDescription: "",
     });
     await Promise.all([get().refreshStatus(), get().resetHistory()]);
+    const fileWord = stagedCount === 1 ? "file" : "files";
+    void notify(`Committed ${stagedCount} ${fileWord} to ${branch}`, summary);
   },
 
   doAmendCommit: async (summary, description) => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
+    const branch = get().branch ?? "current branch";
     await api.amendCommit(repoPath, summary, description);
     pushRecentCommitMessage(summary);
     set({
@@ -312,6 +319,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       amending: false,
     });
     await Promise.all([get().refreshStatus(), get().resetHistory()]);
+    void notify(`Amended commit on ${branch}`, summary);
   },
 
   checkoutBranch: async (branch) => {
@@ -425,32 +433,50 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   fetch: async () => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    await runSync(get, set, repoPath, () => api.gitFetch(repoPath), "Fetch");
+    await runSync(get, set, repoPath, () => api.gitFetch(repoPath), {
+      description: "Fetching origin…",
+      doneMessage: "Fetched origin",
+    });
     await Promise.all([get().refreshBranches(), get().refreshStatus(), get().refreshAheadBehind()]);
     void get().loadRepos();
   },
   pull: async () => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    await runSync(get, set, repoPath, () => api.gitPull(repoPath), "Pull");
+    const branch = get().branch ?? "current branch";
+    await runSync(get, set, repoPath, () => api.gitPull(repoPath), {
+      description: `Pulling origin/${branch}…`,
+      doneMessage: `Pulled origin/${branch}`,
+    });
     await Promise.all([get().refreshStatus(), get().resetHistory(), get().refreshAheadBehind()]);
   },
   push: async () => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    await runSync(get, set, repoPath, () => api.gitPush(repoPath), "Push");
+    const branch = get().branch ?? "current branch";
+    const publish = !get().aheadBehind.published;
+    await runSync(get, set, repoPath, () => api.gitPush(repoPath), {
+      description: publish ? `Publishing ${branch} to origin…` : `Pushing ${branch} to origin…`,
+      doneMessage: publish ? `Published ${branch} to origin` : `Pushed ${branch} to origin`,
+    });
     await get().refreshAheadBehind();
   },
   pullLfs: async () => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    await runSync(get, set, repoPath, () => api.gitLfsPull(repoPath));
+    await runSync(get, set, repoPath, () => api.gitLfsPull(repoPath), {
+      description: "Pulling LFS objects from origin…",
+      doneMessage: "Pulled LFS objects from origin",
+    });
   },
   pushLfs: async () => {
     const repoPath = get().selectedRepo;
     const branch = get().branch;
     if (!repoPath || !branch) return;
-    await runSync(get, set, repoPath, () => api.gitLfsPush(repoPath, branch));
+    await runSync(get, set, repoPath, () => api.gitLfsPush(repoPath, branch), {
+      description: `Pushing LFS objects for ${branch} to origin…`,
+      doneMessage: `Pushed LFS objects for ${branch} to origin`,
+    });
   },
   cancelSync: async () => {
     const eventId = get().syncEventId;
@@ -464,7 +490,10 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     await get().selectRepo(path);
   },
   cloneRepo: async (url, dest) => {
-    await runSync(get, set, dest, () => api.gitClone(url, dest));
+    await runSync(get, set, dest, () => api.gitClone(url, dest), {
+      description: `Cloning ${url}…`,
+      doneMessage: `Cloned ${url}`,
+    });
     const repos = await api.addRepo(dest);
     set({ repos });
     await get().selectRepo(dest);
@@ -492,9 +521,9 @@ async function runSync(
   set: (partial: Partial<RepoState>) => void,
   eventId: string,
   action: () => Promise<void>,
-  label?: string,
+  opts?: { description: string; doneMessage: string },
 ) {
-  set({ syncing: true, syncLog: [], syncError: null, syncEventId: eventId });
+  set({ syncing: true, syncLog: [], syncError: null, syncEventId: eventId, syncDescription: opts?.description ?? null });
   const unlisten = await listen<GitOutputLine>(`git://${eventId}`, (event) => {
     set({ syncLog: [...get().syncLog, event.payload] });
   });
@@ -502,15 +531,15 @@ async function runSync(
   try {
     await action();
     useNetworkStore.getState().noteSuccess();
-    if (label && Date.now() - startedAt > NOTIFY_THRESHOLD_MS) {
+    if (opts && Date.now() - startedAt > NOTIFY_THRESHOLD_MS) {
       const repoName = get().repos.find((r) => r.path === eventId)?.name ?? eventId;
-      void notify(`${label} complete`, repoName);
+      void notify(opts.doneMessage, repoName);
     }
   } catch (e) {
     set({ syncError: String(e) });
     useNetworkStore.getState().noteError(String(e));
   } finally {
     unlisten();
-    set({ syncing: false, syncEventId: null });
+    set({ syncing: false, syncEventId: null, syncDescription: null });
   }
 }

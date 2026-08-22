@@ -10,6 +10,7 @@ export function SyncLogToast() {
   const syncing = useRepoStore((s) => s.syncing);
   const syncLog = useRepoStore((s) => s.syncLog);
   const syncError = useRepoStore((s) => s.syncError);
+  const syncDescription = useRepoStore((s) => s.syncDescription);
   const cancelSync = useRepoStore((s) => s.cancelSync);
   const [visible, setVisible] = useState(false);
 
@@ -37,7 +38,7 @@ export function SyncLogToast() {
       )}
       <div className="max-h-40 overflow-auto font-mono text-xs">
         {syncLog.length === 0 ? (
-          <div className="text-muted-foreground">Working…</div>
+          <div className="text-muted-foreground">{syncDescription ?? "Working…"}</div>
         ) : (
           syncLog.map((entry, i) => (
             <div key={i} className={entry.stream === "stderr" ? "text-muted-foreground" : undefined}>
