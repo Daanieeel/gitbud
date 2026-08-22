@@ -197,7 +197,6 @@ function UnifiedLine({
           {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
         </span>
         <span
-          className="min-w-0 flex-1"
           dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }}
         />
         {onCopyPermalink && line.new_lineno != null && (
@@ -250,12 +249,12 @@ function toSplitRows(hunk: DiffHunk): SplitRow[] {
 
 function SplitCell({ line, language }: { line: DiffLine | null; language: string | undefined }) {
   if (!line) {
-    return <div className="flex-1 bg-muted/30 px-3 py-px" />;
+    return <div className="w-max min-w-[50%] bg-muted/30 px-3 py-px" />;
   }
   return (
     <div
       className={cn(
-        "flex flex-1 px-3 py-px whitespace-pre",
+        "flex w-max min-w-[50%] px-3 py-px whitespace-pre",
         line.kind === "addition" &&
           "bg-[color-mix(in_srgb,var(--accent-green)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--accent-green)_18%,transparent)]",
         line.kind === "deletion" &&
@@ -275,10 +274,7 @@ function SplitCell({ line, language }: { line: DiffLine | null; language: string
       >
         {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
       </span>
-      <span
-        className="min-w-0 flex-1"
-        dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }}
-      />
+      <span dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }} />
     </div>
   );
 }
@@ -354,18 +350,20 @@ function DiffViewImpl({
           <span>{diff.path}</span>
           {ViewToggle}
         </div>
-        {diff.hunks.map((hunk, hunkIdx) => (
-          <div key={hunkIdx}>
-            <HunkHeader hunk={hunk} hunkIdx={hunkIdx} hunkActions={hunkActions} />
-            {toSplitRows(hunk).map((row, rowIdx) => (
-              <div key={rowIdx} className="flex">
-                <SplitCell line={row.left} language={language} />
-                <div className="w-px shrink-0 bg-border" />
-                <SplitCell line={row.right} language={language} />
-              </div>
-            ))}
-          </div>
-        ))}
+        <div className="w-max min-w-full">
+          {diff.hunks.map((hunk, hunkIdx) => (
+            <div key={hunkIdx}>
+              <HunkHeader hunk={hunk} hunkIdx={hunkIdx} hunkActions={hunkActions} />
+              {toSplitRows(hunk).map((row, rowIdx) => (
+                <div key={rowIdx} className="flex">
+                  <SplitCell line={row.left} language={language} />
+                  <div className="w-px shrink-0 bg-border" />
+                  <SplitCell line={row.right} language={language} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -376,25 +374,27 @@ function DiffViewImpl({
         <span>{diff.path}</span>
         {ViewToggle}
       </div>
-      {diff.hunks.map((hunk, hunkIdx) => (
-        <div key={hunkIdx}>
-          <HunkHeader hunk={hunk} hunkIdx={hunkIdx} hunkActions={hunkActions} />
-          {hunk.lines.map((line, lineIdx) => (
-            <UnifiedLine
-              key={lineIdx}
-              line={line}
-              hunkIdx={hunkIdx}
-              lineIdx={lineIdx}
-              language={language}
-              comments={comments}
-              onAddComment={onAddComment}
-              onCopyPermalink={onCopyPermalink}
-              composerKey={composerKey}
-              setComposerKey={setComposerKey}
-            />
-          ))}
-        </div>
-      ))}
+      <div className="w-max min-w-full">
+        {diff.hunks.map((hunk, hunkIdx) => (
+          <div key={hunkIdx}>
+            <HunkHeader hunk={hunk} hunkIdx={hunkIdx} hunkActions={hunkActions} />
+            {hunk.lines.map((line, lineIdx) => (
+              <UnifiedLine
+                key={lineIdx}
+                line={line}
+                hunkIdx={hunkIdx}
+                lineIdx={lineIdx}
+                language={language}
+                comments={comments}
+                onAddComment={onAddComment}
+                onCopyPermalink={onCopyPermalink}
+                composerKey={composerKey}
+                setComposerKey={setComposerKey}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
