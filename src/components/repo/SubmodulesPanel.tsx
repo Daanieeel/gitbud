@@ -45,7 +45,11 @@ export function SubmodulesPanel() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" title="Submodules">
+        <Button
+          variant="outline"
+          size="sm"
+          title="Submodules — nested git repositories checked out at a specific commit inside this one"
+        >
           <BoxIcon className="size-3.5" />
           {submodules.length}
           {uninitialized > 0 && <span className="text-accent-yellow">!</span>}

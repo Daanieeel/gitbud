@@ -204,7 +204,10 @@ export function CommitList({
                   <GitBranchPlusIcon className="size-3.5" />
                   Create Branch Here
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => onRebaseFromHere(commit.oid)}>
+                <ContextMenuItem
+                  onSelect={() => onRebaseFromHere(commit.oid)}
+                  title="Rebase — replay the commits after this one on top of a new base, rewriting their history"
+                >
                   <ListOrderedIcon className="size-3.5" />
                   Interactive Rebase from Here
                 </ContextMenuItem>

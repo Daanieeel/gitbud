@@ -70,7 +70,10 @@ export function CommitBox() {
           You're committing directly to {branch}
         </div>
       )}
-      <label className="flex items-center gap-2 text-xs text-muted-foreground">
+      <label
+        className="flex items-center gap-2 text-xs text-muted-foreground"
+        title="Amend — replace the last commit with this message and any currently staged changes, instead of creating a new commit"
+      >
         <input
           type="checkbox"
           checked={amending}

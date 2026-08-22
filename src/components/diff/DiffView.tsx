@@ -110,6 +110,7 @@ function HunkHeader({ hunk, hunkIdx, hunkActions }: { hunk: DiffHunk; hunkIdx: n
                   size="sm"
                   variant="outline"
                   className="h-6 px-2 text-xs"
+                  title="A hunk is this one contiguous block of changed lines — unstage just it, leaving the rest of the file's staged changes alone"
                   onClick={() => hunkActions.onUnstage?.(hunkIdx)}
                 >
                   Unstage Hunk
@@ -120,6 +121,7 @@ function HunkHeader({ hunk, hunkIdx, hunkActions }: { hunk: DiffHunk; hunkIdx: n
                   size="sm"
                   variant="outline"
                   className="h-6 px-2 text-xs"
+                  title="A hunk is this one contiguous block of changed lines — stage just it, leaving the rest of the file unstaged"
                   onClick={() => hunkActions.onStage?.(hunkIdx)}
                 >
                   Stage Hunk
@@ -130,6 +132,7 @@ function HunkHeader({ hunk, hunkIdx, hunkActions }: { hunk: DiffHunk; hunkIdx: n
               size="sm"
               variant="outline"
               className="h-6 px-2 text-xs hover:border-destructive hover:text-destructive"
+              title="Permanently discard just this hunk's changes, leaving the rest of the file's edits intact"
               onClick={() => hunkActions.onDiscard?.(hunkIdx)}
             >
               Discard Hunk
