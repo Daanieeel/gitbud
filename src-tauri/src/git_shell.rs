@@ -273,3 +273,21 @@ pub fn get_upstream_ahead_behind(repo_path: &str, branch: &str) -> Result<Option
         .map_err(|e| e.message().to_string())?;
     Ok(Some(AheadBehind { ahead, behind }))
 }
+
+// `run_streaming` (and everything built on it — fetch/pull/push/clone/lfs_pull/etc, plus the
+// idle-timeout watchdog and the kill-on-cancel path) needs a real `tauri::AppHandle` to emit
+// progress events, which there's no lightweight way to construct in a unit test. That's the
+// same reason these were never tested before this module grew a cancel registry. The one
+// slice of that machinery that doesn't need an AppHandle — `cancel`'s registry lookup — is
+// covered here; the rest is exercised by manually running the app.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cancel_reports_no_running_operation_for_unknown_event_id() {
+        let result = cancel("no-such-event-id");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("No running git operation"));
+    }
+}

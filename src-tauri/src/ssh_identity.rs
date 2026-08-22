@@ -84,3 +84,72 @@ pub fn clear_from_repo(repo_path: &str) -> Result<(), String> {
         Err(e) => Err(e.message().to_string()),
     }
 }
+
+// Only `apply_to_repo`/`clear_from_repo` are covered here — `list`/`add`/`remove` read and
+// write `~/.config/gitbud/ssh_identities.json` with no test seam, and exercising them would
+// mean mutating the real user's config directory from `cargo test`.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct ScratchRepo {
+        path: std::path::PathBuf,
+    }
+
+    impl ScratchRepo {
+        fn new(name: &str) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "gitbud-test-ssh-identity-{name}-{}",
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+            ));
+            std::fs::create_dir_all(&path).unwrap();
+            git2::Repository::init(&path).unwrap();
+            Self { path }
+        }
+
+        fn path_str(&self) -> String {
+            self.path.to_string_lossy().to_string()
+        }
+    }
+
+    impl Drop for ScratchRepo {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+
+    #[test]
+    fn apply_and_clear_roundtrip() {
+        let scratch = ScratchRepo::new("roundtrip");
+        let repo_path = scratch.path_str();
+
+        apply_to_repo(&repo_path, "/home/user/.ssh/id_ed25519").unwrap();
+        let repo = git2::Repository::open(&repo_path).unwrap();
+        let config = repo.config().unwrap();
+        assert_eq!(
+            config.get_string("core.sshCommand").unwrap(),
+            "ssh -i '/home/user/.ssh/id_ed25519' -o IdentitiesOnly=yes"
+        );
+
+        clear_from_repo(&repo_path).unwrap();
+        let repo = git2::Repository::open(&repo_path).unwrap();
+        assert!(repo.config().unwrap().get_string("core.sshCommand").is_err());
+    }
+
+    #[test]
+    fn apply_escapes_single_quotes_in_key_path() {
+        let scratch = ScratchRepo::new("escaping");
+        let repo_path = scratch.path_str();
+
+        apply_to_repo(&repo_path, "/tmp/it's a key").unwrap();
+        let repo = git2::Repository::open(&repo_path).unwrap();
+        let command = repo.config().unwrap().get_string("core.sshCommand").unwrap();
+        assert_eq!(command, "ssh -i '/tmp/it'\\''s a key' -o IdentitiesOnly=yes");
+    }
+
+    #[test]
+    fn clear_is_a_noop_when_nothing_was_applied() {
+        let scratch = ScratchRepo::new("noop-clear");
+        clear_from_repo(&scratch.path_str()).unwrap();
+    }
+}

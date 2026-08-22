@@ -110,3 +110,75 @@ pub fn get_signing_status(repo_path: &str) -> Result<SigningStatus, String> {
         signing_key: config.get_string("user.signingkey").ok(),
     })
 }
+
+// Only the repo-local (`global: false`) path is tested here. The `global: true` path opens
+// `git2::Config::open_default()` — the real machine-wide `~/.gitconfig` — and there's no seam
+// to redirect that in a unit test without risking mutating the developer's actual git config.
+// `generate_gpg_key`/`list_gpg_keys` are skipped too: they depend on `gpg` being installed and
+// (for generation) take real wall-clock time for entropy, which is exactly the flaky/slow
+// combination not worth unit-testing.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct ScratchRepo {
+        path: std::path::PathBuf,
+    }
+
+    impl ScratchRepo {
+        fn new(name: &str) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "gitbud-test-signing-{name}-{}",
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+            ));
+            std::fs::create_dir_all(&path).unwrap();
+            Repository::init(&path).unwrap();
+            Self { path }
+        }
+
+        fn path_str(&self) -> String {
+            self.path.to_string_lossy().to_string()
+        }
+    }
+
+    impl Drop for ScratchRepo {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+
+    #[test]
+    fn configure_and_disable_signing_roundtrip() {
+        let scratch = ScratchRepo::new("roundtrip");
+        let repo_path = scratch.path_str();
+
+        let status = get_signing_status(&repo_path).unwrap();
+        assert!(!status.enabled);
+
+        configure_signing(&repo_path, "ssh", "/home/user/.ssh/signing.pub", false).unwrap();
+        let status = get_signing_status(&repo_path).unwrap();
+        assert!(status.enabled);
+        assert_eq!(status.format.as_deref(), Some("ssh"));
+        assert_eq!(status.signing_key.as_deref(), Some("/home/user/.ssh/signing.pub"));
+
+        disable_signing(&repo_path, false).unwrap();
+        let status = get_signing_status(&repo_path).unwrap();
+        assert!(!status.enabled);
+        // Disabling only flips commit.gpgsign back off — it deliberately leaves the key
+        // configured so re-enabling doesn't require picking a key again.
+        assert_eq!(status.signing_key.as_deref(), Some("/home/user/.ssh/signing.pub"));
+    }
+
+    #[test]
+    fn generate_ssh_signing_key_writes_a_usable_keypair() {
+        let dir = std::env::temp_dir().join(format!("gitbud-test-signing-sshkey-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let key_path = dir.join("id_ed25519").to_string_lossy().to_string();
+
+        let pubkey = generate_ssh_signing_key(&key_path, "test@example.com").unwrap();
+
+        assert!(pubkey.starts_with("ssh-ed25519 "));
+        assert!(std::path::Path::new(&key_path).exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+}

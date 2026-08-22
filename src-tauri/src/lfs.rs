@@ -76,3 +76,67 @@ pub fn check_lfs_files(repo_path: &str, paths: &[String]) -> Result<Vec<LfsFileI
         })
         .collect())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct ScratchRepo {
+        path: std::path::PathBuf,
+    }
+
+    impl ScratchRepo {
+        fn new(name: &str) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "gitbud-test-lfs-{name}-{}",
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+            ));
+            std::fs::create_dir_all(&path).unwrap();
+            git2::Repository::init(&path).unwrap();
+            Self { path }
+        }
+
+        fn path_str(&self) -> String {
+            self.path.to_string_lossy().to_string()
+        }
+    }
+
+    impl Drop for ScratchRepo {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+
+    #[test]
+    fn has_lfs_reflects_gitattributes() {
+        let scratch = ScratchRepo::new("detect");
+        assert!(!has_lfs(&scratch.path_str()));
+
+        std::fs::write(scratch.path.join(".gitattributes"), "*.bin filter=lfs diff=lfs merge=lfs -text\n").unwrap();
+        assert!(has_lfs(&scratch.path_str()));
+    }
+
+    #[test]
+    fn check_lfs_files_parses_tracked_pointer_and_ignores_untracked() {
+        let scratch = ScratchRepo::new("check-files");
+        let repo_path = scratch.path_str();
+        std::fs::write(scratch.path.join(".gitattributes"), "*.bin filter=lfs diff=lfs merge=lfs -text\n").unwrap();
+        std::fs::write(
+            scratch.path.join("big.bin"),
+            "version https://git-lfs.github.com/spec/v1\noid sha256:abc123\nsize 4096\n",
+        )
+        .unwrap();
+        std::fs::write(scratch.path.join("normal.txt"), "just text\n").unwrap();
+
+        let results = check_lfs_files(&repo_path, &["big.bin".to_string(), "normal.txt".to_string()]).unwrap();
+
+        let big = results.iter().find(|f| f.path == "big.bin").unwrap();
+        assert!(big.is_lfs);
+        assert_eq!(big.oid.as_deref(), Some("abc123"));
+        assert_eq!(big.size, Some(4096));
+
+        let normal = results.iter().find(|f| f.path == "normal.txt").unwrap();
+        assert!(!normal.is_lfs);
+        assert_eq!(normal.oid, None);
+    }
+}
