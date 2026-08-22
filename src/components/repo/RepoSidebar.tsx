@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { listen } from "@tauri-apps/api/event";
 import { Input } from "@/components/ui/input";
 import {
   ContextMenu,
@@ -352,6 +353,27 @@ export function RepoSidebar() {
       cancelled = true;
     };
   }, [repos]);
+
+  // The effect above only recomputes dirty/aheadBehind when the repo *list* changes (add/remove),
+  // so a commit or other git activity in an already-listed repo never refreshed its dot here —
+  // unlike the Changes tab, which does subscribe to repo-changed (see useRepoStore). Refresh just
+  // the affected repo on each event instead of redoing the full list.
+  useEffect(() => {
+    const unlisten = listen<string>("repo-changed", (event) => {
+      const path = event.payload;
+      void api
+        .isDirty(path)
+        .catch(() => false)
+        .then((isDirty) => setDirty((prev) => ({ ...prev, [path]: isDirty })));
+      void api
+        .getAheadBehind(path)
+        .catch(() => ({ ahead: 0, behind: 0, published: true }))
+        .then((ab) => setAheadBehind((prev) => ({ ...prev, [path]: ab })));
+    });
+    return () => {
+      void unlisten.then((f) => f());
+    };
+  }, []);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
