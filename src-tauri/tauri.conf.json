@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "GitBud",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "identifier": "com.gitbud.app",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -40,8 +40,10 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
-      "endpoints": []
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY4QUIyMzZFMDlFOUZFODAKUldTQS91a0piaU9yK0k0TUJSczZMdDRZTllhcjhKQ0FYWmpCRThhSXdiU1BoY0o1WWVjYk5tTzcK",
+      "endpoints": [
+        "https://github.com/Daanieeel/gitbud/releases/latest/download/latest.json"
+      ]
     }
   }
 }

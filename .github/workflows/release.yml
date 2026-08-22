@@ -49,17 +49,16 @@ jobs:
 
       - run: npm ci
 
-      # No updater signing key is configured yet (tauri.conf.json's updater pubkey/endpoints
-      # are empty) — these are plain, unsigned installers. Fine for early releases; add
-      # TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD secrets and the matching
-      # env vars here once the updater is actually wired up.
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          includeUpdaterJson: true
           tagName: ${{ github.ref_name }}
           releaseName: "GitBud ${{ github.ref_name }}"
           releaseBody: "See the assets below to download and install for your platform."
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
