@@ -26,15 +26,7 @@ export function WorkspacePicker() {
   const active = workspaces.find((w) => w.id === activeId);
 
   if (workspaces.length === 0) {
-    return (
-      <>
-        <Button variant="ghost" size="sm" className="h-6 justify-start px-1 text-xs text-muted-foreground" onClick={() => setManageOpen(true)}>
-          <FolderKanbanIcon className="size-3" />
-          New Workspace…
-        </Button>
-        <WorkspaceDialog open={manageOpen} onOpenChange={setManageOpen} />
-      </>
-    );
+    return null;
   }
 
   return (

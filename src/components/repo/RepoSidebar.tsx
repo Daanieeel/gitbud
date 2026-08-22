@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   CopyIcon,
-  FolderInputIcon,
   FolderOpenIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
+  PinIcon,
   RefreshCwIcon,
   TerminalIcon,
   Trash2Icon,
@@ -25,6 +25,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Button } from "@/components/ui/button";
 import { AddRepoMenu } from "./AddRepoMenu";
 import { BatchSyncTrigger } from "./BatchSyncPanel";
+import { PinToSectionDialog } from "./PinToSectionDialog";
 import { WorkspacePicker } from "./WorkspacePicker";
 import { AccountBar } from "@/components/github/AccountBar";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
@@ -37,19 +38,183 @@ import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { AheadBehind, RepoEntry } from "@/lib/types";
 
-function groupKey(repo: RepoEntry): string {
-  return repo.section ?? repo.group;
-}
-
 function groupRepos(repos: RepoEntry[]): Map<string, RepoEntry[]> {
   const groups = new Map<string, RepoEntry[]>();
   for (const repo of repos) {
-    const key = groupKey(repo);
-    const list = groups.get(key) ?? [];
+    const list = groups.get(repo.group) ?? [];
     list.push(repo);
-    groups.set(key, list);
+    groups.set(repo.group, list);
   }
   return groups;
+}
+
+/** Repos pinned to a custom section, grouped and sorted by that section name. Pinning is
+ * additive — a repo keeps showing up under its own organization's group too, so this is
+ * layered on top of `groupRepos`, not a replacement for it. */
+function pinnedGroups(repos: RepoEntry[]): Map<string, RepoEntry[]> {
+  const groups = new Map<string, RepoEntry[]>();
+  for (const repo of repos) {
+    if (!repo.section) continue;
+    const list = groups.get(repo.section) ?? [];
+    list.push(repo);
+    groups.set(repo.section, list);
+  }
+  for (const list of groups.values()) list.sort((a, b) => a.name.localeCompare(b.name));
+  return new Map([...groups.entries()].sort(([a], [b]) => a.localeCompare(b)));
+}
+
+interface RepoRowProps {
+  repo: RepoEntry;
+  selected: boolean;
+  syncingHere: boolean;
+  dirty: boolean;
+  ab: AheadBehind | undefined;
+  showAheadBehind: boolean;
+  draggable: boolean;
+  dragged: boolean;
+  confirmRemove: boolean;
+  onSelect: () => void;
+  onDragStart: () => void;
+  onDragOver: (e: React.DragEvent) => void;
+  onDrop: (e: React.DragEvent) => void;
+  onDragEnd: () => void;
+  onConfirmRemoveChange: (open: boolean) => void;
+  onRemove: () => void;
+  onPinToSection: () => void;
+}
+
+function RepoRow({
+  repo,
+  selected,
+  syncingHere,
+  dirty,
+  ab,
+  showAheadBehind,
+  draggable,
+  dragged,
+  confirmRemove,
+  onSelect,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
+  onConfirmRemoveChange,
+  onRemove,
+  onPinToSection,
+}: RepoRowProps) {
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div
+          draggable={draggable}
+          onDragStart={onDragStart}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
+          onDragEnd={onDragEnd}
+          className={cn(
+            "group flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer",
+            selected && "bg-accent",
+            draggable && "cursor-grab active:cursor-grabbing",
+            dragged && "opacity-50",
+          )}
+          onClick={onSelect}
+        >
+          {syncingHere ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <RefreshCwIcon className="size-3 shrink-0 animate-spin text-primary" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>Syncing…</TooltipContent>
+            </Tooltip>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span
+                  className={cn("size-1.5 shrink-0 rounded-full", dirty ? "bg-primary" : "bg-transparent")}
+                />
+              </TooltipTrigger>
+              <TooltipContent>{dirty ? "Uncommitted changes" : undefined}</TooltipContent>
+            </Tooltip>
+          )}
+          <span className="truncate flex-1">{repo.name}</span>
+          {showAheadBehind && ab && (ab.ahead > 0 || ab.behind > 0) && (
+            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+              {ab.ahead > 0 && `↑${ab.ahead}`}
+              {ab.behind > 0 && `↓${ab.behind}`}
+            </span>
+          )}
+          <Popover open={confirmRemove} onOpenChange={onConfirmRemoveChange}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onConfirmRemoveChange(true);
+                    }}
+                    className={cn(
+                      "shrink-0 rounded-md bg-destructive/10 p-1 text-destructive opacity-0 hover:bg-destructive/20 group-hover:opacity-100",
+                      confirmRemove && "opacity-100",
+                    )}
+                  >
+                    <XIcon className="size-3.5" />
+                  </button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Remove from list</TooltipContent>
+            </Tooltip>
+            <PopoverContent
+              align="end"
+              className="w-56 space-y-2 bg-accent-blue/5 p-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <p className="text-sm">Remove "{repo.name}" from the list?</p>
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onClick={() => onConfirmRemoveChange(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => {
+                    onConfirmRemoveChange(false);
+                    onRemove();
+                  }}
+                >
+                  Remove
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={() => void api.openInTerminal(repo.path)}>
+          <TerminalIcon className="size-3.5" />
+          Open in Terminal
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => void revealItemInDir(repo.path)}>
+          <FolderOpenIcon className="size-3.5" />
+          Open in Finder
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => void copyToClipboard(repo.path)}>
+          <CopyIcon className="size-3.5" />
+          Copy Path
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={onPinToSection}>
+          <PinIcon className="size-3.5" />
+          Pin to Section…
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem variant="destructive" onSelect={onRemove}>
+          <Trash2Icon className="size-3.5" />
+          Remove from Sidebar
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
 }
 
 export function RepoSidebar() {
@@ -73,6 +238,7 @@ export function RepoSidebar() {
   const [aheadBehind, setAheadBehind] = useState<Record<string, AheadBehind>>({});
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const [confirmRemovePath, setConfirmRemovePath] = useState<string | null>(null);
+  const [pinSectionRepo, setPinSectionRepo] = useState<RepoEntry | null>(null);
   const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem("sidebar-collapsed") === "1");
 
   useEffect(() => {
@@ -147,6 +313,11 @@ export function RepoSidebar() {
     return copy;
   }, [filtered, sidebarSort]);
 
+  const pinned = useMemo(
+    () => (sidebarSort === "group" ? pinnedGroups(sorted) : new Map<string, RepoEntry[]>()),
+    [sorted, sidebarSort],
+  );
+
   const grouped = useMemo(() => {
     if (sidebarSort !== "group") {
       return new Map([["", sorted]]);
@@ -156,14 +327,19 @@ export function RepoSidebar() {
     return new Map([...groups.entries()].sort(([a], [b]) => a.localeCompare(b)));
   }, [sorted, sidebarSort]);
 
-  const moveToSection = async (repo: RepoEntry) => {
-    const input = window.prompt(
-      "Move to section (leave blank to use the default grouping):",
-      repo.section ?? "",
-    );
-    if (input === null) return;
-    const updated = await api.setRepoSection(repo.path, input.trim() || null);
+  const knownSections = useMemo(
+    () =>
+      Array.from(new Set(repos.map((r) => r.section).filter((s): s is string => !!s))).sort((a, b) =>
+        a.localeCompare(b),
+      ),
+    [repos],
+  );
+
+  const pinToSection = async (section: string | null) => {
+    if (!pinSectionRepo) return;
+    const updated = await api.setRepoSection(pinSectionRepo.path, section);
     setReposLocal({ repos: updated });
+    setPinSectionRepo(null);
   };
 
   const reorder = async (overPath: string) => {
@@ -261,6 +437,36 @@ export function RepoSidebar() {
             {repos.length === 0 ? 'Use "+" to add a repository' : "No matches"}
           </div>
         )}
+        {[...pinned.entries()].map(([section, sectionRepos]) => (
+          <div key={`pin:${section}`}>
+            <div className="flex items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground">
+              <PinIcon className="size-3" />
+              {section}
+            </div>
+            {sectionRepos.map((repo) => (
+              <RepoRow
+                key={repo.path}
+                repo={repo}
+                selected={selectedRepo === repo.path}
+                syncingHere={syncing && selectedRepo === repo.path}
+                dirty={!!dirty[repo.path]}
+                ab={aheadBehind[repo.path]}
+                showAheadBehind={showAheadBehind}
+                draggable={false}
+                dragged={false}
+                confirmRemove={confirmRemovePath === repo.path}
+                onSelect={() => void selectRepo(repo.path)}
+                onDragStart={() => {}}
+                onDragOver={() => {}}
+                onDrop={() => {}}
+                onDragEnd={() => {}}
+                onConfirmRemoveChange={(open) => setConfirmRemovePath(open ? repo.path : null)}
+                onRemove={() => void removeRepo(repo.path)}
+                onPinToSection={() => setPinSectionRepo(repo)}
+              />
+            ))}
+          </div>
+        ))}
         {[...grouped.entries()].map(([group, groupRepos]) => (
           <div key={group}>
             {group && (
@@ -268,140 +474,34 @@ export function RepoSidebar() {
                 {group}
               </div>
             )}
-            {groupRepos.map((repo) => {
-              const ab = aheadBehind[repo.path];
-              return (
-                <ContextMenu key={repo.path}>
-                  <ContextMenuTrigger asChild>
-                    <div
-                      draggable={sidebarSort === "manual"}
-                      onDragStart={() => setDraggedPath(repo.path)}
-                      onDragOver={(e) => {
-                        if (sidebarSort === "manual") e.preventDefault();
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        void reorder(repo.path);
-                        setDraggedPath(null);
-                      }}
-                      onDragEnd={() => setDraggedPath(null)}
-                      className={cn(
-                        "group flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer",
-                        selectedRepo === repo.path && "bg-accent",
-                        sidebarSort === "manual" && "cursor-grab active:cursor-grabbing",
-                        draggedPath === repo.path && "opacity-50",
-                      )}
-                      onClick={() => void selectRepo(repo.path)}
-                    >
-                      {syncing && selectedRepo === repo.path ? (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span>
-                              <RefreshCwIcon className="size-3 shrink-0 animate-spin text-primary" />
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>Syncing…</TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span
-                              className={cn(
-                                "size-1.5 shrink-0 rounded-full",
-                                dirty[repo.path] ? "bg-primary" : "bg-transparent",
-                              )}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            {dirty[repo.path] ? "Uncommitted changes" : undefined}
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                      <span className="truncate flex-1">{repo.name}</span>
-                      {showAheadBehind && ab && (ab.ahead > 0 || ab.behind > 0) && (
-                        <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-                          {ab.ahead > 0 && `↑${ab.ahead}`}
-                          {ab.behind > 0 && `↓${ab.behind}`}
-                        </span>
-                      )}
-                      <Popover
-                        open={confirmRemovePath === repo.path}
-                        onOpenChange={(open) => setConfirmRemovePath(open ? repo.path : null)}
-                      >
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <PopoverTrigger asChild>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setConfirmRemovePath(repo.path);
-                                }}
-                                className={cn(
-                                  "shrink-0 rounded-md bg-destructive/10 p-1 text-destructive opacity-0 hover:bg-destructive/20 group-hover:opacity-100",
-                                  confirmRemovePath === repo.path && "opacity-100",
-                                )}
-                              >
-                                <XIcon className="size-3.5" />
-                              </button>
-                            </PopoverTrigger>
-                          </TooltipTrigger>
-                          <TooltipContent>Remove from list</TooltipContent>
-                        </Tooltip>
-                        <PopoverContent
-                          align="end"
-                          className="w-56 space-y-2 bg-accent-blue/5 p-3"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <p className="text-sm">Remove "{repo.name}" from the list?</p>
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => setConfirmRemovePath(null)}
-                            >
-                              Cancel
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => {
-                                setConfirmRemovePath(null);
-                                void removeRepo(repo.path);
-                              }}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <ContextMenuItem onSelect={() => void api.openInTerminal(repo.path)}>
-                      <TerminalIcon className="size-3.5" />
-                      Open in Terminal
-                    </ContextMenuItem>
-                    <ContextMenuItem onSelect={() => void revealItemInDir(repo.path)}>
-                      <FolderOpenIcon className="size-3.5" />
-                      Open in Finder
-                    </ContextMenuItem>
-                    <ContextMenuItem onSelect={() => void copyToClipboard(repo.path)}>
-                      <CopyIcon className="size-3.5" />
-                      Copy Path
-                    </ContextMenuItem>
-                    <ContextMenuItem onSelect={() => void moveToSection(repo)}>
-                      <FolderInputIcon className="size-3.5" />
-                      Move to Section…
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem variant="destructive" onSelect={() => void removeRepo(repo.path)}>
-                      <Trash2Icon className="size-3.5" />
-                      Remove from Sidebar
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              );
-            })}
+            {groupRepos.map((repo) => (
+              <RepoRow
+                key={repo.path}
+                repo={repo}
+                selected={selectedRepo === repo.path}
+                syncingHere={syncing && selectedRepo === repo.path}
+                dirty={!!dirty[repo.path]}
+                ab={aheadBehind[repo.path]}
+                showAheadBehind={showAheadBehind}
+                draggable={sidebarSort === "manual"}
+                dragged={draggedPath === repo.path}
+                confirmRemove={confirmRemovePath === repo.path}
+                onSelect={() => void selectRepo(repo.path)}
+                onDragStart={() => setDraggedPath(repo.path)}
+                onDragOver={(e) => {
+                  if (sidebarSort === "manual") e.preventDefault();
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  void reorder(repo.path);
+                  setDraggedPath(null);
+                }}
+                onDragEnd={() => setDraggedPath(null)}
+                onConfirmRemoveChange={(open) => setConfirmRemovePath(open ? repo.path : null)}
+                onRemove={() => void removeRepo(repo.path)}
+                onPinToSection={() => setPinSectionRepo(repo)}
+              />
+            ))}
           </div>
         ))}
       </div>
@@ -414,7 +514,13 @@ export function RepoSidebar() {
         </>
       )}
     </aside>
-    {!collapsed && <ResizeHandle onPointerDown={onPointerDown} />}
+    {!collapsed && <ResizeHandle onPointerDown={onPointerDown} tooltip={false} />}
+    <PinToSectionDialog
+      repo={pinSectionRepo}
+      sections={knownSections}
+      onOpenChange={(open) => !open && setPinSectionRepo(null)}
+      onPin={(section) => void pinToSection(section)}
+    />
     </div>
   );
 }
