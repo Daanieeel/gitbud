@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useRepoStore } from "@/store/useRepoStore";
 import { FileList } from "./FileList";
-import { StashPanel } from "./StashPanel";
 import { ConflictResolutionPanel } from "./ConflictResolutionPanel";
 import { DiffView } from "@/components/diff/DiffView";
 import { CommitBox } from "@/components/commit/CommitBox";
@@ -45,9 +44,6 @@ export function ChangesTab() {
   return (
     <div className="flex h-full min-w-0 flex-1">
       <div style={{ width }} className="flex shrink-0 flex-col border-r border-border">
-        <div className="flex shrink-0 items-center justify-end border-b border-border p-2">
-          <StashPanel hasChanges={files.length > 0} />
-        </div>
         {files.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-4 text-center text-sm text-muted-foreground">
             No local changes
