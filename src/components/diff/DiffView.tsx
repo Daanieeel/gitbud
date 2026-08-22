@@ -103,22 +103,37 @@ function HunkHeader({ hunk, hunkIdx, hunkActions }: { hunk: DiffHunk; hunkIdx: n
     <div className="flex items-center justify-between bg-muted px-3 py-1 text-muted-foreground">
       <span>{hunk.header}</span>
       {hunkActions && (
-        <span className="flex gap-2 text-xs">
+        <span className="flex gap-1.5 text-xs">
           {hunkActions.staged
             ? hunkActions.onUnstage && (
-                <button className="hover:text-foreground" onClick={() => hunkActions.onUnstage?.(hunkIdx)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => hunkActions.onUnstage?.(hunkIdx)}
+                >
                   Unstage Hunk
-                </button>
+                </Button>
               )
             : hunkActions.onStage && (
-                <button className="hover:text-foreground" onClick={() => hunkActions.onStage?.(hunkIdx)}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-6 px-2 text-xs"
+                  onClick={() => hunkActions.onStage?.(hunkIdx)}
+                >
                   Stage Hunk
-                </button>
+                </Button>
               )}
           {!hunkActions.staged && hunkActions.onDiscard && (
-            <button className="hover:text-destructive" onClick={() => hunkActions.onDiscard?.(hunkIdx)}>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs hover:border-destructive hover:text-destructive"
+              onClick={() => hunkActions.onDiscard?.(hunkIdx)}
+            >
               Discard Hunk
-            </button>
+            </Button>
           )}
         </span>
       )}
