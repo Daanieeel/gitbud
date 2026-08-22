@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GitPullRequestIcon, SettingsIcon } from "lucide-react";
+import { GitPullRequestIcon } from "lucide-react";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { BranchSwitcher } from "@/components/repo/BranchSwitcher";
@@ -10,7 +10,6 @@ import { WorktreesPanel } from "@/components/repo/WorktreesPanel";
 import { ReflogPanel } from "@/components/history/ReflogPanel";
 import { LfsPanel } from "@/components/repo/LfsPanel";
 import { SyncButton } from "@/components/repo/SyncButton";
-import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { CreatePRDialog } from "@/components/pr/CreatePRDialog";
 import { OfflineIndicator } from "./OfflineIndicator";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,6 @@ export function Toolbar() {
     (s) => s.repos.find((r) => r.path === s.selectedRepo)?.name,
   );
   const currentLogin = useGitHubStore((s) => s.currentLogin);
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [previewPrOpen, setPreviewPrOpen] = useState(false);
 
   return (
@@ -47,10 +45,6 @@ export function Toolbar() {
         </Button>
       )}
       <SyncButton />
-      <Button variant="ghost" size="icon" title="Settings" onClick={() => setSettingsOpen(true)}>
-        <SettingsIcon className="size-4" />
-      </Button>
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <CreatePRDialog open={previewPrOpen} onOpenChange={setPreviewPrOpen} />
     </header>
   );

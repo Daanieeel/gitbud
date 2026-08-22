@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { KeyRoundIcon, MapPinIcon, PlusIcon, TriangleAlertIcon, XIcon } from "lucide-react";
+import { KeyRoundIcon, MapPinIcon, PlusIcon, SettingsIcon, TriangleAlertIcon, XIcon } from "lucide-react";
+import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { GitHubMark } from "./GitHubMark";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -63,6 +64,7 @@ export function AccountBar() {
 
   const [sshDialogOpen, setSshDialogOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     void init();
@@ -94,10 +96,11 @@ export function AccountBar() {
           </Button>
         </div>
       )}
+      <div className="flex items-center gap-1">
       {identities.length === 0 ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full">
+            <Button variant="outline" size="sm" className="min-w-0 flex-1">
               <PlusIcon className="size-3.5" />
               Add identity
             </Button>
@@ -116,7 +119,7 @@ export function AccountBar() {
       ) : (
         <Popover open={switcherOpen} onOpenChange={setSwitcherOpen}>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-full justify-start gap-2">
+            <Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start gap-2">
               {current && <IdentityAvatar identity={current} />}
               <span className="truncate">{current ? identityLabel(current) : "No identity"}</span>
               {repoOverride && (
@@ -215,8 +218,19 @@ export function AccountBar() {
           </PopoverContent>
         </Popover>
       )}
+      <Button
+        variant="ghost"
+        size="icon"
+        title="Settings"
+        className="shrink-0"
+        onClick={() => setSettingsOpen(true)}
+      >
+        <SettingsIcon className="size-4" />
+      </Button>
+      </div>
       <SignInDialog open={signInOpen} onOpenChange={(open) => (open ? openSignIn() : closeSignIn())} />
       <AddSshIdentityDialog open={sshDialogOpen} onOpenChange={setSshDialogOpen} />
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 }
