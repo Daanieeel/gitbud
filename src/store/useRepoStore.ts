@@ -86,6 +86,8 @@ interface RepoState {
   fetch: () => Promise<void>;
   pull: () => Promise<void>;
   push: () => Promise<void>;
+  pullLfs: () => Promise<void>;
+  pushLfs: () => Promise<void>;
   cancelSync: () => Promise<void>;
 
   addExistingRepo: (path: string) => Promise<void>;
@@ -436,6 +438,17 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     if (!repoPath) return;
     await runSync(get, set, repoPath, () => api.gitPush(repoPath));
     await get().refreshAheadBehind();
+  },
+  pullLfs: async () => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    await runSync(get, set, repoPath, () => api.gitLfsPull(repoPath));
+  },
+  pushLfs: async () => {
+    const repoPath = get().selectedRepo;
+    const branch = get().branch;
+    if (!repoPath || !branch) return;
+    await runSync(get, set, repoPath, () => api.gitLfsPush(repoPath, branch));
   },
   cancelSync: async () => {
     const eventId = get().syncEventId;

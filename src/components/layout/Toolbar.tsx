@@ -7,6 +7,7 @@ import { TagsPanel } from "@/components/repo/TagsPanel";
 import { SubmodulesPanel } from "@/components/repo/SubmodulesPanel";
 import { WorktreesPanel } from "@/components/repo/WorktreesPanel";
 import { ReflogPanel } from "@/components/history/ReflogPanel";
+import { LfsPanel } from "@/components/repo/LfsPanel";
 import { SyncButton } from "@/components/repo/SyncButton";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ export function Toolbar() {
       <SubmodulesPanel />
       <WorktreesPanel />
       <ReflogPanel />
+      <LfsPanel />
       <div className="flex-1" />
       <SyncButton />
       <Button variant="ghost" size="icon" title="Settings" onClick={() => setSettingsOpen(true)}>

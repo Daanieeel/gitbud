@@ -172,6 +172,14 @@ pub fn push(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), Stri
     run_streaming(app, Some(repo_path), &["push"], event_id)
 }
 
+pub fn lfs_pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
+    run_streaming(app, Some(repo_path), &["lfs", "pull"], event_id)
+}
+
+pub fn lfs_push(app: &AppHandle, repo_path: &str, branch: &str, event_id: &str) -> Result<(), String> {
+    run_streaming(app, Some(repo_path), &["lfs", "push", "origin", branch], event_id)
+}
+
 /// Pushes a single ref (e.g. a tag name) to `origin`.
 pub fn push_ref(app: &AppHandle, repo_path: &str, ref_name: &str, event_id: &str) -> Result<(), String> {
     run_streaming(app, Some(repo_path), &["push", "origin", ref_name], event_id)

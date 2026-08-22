@@ -13,6 +13,7 @@ import type {
   GitHubAccount,
   GitHubRepo,
   ImageDiff,
+  LfsFileInfo,
   PollResult,
   PullRequest,
   PullRequestFile,
@@ -144,6 +145,12 @@ export const api = {
   getReflog: (repoPath: string) => invoke<ReflogEntry[]>("get_reflog", { repoPath }),
   reflogRestore: (repoPath: string, oid: string) =>
     invoke<void>("reflog_restore", { repoPath, oid }),
+
+  hasLfs: (repoPath: string) => invoke<boolean>("has_lfs", { repoPath }),
+  checkLfsFiles: (repoPath: string, paths: string[]) =>
+    invoke<LfsFileInfo[]>("check_lfs_files", { repoPath, paths }),
+  gitLfsPull: (repoPath: string) => invoke<void>("git_lfs_pull", { repoPath }),
+  gitLfsPush: (repoPath: string, branch: string) => invoke<void>("git_lfs_push", { repoPath, branch }),
   initRepo: (path: string) => invoke<void>("init_repo", { path }),
 
   listSshIdentities: () => invoke<SshIdentity[]>("list_ssh_identities"),

@@ -6,6 +6,7 @@ mod github;
 mod history;
 mod hunk;
 mod image_diff;
+mod lfs;
 mod rebase;
 mod reflog;
 mod repo;
@@ -320,6 +321,28 @@ fn get_reflog(repo_path: String) -> Result<Vec<reflog::ReflogEntry>, String> {
 #[tauri::command]
 fn reflog_restore(repo_path: String, oid: String) -> Result<(), String> {
     reflog::restore_to(&repo_path, &oid)
+}
+
+// --- Git LFS awareness ---
+
+#[tauri::command]
+fn has_lfs(repo_path: String) -> bool {
+    lfs::has_lfs(&repo_path)
+}
+
+#[tauri::command]
+fn check_lfs_files(repo_path: String, paths: Vec<String>) -> Result<Vec<lfs::LfsFileInfo>, String> {
+    lfs::check_lfs_files(&repo_path, &paths)
+}
+
+#[tauri::command]
+fn git_lfs_pull(app: AppHandle, repo_path: String) -> Result<(), String> {
+    git_shell::lfs_pull(&app, &repo_path, &repo_path)
+}
+
+#[tauri::command]
+fn git_lfs_push(app: AppHandle, repo_path: String, branch: String) -> Result<(), String> {
+    git_shell::lfs_push(&app, &repo_path, &branch, &repo_path)
 }
 
 // --- git identities: GitHub accounts (see github/) plus plain SSH-key identities ---
@@ -775,6 +798,10 @@ pub fn run() {
             remove_worktree,
             get_reflog,
             reflog_restore,
+            has_lfs,
+            check_lfs_files,
+            git_lfs_pull,
+            git_lfs_push,
             list_ssh_identities,
             add_ssh_identity,
             remove_ssh_identity,

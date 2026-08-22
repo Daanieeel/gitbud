@@ -115,6 +115,13 @@ export interface RepoEntry {
   identity_id: string | null;
 }
 
+export interface LfsFileInfo {
+  path: string;
+  is_lfs: boolean;
+  oid: string | null;
+  size: number | null;
+}
+
 export interface ReflogEntry {
   index: number;
   oid: string;

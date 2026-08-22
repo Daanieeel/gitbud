@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "GitBud",
-        "width": 1600,
-        "height": 1200
+        "width": 1200,
+        "height": 900
       }
     ],
     "security": {

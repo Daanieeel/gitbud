@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   CopyIcon,
@@ -26,6 +26,19 @@ import { getFileIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { BlameDialog } from "./BlameDialog";
+import type { LfsFileInfo } from "@/lib/types";
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
+}
 
 const STATUS_DOT_COLOR: Record<ChangeKind, string> = {
   added: "bg-accent-green",
@@ -50,6 +63,22 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
   const branch = useRepoStore((s) => s.branch);
   const discardFile = useRepoStore((s) => s.discardFile);
   const [blamePath, setBlamePath] = useState<string | null>(null);
+  const [lfsInfo, setLfsInfo] = useState<Record<string, LfsFileInfo>>({});
+
+  useEffect(() => {
+    if (!repoPath || files.length === 0) {
+      setLfsInfo({});
+      return;
+    }
+    let cancelled = false;
+    void api.checkLfsFiles(repoPath, files.map((f) => f.path)).then((infos) => {
+      if (cancelled) return;
+      setLfsInfo(Object.fromEntries(infos.filter((i) => i.is_lfs).map((i) => [i.path, i])));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath, files]);
 
   const virtualizer = useVirtualizer({
     count: files.length,
@@ -103,6 +132,14 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                     />
                   </span>
                   <span className="truncate">{file.path}</span>
+                  {lfsInfo[file.path] && (
+                    <span
+                      className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-medium text-muted-foreground"
+                      title="Tracked by Git LFS"
+                    >
+                      LFS{lfsInfo[file.path].size != null && ` · ${formatBytes(lfsInfo[file.path].size!)}`}
+                    </span>
+                  )}
                 </div>
               </ContextMenuTrigger>
               <ContextMenuContent>
