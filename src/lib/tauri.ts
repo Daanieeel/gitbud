@@ -213,6 +213,7 @@ export const api = {
   githubListAccounts: () => invoke<GitHubAccount[]>("github_list_accounts"),
   githubRemoveAccount: (login: string) =>
     invoke<GitHubAccount[]>("github_remove_account", { login }),
+  githubHasToken: (login: string) => invoke<boolean>("github_has_token", { login }),
   githubStartDeviceFlow: (clientId: string) =>
     invoke<DeviceCodeResponse>("github_start_device_flow", { clientId }),
   githubPollDeviceFlow: (clientId: string, deviceCode: string) =>

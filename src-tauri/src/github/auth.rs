@@ -113,7 +113,16 @@ fn save_accounts(accounts: &[Account]) -> Result<(), String> {
 pub fn get_token(login: &str) -> Result<String, String> {
     keyring::Entry::new(KEYRING_SERVICE, login)
         .and_then(|entry| entry.get_password())
-        .map_err(|e| format!("could not read stored token for {login}: {e}"))
+        .map_err(|_| format!("GitHub sign-in for {login} is no longer available (its token is missing from the system keychain) — please sign in again."))
+}
+
+/// Cheap existence check for `get_token`, used to prune accounts whose keychain entry has
+/// gone missing (e.g. removed via Keychain Access, or restored from a backup on another
+/// machine) before they can surface a confusing error in the UI.
+pub fn has_token(login: &str) -> bool {
+    keyring::Entry::new(KEYRING_SERVICE, login)
+        .and_then(|entry| entry.get_password())
+        .is_ok()
 }
 
 pub fn remove_account(login: &str) -> Result<Vec<Account>, String> {

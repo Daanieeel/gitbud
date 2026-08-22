@@ -35,14 +35,26 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
   pollGeneration: 0,
 
   init: async () => {
-    const [accounts, clientId] = await Promise.all([
+    const [storedAccounts, clientId] = await Promise.all([
       api.githubListAccounts(),
       api.githubGetClientId(),
     ]);
+    // An account can outlive its keychain entry (removed via Keychain Access, restored from
+    // a backup on another machine, etc). Prune those up front rather than letting every PR
+    // load fail with a "could not read stored token" error.
+    const validity = await Promise.all(
+      storedAccounts.map((a) => api.githubHasToken(a.login).catch(() => false)),
+    );
+    const stale = storedAccounts.filter((_, i) => !validity[i]);
+    const accounts = storedAccounts.filter((_, i) => validity[i]);
+    await Promise.all(stale.map((a) => api.githubRemoveAccount(a.login).catch(() => {})));
+
     set({
       accounts,
       clientId,
-      currentLogin: get().currentLogin ?? accounts[0]?.login ?? null,
+      currentLogin: accounts.some((a) => a.login === get().currentLogin)
+        ? get().currentLogin
+        : accounts[0]?.login ?? null,
     });
   },
 

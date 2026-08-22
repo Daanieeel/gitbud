@@ -562,6 +562,11 @@ fn github_remove_account(login: String) -> Result<Vec<github::auth::Account>, St
 }
 
 #[tauri::command]
+fn github_has_token(login: String) -> bool {
+    github::auth::has_token(&login)
+}
+
+#[tauri::command]
 async fn github_detect_gh_cli() -> Result<Option<github::auth::Account>, String> {
     github::auth::detect_gh_cli().await
 }
@@ -896,6 +901,7 @@ pub fn run() {
             github_set_host,
             github_list_accounts,
             github_remove_account,
+            github_has_token,
             github_detect_gh_cli,
             github_start_device_flow,
             github_poll_device_flow,
