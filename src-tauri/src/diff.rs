@@ -86,7 +86,7 @@ fn build_file_diff(path: &str, old_path: Option<&str>, diff: &Diff) -> Result<Fi
 
 /// Diff a single file, either the staged side (HEAD -> index) or unstaged side (index -> workdir).
 /// Applies the user's whitespace-handling preference to a set of diff options.
-fn apply_whitespace_setting(opts: &mut DiffOptions) {
+pub(crate) fn apply_whitespace_setting(opts: &mut DiffOptions) {
     if crate::settings::get_settings().map(|s| s.ignore_whitespace).unwrap_or(false) {
         opts.ignore_whitespace(true);
     }
