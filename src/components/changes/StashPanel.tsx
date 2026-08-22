@@ -8,11 +8,38 @@ import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useStashStore } from "@/store/useStashStore";
 import { cn } from "@/lib/utils";
+import { FileTypeIcon } from "@/lib/file-icons";
 import type { FileDiff } from "@/lib/types";
 
 interface StashPanelProps {
   hasChanges: boolean;
 }
+
+/** Turns git's raw stash message — "WIP on <branch>: <oid> <subject>" for an unlabeled
+ * stash, or "On <branch>: <label>" for one saved with a custom message — into its branch and
+ * description parts, so the UI isn't just displaying a run-on string of words. `branch` is
+ * null if the message doesn't match either shape (e.g. an older/foreign stash format), in
+ * which case `description` is the raw message untouched. */
+function parseStashMessage(message: string): { branch: string | null; description: string } {
+  const wip = message.match(/^WIP on (.+): [0-9a-f]{4,40} (.*)$/);
+  if (wip) return { branch: wip[1], description: wip[2] };
+  const labeled = message.match(/^On (.+): (.*)$/);
+  if (labeled) return { branch: labeled[1], description: labeled[2] };
+  return { branch: null, description: message };
+}
+
+// Same git2 Delta status names getCommitFiles returns for the History tab (a stash is just
+// a commit under the hood), so the same status-color mapping applies here.
+const STASH_STATUS_DOT_COLOR: Record<string, string> = {
+  Added: "bg-accent-green",
+  Untracked: "bg-accent-green",
+  Copied: "bg-accent-green",
+  Modified: "bg-accent-green",
+  Deleted: "bg-accent-pink",
+  Renamed: "bg-muted-foreground",
+  Typechange: "bg-muted-foreground",
+  Conflicted: "bg-destructive",
+};
 
 function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
   const refreshStatus = useRepoStore((s) => s.refreshStatus);
@@ -61,16 +88,25 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
           <div
             key={path}
             className={cn(
-              "group flex items-center gap-1 px-2 py-1 text-sm hover:bg-accent",
+              "group flex items-center gap-1.5 px-2 py-1 text-sm hover:bg-accent",
               selectedPath === path && "bg-accent",
             )}
           >
             <span
-              className="min-w-0 flex-1 cursor-pointer truncate"
+              className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 truncate"
               title={`${path} (${status})`}
               onClick={() => setSelectedPath(path)}
             >
-              {path}
+              <span className="relative shrink-0">
+                <FileTypeIcon path={path} className="size-3.5" />
+                <span
+                  className={cn(
+                    "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
+                    STASH_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
+                  )}
+                />
+              </span>
+              <span className="truncate">{path}</span>
             </span>
             <button
               title="Restore this file from the stash, without popping it"
@@ -134,7 +170,8 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
           <div className="border-b border-border p-2">
             <Button
               size="sm"
-              className="w-full"
+              variant="secondary"
+              className="h-7 w-full text-xs"
               disabled={!hasChanges || saving}
               onClick={() => void doSave()}
             >
@@ -146,7 +183,9 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
             {stashes.length === 0 && (
               <div className="p-3 text-center text-sm text-muted-foreground">No stashes</div>
             )}
-            {stashes.map((s) => (
+            {stashes.map((s) => {
+              const { branch, description } = parseStashMessage(s.message);
+              return (
               <div
                 key={s.index}
                 className="group flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
@@ -157,7 +196,8 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
                 }}
               >
                 <span className="min-w-0 flex-1 truncate" title={s.message}>
-                  {s.message}
+                  {description}
+                  {branch && <span className="ml-1.5 text-xs text-muted-foreground">on {branch}</span>}
                 </span>
                 <button
                   title="View files & diff"
@@ -202,7 +242,8 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
                   <Trash2Icon className="size-3.5" />
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
         </PopoverContent>
       </Popover>
@@ -211,7 +252,14 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
         <DialogContent className="flex h-[70vh] max-w-5xl flex-col">
           <DialogHeader>
             <DialogTitle>
-              {detailIndex !== null ? stashes.find((s) => s.index === detailIndex)?.message : ""}
+              {(() => {
+                const message = detailIndex !== null
+                  ? stashes.find((s) => s.index === detailIndex)?.message
+                  : null;
+                if (!message) return "";
+                const { branch, description } = parseStashMessage(message);
+                return branch ? `${description} (stashed on ${branch})` : description;
+              })()}
             </DialogTitle>
           </DialogHeader>
           {repoPath && detailIndex !== null && <StashDetail repoPath={repoPath} index={detailIndex} />}
