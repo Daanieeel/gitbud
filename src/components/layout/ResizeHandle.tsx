@@ -1,19 +1,18 @@
-import { cn } from "@/lib/utils";
-
 interface ResizeHandleProps {
   onPointerDown: (e: React.PointerEvent) => void;
-  className?: string;
 }
 
-/** A thin drag-to-resize divider between a fixed panel and the rest of the layout. */
-export function ResizeHandle({ onPointerDown, className }: ResizeHandleProps) {
+/** An invisible drag-to-resize zone between two panes, with zero layout footprint of its own
+ * — the actual boundary between the panes stays wherever their own border/gap already puts
+ * it, and this just widens the draggable hit-area to straddle that point symmetrically. */
+export function ResizeHandle({ onPointerDown }: ResizeHandleProps) {
   return (
-    <div
-      onPointerDown={onPointerDown}
-      title="Drag to resize"
-      className={cn("group relative w-1 shrink-0 cursor-col-resize", className)}
-    >
-      <div className="absolute inset-y-0 left-0 w-px bg-border group-hover:bg-primary group-active:bg-primary" />
+    <div className="relative w-0 shrink-0">
+      <div
+        onPointerDown={onPointerDown}
+        title="Drag to resize"
+        className="absolute inset-y-0 -left-3 -right-3 z-10 cursor-col-resize"
+      />
     </div>
   );
 }

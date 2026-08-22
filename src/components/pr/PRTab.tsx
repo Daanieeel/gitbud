@@ -65,7 +65,7 @@ export function PRTab() {
 
   return (
     <div className="flex h-full min-w-0 flex-1">
-      <div style={{ width }} className="flex shrink-0 flex-col">
+      <div style={{ width }} className="flex shrink-0 flex-col border-r border-border">
         <div className="flex shrink-0 items-center justify-between border-b border-border p-2">
           <div className="flex gap-1">
             {FILTERS.map((f) => (

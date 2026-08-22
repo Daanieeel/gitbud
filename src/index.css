@@ -14,7 +14,10 @@
   --foreground: #0a0a0a;
   --card: #ffffff;
   --card-foreground: #0a0a0a;
-  --popover: #ffffff;
+  /* Popovers/dropdowns/menus get the page's muted tone rather than the card's white, so they
+     read as a distinct floating layer instead of just "another white rectangle" on top of
+     the panes they open from. */
+  --popover: #f2f2f2;
   --popover-foreground: #0a0a0a;
   --primary: #0070f3;
   --primary-foreground: #ffffff;
@@ -50,7 +53,9 @@
   --foreground: #eeeeee;
   --card: #1a1a1a;
   --card-foreground: #eeeeee;
-  --popover: #1a1a1a;
+  /* Popovers/dropdowns/menus stay at the page's near-black tone rather than the card's
+     lighter charcoal, so they read as a distinct floating layer, not just another card. */
+  --popover: #000000;
   --popover-foreground: #eeeeee;
   --primary: #0070f3;
   --primary-foreground: #ffffff;
@@ -62,7 +67,7 @@
   --accent-foreground: #eeeeee;
   --destructive: #ff4d8d;
   --destructive-foreground: #ffffff;
-  --border: #1a1a1a;
+  --border: #2a2a2a;
   --input: #3a3a3a;
   --ring: #0070f3;
 

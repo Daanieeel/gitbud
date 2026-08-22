@@ -49,7 +49,7 @@ export function HistoryTab() {
 
   return (
     <div className="flex h-full min-w-0 flex-1">
-      <div style={{ width: commitList.width }} className="shrink-0">
+      <div style={{ width: commitList.width }} className="shrink-0 border-r border-border">
         <CommitList
           commits={commits}
           selectedOid={selectedCommitOid}
@@ -60,7 +60,7 @@ export function HistoryTab() {
         />
       </div>
       <ResizeHandle onPointerDown={commitList.onPointerDown} />
-      <div style={{ width: fileList.width }} className="shrink-0 overflow-auto">
+      <div style={{ width: fileList.width }} className="shrink-0 overflow-auto border-r border-border">
         {selectedCommitFiles.map(([path, status]) => (
           <div
             key={path}
