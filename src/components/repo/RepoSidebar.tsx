@@ -3,7 +3,6 @@ import {
   CopyIcon,
   FolderInputIcon,
   FolderOpenIcon,
-  LockIcon,
   RefreshCwIcon,
   TerminalIcon,
   Trash2Icon,
@@ -19,6 +18,8 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 import { AddRepoMenu } from "./AddRepoMenu";
 import { BatchSyncTrigger } from "./BatchSyncPanel";
 import { WorkspacePicker } from "./WorkspacePicker";
@@ -68,6 +69,7 @@ export function RepoSidebar() {
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const [aheadBehind, setAheadBehind] = useState<Record<string, AheadBehind>>({});
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
+  const [confirmRemovePath, setConfirmRemovePath] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,11 +147,6 @@ export function RepoSidebar() {
     for (const list of groups.values()) list.sort((a, b) => a.name.localeCompare(b.name));
     return new Map([...groups.entries()].sort(([a], [b]) => a.localeCompare(b)));
   }, [sorted, sidebarSort]);
-
-  const togglePrivate = async (repo: RepoEntry) => {
-    const updated = await api.setRepoPrivate(repo.path, !repo.is_private);
-    setReposLocal({ repos: updated });
-  };
 
   const moveToSection = async (repo: RepoEntry) => {
     const input = window.prompt(
@@ -254,29 +251,52 @@ export function RepoSidebar() {
                           {ab.behind > 0 && `↓${ab.behind}`}
                         </span>
                       )}
-                      <button
-                        title={repo.is_private ? "Marked private" : "Mark as private"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void togglePrivate(repo);
-                        }}
-                        className={cn(
-                          "opacity-0 group-hover:opacity-100",
-                          repo.is_private && "opacity-100 text-foreground",
-                        )}
+                      <Popover
+                        open={confirmRemovePath === repo.path}
+                        onOpenChange={(open) => setConfirmRemovePath(open ? repo.path : null)}
                       >
-                        <LockIcon className="size-3.5" />
-                      </button>
-                      <button
-                        title="Remove from list"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          void removeRepo(repo.path);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                      >
-                        <XIcon className="size-3.5" />
-                      </button>
+                        <PopoverTrigger asChild>
+                          <button
+                            title="Remove from list"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmRemovePath(repo.path);
+                            }}
+                            className={cn(
+                              "shrink-0 rounded-md bg-destructive/10 p-1 text-destructive opacity-0 hover:bg-destructive/20 group-hover:opacity-100",
+                              confirmRemovePath === repo.path && "opacity-100",
+                            )}
+                          >
+                            <XIcon className="size-3.5" />
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          align="end"
+                          className="w-56 space-y-2 bg-accent-blue/5 p-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <p className="text-sm">Remove "{repo.name}" from the list?</p>
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setConfirmRemovePath(null)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => {
+                                setConfirmRemovePath(null);
+                                void removeRepo(repo.path);
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     </div>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
