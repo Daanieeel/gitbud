@@ -19,14 +19,14 @@ import { cn } from "@/lib/utils";
 
 function IdentityAvatar({ identity }: { identity: UnifiedIdentity }) {
   if (identity.kind === "github") {
-    return <img src={identity.avatarUrl} alt="" className="size-4 shrink-0 rounded-full" />;
+    return <img src={identity.avatarUrl} alt="" className="size-6 shrink-0 rounded-full" />;
   }
   return (
     <span
       title="SSH identity"
-      className="flex size-4 shrink-0 items-center justify-center rounded-full bg-accent-yellow/20 text-accent-yellow"
+      className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-yellow/20 text-accent-yellow"
     >
-      <KeyRoundIcon className="size-3" />
+      <KeyRoundIcon className="size-3.5" />
     </span>
   );
 }
@@ -97,7 +97,7 @@ export function AccountBar() {
               <div
                 key={identity.id}
                 className={cn(
-                  "flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer",
+                  "flex items-center gap-2.5 rounded-md px-2.5 py-2.5 text-sm hover:bg-accent cursor-pointer",
                   effectiveId === identity.id && "bg-accent",
                 )}
                 onClick={() => {
@@ -120,8 +120,8 @@ export function AccountBar() {
                         : `Pin ${identityLabel(identity)} to this repo only`
                     }
                     className={cn(
-                      "shrink-0 text-muted-foreground hover:text-accent-yellow",
-                      repoOverride === identity.id && "text-accent-yellow",
+                      "shrink-0 rounded-md bg-accent-yellow/10 p-1.5 text-accent-yellow hover:bg-accent-yellow/20",
+                      repoOverride === identity.id && "bg-accent-yellow/25",
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
@@ -133,18 +133,18 @@ export function AccountBar() {
                       setSwitcherOpen(false);
                     }}
                   >
-                    <MapPinIcon className="size-3.5" />
+                    <MapPinIcon className="size-4" />
                   </button>
                 )}
                 <button
                   title={`Remove ${identityLabel(identity)}`}
-                  className="shrink-0 text-muted-foreground hover:text-destructive"
+                  className="shrink-0 rounded-md bg-destructive/10 p-1.5 text-destructive hover:bg-destructive/20"
                   onClick={(e) => {
                     e.stopPropagation();
                     remove(identity);
                   }}
                 >
-                  <XIcon className="size-3.5" />
+                  <XIcon className="size-4" />
                 </button>
               </div>
             ))}
