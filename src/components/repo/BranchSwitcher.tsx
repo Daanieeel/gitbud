@@ -62,7 +62,7 @@ export function BranchSwitcher() {
 
   if (!selectedRepo) {
     return (
-      <Button variant="secondary" className="w-48 justify-between" disabled>
+      <Button variant="secondary" size="sm" className="w-48 justify-between" disabled>
         <span className="flex items-center gap-2 text-muted-foreground">
           <GitBranchIcon className="size-4" /> No repository
         </span>
@@ -116,7 +116,7 @@ export function BranchSwitcher() {
       <Tooltip>
         <TooltipTrigger asChild>
           <PopoverTrigger asChild>
-            <Button variant="secondary" className="w-48 justify-between" disabled={switching}>
+            <Button variant="secondary" size="sm" className="w-48 justify-between" disabled={switching}>
               <span className="flex min-w-0 items-center gap-2">
                 <GitBranchIcon className={cn("size-4 shrink-0", switching && "animate-spin")} />
                 <span className="truncate">{branch ?? "…"}</span>
