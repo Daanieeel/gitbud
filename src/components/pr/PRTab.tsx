@@ -80,16 +80,16 @@ export function PRTab() {
     );
   }
 
-  if (loadError && loadError.includes("404")) {
+  if (loadError && (loadError.includes("404") || loadError.includes("403"))) {
     return (
       <div className="flex h-full items-center justify-center bg-dot-grid p-6">
         <div className="flex w-full max-w-sm flex-col items-center gap-2 rounded-md border border-destructive/20 bg-destructive/10 p-4 text-center text-destructive">
           <span className="flex items-center justify-center gap-1.5 font-medium">
             <TriangleAlertIcon className="size-4 shrink-0" />
-            Repository Not Found
+            Access Denied
           </span>
           <p className="text-xs leading-relaxed">
-            GitHub returned a 404 error. If this repository belongs to an organization, you may need to explicitly grant GitBud access to that organization in your GitHub settings.
+            GitHub blocked access to this repository. If it belongs to an organization, you must explicitly grant GitBud access to that organization in your GitHub settings.
           </p>
           <Button
             size="sm"
