@@ -115,6 +115,12 @@ export interface RepoEntry {
   identity_id: string | null;
 }
 
+export interface ReflogEntry {
+  index: number;
+  oid: string;
+  message: string;
+}
+
 export interface WorktreeInfo {
   name: string;
   path: string;

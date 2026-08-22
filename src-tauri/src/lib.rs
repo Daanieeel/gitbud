@@ -7,6 +7,7 @@ mod history;
 mod hunk;
 mod image_diff;
 mod rebase;
+mod reflog;
 mod repo;
 mod settings;
 mod ssh_identity;
@@ -307,6 +308,18 @@ fn add_worktree(repo_path: String, path: String, branch: String, create_branch: 
 #[tauri::command]
 fn remove_worktree(repo_path: String, worktree_path: String, force: bool) -> Result<(), String> {
     worktrees::remove_worktree(&repo_path, &worktree_path, force)
+}
+
+// --- reflog / undo ---
+
+#[tauri::command]
+fn get_reflog(repo_path: String) -> Result<Vec<reflog::ReflogEntry>, String> {
+    reflog::get_reflog(&repo_path)
+}
+
+#[tauri::command]
+fn reflog_restore(repo_path: String, oid: String) -> Result<(), String> {
+    reflog::restore_to(&repo_path, &oid)
 }
 
 // --- git identities: GitHub accounts (see github/) plus plain SSH-key identities ---
@@ -760,6 +773,8 @@ pub fn run() {
             list_worktrees,
             add_worktree,
             remove_worktree,
+            get_reflog,
+            reflog_restore,
             list_ssh_identities,
             add_ssh_identity,
             remove_ssh_identity,

@@ -19,6 +19,7 @@ import type {
   RebaseResult,
   RebaseTodoItem,
   RepoEntry,
+  ReflogEntry,
   RepoStatus,
   ReviewComment,
   Settings,
@@ -139,6 +140,10 @@ export const api = {
     invoke<void>("add_worktree", { repoPath, path, branch, createBranch }),
   removeWorktree: (repoPath: string, worktreePath: string, force: boolean) =>
     invoke<void>("remove_worktree", { repoPath, worktreePath, force }),
+
+  getReflog: (repoPath: string) => invoke<ReflogEntry[]>("get_reflog", { repoPath }),
+  reflogRestore: (repoPath: string, oid: string) =>
+    invoke<void>("reflog_restore", { repoPath, oid }),
   initRepo: (path: string) => invoke<void>("init_repo", { path }),
 
   listSshIdentities: () => invoke<SshIdentity[]>("list_ssh_identities"),
