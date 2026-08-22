@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { cn } from "@/lib/utils";
 
 export function LfsPanel() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -43,12 +44,12 @@ export function LfsPanel() {
         </p>
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" className="flex-1" disabled={syncing} onClick={() => void pullLfs()}>
-            <DownloadIcon className="size-3.5" />
-            Pull LFS
+            <DownloadIcon className={cn("size-3.5", syncing && "animate-spin")} />
+            {syncing ? "Working…" : "Pull LFS"}
           </Button>
           <Button size="sm" variant="secondary" className="flex-1" disabled={syncing} onClick={() => void pushLfs()}>
-            <UploadIcon className="size-3.5" />
-            Push LFS
+            <UploadIcon className={cn("size-3.5", syncing && "animate-spin")} />
+            {syncing ? "Working…" : "Push LFS"}
           </Button>
         </div>
       </PopoverContent>
