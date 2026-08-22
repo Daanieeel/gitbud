@@ -16,7 +16,7 @@ Mark as done when the feature is implemented. Commit after every TODO, do not pu
 - [x] fix error `could not read stored token for Daanieeel: No matching entry found in secure storage` surfacing in the PR tab — an account can outlive its OS keychain entry; `useGitHubStore.init` now checks each stored account's token and prunes the ones missing one instead of repeatedly failing every PR load with that raw error.
 - [x] account switcher: show the pin/remove buttons always, not only on hover, and add tooltips to them — both already had `title`s, now always visible instead of hover-only.
 - [x] remove the "Clear pin — use …" button in the account switcher and design a more intuitive replacement — clicking the same pin icon again now unpins (a toggle), instead of a separate text button below the list.
-- [ ] move the batch-actions dropdown (currently at the top) to the bottom of the project/repo explorer, as its own side-by-side buttons instead of a dropdown.
+- [x] move the batch-actions dropdown (currently at the top) to the bottom of the project/repo explorer, as its own side-by-side buttons instead of a dropdown — now "Fetch All"/"Pull All" buttons above the account switcher.
 - [ ] move the search bar — TODO: user's request cut off mid-sentence ("move the search bar to where "), needs clarification on destination.
 - [x] "Stage Hunk" and "Discard Hunk" buttons need real button look, not just clickable text — now rendered with the shared `Button` component (outline, small).
 - [ ] in branches list, show the current branch's upstream branch name (if any) next to the branch name. also show two lists: local and origin branches, with the current branch highlighted.
