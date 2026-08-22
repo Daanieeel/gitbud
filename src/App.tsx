@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 import { RepoSidebar } from "@/components/repo/RepoSidebar";
 import { Toolbar } from "@/components/layout/Toolbar";
 import { TabBar } from "@/components/layout/TabBar";
@@ -88,9 +89,40 @@ function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [pull]);
 
+  useEffect(() => {
+    const unlisten = listen<string>("menu-event", (event) => {
+      switch (event.payload) {
+        case "settings":
+          window.dispatchEvent(new CustomEvent("open-settings"));
+          break;
+        case "add_repo":
+          setPalette({ open: true, mode: "repos" });
+          break;
+        case "fetch":
+          useRepoStore.getState().fetch();
+          break;
+        case "pull":
+          useRepoStore.getState().pull();
+          break;
+        case "push":
+          useRepoStore.getState().push();
+          break;
+        case "branch_switcher":
+          window.dispatchEvent(new CustomEvent("open-branch-switcher"));
+          break;
+        case "create_pr":
+          window.dispatchEvent(new CustomEvent("open-create-pr"));
+          break;
+      }
+    });
+    return () => {
+      unlisten.then((f) => f());
+    };
+  }, []);
+
   return (
     <TooltipProvider delayDuration={300}>
-    <div className="flex h-screen w-screen gap-3 bg-background p-3 text-foreground">
+    <div className="flex h-screen w-screen gap-3 bg-black p-3 text-foreground">
       <RepoSidebar />
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <div className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md">
