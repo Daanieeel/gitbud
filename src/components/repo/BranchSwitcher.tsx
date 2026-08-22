@@ -42,6 +42,8 @@ export function BranchSwitcher() {
   const [filter, setFilter] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [switching, setSwitching] = useState(false);
+  const [renameBusy, setRenameBusy] = useState(false);
 
   const local = useMemo(
     () => branches.filter((b) => !b.is_remote && b.name.toLowerCase().includes(filter.toLowerCase())),
@@ -73,8 +75,40 @@ export function BranchSwitcher() {
       setRenaming(null);
       return;
     }
-    await renameBranch(renaming, renameValue.trim());
-    setRenaming(null);
+    setRenameBusy(true);
+    try {
+      await renameBranch(renaming, renameValue.trim());
+    } finally {
+      setRenameBusy(false);
+      setRenaming(null);
+    }
+  };
+
+  const doCheckout = async (name: string) => {
+    setOpen(false);
+    setSwitching(true);
+    const startedAt = Date.now();
+    try {
+      await checkoutBranch(name);
+    } finally {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
+      setSwitching(false);
+    }
+  };
+
+  const doCreate = async (name: string) => {
+    setFilter("");
+    setOpen(false);
+    setSwitching(true);
+    const startedAt = Date.now();
+    try {
+      await createBranch(name, true);
+    } finally {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
+      setSwitching(false);
+    }
   };
 
   return (
@@ -82,9 +116,9 @@ export function BranchSwitcher() {
       <Tooltip>
         <TooltipTrigger asChild>
           <PopoverTrigger asChild>
-            <Button variant="secondary" className="w-48 justify-between">
+            <Button variant="secondary" className="w-48 justify-between" disabled={switching}>
               <span className="flex min-w-0 items-center gap-2">
-                <GitBranchIcon className="size-4 shrink-0" />
+                <GitBranchIcon className={cn("size-4 shrink-0", switching && "animate-spin")} />
                 <span className="truncate">{branch ?? "…"}</span>
                 {branch && isProtectedBranch(branch) && (
                   <Tooltip>
@@ -129,6 +163,7 @@ export function BranchSwitcher() {
               <Input
                 key={b.name}
                 autoFocus
+                disabled={renameBusy}
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}
                 onBlur={() => void commitRename()}
@@ -146,10 +181,7 @@ export function BranchSwitcher() {
                       "flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
                       b.is_head && "bg-accent",
                     )}
-                    onClick={() => {
-                      void checkoutBranch(b.name);
-                      setOpen(false);
-                    }}
+                    onClick={() => void doCheckout(b.name)}
                   >
                     <span className="min-w-0 flex-1 truncate">{b.name}</span>
                     {isLocalOnly(b.name) && (
@@ -212,11 +244,7 @@ export function BranchSwitcher() {
           {canCreate && (
             <div
               className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-primary hover:bg-accent"
-              onClick={() => {
-                void createBranch(filter.trim(), true);
-                setFilter("");
-                setOpen(false);
-              }}
+              onClick={() => void doCreate(filter.trim())}
             >
               <PlusIcon className="size-3.5" />
               <span className="truncate">Create branch "{filter.trim()}"</span>
