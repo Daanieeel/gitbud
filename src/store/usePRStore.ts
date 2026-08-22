@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { api } from "@/lib/tauri";
 import { notify } from "@/lib/notify";
 import { overallFrom, type Overall } from "@/components/pr/CIBadge";
+import { useNetworkStore } from "./useNetworkStore";
 import type { PullRequest, PullRequestFile, ReviewComment } from "@/lib/types";
 
 export type PRFilter = "open" | "closed" | "all";
@@ -89,8 +90,10 @@ export const usePRStore = create<PRState>((set, get) => ({
     try {
       const pulls = await api.githubListPullRequests(repoPath, login, get().filter);
       set({ pulls, loading: false });
+      useNetworkStore.getState().noteSuccess();
     } catch (err) {
       set({ loading: false, loadError: String(err) });
+      useNetworkStore.getState().noteError(String(err));
     }
   },
 

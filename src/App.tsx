@@ -14,6 +14,7 @@ import { useSettingsStore } from "@/store/useSettingsStore";
 import { useIdentityStore } from "@/store/useIdentityStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { usePRStore } from "@/store/usePRStore";
+import { useNetworkStore } from "@/store/useNetworkStore";
 
 function App() {
   const initGlobalListeners = useRepoStore((s) => s.initGlobalListeners);
@@ -54,6 +55,17 @@ function App() {
     }, 60_000);
     return () => clearInterval(interval);
   }, [selectedRepo, currentLogin, pollWatchedChecks]);
+
+  useEffect(() => {
+    const goOnline = () => useNetworkStore.getState().setOffline(false);
+    const goOffline = () => useNetworkStore.getState().setOffline(true);
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

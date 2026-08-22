@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { api } from "@/lib/tauri";
 import { pushRecentCommitMessage } from "@/lib/commit-history";
 import { notify } from "@/lib/notify";
+import { useNetworkStore } from "./useNetworkStore";
 import type {
   AheadBehind,
   BranchInfo,
@@ -500,12 +501,14 @@ async function runSync(
   const startedAt = Date.now();
   try {
     await action();
+    useNetworkStore.getState().noteSuccess();
     if (label && Date.now() - startedAt > NOTIFY_THRESHOLD_MS) {
       const repoName = get().repos.find((r) => r.path === eventId)?.name ?? eventId;
       void notify(`${label} complete`, repoName);
     }
   } catch (e) {
     set({ syncError: String(e) });
+    useNetworkStore.getState().noteError(String(e));
   } finally {
     unlisten();
     set({ syncing: false, syncEventId: null });

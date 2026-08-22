@@ -10,6 +10,7 @@ import { ReflogPanel } from "@/components/history/ReflogPanel";
 import { LfsPanel } from "@/components/repo/LfsPanel";
 import { SyncButton } from "@/components/repo/SyncButton";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
+import { OfflineIndicator } from "./OfflineIndicator";
 import { Button } from "@/components/ui/button";
 
 export function Toolbar() {
@@ -29,6 +30,7 @@ export function Toolbar() {
       <ReflogPanel />
       <LfsPanel />
       <div className="flex-1" />
+      <OfflineIndicator />
       <SyncButton />
       <Button variant="ghost" size="icon" title="Settings" onClick={() => setSettingsOpen(true)}>
         <SettingsIcon className="size-4" />
