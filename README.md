@@ -21,6 +21,7 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 
 ## Contents
 
+- [Roadmap](#roadmap)
 - [Features](#features)
 - [Performance, not as an afterthought](#performance-not-as-an-afterthought)
 - [Getting Started](#getting-started)
@@ -29,6 +30,13 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [Architecture](#architecture)
 - [Contributing](#contributing)
 - [License](#license)
+
+## Roadmap
+
+- [ ] Auto-updater
+- [ ] GitHub profile pictures in commit history
+- [ ] Settings redesign
+- [ ] ...and more to come
 
 ## Features
 
