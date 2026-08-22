@@ -142,6 +142,9 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     await listen<string>("repo-changed", (event) => {
       if (event.payload === get().selectedRepo) {
         void get().refreshStatus();
+        void get().refreshBranches();
+        void get().refreshAheadBehind();
+        void get().resetHistory();
         void useStashStore.getState().load(event.payload);
       }
     });
