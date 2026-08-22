@@ -36,11 +36,9 @@ Ordered low-hanging-fruit first (smallest lift → biggest lift).
 - [x] **Visual 3-way merge tool** — new `merge3.rs` backend (`get_conflict_sides` reads the index's conflict stages and diffs ours/theirs vs. the common ancestor via `git2::diff_blobs`) + a frontend block-merge (`lib/merge3.ts`: overlapping-range merge of the two independent diffs) that separates "only one side touched this" (auto-kept) from real overlapping conflicts (require an explicit Base/Mine/Theirs pick per block). `ConflictResolutionPanel.tsx` now defaults to this 3-way view with a "Raw" toggle as fallback; "Save Resolution" reconstructs the file from the picks and stages it.
 - [x] **Git worktree support** — new `worktrees.rs` backend (git2 for listing, shells `git worktree add/remove` for mutation) + a `WorktreesPanel` in the toolbar with a plain-language explainer ("checks out a branch into its own folder, so you can work on it without disturbing what's checked out here"), a guided new-worktree form (folder picker + new-branch-or-existing-branch choice), and "Open" which adds the worktree folder to the sidebar as its own repo (so it gets the full normal UI without touching the main checkout) — remove requires an explicit second "Force Remove" confirmation if it has uncommitted changes.
 - [x] **Default window size** — reduced ~25% from the doubled size to 1200x900 (was 1600x1200) in `tauri.conf.json`; still freely resizable.
-- [ ] **Create ALL_FEATURES.md** — write an exhaustive list of all GitBud features and their status (done, in progress, not started).
+- [x] **Create ALL_FEATURES.md** — added, covering core git ops, GitHub integration, UI/UX, P3/exploratory, and platform status.
 
 ## P3 — Later / exploratory
 
 - [ ] GPG/SSH commit-signing setup wizard (generate or import a signing key, wire it into git config from within Settings).
-- [ ] Localization / i18n framework for UI strings.
-- [ ] Plugin/extension hook points for third-party panels or commands.
 - [ ] Offline-mode indicator when network-dependent actions (fetch/push/PRs) can't reach the remote.
