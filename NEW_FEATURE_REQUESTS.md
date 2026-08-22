@@ -9,7 +9,7 @@ Mark as done when the feature is implemented. Commit after every TODO, do not pu
 - [x] add a "Preview PR" button/flow: opens a popup to preview and edit the PR before creating it (title + description fields), with the title prefilled for quality of life, and a "Create" button that opens the PR on origin. Reused the existing `CreatePRDialog`: it now prefills the title from the branch's latest commit summary (falling back to the branch name), and a new "Preview PR" button in the main toolbar (visible once signed in to GitHub) opens it directly, instead of only being reachable from inside the PR tab.
 - [x] SSH identity creation: added a "Quick" / "Advanced" mode toggle to `AddSshIdentityDialog`. Advanced = original flow (pick an existing key file). Quick = generates a new ed25519 keypair on press (reused the existing `generateSshSigningKey` Tauri command, no new backend needed) at `~/.ssh/gitbud_<host>_ed25519`, then shows the pubkey with a "copy public key" button matching the signing wizard's pattern.
 - [x] the main window has a small rubber-band/scroll wiggle over some empty areas — added `height: 100%; overflow: hidden` on `html`/`body`/`#root` so the app shell itself never scrolls; inner panels keep their own explicit `overflow-auto`.
-- [ ] resizable sidebars/panels — let the user drag to resize the repo sidebar and other fixed-width panels (currently hardcoded widths like `w-56`/`w-72`/`w-80`).
+- [x] resizable sidebars/panels — added a `useResizableWidth` hook (persisted per-panel in localStorage) + `ResizeHandle` divider, wired into the repo sidebar, History's commit-list/file-list panels, and the PR list panel.
 - [ ] diff view: color the full line background by change type (add/remove/etc, next to the existing +/- gutter symbols), like a highlighter pen — keep syntax highlighting intact on top (background tint only, don't replace token colors).
 - [x] buttons need `cursor: pointer` on hover — added a base-layer rule (`button:not(:disabled), [role="button"]:not([aria-disabled="true"])`) in `index.css`.
 - [ ] add tooltips explaining git jargon on buttons/controls that use non-everyday terminology (worktree, hunk, amend, rebase, stash, reflog, etc) for less git-savvy users.
@@ -19,6 +19,7 @@ Mark as done when the feature is implemented. Commit after every TODO, do not pu
 - [ ] move the batch-actions dropdown (currently at the top) to the bottom of the project/repo explorer, as its own side-by-side buttons instead of a dropdown.
 - [ ] move the search bar — TODO: user's request cut off mid-sentence ("move the search bar to where "), needs clarification on destination.
 - [ ] "Stage Hunk" and "Discard Hunk" buttons need real button look, not just clickable text.
+- [ ] in branches list, show the current branch's upstream branch name (if any) next to the branch name. also show two lists: local and origin branches, with the current branch highlighted.
 
 ## After all others are done
 
