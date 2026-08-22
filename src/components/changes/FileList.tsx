@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { ChangeKind, FileEntry } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   ContextMenu,
@@ -19,6 +20,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -65,6 +67,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
   const branch = useRepoStore((s) => s.branch);
   const discardFile = useRepoStore((s) => s.discardFile);
   const [blamePath, setBlamePath] = useState<string | null>(null);
+  const [confirmDiscardPath, setConfirmDiscardPath] = useState<string | null>(null);
   const [lfsInfo, setLfsInfo] = useState<Record<string, LfsFileInfo>>({});
 
   useEffect(() => {
@@ -103,6 +106,11 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
           const file = files[row.index];
           return (
             <ContextMenu key={file.path}>
+            <Popover
+              open={confirmDiscardPath === file.path}
+              onOpenChange={(o) => !o && setConfirmDiscardPath(null)}
+            >
+              <PopoverAnchor asChild>
               <ContextMenuTrigger asChild>
                 <div
                   style={{
@@ -162,6 +170,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                   )}
                 </div>
               </ContextMenuTrigger>
+              </PopoverAnchor>
               <ContextMenuContent>
                 <ContextMenuItem onSelect={() => void copyToClipboard(file.path)}>
                   <CopyIcon className="size-3.5" />
@@ -205,12 +214,31 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                 <ContextMenuSeparator />
                 <ContextMenuItem
                   variant="destructive"
-                  onSelect={() => void discardFile(file.path)}
+                  onSelect={() => setConfirmDiscardPath(file.path)}
                 >
                   <Trash2Icon className="size-3.5" />
                   Discard Changes
                 </ContextMenuItem>
               </ContextMenuContent>
+              <PopoverContent align="start" className="w-56 space-y-2 p-3">
+                <p className="text-sm">Permanently discard changes to "{file.path}"?</p>
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmDiscardPath(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => {
+                      setConfirmDiscardPath(null);
+                      void discardFile(file.path);
+                    }}
+                  >
+                    Discard
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
             </ContextMenu>
           );
         })}
