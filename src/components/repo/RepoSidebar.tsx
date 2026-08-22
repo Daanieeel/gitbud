@@ -308,9 +308,9 @@ export function RepoSidebar() {
           </div>
         ))}
       </div>
-      {filtered.length > 1 && (
+      {repos.length > 0 && (
         <div className="shrink-0 border-t border-border p-2">
-          <BatchSyncTrigger repos={filtered} />
+          <BatchSyncTrigger repos={filtered} totalCount={repos.length} />
         </div>
       )}
       <AccountBar />

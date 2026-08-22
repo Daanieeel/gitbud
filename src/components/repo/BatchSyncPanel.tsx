@@ -5,11 +5,12 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { cn } from "@/lib/utils";
 import type { RepoEntry } from "@/lib/types";
 
-export function BatchSyncTrigger({ repos }: { repos: RepoEntry[] }) {
+export function BatchSyncTrigger({ repos, totalCount }: { repos: RepoEntry[]; totalCount: number }) {
   const running = useBatchSyncStore((s) => s.running);
   const runPullAll = useBatchSyncStore((s) => s.runPullAll);
 
   if (repos.length === 0) return null;
+  const filtered = repos.length < totalCount;
 
   return (
     <Button
@@ -17,11 +18,11 @@ export function BatchSyncTrigger({ repos }: { repos: RepoEntry[] }) {
       size="sm"
       className="w-full"
       disabled={running}
-      title="Pull every repo in the sidebar"
+      title={filtered ? "Pull every repo currently matching the filter" : "Pull every repo in the sidebar"}
       onClick={() => void runPullAll(repos.map((r) => r.path))}
     >
       <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
-      Update All ({repos.length})
+      {filtered ? `Update ${repos.length}/${totalCount}` : "Update All"}
     </Button>
   );
 }
