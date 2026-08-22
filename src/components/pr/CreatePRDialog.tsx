@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { GitPullRequestCreateArrow, GitPullRequestDraftIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -185,6 +186,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
         ),
       ]);
       onOpenChange(false);
+      void openUrl(pr.html_url);
       setTitle("");
       setBody("");
       setSelectedLabels([]);
