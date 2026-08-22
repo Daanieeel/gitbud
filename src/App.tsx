@@ -45,6 +45,8 @@ function App() {
     if (selectedRepo) void syncRepoIdentity(selectedRepo);
   }, [selectedRepo, syncRepoIdentity]);
 
+  // Deliberate exception to "no polling": GitHub gives a pure desktop client no event/webhook
+  // mechanism for check-run status, so watched-PR CI notifications have no event-driven option.
   useEffect(() => {
     if (!selectedRepo || !currentLogin) return;
     const interval = setInterval(() => {

@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { GitHubMark } from "@/components/github/GitHubMark";
 import { UpdateChecker } from "./UpdateChecker";
+import { SigningWizard } from "./SigningWizard";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -202,6 +203,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     <SaveIcon className="size-3.5" />
                     Save Identity
                   </Button>
+                </div>
+                <div className="py-2">
+                  <SigningWizard
+                    repoPath={repoPath}
+                    name={gitName}
+                    email={gitEmail}
+                    global={gitScope === "global"}
+                  />
                 </div>
                 <Row label="Default branch name">
                   <Input

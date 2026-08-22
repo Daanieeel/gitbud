@@ -70,4 +70,6 @@ Issues and PRs welcome. A few ground rules to keep this project on-mission:
 3. **Auth stays out of Rust.** Anything that needs a user's GitHub credentials for git operations (fetch/pull/push/clone) shells out to system `git`; only the GitHub *API* (PRs, checks, comments) talks HTTP directly, using tokens from Device Flow or `gh`.
 4. **Keep the frontend dumb.** Git logic belongs in `src-tauri/`, not in a Zustand store.
 
-This project doesn't have a license file yet — check back before assuming terms, or open an issue to ask.
+## License
+
+[GNU Affero General Public License v3.0 or later](LICENSE) — free to use, modify, and redistribute (commercially or not), but any distributed or network-served version, including a modified or hosted one, must keep its source available under the same terms. It can never be relicensed as closed-source/proprietary.

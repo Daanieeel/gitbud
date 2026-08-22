@@ -22,7 +22,7 @@ import {
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubFileUrl } from "@/lib/github-links";
-import { getFileIcon } from "@/lib/file-icons";
+import { FileTypeIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { BlameDialog } from "./BlameDialog";
@@ -92,7 +92,6 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {virtualizer.getVirtualItems().map((row) => {
           const file = files[row.index];
-          const { icon: Icon, color } = getFileIcon(file.path);
           return (
             <ContextMenu key={file.path}>
               <ContextMenuTrigger asChild>
@@ -122,7 +121,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                     {file.status === "conflicted" ? (
                       <TriangleAlertIcon className="size-3.5 text-destructive" />
                     ) : (
-                      <Icon className="size-3.5" style={{ color }} />
+                      <FileTypeIcon path={file.path} className="size-3.5" />
                     )}
                     <span
                       className={cn(

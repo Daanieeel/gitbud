@@ -12,6 +12,7 @@ mod rebase;
 mod reflog;
 mod repo;
 mod settings;
+mod signing;
 mod ssh_identity;
 mod stash;
 mod submodules;
@@ -356,6 +357,43 @@ fn get_conflict_sides(repo_path: String, path: String) -> Result<merge3::Conflic
 #[tauri::command]
 fn resolve_conflict_with_content(repo_path: String, path: String, content: String) -> Result<(), String> {
     merge3::resolve_conflict_with_content(&repo_path, &path, &content)
+}
+
+// --- commit signing (GPG or SSH) ---
+
+#[tauri::command]
+fn has_gpg() -> bool {
+    signing::has_gpg()
+}
+
+#[tauri::command]
+fn list_gpg_keys() -> Result<Vec<(String, String)>, String> {
+    signing::list_gpg_keys()
+}
+
+#[tauri::command]
+fn generate_gpg_key(name: String, email: String) -> Result<String, String> {
+    signing::generate_gpg_key(&name, &email)
+}
+
+#[tauri::command]
+fn generate_ssh_signing_key(path: String, email: String) -> Result<String, String> {
+    signing::generate_ssh_signing_key(&path, &email)
+}
+
+#[tauri::command]
+fn configure_signing(repo_path: String, format: String, signing_key: String, global: bool) -> Result<(), String> {
+    signing::configure_signing(&repo_path, &format, &signing_key, global)
+}
+
+#[tauri::command]
+fn disable_signing(repo_path: String, global: bool) -> Result<(), String> {
+    signing::disable_signing(&repo_path, global)
+}
+
+#[tauri::command]
+fn get_signing_status(repo_path: String) -> Result<signing::SigningStatus, String> {
+    signing::get_signing_status(&repo_path)
 }
 
 // --- git identities: GitHub accounts (see github/) plus plain SSH-key identities ---
@@ -820,6 +858,13 @@ pub fn run() {
             git_lfs_push,
             get_conflict_sides,
             resolve_conflict_with_content,
+            has_gpg,
+            list_gpg_keys,
+            generate_gpg_key,
+            generate_ssh_signing_key,
+            configure_signing,
+            disable_signing,
+            get_signing_status,
             list_ssh_identities,
             add_ssh_identity,
             remove_ssh_identity,

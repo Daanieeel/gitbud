@@ -134,6 +134,12 @@ export interface LfsFileInfo {
   size: number | null;
 }
 
+export interface SigningStatus {
+  enabled: boolean;
+  format: string | null;
+  signing_key: string | null;
+}
+
 export interface ReflogEntry {
   index: number;
   oid: string;

@@ -65,7 +65,7 @@ Exhaustive list of implemented, partial, and not-started features. Status legend
 | Context menus (repo/branch/file/commit) | Done | |
 | Diff view (unified/split, syntax highlight) | Done | Split is structural pairing, not full LCS alignment |
 | Image/binary diff viewer | Done | |
-| File icons | Partial | Lightweight custom mapping, not the vendored vscode-symbols asset pack |
+| File icons | Done | Uses `@react-symbols/icons` (the actual VSCode "Symbols" icon pack) |
 | Sidebar: sort (name/recent/group/manual) | Done | Manual drag-to-reorder added this session |
 | Sidebar: custom sections | Done | Per-repo override of auto-derived group |
 | Sidebar: ahead/behind badges | Done | |
