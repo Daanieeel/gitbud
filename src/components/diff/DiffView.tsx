@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ImageDiffView } from "./ImageDiffView";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { highlightLine, languageForPath } from "@/lib/highlight";
 
@@ -114,37 +115,57 @@ function HunkActionsRow({ hunkIdx, hunkActions }: { hunkIdx: number; hunkActions
       <div className="sticky right-3 flex gap-1.5 py-1.5 text-xs">
         {hunkActions.staged
           ? hunkActions.onUnstage && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 px-2 text-xs"
-                title="A chunk is this one contiguous block of changed lines — unstage just it, leaving the rest of the file's staged changes alone"
-                onClick={() => hunkActions.onUnstage?.(hunkIdx)}
-              >
-                Unstage
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => hunkActions.onUnstage?.(hunkIdx)}
+                  >
+                    Unstage
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  A chunk is this one contiguous block of changed lines — unstage just it, leaving the rest of the
+                  file's staged changes alone
+                </TooltipContent>
+              </Tooltip>
             )
           : hunkActions.onStage && (
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-6 px-2 text-xs"
-                title="A chunk is this one contiguous block of changed lines — stage just it, leaving the rest of the file unstaged"
-                onClick={() => hunkActions.onStage?.(hunkIdx)}
-              >
-                Stage
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-6 px-2 text-xs"
+                    onClick={() => hunkActions.onStage?.(hunkIdx)}
+                  >
+                    Stage
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  A chunk is this one contiguous block of changed lines — stage just it, leaving the rest of the file
+                  unstaged
+                </TooltipContent>
+              </Tooltip>
             )}
         {!hunkActions.staged && hunkActions.onDiscard && (
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-6 px-2 text-xs hover:border-destructive hover:text-destructive"
-            title="Permanently discard just this chunk's changes, leaving the rest of the file's edits intact"
-            onClick={() => hunkActions.onDiscard?.(hunkIdx)}
-          >
-            Discard
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-6 px-2 text-xs hover:border-destructive hover:text-destructive"
+                onClick={() => hunkActions.onDiscard?.(hunkIdx)}
+              >
+                Discard
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              Permanently discard just this chunk's changes, leaving the rest of the file's edits intact
+            </TooltipContent>
+          </Tooltip>
         )}
       </div>
     </div>
@@ -206,22 +227,30 @@ function UnifiedLine({
           dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }}
         />
         {onCopyPermalink && line.new_lineno != null && (
-          <button
-            title="Copy GitHub permalink to this line"
-            className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
-            onClick={() => onCopyPermalink(line.new_lineno as number)}
-          >
-            <LinkIcon className="size-3.5" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
+                onClick={() => onCopyPermalink(line.new_lineno as number)}
+              >
+                <LinkIcon className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Copy GitHub permalink to this line</TooltipContent>
+          </Tooltip>
         )}
         {canComment && (
-          <button
-            title="Add comment"
-            className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
-            onClick={() => setComposerKey(composerKey === key ? null : key)}
-          >
-            <MessageSquarePlusIcon className="size-3.5" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
+                onClick={() => setComposerKey(composerKey === key ? null : key)}
+              >
+                <MessageSquarePlusIcon className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Add comment</TooltipContent>
+          </Tooltip>
         )}
       </div>
       <CommentThread comments={lineComments} />
@@ -301,13 +330,17 @@ function DiffViewImpl({
   const language = useMemo(() => (diff ? languageForPath(diff.path) : undefined), [diff]);
 
   const ViewToggle = (
-    <button
-      title={diffViewMode === "split" ? "Switch to unified view" : "Switch to split view"}
-      className="text-muted-foreground hover:text-foreground"
-      onClick={() => void updateSettings({ diff_view: diffViewMode === "split" ? "unified" : "split" })}
-    >
-      {diffViewMode === "split" ? <RowsIcon className="size-3.5" /> : <ColumnsIcon className="size-3.5" />}
-    </button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          className="text-muted-foreground hover:text-foreground"
+          onClick={() => void updateSettings({ diff_view: diffViewMode === "split" ? "unified" : "split" })}
+        >
+          {diffViewMode === "split" ? <RowsIcon className="size-3.5" /> : <ColumnsIcon className="size-3.5" />}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{diffViewMode === "split" ? "Switch to unified view" : "Switch to split view"}</TooltipContent>
+    </Tooltip>
   );
 
   if (!path) {

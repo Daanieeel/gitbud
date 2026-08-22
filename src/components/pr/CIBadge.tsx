@@ -7,6 +7,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface CIBadgeProps {
   repoPath: string;
@@ -48,28 +49,33 @@ export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
     overall === "passing" ? "text-accent-green" : overall === "failing" ? "text-accent-pink" : "text-accent-yellow";
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button onClick={(e) => e.stopPropagation()} title={`CI: ${overall}`}>
-          <Icon className={`size-3.5 ${color}`} />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-72 p-1" align="start">
-        {runs.map((run) => (
-          <a
-            key={run.name}
-            href={run.html_url}
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-          >
-            <span className="truncate">{run.name}</span>
-            <span className="shrink-0 text-xs text-muted-foreground">
-              {run.status === "completed" ? run.conclusion : run.status}
-            </span>
-          </a>
-        ))}
-      </PopoverContent>
-    </Popover>
+    <Tooltip>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <TooltipTrigger asChild>
+            <button onClick={(e) => e.stopPropagation()}>
+              <Icon className={`size-3.5 ${color}`} />
+            </button>
+          </TooltipTrigger>
+        </PopoverTrigger>
+        <PopoverContent className="w-72 p-1" align="start">
+          {runs.map((run) => (
+            <a
+              key={run.name}
+              href={run.html_url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+            >
+              <span className="truncate">{run.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {run.status === "completed" ? run.conclusion : run.status}
+              </span>
+            </a>
+          ))}
+        </PopoverContent>
+      </Popover>
+      <TooltipContent>{`CI: ${overall}`}</TooltipContent>
+    </Tooltip>
   );
 }

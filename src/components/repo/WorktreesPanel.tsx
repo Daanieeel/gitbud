@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import type { WorktreeInfo } from "@/lib/types";
@@ -88,16 +89,19 @@ export function WorktreesPanel() {
 
   return (
     <Popover onOpenChange={(o) => o && refresh()}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          title="Worktrees — check out another branch into its own folder, side by side with this one"
-        >
-          <FolderTreeIcon className="size-3.5" />
-          Worktrees{extra.length > 0 ? ` (${extra.length})` : ""}
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button variant="secondary" size="sm">
+              <FolderTreeIcon className="size-3.5" />
+              Worktrees{extra.length > 0 ? ` (${extra.length})` : ""}
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>
+          Worktrees — check out another branch into its own folder, side by side with this one
+        </TooltipContent>
+      </Tooltip>
       <PopoverContent className="w-96 p-0" align="start">
         <div className="border-b border-border p-2 text-xs text-muted-foreground">
           A worktree checks out a branch into its own folder, so you can work on it without
@@ -110,45 +114,67 @@ export function WorktreesPanel() {
               <FolderTreeIcon className="size-3.5 shrink-0 text-muted-foreground" />
               <div className="min-w-0 flex-1">
                 <div className="truncate">{wt.branch ?? wt.name}</div>
-                <div className="truncate text-xs text-muted-foreground" title={wt.path}>
-                  {wt.path}
-                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {wt.path}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>{wt.path}</TooltipContent>
+                </Tooltip>
               </div>
               {wt.is_locked && (
-                <span title="Locked (won't be pruned)">
-                  <LockIcon className="size-3.5 shrink-0 text-accent-yellow" />
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <LockIcon className="size-3.5 shrink-0 text-accent-yellow" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>Locked (won't be pruned)</TooltipContent>
+                </Tooltip>
               )}
               {!wt.is_main && (
                 <>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    title="Open this worktree as its own repo in the sidebar"
-                    onClick={() => void openWorktree(wt)}
-                  >
-                    <FolderOpenIcon className="size-3.5" />
-                    Open
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => void openWorktree(wt)}
+                      >
+                        <FolderOpenIcon className="size-3.5" />
+                        Open
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Open this worktree as its own repo in the sidebar</TooltipContent>
+                  </Tooltip>
                   {confirmForcePath === wt.path ? (
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      disabled={busy}
-                      title="Discard uncommitted changes in this worktree and remove it anyway"
-                      onClick={() => void removeOne(wt, true)}
-                    >
-                      Force Remove
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={busy}
+                          onClick={() => void removeOne(wt, true)}
+                        >
+                          Force Remove
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Discard uncommitted changes in this worktree and remove it anyway</TooltipContent>
+                    </Tooltip>
                   ) : (
-                    <button
-                      title="Remove worktree"
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
-                      onClick={() => void removeOne(wt, false)}
-                    >
-                      <Trash2Icon className="size-3.5" />
-                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          className="shrink-0 text-muted-foreground hover:text-destructive"
+                          onClick={() => void removeOne(wt, false)}
+                        >
+                          <Trash2Icon className="size-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Remove worktree</TooltipContent>
+                    </Tooltip>
                   )}
                 </>
               )}
@@ -174,7 +200,7 @@ export function WorktreesPanel() {
                   onChange={(e) => setPath(e.target.value)}
                   className="h-7"
                 />
-                <Button type="button" size="sm" variant="outline" onClick={() => void pickFolder()}>
+                <Button type="button" size="sm" variant="secondary" onClick={() => void pickFolder()}>
                   <FolderOpenIcon className="size-3.5" />
                 </Button>
               </div>

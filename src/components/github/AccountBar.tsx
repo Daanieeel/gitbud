@@ -10,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useIdentityStore, githubIdentityId, sshIdentityId, type UnifiedIdentity } from "@/store/useIdentityStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
@@ -23,12 +24,14 @@ function IdentityAvatar({ identity }: { identity: UnifiedIdentity }) {
     return <img src={identity.avatarUrl} alt="" className="size-6 shrink-0 rounded-full" />;
   }
   return (
-    <span
-      title="SSH identity"
-      className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-yellow/20 text-accent-yellow"
-    >
-      <KeyRoundIcon className="size-3.5" />
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-accent-yellow/20 text-accent-yellow">
+          <KeyRoundIcon className="size-3.5" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>SSH identity</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -88,10 +91,10 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
         <div className="flex flex-col gap-1.5 rounded-md bg-destructive/10 p-2 text-xs text-destructive">
           <span className="flex items-center gap-1.5 font-medium">
             <TriangleAlertIcon className="size-3.5 shrink-0" />
-            GitHub sign-in for {identityLabel(brokenIdentity)} expired
+            GitHub sign-in expired
           </span>
-          <span>Its token is missing from the system keychain — reconnect to keep using it.</span>
-          <Button size="sm" variant="outline" onClick={() => void reauth(brokenLogin as string)}>
+          <span>Token for <code>{identityLabel(brokenIdentity)}</code> is missing from the system keychain — reconnect to keep using it.</span>
+          <Button size="sm" variant="secondary" onClick={() => void reauth(brokenLogin as string)}>
             Reconnect GitHub
           </Button>
         </div>
@@ -101,11 +104,16 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {collapsed ? (
-              <Button variant="outline" size="icon" title="Add identity">
-                <LogInIcon className="size-4" />
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="secondary" size="icon">
+                    <LogInIcon className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Add identity</TooltipContent>
+              </Tooltip>
             ) : (
-              <Button variant="outline" size="sm" className="h-9 min-w-0 flex-1">
+              <Button variant="secondary" size="sm" className="h-9 min-w-0 flex-1">
                 <LogInIcon className="size-3.5" />
                 Add identity
               </Button>
@@ -126,20 +134,27 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
         <Popover open={switcherOpen} onOpenChange={setSwitcherOpen}>
           <PopoverTrigger asChild>
             {collapsed ? (
-              <button
-                title={current ? identityLabel(current) : "No identity"}
-                className="flex size-9 items-center justify-center rounded-md hover:bg-accent"
-              >
-                {current ? <IdentityAvatar identity={current} /> : <LogInIcon className="size-4" />}
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button className="flex size-9 items-center justify-center rounded-md hover:bg-accent">
+                    {current ? <IdentityAvatar identity={current} /> : <LogInIcon className="size-4" />}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{current ? identityLabel(current) : "No identity"}</TooltipContent>
+              </Tooltip>
             ) : (
-              <Button variant="outline" size="sm" className="h-9 min-w-0 flex-1 justify-start gap-2">
+              <Button variant="secondary" size="sm" className="h-9 min-w-0 flex-1 justify-start gap-2">
                 {current && <IdentityAvatar identity={current} />}
                 <span className="truncate">{current ? identityLabel(current) : "No identity"}</span>
                 {repoOverride && (
-                  <span title="Pinned to this repo">
-                    <MapPinIcon className="size-3 shrink-0 text-accent-yellow" />
-                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <MapPinIcon className="size-3 shrink-0 text-accent-yellow" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>Pinned to this repo</TooltipContent>
+                  </Tooltip>
                 )}
               </Button>
             )}
@@ -165,39 +180,47 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
                   )}
                 </span>
                 {selectedRepo && (
-                  <button
-                    title={
-                      repoOverride === identity.id
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className={cn(
+                          "shrink-0 rounded-md bg-accent-yellow/10 p-1.5 text-accent-yellow hover:bg-accent-yellow/20",
+                          repoOverride === identity.id && "bg-accent-yellow/25",
+                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (repoOverride === identity.id) {
+                            void clearRepoOverride(selectedRepo);
+                          } else {
+                            void setActive(identity.id, selectedRepo);
+                          }
+                          setSwitcherOpen(false);
+                        }}
+                      >
+                        <MapPinIcon className="size-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {repoOverride === identity.id
                         ? `Unpin — use the global default identity for this repo again`
-                        : `Pin ${identityLabel(identity)} to this repo only`
-                    }
-                    className={cn(
-                      "shrink-0 rounded-md bg-accent-yellow/10 p-1.5 text-accent-yellow hover:bg-accent-yellow/20",
-                      repoOverride === identity.id && "bg-accent-yellow/25",
-                    )}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (repoOverride === identity.id) {
-                        void clearRepoOverride(selectedRepo);
-                      } else {
-                        void setActive(identity.id, selectedRepo);
-                      }
-                      setSwitcherOpen(false);
-                    }}
-                  >
-                    <MapPinIcon className="size-4" />
-                  </button>
+                        : `Pin ${identityLabel(identity)} to this repo only`}
+                    </TooltipContent>
+                  </Tooltip>
                 )}
-                <button
-                  title={`Remove ${identityLabel(identity)}`}
-                  className="shrink-0 rounded-md bg-destructive/10 p-1.5 text-destructive hover:bg-destructive/20"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    remove(identity);
-                  }}
-                >
-                  <XIcon className="size-4" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="shrink-0 rounded-md bg-destructive/10 p-1.5 text-destructive hover:bg-destructive/20"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        remove(identity);
+                      }}
+                    >
+                      <XIcon className="size-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>{`Remove ${identityLabel(identity)}`}</TooltipContent>
+                </Tooltip>
               </div>
             ))}
             <div className="mt-1 border-t border-border pt-1">
@@ -233,15 +256,19 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
           </PopoverContent>
         </Popover>
       )}
-      <Button
-        variant="outline"
-        size="icon"
-        title="Settings"
-        className="shrink-0"
-        onClick={() => setSettingsOpen(true)}
-      >
-        <SettingsIcon className="size-4" />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="shrink-0"
+            onClick={() => setSettingsOpen(true)}
+          >
+            <SettingsIcon className="size-4" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Settings</TooltipContent>
+      </Tooltip>
       </div>
       <SignInDialog open={signInOpen} onOpenChange={(open) => (open ? openSignIn() : closeSignIn())} />
       <AddSshIdentityDialog open={sshDialogOpen} onOpenChange={setSshDialogOpen} />

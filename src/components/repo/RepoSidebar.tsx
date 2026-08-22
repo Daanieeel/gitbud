@@ -21,6 +21,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { AddRepoMenu } from "./AddRepoMenu";
 import { BatchSyncTrigger } from "./BatchSyncPanel";
@@ -189,29 +190,37 @@ export function RepoSidebar() {
       {collapsed ? (
         <>
           <div className="flex shrink-0 justify-center border-b border-border p-1.5">
-            <Button variant="ghost" size="icon" title="Expand sidebar" onClick={() => setCollapsed(false)}>
-              <PanelLeftOpenIcon className="size-4" />
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={() => setCollapsed(false)}>
+                  <PanelLeftOpenIcon className="size-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Expand sidebar</TooltipContent>
+            </Tooltip>
           </div>
           <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-auto p-1.5">
             {sorted.map((repo) => (
-              <button
-                key={repo.path}
-                title={repo.name}
-                onClick={() => void selectRepo(repo.path)}
-                className={cn(
-                  "relative flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-medium hover:bg-accent",
-                  selectedRepo === repo.path && "bg-accent",
-                )}
-              >
-                {repo.name.slice(0, 2).toUpperCase()}
-                {dirty[repo.path] && (
-                  <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary" />
-                )}
-                {syncing && selectedRepo === repo.path && (
-                  <RefreshCwIcon className="absolute top-0.5 right-0.5 size-2.5 animate-spin text-primary" />
-                )}
-              </button>
+              <Tooltip key={repo.path}>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => void selectRepo(repo.path)}
+                    className={cn(
+                      "relative flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-medium hover:bg-accent",
+                      selectedRepo === repo.path && "bg-accent",
+                    )}
+                  >
+                    {repo.name.slice(0, 2).toUpperCase()}
+                    {dirty[repo.path] && (
+                      <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary" />
+                    )}
+                    {syncing && selectedRepo === repo.path && (
+                      <RefreshCwIcon className="absolute top-0.5 right-0.5 size-2.5 animate-spin text-primary" />
+                    )}
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>{repo.name}</TooltipContent>
+              </Tooltip>
             ))}
           </div>
           {repos.length > 0 && (
@@ -232,9 +241,14 @@ export function RepoSidebar() {
             className="h-7"
           />
           <AddRepoMenu />
-          <Button variant="ghost" size="icon" title="Collapse sidebar" onClick={() => setCollapsed(true)}>
-            <PanelLeftCloseIcon className="size-4" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={() => setCollapsed(true)}>
+                <PanelLeftCloseIcon className="size-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Collapse sidebar</TooltipContent>
+          </Tooltip>
         </div>
         <div className="flex items-center justify-between gap-2">
           <WorkspacePicker />
@@ -279,17 +293,28 @@ export function RepoSidebar() {
                       onClick={() => void selectRepo(repo.path)}
                     >
                       {syncing && selectedRepo === repo.path ? (
-                        <span title="Syncing…">
-                          <RefreshCwIcon className="size-3 shrink-0 animate-spin text-primary" />
-                        </span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span>
+                              <RefreshCwIcon className="size-3 shrink-0 animate-spin text-primary" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>Syncing…</TooltipContent>
+                        </Tooltip>
                       ) : (
-                        <span
-                          className={cn(
-                            "size-1.5 shrink-0 rounded-full",
-                            dirty[repo.path] ? "bg-primary" : "bg-transparent",
-                          )}
-                          title={dirty[repo.path] ? "Uncommitted changes" : undefined}
-                        />
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span
+                              className={cn(
+                                "size-1.5 shrink-0 rounded-full",
+                                dirty[repo.path] ? "bg-primary" : "bg-transparent",
+                              )}
+                            />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {dirty[repo.path] ? "Uncommitted changes" : undefined}
+                          </TooltipContent>
+                        </Tooltip>
                       )}
                       <span className="truncate flex-1">{repo.name}</span>
                       {showAheadBehind && ab && (ab.ahead > 0 || ab.behind > 0) && (
@@ -302,21 +327,25 @@ export function RepoSidebar() {
                         open={confirmRemovePath === repo.path}
                         onOpenChange={(open) => setConfirmRemovePath(open ? repo.path : null)}
                       >
-                        <PopoverTrigger asChild>
-                          <button
-                            title="Remove from list"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setConfirmRemovePath(repo.path);
-                            }}
-                            className={cn(
-                              "shrink-0 rounded-md bg-destructive/10 p-1 text-destructive opacity-0 hover:bg-destructive/20 group-hover:opacity-100",
-                              confirmRemovePath === repo.path && "opacity-100",
-                            )}
-                          >
-                            <XIcon className="size-3.5" />
-                          </button>
-                        </PopoverTrigger>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <PopoverTrigger asChild>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfirmRemovePath(repo.path);
+                                }}
+                                className={cn(
+                                  "shrink-0 rounded-md bg-destructive/10 p-1 text-destructive opacity-0 hover:bg-destructive/20 group-hover:opacity-100",
+                                  confirmRemovePath === repo.path && "opacity-100",
+                                )}
+                              >
+                                <XIcon className="size-3.5" />
+                              </button>
+                            </PopoverTrigger>
+                          </TooltipTrigger>
+                          <TooltipContent>Remove from list</TooltipContent>
+                        </Tooltip>
                         <PopoverContent
                           align="end"
                           className="w-56 space-y-2 bg-accent-blue/5 p-3"

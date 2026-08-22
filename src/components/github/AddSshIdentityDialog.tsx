@@ -12,6 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIdentityStore } from "@/store/useIdentityStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
@@ -132,7 +133,7 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
             <div className="flex flex-col gap-2">
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 disabled={!host.trim() || generating}
                 onClick={() => void generateKey()}
@@ -144,14 +145,18 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
                 <>
                   <div className="flex items-center gap-2 rounded-sm bg-muted/40 p-1.5 text-xs">
                     <span className="min-w-0 flex-1 truncate font-mono">{pubkey}</span>
-                    <button
-                      type="button"
-                      title="Copy public key"
-                      onClick={() => void copyToClipboard(pubkey)}
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
-                    >
-                      <CopyIcon className="size-3.5" />
-                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => void copyToClipboard(pubkey)}
+                          className="shrink-0 text-muted-foreground hover:text-foreground"
+                        >
+                          <CopyIcon className="size-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Copy public key</TooltipContent>
+                    </Tooltip>
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Copy this public key into {host.trim() || "the host"}'s SSH keys settings.
@@ -169,7 +174,7 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
                   value={keyPath}
                   onChange={(e) => setKeyPath(e.target.value)}
                 />
-                <Button type="button" variant="outline" size="sm" onClick={() => void pickKey()}>
+                <Button type="button" variant="secondary" size="sm" onClick={() => void pickKey()}>
                   <FolderOpenIcon className="size-3.5" />
                   Browse
                 </Button>

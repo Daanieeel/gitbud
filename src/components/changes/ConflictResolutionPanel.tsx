@@ -101,15 +101,15 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
             Raw
           </button>
         </div>
-        <Button size="sm" variant="outline" disabled={resolving} onClick={() => void useSide("ours")}>
+        <Button size="sm" variant="secondary" disabled={resolving} onClick={() => void useSide("ours")}>
           <UserIcon className="size-3.5" />
           Use Mine (whole file)
         </Button>
-        <Button size="sm" variant="outline" disabled={resolving} onClick={() => void useSide("theirs")}>
+        <Button size="sm" variant="secondary" disabled={resolving} onClick={() => void useSide("theirs")}>
           <UsersIcon className="size-3.5" />
           Use Theirs (whole file)
         </Button>
-        <Button size="sm" variant="outline" onClick={() => void openPath(`${repoPath}/${path}`)}>
+        <Button size="sm" variant="secondary" onClick={() => void openPath(`${repoPath}/${path}`)}>
           <PencilIcon className="size-3.5" />
           Edit Manually
         </Button>

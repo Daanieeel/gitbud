@@ -4,6 +4,7 @@ import { PlusIcon, TagIcon, Trash2Icon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { githubRepoUrl } from "@/lib/github-links";
@@ -62,12 +63,17 @@ export function TagsPanel() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" title="Tags">
-          <TagIcon className="size-3.5" />
-          {tags.length > 0 ? tags.length : ""}
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button variant="secondary" size="sm">
+              <TagIcon className="size-3.5" />
+              {tags.length > 0 ? tags.length : ""}
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Tags</TooltipContent>
+      </Tooltip>
       <PopoverContent className="w-72 p-0" align="start">
         <div className="max-h-56 overflow-auto p-1">
           {tags.length === 0 && (
@@ -75,36 +81,53 @@ export function TagsPanel() {
           )}
           {tags.map((t) => (
             <div key={t.name} className="group flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent">
-              <span className="min-w-0 flex-1 truncate font-mono" title={t.message ?? undefined}>
-                {t.name}
-              </span>
-              <button
-                title="Open on GitHub"
-                className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                onClick={() =>
-                  void githubRepoUrl(repoPath).then((base) => {
-                    if (base) void openUrl(`${base}/releases/tag/${t.name}`);
-                  })
-                }
-              >
-                <TagIcon className="size-3.5" />
-              </button>
-              <button
-                title="Push tag to origin"
-                disabled={busy}
-                className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                onClick={() => void push(t.name)}
-              >
-                <UploadIcon className="size-3.5" />
-              </button>
-              <button
-                title="Delete tag"
-                disabled={busy}
-                className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                onClick={() => void remove(t.name)}
-              >
-                <Trash2Icon className="size-3.5" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="min-w-0 flex-1 truncate font-mono">
+                    {t.name}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{t.message ?? undefined}</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                    onClick={() =>
+                      void githubRepoUrl(repoPath).then((base) => {
+                        if (base) void openUrl(`${base}/releases/tag/${t.name}`);
+                      })
+                    }
+                  >
+                    <TagIcon className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Open on GitHub</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    disabled={busy}
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                    onClick={() => void push(t.name)}
+                  >
+                    <UploadIcon className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Push tag to origin</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    disabled={busy}
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                    onClick={() => void remove(t.name)}
+                  >
+                    <Trash2Icon className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Delete tag</TooltipContent>
+              </Tooltip>
             </div>
           ))}
         </div>

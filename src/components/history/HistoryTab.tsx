@@ -10,6 +10,7 @@ import { githubFileUrl } from "@/lib/github-links";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const COMMIT_STATUS_DOT_COLOR: Record<string, string> = {
   Added: "bg-accent-green",
@@ -62,26 +63,29 @@ export function HistoryTab() {
       <ResizeHandle onPointerDown={commitList.onPointerDown} />
       <div style={{ width: fileList.width }} className="shrink-0 overflow-auto border-r border-border">
         {selectedCommitFiles.map(([path, status]) => (
-          <div
-            key={path}
-            className={cn(
-              "flex cursor-pointer items-center gap-1.5 truncate px-2 py-1 text-sm hover:bg-accent",
-              selectedCommitFilePath === path && "bg-accent",
-            )}
-            title={`${path} (${status})`}
-            onClick={() => void selectCommitFile(path)}
-          >
-            <span className="relative shrink-0">
-              <FileTypeIcon path={path} className="size-3.5" />
-              <span
+          <Tooltip key={path}>
+            <TooltipTrigger asChild>
+              <div
                 className={cn(
-                  "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                  COMMIT_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
+                  "flex cursor-pointer items-center gap-1.5 truncate px-2 py-1 text-sm hover:bg-accent",
+                  selectedCommitFilePath === path && "bg-accent",
                 )}
-              />
-            </span>
-            <span className="truncate">{path}</span>
-          </div>
+                onClick={() => void selectCommitFile(path)}
+              >
+                <span className="relative shrink-0">
+                  <FileTypeIcon path={path} className="size-3.5" />
+                  <span
+                    className={cn(
+                      "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
+                      COMMIT_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
+                    )}
+                  />
+                </span>
+                <span className="truncate">{path}</span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent>{`${path} (${status})`}</TooltipContent>
+          </Tooltip>
         ))}
       </div>
       <ResizeHandle onPointerDown={fileList.onPointerDown} />

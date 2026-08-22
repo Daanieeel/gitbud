@@ -117,7 +117,7 @@ export function CloneDialog({ open: isOpen, onOpenChange, onClone }: CloneDialog
             onChange={(e) => setUrl(e.target.value)}
           />
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => void pickParentDir()}>
+            <Button variant="secondary" size="sm" onClick={() => void pickParentDir()}>
               <FolderOpenIcon className="size-3.5" />
               Choose Folder
             </Button>

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { BoxIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import type { SubmoduleInfo } from "@/lib/types";
@@ -44,24 +45,32 @@ export function SubmodulesPanel() {
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          title="Submodules — nested git repositories checked out at a specific commit inside this one"
-        >
-          <BoxIcon className="size-3.5" />
-          {submodules.length}
-          {uninitialized > 0 && <span className="text-accent-yellow">!</span>}
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button variant="secondary" size="sm">
+              <BoxIcon className="size-3.5" />
+              {submodules.length}
+              {uninitialized > 0 && <span className="text-accent-yellow">!</span>}
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>
+          Submodules — nested git repositories checked out at a specific commit inside this one
+        </TooltipContent>
+      </Tooltip>
       <PopoverContent className="w-80 p-0" align="start">
         <div className="max-h-56 overflow-auto p-1">
           {submodules.map((sub) => (
             <div key={sub.path} className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm">
-              <span className="min-w-0 flex-1 truncate" title={sub.url ?? undefined}>
-                {sub.path}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="min-w-0 flex-1 truncate">
+                    {sub.path}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{sub.url ?? undefined}</TooltipContent>
+              </Tooltip>
               {sub.initialized ? (
                 <span className="shrink-0 font-mono text-xs text-muted-foreground">
                   {sub.head_oid?.slice(0, 7)}
@@ -71,7 +80,7 @@ export function SubmodulesPanel() {
               )}
               <Button
                 size="sm"
-                variant="outline"
+                variant="secondary"
                 disabled={busy}
                 onClick={() => void updateOne(sub.path)}
               >

@@ -6,6 +6,7 @@ import { DiffView } from "@/components/diff/DiffView";
 import { CommitBox } from "@/components/commit/CommitBox";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 
@@ -51,13 +52,17 @@ export function ChangesTab() {
         ) : (
           <>
             <div className="flex shrink-0 items-center gap-2 border-b border-border p-2">
-              <Checkbox
-                checked={allStaged}
-                title={allStaged ? "Unstage all" : "Stage all"}
-                onCheckedChange={(checked) =>
-                  void toggleStaged(filtered.map((f) => f.path), checked === true)
-                }
-              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Checkbox
+                    checked={allStaged}
+                    onCheckedChange={(checked) =>
+                      void toggleStaged(filtered.map((f) => f.path), checked === true)
+                    }
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{allStaged ? "Unstage all" : "Stage all"}</TooltipContent>
+              </Tooltip>
               <Input
                 placeholder="Filter files"
                 value={filter}

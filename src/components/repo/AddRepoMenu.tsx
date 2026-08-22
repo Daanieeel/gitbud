@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CloneDialog } from "./CloneDialog";
 import { useRepoStore } from "@/store/useRepoStore";
 
@@ -30,11 +31,16 @@ export function AddRepoMenu() {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" title="Add repository">
-            <PlusIcon />
-          </Button>
-        </DropdownMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" size="icon">
+                <PlusIcon />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Add repository</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent align="start">
           <DropdownMenuItem onSelect={() => setCloneOpen(true)}>
             <DownloadIcon className="size-3.5" />

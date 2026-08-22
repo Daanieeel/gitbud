@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { DatabaseIcon, DownloadIcon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 
@@ -24,23 +25,28 @@ export function LfsPanel() {
 
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" title="Git LFS — this repo tracks large files via Git LFS">
-          <DatabaseIcon className="size-3.5" />
-          LFS
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button variant="secondary" size="sm">
+              <DatabaseIcon className="size-3.5" />
+              LFS
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Git LFS — this repo tracks large files via Git LFS</TooltipContent>
+      </Tooltip>
       <PopoverContent className="w-64 p-2" align="start">
         <p className="mb-2 text-xs text-muted-foreground">
           This repo tracks large files with Git LFS. Fetch/pull/push don't always transfer LFS
           objects on their own — use these if a large file looks stuck as a pointer.
         </p>
         <div className="flex gap-2">
-          <Button size="sm" variant="outline" className="flex-1" disabled={syncing} onClick={() => void pullLfs()}>
+          <Button size="sm" variant="secondary" className="flex-1" disabled={syncing} onClick={() => void pullLfs()}>
             <DownloadIcon className="size-3.5" />
             Pull LFS
           </Button>
-          <Button size="sm" variant="outline" className="flex-1" disabled={syncing} onClick={() => void pushLfs()}>
+          <Button size="sm" variant="secondary" className="flex-1" disabled={syncing} onClick={() => void pushLfs()}>
             <UploadIcon className="size-3.5" />
             Push LFS
           </Button>

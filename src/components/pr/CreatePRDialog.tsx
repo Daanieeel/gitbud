@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -93,14 +94,18 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
           </label>
         </div>
         <DialogFooter>
-          <Button
-            disabled={submitting || !title.trim()}
-            title={`Open a PR from ${branch ?? "this branch"} into ${base}`}
-            onClick={() => void submit()}
-          >
-            <GitPullRequestIcon className="size-3.5" />
-            {submitting ? "Creating…" : "Create Pull Request"}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                disabled={submitting || !title.trim()}
+                onClick={() => void submit()}
+              >
+                <GitPullRequestIcon className="size-3.5" />
+                {submitting ? "Creating…" : "Create Pull Request"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{`Open a PR from ${branch ?? "this branch"} into ${base}`}</TooltipContent>
+          </Tooltip>
         </DialogFooter>
       </DialogContent>
     </Dialog>

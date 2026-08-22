@@ -317,11 +317,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </Row>
                 <Row label="Settings backup">
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => void exportSettings()}>
+                    <Button size="sm" variant="secondary" onClick={() => void exportSettings()}>
                       <DownloadIcon className="size-3.5" />
                       Export…
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => void importSettings()}>
+                    <Button size="sm" variant="secondary" onClick={() => void importSettings()}>
                       <UploadIcon className="size-3.5" />
                       Import…
                     </Button>

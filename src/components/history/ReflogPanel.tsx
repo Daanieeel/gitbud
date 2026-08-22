@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import type { ReflogEntry } from "@/lib/types";
@@ -47,10 +48,15 @@ export function ReflogPanel() {
 
   return (
     <>
-      <Button variant="outline" size="sm" title="Reflog — undo a reset, rebase, or accidental branch move" onClick={() => setOpen(true)}>
-        <HistoryIcon className="size-3.5" />
-        Reflog
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="secondary" size="sm" onClick={() => setOpen(true)}>
+            <HistoryIcon className="size-3.5" />
+            Reflog
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Reflog — undo a reset, rebase, or accidental branch move</TooltipContent>
+      </Tooltip>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -82,16 +88,20 @@ export function ReflogPanel() {
                     Confirm reset
                   </Button>
                 ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={busy}
-                    title="Restore to here (hard reset)"
-                    onClick={() => setConfirmOid(entry.oid)}
-                  >
-                    <RotateCcwIcon className="size-3.5" />
-                    Restore
-                  </Button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy}
+                        onClick={() => setConfirmOid(entry.oid)}
+                      >
+                        <RotateCcwIcon className="size-3.5" />
+                        Restore
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Restore to here (hard reset)</TooltipContent>
+                  </Tooltip>
                 )}
               </div>
             ))}

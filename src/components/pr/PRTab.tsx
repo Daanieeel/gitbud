@@ -52,7 +52,7 @@ export function PRTab() {
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-dot-grid text-center text-sm text-muted-foreground">
         <TriangleAlertIcon className="size-8 text-destructive" />
         <p className="max-w-sm">Sign in with GitHub to see pull requests</p>
-        <Button variant="outline" onClick={openSignIn}>
+        <Button variant="secondary" onClick={openSignIn}>
           Sign in with GitHub
         </Button>
       </div>
@@ -64,7 +64,7 @@ export function PRTab() {
       <div className="flex h-full flex-col items-center justify-center gap-3 bg-dot-grid text-center text-sm text-muted-foreground">
         <TriangleAlertIcon className="size-8 text-destructive" />
         <p className="max-w-sm">{loadError}</p>
-        <Button variant="outline" onClick={() => void reauth(currentLogin)}>
+        <Button variant="secondary" onClick={() => void reauth(currentLogin)}>
           Reconnect GitHub
         </Button>
       </div>

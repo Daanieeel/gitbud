@@ -42,7 +42,7 @@ export function UpstreamBanner({ repoPath, branch }: UpstreamBannerProps) {
       <span>
         Upstream is {status.behind} commit{status.behind === 1 ? "" : "s"} ahead.
       </span>
-      <Button size="sm" variant="outline" disabled={syncing} onClick={() => void sync()}>
+      <Button size="sm" variant="secondary" disabled={syncing} onClick={() => void sync()}>
         <ArrowUpFromLineIcon className="size-3.5" />
         {syncing ? "Syncing…" : "Fetch Upstream & Fast-Forward"}
       </Button>

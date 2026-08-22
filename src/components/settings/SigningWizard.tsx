@@ -4,6 +4,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { homeDir } from "@tauri-apps/api/path";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { SigningStatus } from "@/lib/types";
@@ -150,11 +151,11 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
                   onChange={(e) => setSshKeyPath(e.target.value)}
                   className="h-8"
                 />
-                <Button size="sm" variant="outline" onClick={() => void pickExistingSshKey()}>
+                <Button size="sm" variant="secondary" onClick={() => void pickExistingSshKey()}>
                   <KeyRoundIcon className="size-3.5" />
                   Use Existing
                 </Button>
-                <Button size="sm" variant="outline" disabled={busy} onClick={() => void generateSsh()}>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void generateSsh()}>
                   <PlusIcon className="size-3.5" />
                   Generate New
                 </Button>
@@ -162,13 +163,17 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
               {pubkey && (
                 <div className="flex items-center gap-2 rounded-sm bg-muted/40 p-1.5 text-xs">
                   <span className="min-w-0 flex-1 truncate font-mono">{pubkey}</span>
-                  <button
-                    title="Copy public key"
-                    onClick={() => void copyToClipboard(pubkey)}
-                    className="shrink-0 text-muted-foreground hover:text-foreground"
-                  >
-                    <CopyIcon className="size-3.5" />
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => void copyToClipboard(pubkey)}
+                        className="shrink-0 text-muted-foreground hover:text-foreground"
+                      >
+                        <CopyIcon className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Copy public key</TooltipContent>
+                  </Tooltip>
                 </div>
               )}
               {pubkey && (
@@ -192,7 +197,7 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
                     </option>
                   ))}
                 </select>
-                <Button size="sm" variant="outline" disabled={busy} onClick={() => void generateGpg()}>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void generateGpg()}>
                   <PlusIcon className="size-3.5" />
                   Generate New
                 </Button>
@@ -209,7 +214,7 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
       )}
       {status?.enabled && (
         <div className="flex justify-end">
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => void disable()}>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={() => void disable()}>
             Disable Signing
           </Button>
         </div>

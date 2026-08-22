@@ -22,6 +22,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
 import { cn, isProtectedBranch } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -59,7 +60,7 @@ export function BranchSwitcher() {
 
   if (!selectedRepo) {
     return (
-      <Button variant="outline" className="w-48 justify-between" disabled>
+      <Button variant="secondary" className="w-48 justify-between" disabled>
         <span className="flex items-center gap-2 text-muted-foreground">
           <GitBranchIcon className="size-4" /> No repository
         </span>
@@ -78,25 +79,40 @@ export function BranchSwitcher() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" className="w-48 justify-between" title="Switch or create a branch">
-          <span className="flex min-w-0 items-center gap-2">
-            <GitBranchIcon className="size-4 shrink-0" />
-            <span className="truncate">{branch ?? "…"}</span>
-            {branch && isProtectedBranch(branch) && (
-              <span title={`${branch} is a protected default branch`}>
-                <TriangleAlertIcon className="size-3.5 shrink-0 text-accent-yellow" />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button variant="secondary" className="w-48 justify-between">
+              <span className="flex min-w-0 items-center gap-2">
+                <GitBranchIcon className="size-4 shrink-0" />
+                <span className="truncate">{branch ?? "…"}</span>
+                {branch && isProtectedBranch(branch) && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <TriangleAlertIcon className="size-3.5 shrink-0 text-accent-yellow" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{`${branch} is a protected default branch`}</TooltipContent>
+                  </Tooltip>
+                )}
+                {branch && isLocalOnly(branch) && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <CloudUploadIcon className="size-3.5 shrink-0 text-accent-blue" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{`${branch} has never been pushed`}</TooltipContent>
+                  </Tooltip>
+                )}
               </span>
-            )}
-            {branch && isLocalOnly(branch) && (
-              <span title={`${branch} has never been pushed — local only, not published to origin`}>
-                <CloudUploadIcon className="size-3.5 shrink-0 text-accent-blue" />
-              </span>
-            )}
-          </span>
-          <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" />
-        </Button>
-      </PopoverTrigger>
+              <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Switch or create a branch</TooltipContent>
+      </Tooltip>
       <PopoverContent className="w-64 p-0">
         <div className="border-b border-border p-2">
           <Input
@@ -137,12 +153,14 @@ export function BranchSwitcher() {
                   >
                     <span className="min-w-0 flex-1 truncate">{b.name}</span>
                     {isLocalOnly(b.name) && (
-                      <span
-                        className="shrink-0 rounded-full bg-accent-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-blue"
-                        title={`${b.name} has never been pushed — local only`}
-                      >
-                        local
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="shrink-0 rounded-full bg-accent-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-blue">
+                            local
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>{`${b.name} has never been pushed`}</TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
                 </ContextMenuTrigger>

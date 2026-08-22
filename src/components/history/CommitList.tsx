@@ -23,6 +23,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CIBadge } from "@/components/pr/CIBadge";
 import { CommitGraph } from "./CommitGraph";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -55,9 +56,14 @@ function VerificationBadge({ repoPath, login, sha }: { repoPath: string; login: 
 
   if (!verified) return null;
   return (
-    <span title="Verified signature">
-      <ShieldCheckIcon className="size-3 shrink-0 text-accent-green" />
-    </span>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>
+          <ShieldCheckIcon className="size-3 shrink-0 text-accent-green" />
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Verified signature</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -204,13 +210,18 @@ export function CommitList({
                   <GitBranchPlusIcon className="size-3.5" />
                   Create Branch Here
                 </ContextMenuItem>
-                <ContextMenuItem
-                  onSelect={() => onRebaseFromHere(commit.oid)}
-                  title="Rebase — replay the commits after this one on top of a new base, rewriting their history"
-                >
-                  <ListOrderedIcon className="size-3.5" />
-                  Interactive Rebase from Here
-                </ContextMenuItem>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <ContextMenuItem onSelect={() => onRebaseFromHere(commit.oid)}>
+                      <ListOrderedIcon className="size-3.5" />
+                      Interactive Rebase from Here
+                    </ContextMenuItem>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Rebase — replay the commits after this one on top of a new base, rewriting their
+                    history
+                  </TooltipContent>
+                </Tooltip>
               </ContextMenuContent>
             </ContextMenu>
           );

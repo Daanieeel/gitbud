@@ -3,6 +3,7 @@ import { Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { api } from "@/lib/tauri";
@@ -60,12 +61,17 @@ export function BranchPruner() {
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm" title="Branches with a merged PR">
-          <Trash2Icon className="size-3.5" />
-          {candidates.length} merged
-        </Button>
-      </PopoverTrigger>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button variant="secondary" size="sm">
+              <Trash2Icon className="size-3.5" />
+              {candidates.length} merged
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Branches with a merged PR</TooltipContent>
+      </Tooltip>
       <PopoverContent className="w-72 p-0" align="start">
         <div className="border-b border-border p-2 text-xs text-muted-foreground">
           These branches' pull requests were merged on GitHub.

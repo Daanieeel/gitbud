@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import type { PullRequest } from "@/lib/types";
 import { usePRStore } from "@/store/usePRStore";
 import { CIBadge } from "./CIBadge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface PRListProps {
   repoPath: string;
@@ -68,27 +69,31 @@ export function PRList({ repoPath, login, pulls, selectedNumber, onSelect }: PRL
                     #{pr.number} by {pr.author_login}
                   </span>
                   <CIBadge repoPath={repoPath} login={login} sha={pr.head_sha} />
-                  <button
-                    title={
-                      watched.includes(pr.number)
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleWatch(pr.number);
+                        }}
+                        className={cn(
+                          "text-muted-foreground hover:text-foreground",
+                          watched.includes(pr.number) && "text-accent-yellow",
+                        )}
+                      >
+                        {watched.includes(pr.number) ? (
+                          <BellRingIcon className="size-3" />
+                        ) : (
+                          <BellIcon className="size-3" />
+                        )}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {watched.includes(pr.number)
                         ? "Stop notifying me when CI status changes"
-                        : "Notify me when CI status changes"
-                    }
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleWatch(pr.number);
-                    }}
-                    className={cn(
-                      "text-muted-foreground hover:text-foreground",
-                      watched.includes(pr.number) && "text-accent-yellow",
-                    )}
-                  >
-                    {watched.includes(pr.number) ? (
-                      <BellRingIcon className="size-3" />
-                    ) : (
-                      <BellIcon className="size-3" />
-                    )}
-                  </button>
+                        : "Notify me when CI status changes"}
+                    </TooltipContent>
+                  </Tooltip>
                   {pr.merged && (
                     <span className="rounded bg-accent-purple/20 px-1 text-accent-purple">merged</span>
                   )}

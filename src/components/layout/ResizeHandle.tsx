@@ -1,3 +1,5 @@
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 interface ResizeHandleProps {
   onPointerDown: (e: React.PointerEvent) => void;
 }
@@ -8,11 +10,15 @@ interface ResizeHandleProps {
 export function ResizeHandle({ onPointerDown }: ResizeHandleProps) {
   return (
     <div className="relative w-0 shrink-0">
-      <div
-        onPointerDown={onPointerDown}
-        title="Drag to resize"
-        className="absolute inset-y-0 -left-3 -right-3 z-10 cursor-col-resize"
-      />
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <div
+            onPointerDown={onPointerDown}
+            className="absolute inset-y-0 -left-3 -right-3 z-10 cursor-col-resize"
+          />
+        </TooltipTrigger>
+        <TooltipContent>Drag to resize</TooltipContent>
+      </Tooltip>
     </div>
   );
 }

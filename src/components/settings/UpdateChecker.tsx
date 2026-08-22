@@ -56,7 +56,7 @@ export function UpdateChecker() {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
-        <Button size="sm" variant="outline" disabled={status === "checking"} onClick={() => void checkForUpdates()}>
+        <Button size="sm" variant="secondary" disabled={status === "checking"} onClick={() => void checkForUpdates()}>
           <RefreshCwIcon className={`size-3.5 ${status === "checking" ? "animate-spin" : ""}`} />
           Check for Updates
         </Button>

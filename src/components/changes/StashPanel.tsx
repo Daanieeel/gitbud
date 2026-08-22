@@ -3,6 +3,7 @@ import { ArchiveIcon, ExpandIcon, Trash2Icon, Undo2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DiffView } from "@/components/diff/DiffView";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -95,33 +96,41 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
               selectedPath === path && "bg-accent",
             )}
           >
-            <span
-              className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 truncate"
-              title={`${path} (${status})`}
-              onClick={() => setSelectedPath(path)}
-            >
-              <span className="relative shrink-0">
-                <FileTypeIcon path={path} className="size-3.5" />
+            <Tooltip>
+              <TooltipTrigger asChild>
                 <span
+                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 truncate"
+                  onClick={() => setSelectedPath(path)}
+                >
+                  <span className="relative shrink-0">
+                    <FileTypeIcon path={path} className="size-3.5" />
+                    <span
+                      className={cn(
+                        "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
+                        STASH_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
+                      )}
+                    />
+                  </span>
+                  <span className="truncate">{path}</span>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>{`${path} (${status})`}</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
                   className={cn(
-                    "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                    STASH_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
+                    "shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-50",
+                    selectedPath === path ? "opacity-100" : "opacity-0 group-hover:opacity-100",
                   )}
-                />
-              </span>
-              <span className="truncate">{path}</span>
-            </span>
-            <button
-              title="Restore this file from the stash, without popping it"
-              className={cn(
-                "shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-50",
-                selectedPath === path ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-              )}
-              disabled={applyingPath === path}
-              onClick={() => void applyFile(path)}
-            >
-              <Undo2Icon className="size-3.5" />
-            </button>
+                  disabled={applyingPath === path}
+                  onClick={() => void applyFile(path)}
+                >
+                  <Undo2Icon className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Restore this file from the stash, without popping it</TooltipContent>
+            </Tooltip>
           </div>
         ))}
       </div>
@@ -167,12 +176,17 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" title="Stash uncommitted changes, or apply a saved stash">
-            <ArchiveIcon className="size-3.5" />
-            Stash{stashes.length > 0 ? ` (${stashes.length})` : ""}
-          </Button>
-        </PopoverTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button variant="secondary" size="sm">
+                <ArchiveIcon className="size-3.5" />
+                Stash{stashes.length > 0 ? ` (${stashes.length})` : ""}
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Stash uncommitted changes, or apply a saved stash</TooltipContent>
+        </Tooltip>
         <PopoverContent className="w-72 p-0" align="start">
           <div className="border-b border-border p-2">
             <Button
@@ -202,52 +216,73 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
                   setOpen(false);
                 }}
               >
-                <span className="min-w-0 flex-1 truncate" title={s.message}>
-                  {description}
-                  {branch && <span className="ml-1.5 text-xs text-muted-foreground">on {branch}</span>}
-                </span>
-                <button
-                  title="View files & diff"
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDetailIndex(s.index);
-                    setDetailOpen(true);
-                    setOpen(false);
-                  }}
-                >
-                  <ExpandIcon className="size-3.5" />
-                </button>
-                <button
-                  title="Apply (keep stash)"
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void apply(repoPath, s.index).then(() => refreshStatus());
-                  }}
-                >
-                  <Undo2Icon className="size-3.5" />
-                </button>
-                <button
-                  title="Pop (apply and remove)"
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void pop(repoPath, s.index).then(() => refreshStatus());
-                  }}
-                >
-                  <ArchiveIcon className="size-3.5" />
-                </button>
-                <button
-                  title="Drop"
-                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    void drop(repoPath, s.index);
-                  }}
-                >
-                  <Trash2Icon className="size-3.5" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="min-w-0 flex-1 truncate">
+                      {description}
+                      {branch && <span className="ml-1.5 text-xs text-muted-foreground">on {branch}</span>}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{s.message}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDetailIndex(s.index);
+                        setDetailOpen(true);
+                        setOpen(false);
+                      }}
+                    >
+                      <ExpandIcon className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>View files & diff</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void apply(repoPath, s.index).then(() => refreshStatus());
+                      }}
+                    >
+                      <Undo2Icon className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Apply (keep stash)</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void pop(repoPath, s.index).then(() => refreshStatus());
+                      }}
+                    >
+                      <ArchiveIcon className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Pop (apply and remove)</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void drop(repoPath, s.index);
+                      }}
+                    >
+                      <Trash2Icon className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Drop</TooltipContent>
+                </Tooltip>
               </div>
               );
             })}

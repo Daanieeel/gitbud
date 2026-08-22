@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { CheckIcon, CircleIcon, RefreshCwIcon, XCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useBatchSyncStore } from "@/store/useBatchSyncStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { cn } from "@/lib/utils";
@@ -35,17 +36,27 @@ export function BatchSyncTrigger({
 
   if (iconOnly) {
     return (
-      <Button variant="outline" size="icon" disabled={running} title={title} onClick={run}>
-        <RefreshCwIcon className={cn("size-4", running && "animate-spin")} />
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="secondary" size="icon" disabled={running} onClick={run}>
+            <RefreshCwIcon className={cn("size-4", running && "animate-spin")} />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{title}</TooltipContent>
+      </Tooltip>
     );
   }
 
   return (
-    <Button variant="outline" size="sm" className="w-full" disabled={running} title={title} onClick={run}>
-      <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
-      {filtered ? `Update ${repos.length}/${totalCount}` : "Update All"}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button variant="secondary" size="sm" className="w-full" disabled={running} onClick={run}>
+          <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
+          {filtered ? `Update ${repos.length}/${totalCount}` : "Update All"}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{title}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -83,13 +94,18 @@ function BatchSyncToastContent({ toastId }: { toastId: string | number }) {
         {entries.map(([path, status]) => {
           const repo = repos.find((r) => r.path === path);
           return (
-            <div key={path} className="flex items-center gap-2 py-0.5 text-xs" title={errors[path]}>
-              {status === "pending" && <CircleIcon className="size-3 shrink-0 text-muted-foreground" />}
-              {status === "running" && <RefreshCwIcon className="size-3 shrink-0 animate-spin text-primary" />}
-              {status === "done" && <CheckIcon className="size-3 shrink-0 text-accent-green" />}
-              {status === "error" && <XCircleIcon className="size-3 shrink-0 text-destructive" />}
-              <span className="min-w-0 flex-1 truncate">{repo?.name ?? path}</span>
-            </div>
+            <Tooltip key={path}>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-2 py-0.5 text-xs">
+                  {status === "pending" && <CircleIcon className="size-3 shrink-0 text-muted-foreground" />}
+                  {status === "running" && <RefreshCwIcon className="size-3 shrink-0 animate-spin text-primary" />}
+                  {status === "done" && <CheckIcon className="size-3 shrink-0 text-accent-green" />}
+                  {status === "error" && <XCircleIcon className="size-3 shrink-0 text-destructive" />}
+                  <span className="min-w-0 flex-1 truncate">{repo?.name ?? path}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{errors[path]}</TooltipContent>
+            </Tooltip>
           );
         })}
       </div>

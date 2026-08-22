@@ -8,6 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DiffView } from "@/components/diff/DiffView";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CIBadge } from "./CIBadge";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
@@ -65,66 +66,82 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
           </div>
         </div>
         <CIBadge repoPath={repoPath} login={login} sha={pr.head_sha} />
-        <a
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            void openUrl(pr.html_url);
-          }}
-          title="Open on GitHub"
-          className="text-muted-foreground hover:text-foreground"
-        >
-          <ExternalLinkIcon className="size-4" />
-        </a>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={checkingOut}
-          title={`Fetch and check out as local branch pr-${pr.number}`}
-          onClick={() => void checkout()}
-        >
-          <GitBranchIcon className="size-3.5" />
-          {checkingOut ? "Checking out…" : "Checkout"}
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                void openUrl(pr.html_url);
+              }}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <ExternalLinkIcon className="size-4" />
+            </a>
+          </TooltipTrigger>
+          <TooltipContent>Open on GitHub</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={checkingOut}
+              onClick={() => void checkout()}
+            >
+              <GitBranchIcon className="size-3.5" />
+              {checkingOut ? "Checking out…" : "Checkout"}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{`Fetch and check out as local branch pr-${pr.number}`}</TooltipContent>
+        </Tooltip>
         {!pr.merged && pr.state === "open" && (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button size="sm" disabled={merging} title="Merge this pull request">
-                <GitMergeIcon className="size-3.5" />
-                {merging ? "Merging…" : "Merge"}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => void merge("merge")}>
-                <GitMergeIcon className="size-3.5" />
-                Create merge commit
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void merge("squash")}>
-                <GitMergeIcon className="size-3.5" />
-                Squash and merge
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void merge("rebase")}>
-                <GitMergeIcon className="size-3.5" />
-                Rebase and merge
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <Tooltip>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <TooltipTrigger asChild>
+                  <Button size="sm" disabled={merging}>
+                    <GitMergeIcon className="size-3.5" />
+                    {merging ? "Merging…" : "Merge"}
+                  </Button>
+                </TooltipTrigger>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => void merge("merge")}>
+                  <GitMergeIcon className="size-3.5" />
+                  Create merge commit
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void merge("squash")}>
+                  <GitMergeIcon className="size-3.5" />
+                  Squash and merge
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => void merge("rebase")}>
+                  <GitMergeIcon className="size-3.5" />
+                  Rebase and merge
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <TooltipContent>Merge this pull request</TooltipContent>
+          </Tooltip>
         )}
       </div>
       <div className="flex min-h-0 flex-1">
         <div className="w-56 shrink-0 overflow-auto border-r border-border">
           {files.map((f) => (
-            <div
-              key={f.filename}
-              className={cn(
-                "cursor-pointer truncate px-2 py-1 text-sm hover:bg-accent",
-                selectedFilePath === f.filename && "bg-accent",
-              )}
-              title={`${f.filename} (${f.status})`}
-              onClick={() => selectFile(f.filename)}
-            >
-              {f.filename}
-            </div>
+            <Tooltip key={f.filename}>
+              <TooltipTrigger asChild>
+                <div
+                  className={cn(
+                    "cursor-pointer truncate px-2 py-1 text-sm hover:bg-accent",
+                    selectedFilePath === f.filename && "bg-accent",
+                  )}
+                  onClick={() => selectFile(f.filename)}
+                >
+                  {f.filename}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>{`${f.filename} (${f.status})`}</TooltipContent>
+            </Tooltip>
           ))}
         </div>
         <div className="min-w-0 flex-1">

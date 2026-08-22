@@ -19,6 +19,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubFileUrl } from "@/lib/github-links";
@@ -118,18 +119,22 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                   )}
                   onClick={() => onSelect(file.path)}
                 >
-                  <Checkbox
-                    checked={file.partially_staged ? "indeterminate" : file.staged}
-                    title={
-                      file.partially_staged
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Checkbox
+                        checked={file.partially_staged ? "indeterminate" : file.staged}
+                        onClick={(e) => e.stopPropagation()}
+                        onCheckedChange={(checked) => onToggle(file.path, checked === true)}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {file.partially_staged
                         ? "Partially staged — click to finish staging the rest"
                         : file.staged
                           ? "Unstage"
-                          : "Stage"
-                    }
-                    onClick={(e) => e.stopPropagation()}
-                    onCheckedChange={(checked) => onToggle(file.path, checked === true)}
-                  />
+                          : "Stage"}
+                    </TooltipContent>
+                  </Tooltip>
                   <span className="relative shrink-0">
                     {file.status === "conflicted" ? (
                       <TriangleAlertIcon className="size-3.5 text-destructive" />
@@ -155,12 +160,14 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                     })()}
                   </span>
                   {lfsInfo[file.path] && (
-                    <span
-                      className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-medium text-muted-foreground"
-                      title="Tracked by Git LFS"
-                    >
-                      LFS{lfsInfo[file.path].size != null && ` · ${formatBytes(lfsInfo[file.path].size!)}`}
-                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-medium text-muted-foreground">
+                          LFS{lfsInfo[file.path].size != null && ` · ${formatBytes(lfsInfo[file.path].size!)}`}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>Tracked by Git LFS</TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
               </ContextMenuTrigger>
