@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { LockIcon, RefreshCwIcon, XIcon } from "lucide-react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Input } from "@/components/ui/input";
 import {
   ContextMenu,
@@ -33,8 +34,10 @@ export function RepoSidebar() {
   const selectedRepo = useRepoStore((s) => s.selectedRepo);
   const selectRepo = useRepoStore((s) => s.selectRepo);
   const removeRepo = useRepoStore((s) => s.removeRepo);
+  const addExistingRepo = useRepoStore((s) => s.addExistingRepo);
   const setReposLocal = useRepoStore.setState;
   const syncing = useRepoStore((s) => s.syncing);
+  const [dragOver, setDragOver] = useState(false);
   const sidebarSort = useSettingsStore((s) => s.settings.sidebar_sort);
   const showAheadBehind = useSettingsStore((s) => s.settings.show_ahead_behind);
 
@@ -63,6 +66,27 @@ export function RepoSidebar() {
       cancelled = true;
     };
   }, [repos]);
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void getCurrentWebview()
+      .onDragDropEvent((event) => {
+        if (event.payload.type === "drop") {
+          setDragOver(false);
+          for (const path of event.payload.paths) {
+            void addExistingRepo(path).catch(() => {});
+          }
+        } else if (event.payload.type === "enter" || event.payload.type === "over") {
+          setDragOver(true);
+        } else {
+          setDragOver(false);
+        }
+      })
+      .then((fn) => {
+        unlisten = fn;
+      });
+    return () => unlisten?.();
+  }, [addExistingRepo]);
 
   const filtered = useMemo(() => {
     if (!filter.trim()) return repos;
@@ -97,7 +121,12 @@ export function RepoSidebar() {
   };
 
   return (
-    <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border">
+    <aside
+      className={cn(
+        "flex h-full w-64 shrink-0 flex-col border-r border-border",
+        dragOver && "ring-2 ring-inset ring-primary",
+      )}
+    >
       <div className="flex shrink-0 items-center gap-2 border-b border-border p-2">
         <Input
           placeholder="Filter repositories"

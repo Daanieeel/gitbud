@@ -49,7 +49,7 @@ Mark as done when the feature is implemented.
 - [x] **File search/filter** in `ChangesTab.tsx`/`FileList.tsx` — already existed since the initial build (filter input above the file list).
 - [ ] **Interactive rebase** — reorder/squash/edit/drop commits via a drag-orderable list before running `git rebase -i`.
 - [ ] **Custom sidebar sections** (Favorites, Work, Personal, etc.) to organize repositories instead of one flat list.
-- [ ] **Commit message templates / history** — recall recently used commit messages, or load a repo's `.gitmessage` template.
+- [x] **Commit message history** — `lib/commit-history.ts` (localStorage, per-machine not per-repo), history icon next to the summary field in `CommitBox.tsx`. Loading a repo's `.gitmessage` template is not implemented.
 - [ ] **Drag-and-drop** a folder onto the sidebar to add it as a repo (alternative to `AddRepoMenu.tsx`'s picker).
 - [ ] **Submodule support** — detect and show submodule status, allow update/init from the UI.
-- [ ] **Animated status icons** — subtle spinner/pulse on a repo row while fetch/pull/push is running.
+- [x] **Animated status icons** — spinning refresh icon on the active repo's sidebar row while fetch/pull/push is running (`RepoSidebar.tsx`).
