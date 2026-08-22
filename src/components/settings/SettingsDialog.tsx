@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { GitHubMark } from "@/components/github/GitHubMark";
+import { UpdateChecker } from "./UpdateChecker";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -323,6 +324,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 {importExportError && (
                   <p className="text-xs text-destructive">{importExportError}</p>
                 )}
+                <Row label="Updates">
+                  <UpdateChecker />
+                </Row>
               </>
             )}
           </div>
