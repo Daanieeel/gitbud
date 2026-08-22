@@ -95,10 +95,24 @@ export function AccountBar() {
         </div>
       )}
       {identities.length === 0 ? (
-        <Button variant="outline" size="sm" className="w-full" onClick={openSignIn}>
-          <GitHubMark className="size-3.5" />
-          Sign in with GitHub
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="w-full">
+              <PlusIcon className="size-3.5" />
+              Add identity
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem onSelect={openSignIn}>
+              <GitHubMark className="size-3.5" />
+              GitHub account
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setSshDialogOpen(true)}>
+              <KeyRoundIcon className="size-3.5" />
+              SSH identity
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ) : (
         <Popover open={switcherOpen} onOpenChange={setSwitcherOpen}>
           <PopoverTrigger asChild>
