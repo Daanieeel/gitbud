@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { formatDistanceToNow } from "date-fns";
 import { ShieldCheckIcon } from "lucide-react";
@@ -16,8 +16,11 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { CIBadge } from "@/components/pr/CIBadge";
+import { CommitGraph } from "./CommitGraph";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
+
+const ROW_HEIGHT = 52;
 
 interface CommitListProps {
   commits: CommitEntry[];
@@ -59,9 +62,18 @@ export function CommitList({ commits, selectedOid, onSelect, onNeedMore, onCreat
   const virtualizer = useVirtualizer({
     count: commits.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 52,
+    estimateSize: () => ROW_HEIGHT,
     overscan: 12,
   });
+
+  const laneCount = useMemo(() => {
+    let max = 0;
+    for (const c of commits) {
+      max = Math.max(max, c.lane);
+      for (const l of c.active_lanes) max = Math.max(max, l);
+    }
+    return max + 1;
+  }, [commits]);
 
   const items = virtualizer.getVirtualItems();
   const lastIndex = items.length > 0 ? items[items.length - 1].index : -1;
@@ -97,6 +109,12 @@ export function CommitList({ commits, selectedOid, onSelect, onNeedMore, onCreat
                   )}
                   onClick={() => onSelect(commit.oid)}
                 >
+                  <CommitGraph
+                    commit={commit}
+                    prevActiveLanes={commits[row.index - 1]?.active_lanes}
+                    laneCount={laneCount}
+                    rowHeight={row.size}
+                  />
                   <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-medium">
                     {initial}
                   </div>
