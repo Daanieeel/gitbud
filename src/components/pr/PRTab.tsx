@@ -95,7 +95,7 @@ export function PRTab() {
             size="sm"
             variant="secondary"
             className="mt-2 text-foreground"
-            onClick={() => void openUrl("https://github.com/apps/gitbud/installations/new")}
+            onClick={() => void openUrl("https://github.com/apps/gitbud-client/installations/new")}
           >
             Install on Organization
           </Button>
