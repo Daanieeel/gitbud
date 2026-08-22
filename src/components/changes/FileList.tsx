@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { FileIcon, FilePlus, FileMinus, FileEdit, FileSymlink, TriangleAlertIcon } from "lucide-react";
+import { TriangleAlertIcon } from "lucide-react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { ChangeKind, FileEntry } from "@/lib/types";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,27 +14,18 @@ import {
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubFileUrl } from "@/lib/github-links";
+import { getFileIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 
-const STATUS_ICON: Record<ChangeKind, typeof FileIcon> = {
-  added: FilePlus,
-  untracked: FilePlus,
-  modified: FileEdit,
-  deleted: FileMinus,
-  renamed: FileSymlink,
-  type_change: FileEdit,
-  conflicted: TriangleAlertIcon,
-};
-
-const STATUS_COLOR: Record<ChangeKind, string> = {
-  added: "text-accent-green",
-  untracked: "text-accent-green",
-  modified: "text-accent-green",
-  deleted: "text-accent-pink",
-  renamed: "text-muted-foreground",
-  type_change: "text-muted-foreground",
-  conflicted: "text-destructive",
+const STATUS_DOT_COLOR: Record<ChangeKind, string> = {
+  added: "bg-accent-green",
+  untracked: "bg-accent-green",
+  modified: "bg-accent-green",
+  deleted: "bg-accent-pink",
+  renamed: "bg-muted-foreground",
+  type_change: "bg-muted-foreground",
+  conflicted: "bg-destructive",
 };
 
 interface FileListProps {
@@ -62,7 +53,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {virtualizer.getVirtualItems().map((row) => {
           const file = files[row.index];
-          const Icon = STATUS_ICON[file.status];
+          const { icon: Icon, color } = getFileIcon(file.path);
           return (
             <ContextMenu key={file.path}>
               <ContextMenuTrigger asChild>
@@ -87,7 +78,19 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                     onClick={(e) => e.stopPropagation()}
                     onCheckedChange={(checked) => onToggle(file.path, checked === true)}
                   />
-                  <Icon className={cn("size-3.5 shrink-0", STATUS_COLOR[file.status])} />
+                  <span className="relative shrink-0">
+                    {file.status === "conflicted" ? (
+                      <TriangleAlertIcon className="size-3.5 text-destructive" />
+                    ) : (
+                      <Icon className="size-3.5" style={{ color }} />
+                    )}
+                    <span
+                      className={cn(
+                        "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
+                        STATUS_DOT_COLOR[file.status],
+                      )}
+                    />
+                  </span>
                   <span className="truncate">{file.path}</span>
                 </div>
               </ContextMenuTrigger>

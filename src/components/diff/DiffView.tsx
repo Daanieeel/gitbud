@@ -1,10 +1,11 @@
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { LinkIcon, MessageSquarePlusIcon } from "lucide-react";
 import type { FileDiff, ImageDiff, ReviewComment } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ImageDiffView } from "./ImageDiffView";
 import { Button } from "@/components/ui/button";
 import { useSettingsStore } from "@/store/useSettingsStore";
+import { highlightLine, languageForPath } from "@/lib/highlight";
 
 interface HunkActions {
   /** Whether the diff being shown is the staged (HEAD->index) or unstaged (index->workdir) side. */
@@ -108,6 +109,7 @@ function DiffViewImpl({
 }: DiffViewProps) {
   const [composerKey, setComposerKey] = useState<string | null>(null);
   const fontSize = useSettingsStore((s) => s.settings.diff_font_size);
+  const language = useMemo(() => (diff ? languageForPath(diff.path) : undefined), [diff]);
 
   if (!path) {
     return (
@@ -191,23 +193,26 @@ function DiffViewImpl({
             const canComment = Boolean(onAddComment) && line.new_lineno != null;
             return (
               <div key={lineIdx}>
-                <div
-                  className={cn(
-                    "group flex px-3 py-px whitespace-pre",
-                    line.kind === "addition" && "bg-[var(--diff-add-bg)] text-[var(--diff-add-fg)]",
-                    line.kind === "deletion" && "bg-[var(--diff-del-bg)] text-[var(--diff-del-fg)]",
-                  )}
-                >
+                <div className="group flex px-3 py-px whitespace-pre hover:bg-accent/40">
                   <span className="mr-3 inline-block w-8 shrink-0 select-none text-right text-muted-foreground/60">
                     {line.old_lineno ?? ""}
                   </span>
                   <span className="mr-3 inline-block w-8 shrink-0 select-none text-right text-muted-foreground/60">
                     {line.new_lineno ?? ""}
                   </span>
-                  <span className="mr-2 shrink-0 select-none">
+                  <span
+                    className={cn(
+                      "mr-2 shrink-0 select-none font-semibold",
+                      line.kind === "addition" && "text-accent-green",
+                      line.kind === "deletion" && "text-accent-pink",
+                    )}
+                  >
                     {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
                   </span>
-                  <span className="min-w-0 flex-1">{line.content}</span>
+                  <span
+                    className="min-w-0 flex-1"
+                    dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }}
+                  />
                   {onCopyPermalink && line.new_lineno != null && (
                     <button
                       title="Copy GitHub permalink to this line"
