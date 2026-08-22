@@ -1,5 +1,5 @@
 import { formatDistanceToNow } from "date-fns";
-import { ArrowDownIcon, ArrowUpIcon, CloudUploadIcon, RefreshCwIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpIcon, CloudUploadIcon, InfoIcon, RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useRepoStore } from "@/store/useRepoStore";
 import { cn } from "@/lib/utils";
@@ -38,8 +38,12 @@ export function SyncButton() {
     title = `${label} (Cmd+Shift+P to pull)`;
   }
 
+  const lastFetchedText = lastFetched
+    ? `Last fetched ${formatDistanceToNow(new Date(lastFetched * 1000), { addSuffix: true })}`
+    : "Never fetched";
+
   return (
-    <div className="flex flex-col items-start">
+    <div className="flex items-center gap-1">
       <Button
         variant="outline"
         size="sm"
@@ -50,10 +54,8 @@ export function SyncButton() {
         <Icon className={cn("size-3.5", syncing && "animate-spin")} />
         {label}
       </Button>
-      <span className="pl-1 text-[10px] text-muted-foreground">
-        {lastFetched
-          ? `Last fetched ${formatDistanceToNow(new Date(lastFetched * 1000), { addSuffix: true })}`
-          : "Never fetched"}
+      <span title={lastFetchedText} className="flex items-center text-muted-foreground">
+        <InfoIcon className="size-3.5" />
       </span>
     </div>
   );
