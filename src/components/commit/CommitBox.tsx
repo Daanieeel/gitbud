@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
 import { isProtectedBranch } from "@/lib/utils";
 
@@ -62,17 +63,22 @@ export function CommitBox() {
 
   return (
     <div className="flex shrink-0 flex-col gap-2 border-t border-border p-2">
-      <label
-        className="flex items-center gap-2 text-xs text-muted-foreground"
-        title="Amend — replace the last commit with this message and any currently staged changes, instead of creating a new commit"
-      >
-        <Checkbox
-          checked={amending}
-          disabled={!lastCommit}
-          onCheckedChange={(checked) => toggleAmend(checked === true)}
-        />
-        Amend last commit
-      </label>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Checkbox
+              checked={amending}
+              disabled={!lastCommit}
+              onCheckedChange={(checked) => toggleAmend(checked === true)}
+            />
+            Amend last commit
+          </label>
+        </TooltipTrigger>
+        <TooltipContent>
+          Amend — replace the last commit with this message and any currently staged changes, instead of
+          creating a new commit
+        </TooltipContent>
+      </Tooltip>
       <Input
         placeholder="Summary (required)"
         value={summary}

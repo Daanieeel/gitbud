@@ -11,7 +11,10 @@ export interface FileEntry {
   path: string;
   old_path: string | null;
   status: ChangeKind;
+  /** True when staged with no further unstaged changes on top of that. */
   staged: boolean;
+  /** True when this path has changes in both the index and the working tree. */
+  partially_staged: boolean;
 }
 
 export interface RepoStatus {

@@ -18,7 +18,14 @@ pub struct FileEntry {
     pub path: String,
     pub old_path: Option<String>,
     pub status: ChangeKind,
+    /// True when this path is staged with no further unstaged changes on top — i.e. `git add`
+    /// on it right now would be a no-op. False for a path that's entirely unstaged *or*
+    /// partially staged (see `partially_staged`), since either way there's more to stage.
     pub staged: bool,
+    /// True when this path has changes in *both* the index and the working tree (e.g. you
+    /// staged one hunk and left another edit unstaged). The UI shows this as a checkbox in
+    /// an indeterminate state rather than fully checked.
+    pub partially_staged: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,8 +102,14 @@ pub fn get_status(repo_path: &str) -> Result<RepoStatus, String> {
 
         let index_kind = kind_from_flags(flags, true);
         let worktree_kind = kind_from_flags(flags, false);
-        let staged = index_kind.is_some();
         let status = worktree_kind.or(index_kind).unwrap_or(ChangeKind::Modified);
+        // A conflict isn't a staging state — `kind_from_flags` reports Conflicted on both
+        // sides for it, which would otherwise look like "staged AND unstaged" here.
+        let (staged, partially_staged) = if status == ChangeKind::Conflicted {
+            (false, false)
+        } else {
+            (index_kind.is_some() && worktree_kind.is_none(), index_kind.is_some() && worktree_kind.is_some())
+        };
 
         let (path, old_path) = if let Some(diff) = entry.index_to_workdir().or(entry.head_to_index()) {
             let new_path = diff
@@ -119,6 +132,7 @@ pub fn get_status(repo_path: &str) -> Result<RepoStatus, String> {
             old_path,
             status,
             staged,
+            partially_staged,
         });
     }
 
