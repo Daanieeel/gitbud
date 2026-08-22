@@ -152,7 +152,16 @@ function UnifiedLine({
   const canComment = Boolean(onAddComment) && line.new_lineno != null;
   return (
     <div>
-      <div className="group flex px-3 py-px whitespace-pre hover:bg-accent/40">
+      <div
+        className={cn(
+          "group flex px-3 py-px whitespace-pre",
+          line.kind === "addition" &&
+            "bg-[color-mix(in_srgb,var(--accent-green)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--accent-green)_18%,transparent)]",
+          line.kind === "deletion" &&
+            "bg-[color-mix(in_srgb,var(--accent-pink)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--accent-pink)_18%,transparent)]",
+          line.kind === "context" && "hover:bg-accent/40",
+        )}
+      >
         <span className="mr-3 inline-block w-8 shrink-0 select-none text-right text-muted-foreground/60">
           {line.old_lineno ?? ""}
         </span>
@@ -228,8 +237,11 @@ function SplitCell({ line, language }: { line: DiffLine | null; language: string
     <div
       className={cn(
         "flex flex-1 px-3 py-px whitespace-pre",
-        line.kind === "addition" && "bg-[color-mix(in_srgb,var(--accent-green)_10%,transparent)]",
-        line.kind === "deletion" && "bg-[color-mix(in_srgb,var(--accent-pink)_10%,transparent)]",
+        line.kind === "addition" &&
+          "bg-[color-mix(in_srgb,var(--accent-green)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--accent-green)_18%,transparent)]",
+        line.kind === "deletion" &&
+          "bg-[color-mix(in_srgb,var(--accent-pink)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--accent-pink)_18%,transparent)]",
+        line.kind === "context" && "hover:bg-accent/40",
       )}
     >
       <span className="mr-3 inline-block w-8 shrink-0 select-none text-right text-muted-foreground/60">
