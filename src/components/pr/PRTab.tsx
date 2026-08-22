@@ -89,15 +89,15 @@ export function PRTab() {
             Repository Not Found
           </span>
           <p className="text-xs leading-relaxed">
-            GitHub returned a 404 error. If this repository belongs to an organization, an admin must install the GitBud GitHub App on the organization before it can be accessed.
+            GitHub returned a 404 error. If this repository belongs to an organization, you may need to explicitly grant GitBud access to that organization in your GitHub settings.
           </p>
           <Button
             size="sm"
             variant="secondary"
             className="mt-2 text-foreground"
-            onClick={() => void openUrl("https://github.com/apps/gitbud-client/installations/new")}
+            onClick={() => void openUrl("https://github.com/settings/connections/applications/Ov23li3VnSdamGm6SrSm")}
           >
-            Install on Organization
+            Grant Organization Access
           </Button>
         </div>
       </div>
