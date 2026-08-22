@@ -123,8 +123,10 @@ struct CreatePrBody<'a> {
     head: &'a str,
     base: &'a str,
     body: &'a str,
+    draft: bool,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn create_pull_request(
     token: &str,
     owner: &str,
@@ -133,12 +135,13 @@ pub async fn create_pull_request(
     head: &str,
     base: &str,
     body: &str,
+    draft: bool,
 ) -> Result<PullRequest, String> {
     let url = format!("https://api.github.com/repos/{owner}/{repo}/pulls");
     let res = check(
         client(token)?
             .post(url)
-            .json(&CreatePrBody { title, head, base, body })
+            .json(&CreatePrBody { title, head, base, body, draft })
             .send()
             .await
             .map_err(|e| e.to_string())?,
@@ -361,6 +364,82 @@ pub async fn create_review_comment(
     .await?;
     let raw: RawReviewComment = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CheckRun {
+    pub name: String,
+    pub status: String,
+    pub conclusion: Option<String>,
+    pub html_url: String,
+    pub started_at: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct CheckRunsResponse {
+    check_runs: Vec<CheckRun>,
+}
+
+/// Fetches GitHub Actions check-run results for a commit sha (used for CI status badges
+/// on PR rows and commit rows).
+pub async fn list_check_runs(
+    token: &str,
+    owner: &str,
+    repo: &str,
+    sha: &str,
+) -> Result<Vec<CheckRun>, String> {
+    let url = format!("https://api.github.com/repos/{owner}/{repo}/commits/{sha}/check-runs?per_page=50");
+    let res = check(client(token)?.get(url).send().await.map_err(|e| e.to_string())?).await?;
+    let parsed: CheckRunsResponse = res.json().await.map_err(|e| e.to_string())?;
+    Ok(parsed.check_runs)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitVerification {
+    pub verified: bool,
+    pub reason: String,
+}
+
+#[derive(Deserialize)]
+struct CommitDetailResponse {
+    commit: CommitDetailInner,
+}
+
+#[derive(Deserialize)]
+struct CommitDetailInner {
+    verification: CommitVerification,
+}
+
+/// Looks up GPG/SSH signature verification for a commit already pushed to GitHub.
+pub async fn get_commit_verification(
+    token: &str,
+    owner: &str,
+    repo: &str,
+    sha: &str,
+) -> Result<CommitVerification, String> {
+    let url = format!("https://api.github.com/repos/{owner}/{repo}/commits/{sha}");
+    let res = check(client(token)?.get(url).send().await.map_err(|e| e.to_string())?).await?;
+    let parsed: CommitDetailResponse = res.json().await.map_err(|e| e.to_string())?;
+    Ok(parsed.commit.verification)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitHubRepo {
+    pub full_name: String,
+    pub clone_url: String,
+    pub description: Option<String>,
+    pub private: bool,
+    pub fork: bool,
+    pub updated_at: String,
+}
+
+/// Lists the authenticated user's own repos, plus org repos they have access to, newest first —
+/// backs the "browse your repos" clone picker.
+pub async fn list_user_repos(token: &str) -> Result<Vec<GitHubRepo>, String> {
+    let url = "https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member";
+    let res = check(client(token)?.get(url).send().await.map_err(|e| e.to_string())?).await?;
+    res.json().await.map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

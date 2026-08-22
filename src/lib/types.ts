@@ -136,3 +136,26 @@ export interface PullRequestFile {
   status: string;
   diff: FileDiff;
 }
+
+export interface CheckRun {
+  name: string;
+  status: string;
+  conclusion: string | null;
+  html_url: string;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+export interface CommitVerification {
+  verified: boolean;
+  reason: string;
+}
+
+export interface GitHubRepo {
+  full_name: string;
+  clone_url: string;
+  description: string | null;
+  private: boolean;
+  fork: boolean;
+  updated_at: string;
+}

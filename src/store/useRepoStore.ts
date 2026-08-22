@@ -24,7 +24,7 @@ interface RepoState {
   selectedFileDiff: FileDiff | null;
   selectedFileImageDiff: ImageDiff | null;
 
-  activeTab: "changes" | "history";
+  activeTab: "changes" | "history" | "pulls";
 
   commits: CommitEntry[];
   historyExhausted: boolean;
@@ -46,7 +46,7 @@ interface RepoState {
   refreshStatus: () => Promise<void>;
   refreshBranches: () => Promise<void>;
   refreshAheadBehind: () => Promise<void>;
-  setActiveTab: (tab: "changes" | "history") => void;
+  setActiveTab: (tab: "changes" | "history" | "pulls") => void;
 
   toggleStaged: (paths: string[], staged: boolean) => Promise<void>;
   selectFile: (path: string | null) => Promise<void>;

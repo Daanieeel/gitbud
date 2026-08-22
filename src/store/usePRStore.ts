@@ -29,6 +29,7 @@ interface PRState {
     head: string,
     base: string,
     body: string,
+    draft: boolean,
   ) => Promise<void>;
   mergePR: (repoPath: string, login: string, number: number, method: string) => Promise<void>;
 }
@@ -84,8 +85,8 @@ export const usePRStore = create<PRState>((set, get) => ({
     set((s) => ({ comments: [...s.comments, comment] }));
   },
 
-  createPR: async (repoPath, login, title, head, base, body) => {
-    await api.githubCreatePullRequest(repoPath, login, title, head, base, body);
+  createPR: async (repoPath, login, title, head, base, body, draft) => {
+    await api.githubCreatePullRequest(repoPath, login, title, head, base, body, draft);
     await get().load(repoPath, login);
   },
 

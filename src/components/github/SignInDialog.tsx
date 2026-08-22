@@ -23,13 +23,59 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
   const setClientId = useGitHubStore((s) => s.setClientId);
   const startSignIn = useGitHubStore((s) => s.startSignIn);
   const cancelSignIn = useGitHubStore((s) => s.cancelSignIn);
+  const tryGhCli = useGitHubStore((s) => s.tryGhCli);
 
   const [clientIdInput, setClientIdInput] = useState(clientId ?? "");
+  const [ghCliChecked, setGhCliChecked] = useState(false);
+  const [ghCliTrying, setGhCliTrying] = useState(false);
+  const [showManual, setShowManual] = useState(false);
 
   const handleOpenChange = (next: boolean) => {
-    if (!next) cancelSignIn();
+    if (!next) {
+      cancelSignIn();
+      setGhCliChecked(false);
+      setShowManual(false);
+    }
     onOpenChange(next);
   };
+
+  const attemptGhCli = async () => {
+    setGhCliTrying(true);
+    try {
+      const found = await tryGhCli();
+      if (found) {
+        onOpenChange(false);
+      } else {
+        setGhCliChecked(true);
+      }
+    } finally {
+      setGhCliTrying(false);
+    }
+  };
+
+  if (!ghCliChecked && !showManual && !clientId) {
+    return (
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Connect GitHub</DialogTitle>
+            <DialogDescription>
+              If you already use the GitHub CLI (`gh`) and are logged in there, GitBud can reuse
+              that login with one click — no setup needed.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="sm:justify-between">
+            <Button variant="ghost" onClick={() => setShowManual(true)}>
+              I don't use gh CLI
+            </Button>
+            <Button disabled={ghCliTrying} onClick={() => void attemptGhCli()}>
+              {ghCliTrying ? "Checking…" : "Use gh CLI login"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   if (!clientId) {
     return (
@@ -38,6 +84,7 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
           <DialogHeader>
             <DialogTitle>Connect GitHub</DialogTitle>
             <DialogDescription>
+              {ghCliChecked && "No gh CLI login found. "}
               GitBud has no bundled credentials — register your own OAuth App (free, one-time)
               with Device Flow enabled, then paste its Client ID here.
             </DialogDescription>

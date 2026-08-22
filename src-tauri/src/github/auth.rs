@@ -106,6 +106,48 @@ fn save_account(account: Account, token: &str) -> Result<Vec<Account>, String> {
 
 const USER_AGENT: &str = "GitBud";
 
+/// Fetches the account for a token and persists it (keychain + accounts.json). Shared by
+/// both the device-flow success path and `gh` CLI token detection.
+async fn complete_login(token: &str) -> Result<Account, String> {
+    let client = reqwest::Client::new();
+    let user = client
+        .get("https://api.github.com/user")
+        .header("Authorization", format!("Bearer {token}"))
+        .header("User-Agent", USER_AGENT)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .json::<GitHubUserResponse>()
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let account = Account {
+        login: user.login,
+        name: user.name,
+        avatar_url: user.avatar_url,
+    };
+    save_account(account.clone(), token)?;
+    Ok(account)
+}
+
+/// Looks for an existing `gh` CLI login (`gh auth token`) and, if found, adopts it as a
+/// GitBud account — zero-config sign-in for developers who already use the GitHub CLI.
+pub async fn detect_gh_cli() -> Result<Option<Account>, String> {
+    let output = std::process::Command::new("gh")
+        .args(["auth", "token"])
+        .output();
+
+    let Ok(output) = output else { return Ok(None) };
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let token = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if token.is_empty() {
+        return Ok(None);
+    }
+    complete_login(&token).await.map(Some)
+}
+
 pub async fn start_device_flow(client_id: &str) -> Result<DeviceCodeResponse, String> {
     let client = reqwest::Client::new();
     let res = client
@@ -158,23 +200,7 @@ pub async fn poll_device_flow(client_id: &str, device_code: &str) -> Result<Poll
         .map_err(|e| e.to_string())?;
 
     if let Some(token) = res.access_token {
-        let user = client
-            .get("https://api.github.com/user")
-            .header("Authorization", format!("Bearer {token}"))
-            .header("User-Agent", USER_AGENT)
-            .send()
-            .await
-            .map_err(|e| e.to_string())?
-            .json::<GitHubUserResponse>()
-            .await
-            .map_err(|e| e.to_string())?;
-
-        let account = Account {
-            login: user.login,
-            name: user.name,
-            avatar_url: user.avatar_url,
-        };
-        save_account(account.clone(), &token)?;
+        let account = complete_login(&token).await?;
         return Ok(PollResult::Success { account });
     }
 

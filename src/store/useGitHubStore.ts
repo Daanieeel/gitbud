@@ -24,6 +24,7 @@ interface GitHubState {
 
   startSignIn: () => Promise<void>;
   cancelSignIn: () => void;
+  tryGhCli: () => Promise<boolean>;
 }
 
 export const useGitHubStore = create<GitHubState>((set, get) => ({
@@ -106,5 +107,15 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
 
   cancelSignIn: () => {
     set((s) => ({ pollGeneration: s.pollGeneration + 1, deviceFlow: null }));
+  },
+
+  tryGhCli: async () => {
+    const account = await api.githubDetectGhCli().catch(() => null);
+    if (!account) return false;
+    set((s) => ({
+      accounts: [...s.accounts.filter((a) => a.login !== account.login), account],
+      currentLogin: account.login,
+    }));
+    return true;
   },
 }));

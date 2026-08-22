@@ -95,6 +95,40 @@ pub fn clone(app: &AppHandle, url: &str, dest: &str, event_id: &str) -> Result<(
     }
 }
 
+/// Fetches a PR's head ref and checks it out as a local tracking branch `pr-{number}`,
+/// so testing a PR locally never touches the contributor's own branch naming.
+pub fn checkout_pull_request(
+    app: &AppHandle,
+    repo_path: &str,
+    number: u64,
+    event_id: &str,
+) -> Result<String, String> {
+    let local_branch = format!("pr-{number}");
+    let refspec = format!("pull/{number}/head:{local_branch}");
+    run_streaming(app, repo_path, &["fetch", "origin", &refspec], event_id)?;
+    run_streaming(app, repo_path, &["checkout", &local_branch], event_id)?;
+    Ok(local_branch)
+}
+
+/// Fetches `upstream` and fast-forwards the given local branch to `upstream/{branch}`.
+/// Used for fork-sync: keeping a fork's default branch caught up without a terminal.
+pub fn sync_upstream(
+    app: &AppHandle,
+    repo_path: &str,
+    branch: &str,
+    event_id: &str,
+) -> Result<(), String> {
+    run_streaming(app, repo_path, &["fetch", "upstream"], event_id)?;
+    let upstream_ref = format!("upstream/{branch}");
+    run_streaming(app, repo_path, &["merge", "--ff-only", &upstream_ref], event_id)
+}
+
+pub fn has_remote(repo_path: &str, name: &str) -> bool {
+    git2::Repository::open(repo_path)
+        .and_then(|repo| repo.find_remote(name).map(|_| ()))
+        .is_ok()
+}
+
 pub fn get_ahead_behind(repo_path: &str) -> Result<AheadBehind, String> {
     let repo = git2::Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let head = repo.head().map_err(|e| e.message().to_string())?;
@@ -111,4 +145,26 @@ pub fn get_ahead_behind(repo_path: &str) -> Result<AheadBehind, String> {
         .graph_ahead_behind(local_oid, upstream_oid)
         .map_err(|e| e.message().to_string())?;
     Ok(AheadBehind { ahead, behind })
+}
+
+/// Ahead/behind of the local branch vs. `upstream/{branch}` (the fork's origin, as opposed
+/// to `origin`), used to power the "fork is behind upstream" banner. Returns None when
+/// there's no `upstream` remote or no matching remote-tracking ref yet.
+pub fn get_upstream_ahead_behind(repo_path: &str, branch: &str) -> Result<Option<AheadBehind>, String> {
+    let repo = git2::Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    if repo.find_remote("upstream").is_err() {
+        return Ok(None);
+    }
+    let head = repo.head().map_err(|e| e.message().to_string())?;
+    let Some(local_oid) = head.target() else { return Ok(None) };
+
+    let upstream_ref = format!("refs/remotes/upstream/{branch}");
+    let Ok(upstream_oid) = repo.refname_to_id(&upstream_ref) else {
+        return Ok(None);
+    };
+
+    let (ahead, behind) = repo
+        .graph_ahead_behind(local_oid, upstream_oid)
+        .map_err(|e| e.message().to_string())?;
+    Ok(Some(AheadBehind { ahead, behind }))
 }

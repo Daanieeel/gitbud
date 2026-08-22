@@ -183,6 +183,29 @@ fn get_ahead_behind(repo_path: String) -> Result<git_shell::AheadBehind, String>
     git_shell::get_ahead_behind(&repo_path)
 }
 
+#[tauri::command]
+fn has_upstream_remote(repo_path: String) -> bool {
+    git_shell::has_remote(&repo_path, "upstream")
+}
+
+#[tauri::command]
+fn get_upstream_ahead_behind(
+    repo_path: String,
+    branch: String,
+) -> Result<Option<git_shell::AheadBehind>, String> {
+    git_shell::get_upstream_ahead_behind(&repo_path, &branch)
+}
+
+#[tauri::command]
+fn sync_upstream(app: AppHandle, repo_path: String, branch: String) -> Result<(), String> {
+    git_shell::sync_upstream(&app, &repo_path, &branch, &repo_path)
+}
+
+#[tauri::command]
+fn checkout_pull_request(app: AppHandle, repo_path: String, number: u64) -> Result<String, String> {
+    git_shell::checkout_pull_request(&app, &repo_path, number, &repo_path)
+}
+
 // --- github: auth ---
 
 #[tauri::command]
@@ -203,6 +226,11 @@ fn github_list_accounts() -> Result<Vec<github::auth::Account>, String> {
 #[tauri::command]
 fn github_remove_account(login: String) -> Result<Vec<github::auth::Account>, String> {
     github::auth::remove_account(&login)
+}
+
+#[tauri::command]
+async fn github_detect_gh_cli() -> Result<Option<github::auth::Account>, String> {
+    github::auth::detect_gh_cli().await
 }
 
 #[tauri::command]
@@ -259,9 +287,50 @@ async fn github_create_pull_request(
     head: String,
     base: String,
     body: String,
+    draft: bool,
 ) -> Result<github::api::PullRequest, String> {
     let (token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::create_pull_request(&token, &owner, &repo, &title, &head, &base, &body).await
+    github::api::create_pull_request(&token, &owner, &repo, &title, &head, &base, &body, draft).await
+}
+
+#[tauri::command]
+async fn github_list_check_runs(
+    repo_path: String,
+    login: String,
+    sha: String,
+) -> Result<Vec<github::api::CheckRun>, String> {
+    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_check_runs(&token, &owner, &repo, &sha).await
+}
+
+#[tauri::command]
+async fn github_get_commit_verification(
+    repo_path: String,
+    login: String,
+    sha: String,
+) -> Result<github::api::CommitVerification, String> {
+    let (token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_commit_verification(&token, &owner, &repo, &sha).await
+}
+
+#[tauri::command]
+async fn github_list_user_repos(login: String) -> Result<Vec<github::api::GitHubRepo>, String> {
+    let token = github::auth::get_token(&login)?;
+    github::api::list_user_repos(&token).await
+}
+
+#[tauri::command]
+fn read_pr_template(repo_path: String) -> Option<String> {
+    for candidate in [
+        ".github/PULL_REQUEST_TEMPLATE.md",
+        ".github/pull_request_template.md",
+        "PULL_REQUEST_TEMPLATE.md",
+    ] {
+        if let Ok(contents) = std::fs::read_to_string(std::path::Path::new(&repo_path).join(candidate)) {
+            return Some(contents);
+        }
+    }
+    None
 }
 
 #[tauri::command]
@@ -371,12 +440,17 @@ pub fn run() {
             git_push,
             git_clone,
             get_ahead_behind,
+            has_upstream_remote,
+            get_upstream_ahead_behind,
+            sync_upstream,
+            checkout_pull_request,
             start_watch,
             stop_watch,
             github_get_client_id,
             github_set_client_id,
             github_list_accounts,
             github_remove_account,
+            github_detect_gh_cli,
             github_start_device_flow,
             github_poll_device_flow,
             github_remote_owner_repo,
@@ -387,6 +461,10 @@ pub fn run() {
             github_list_pull_request_files,
             github_list_review_comments,
             github_create_review_comment,
+            github_list_check_runs,
+            github_get_commit_verification,
+            github_list_user_repos,
+            read_pr_template,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

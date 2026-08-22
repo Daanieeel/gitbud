@@ -2,10 +2,13 @@ import { invoke } from "@tauri-apps/api/core";
 import type {
   AheadBehind,
   BranchInfo,
+  CheckRun,
   CommitEntry,
+  CommitVerification,
   DeviceCodeResponse,
   FileDiff,
   GitHubAccount,
+  GitHubRepo,
   ImageDiff,
   PollResult,
   PullRequest,
@@ -66,11 +69,19 @@ export const api = {
   gitPush: (repoPath: string) => invoke<void>("git_push", { repoPath }),
   gitClone: (url: string, dest: string) => invoke<void>("git_clone", { url, dest }),
   getAheadBehind: (repoPath: string) => invoke<AheadBehind>("get_ahead_behind", { repoPath }),
+  hasUpstreamRemote: (repoPath: string) => invoke<boolean>("has_upstream_remote", { repoPath }),
+  getUpstreamAheadBehind: (repoPath: string, branch: string) =>
+    invoke<AheadBehind | null>("get_upstream_ahead_behind", { repoPath, branch }),
+  syncUpstream: (repoPath: string, branch: string) =>
+    invoke<void>("sync_upstream", { repoPath, branch }),
+  checkoutPullRequest: (repoPath: string, number: number) =>
+    invoke<string>("checkout_pull_request", { repoPath, number }),
 
   startWatch: (repoPath: string) => invoke<void>("start_watch", { repoPath }),
   stopWatch: (repoPath: string) => invoke<void>("stop_watch", { repoPath }),
 
   // --- GitHub ---
+  githubDetectGhCli: () => invoke<GitHubAccount | null>("github_detect_gh_cli"),
   githubGetClientId: () => invoke<string | null>("github_get_client_id"),
   githubSetClientId: (clientId: string) => invoke<void>("github_set_client_id", { clientId }),
   githubListAccounts: () => invoke<GitHubAccount[]>("github_list_accounts"),
@@ -93,7 +104,18 @@ export const api = {
     head: string,
     base: string,
     body: string,
-  ) => invoke<PullRequest>("github_create_pull_request", { repoPath, login, title, head, base, body }),
+    draft: boolean,
+  ) =>
+    invoke<PullRequest>("github_create_pull_request", {
+      repoPath,
+      login,
+      title,
+      head,
+      base,
+      body,
+      draft,
+    }),
+  readPrTemplate: (repoPath: string) => invoke<string | null>("read_pr_template", { repoPath }),
   githubMergePullRequest: (repoPath: string, login: string, number: number, mergeMethod: string) =>
     invoke<void>("github_merge_pull_request", { repoPath, login, number, mergeMethod }),
   githubListPullRequestFiles: (repoPath: string, login: string, number: number) =>
@@ -126,4 +148,10 @@ export const api = {
       side,
       body,
     }),
+  githubListCheckRuns: (repoPath: string, login: string, sha: string) =>
+    invoke<CheckRun[]>("github_list_check_runs", { repoPath, login, sha }),
+  githubGetCommitVerification: (repoPath: string, login: string, sha: string) =>
+    invoke<CommitVerification>("github_get_commit_verification", { repoPath, login, sha }),
+  githubListUserRepos: (login: string) =>
+    invoke<GitHubRepo[]>("github_list_user_repos", { login }),
 };
