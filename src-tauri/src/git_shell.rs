@@ -220,6 +220,22 @@ pub fn push(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), Stri
     run_streaming(app, Some(repo_path), &["push", "-u", "origin", "HEAD", "--progress"], event_id)
 }
 
+/// Renames a branch on `origin` to match a local rename that's already happened (via
+/// `repo::rename_branch`): pushes the (already locally-renamed) branch under its new name,
+/// setting it as the upstream in the same step, then removes the old name from the remote.
+/// If `old_name` was never actually pushed, the delete is a no-op error we can safely ignore.
+pub fn rename_branch_remote(
+    app: &AppHandle,
+    repo_path: &str,
+    old_name: &str,
+    new_name: &str,
+    event_id: &str,
+) -> Result<(), String> {
+    run_streaming(app, Some(repo_path), &["push", "-u", "origin", new_name], event_id)?;
+    let _ = run_streaming(app, Some(repo_path), &["push", "origin", "--delete", old_name], event_id);
+    Ok(())
+}
+
 pub fn lfs_pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
     run_streaming(app, Some(repo_path), &["lfs", "pull"], event_id)
 }

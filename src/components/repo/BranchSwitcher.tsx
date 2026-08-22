@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ChevronsUpDownIcon,
   CloudUploadIcon,
@@ -14,7 +14,8 @@ import {
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -42,19 +43,9 @@ export function BranchSwitcher() {
   const [filter, setFilter] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
+  const [renameRemote, setRenameRemote] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [renameBusy, setRenameBusy] = useState(false);
-  const renameInputRef = useRef<HTMLInputElement>(null);
-
-  // The context menu that opens the rename Input restores focus to its own trigger on close,
-  // which races the Input's autofocus and can steal it back right away — closing the Input
-  // via onBlur before the user types anything. Focusing on the next frame lets that
-  // restoration finish first, so ours always wins.
-  useEffect(() => {
-    if (!renaming) return;
-    const raf = requestAnimationFrame(() => renameInputRef.current?.focus());
-    return () => cancelAnimationFrame(raf);
-  }, [renaming]);
 
   useEffect(() => {
     const handleOpenBranchSwitcher = () => setOpen(true);
@@ -94,7 +85,7 @@ export function BranchSwitcher() {
     }
     setRenameBusy(true);
     try {
-      await renameBranch(renaming, renameValue.trim());
+      await renameBranch(renaming, renameValue.trim(), renameRemote);
     } finally {
       setRenameBusy(false);
       setRenaming(null);
@@ -168,6 +159,7 @@ export function BranchSwitcher() {
         <div className="border-b border-border p-2">
           <Input
             autoFocus
+            autoComplete="off"
             placeholder="Find or create branch"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
@@ -175,43 +167,37 @@ export function BranchSwitcher() {
           />
         </div>
         <div className="flex max-h-64 flex-col gap-1 overflow-auto p-1">
-          {local.map((b) =>
-            renaming === b.name ? (
-              <Input
-                key={b.name}
-                ref={renameInputRef}
-                disabled={renameBusy}
-                value={renameValue}
-                onChange={(e) => setRenameValue(e.target.value)}
-                onBlur={() => void commitRename()}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void commitRename();
-                  if (e.key === "Escape") setRenaming(null);
-                }}
-                className="h-7 my-0.5"
-              />
-            ) : (
-              <ContextMenu key={b.name}>
+          {local.map((b) => (
+            <Popover
+              key={b.name}
+              open={renaming === b.name}
+              onOpenChange={(isOpen) => {
+                if (!isOpen) setRenaming(null);
+              }}
+            >
+              <ContextMenu>
                 <ContextMenuTrigger asChild>
-                  <div
-                    className={cn(
-                      "flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
-                      b.is_head && "bg-accent",
-                    )}
-                    onClick={() => void doCheckout(b.name)}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                    {isLocalOnly(b.name) && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="shrink-0 rounded-full bg-accent-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-blue">
-                            local
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>{`${b.name} has never been pushed`}</TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
+                  <PopoverAnchor asChild>
+                    <div
+                      className={cn(
+                        "flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
+                        b.is_head && "bg-accent",
+                      )}
+                      onClick={() => void doCheckout(b.name)}
+                    >
+                      <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                      {isLocalOnly(b.name) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="shrink-0 rounded-full bg-accent-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-blue">
+                              local
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>{`${b.name} has never been pushed`}</TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </PopoverAnchor>
                 </ContextMenuTrigger>
                 <ContextMenuContent>
                   <ContextMenuItem onSelect={() => void copyToClipboard(b.name)}>
@@ -234,6 +220,7 @@ export function BranchSwitcher() {
                     onSelect={() => {
                       setRenaming(b.name);
                       setRenameValue(b.name);
+                      setRenameRemote(false);
                     }}
                   >
                     <PencilIcon className="size-3.5" />
@@ -256,8 +243,43 @@ export function BranchSwitcher() {
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
-            ),
-          )}
+              <PopoverContent align="start" className="w-56 space-y-2 p-3">
+                <Input
+                  autoFocus
+                  disabled={renameBusy}
+                  value={renameValue}
+                  onChange={(e) => setRenameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void commitRename();
+                    if (e.key === "Escape") setRenaming(null);
+                  }}
+                  className="h-7"
+                />
+                {!isLocalOnly(b.name) && (
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Checkbox
+                      checked={renameRemote}
+                      disabled={renameBusy}
+                      onCheckedChange={(checked) => setRenameRemote(checked === true)}
+                    />
+                    Also rename on remote
+                  </label>
+                )}
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setRenaming(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={renameBusy || !renameValue.trim()}
+                    onClick={() => void commitRename()}
+                  >
+                    Rename
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          ))}
           {canCreate && (
             <div
               className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-primary hover:bg-accent"

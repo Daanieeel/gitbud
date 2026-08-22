@@ -13,7 +13,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { CIBadge } from "./CIBadge";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
-import type { PullRequest } from "@/lib/types";
+import type { ImageDiff, PullRequest } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FileTypeIcon } from "@/lib/file-icons";
@@ -45,6 +45,7 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
 
   const [checkingOut, setCheckingOut] = useState(false);
   const [merging, setMerging] = useState(false);
+  const [selectedImageDiff, setSelectedImageDiff] = useState<ImageDiff | null>(null);
 
   const checkout = async () => {
     setCheckingOut(true);
@@ -66,6 +67,18 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
 
   const selectedFile = files.find((f) => f.filename === selectedFilePath);
   const fileComments = comments.filter((c) => c.path === selectedFilePath);
+
+  // The PR files API's `patch` text (what selectedFile.diff is parsed from) is empty for
+  // binary files, so images need their bytes fetched separately via the Contents API.
+  useEffect(() => {
+    if (!selectedFile?.diff.is_image) {
+      setSelectedImageDiff(null);
+      return;
+    }
+    void api
+      .githubGetPullRequestImageDiff(repoPath, login, selectedFile.filename, pr.base_sha, pr.head_sha)
+      .then(setSelectedImageDiff);
+  }, [repoPath, login, selectedFile, pr.base_sha, pr.head_sha]);
 
   const filePaths = useMemo(() => files.map((f) => f.filename), [files]);
   const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, (path) => selectFile(path));
@@ -178,6 +191,7 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
           <DiffView
             path={selectedFilePath}
             diff={selectedFile?.diff ?? null}
+            imageDiff={selectedImageDiff}
             comments={fileComments}
             onAddComment={(line, side, body) => addComment(repoPath, login, line, side, body)}
           />

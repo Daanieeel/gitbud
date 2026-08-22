@@ -252,6 +252,7 @@ export interface PullRequest {
   head_ref: string;
   head_sha: string;
   base_ref: string;
+  base_sha: string;
   merged: boolean;
   mergeable: boolean | null;
   labels: string[];

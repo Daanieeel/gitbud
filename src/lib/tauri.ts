@@ -90,6 +90,8 @@ export const api = {
     invoke<void>("delete_branch", { repoPath, name }),
   renameBranch: (repoPath: string, oldName: string, newName: string) =>
     invoke<void>("rename_branch", { repoPath, oldName, newName }),
+  renameBranchRemote: (repoPath: string, oldName: string, newName: string) =>
+    invoke<void>("rename_branch_remote", { repoPath, oldName, newName }),
   mergeBranch: (repoPath: string, branchName: string) =>
     invoke<CherryPickResult>("merge_branch", { repoPath, branchName }),
 
@@ -114,6 +116,8 @@ export const api = {
     invoke<[string, string][]>("get_branch_diff_files", { repoPath, base, head }),
   getBranchDiffFile: (repoPath: string, base: string, head: string, path: string) =>
     invoke<FileDiff>("get_branch_diff_file", { repoPath, base, head, path }),
+  getBranchImageDiff: (repoPath: string, base: string, head: string, path: string) =>
+    invoke<ImageDiff>("get_branch_image_diff", { repoPath, base, head, path }),
   getImageDiff: (repoPath: string, path: string, staged: boolean) =>
     invoke<ImageDiff>("get_image_diff", { repoPath, path, staged }),
   getCommitImageDiff: (repoPath: string, oid: string, path: string) =>
@@ -284,6 +288,14 @@ export const api = {
     }).then((rows): PullRequestFile[] =>
       rows.map(([filename, status, diff]) => ({ filename, status, diff })),
     ),
+  githubGetPullRequestImageDiff: (
+    repoPath: string,
+    login: string,
+    path: string,
+    baseSha: string,
+    headSha: string,
+  ) =>
+    invoke<ImageDiff>("github_get_pull_request_image_diff", { repoPath, login, path, baseSha, headSha }),
   githubListReviewComments: (repoPath: string, login: string, number: number) =>
     invoke<ReviewComment[]>("github_list_review_comments", { repoPath, login, number }),
   githubCreateReviewComment: (

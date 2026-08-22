@@ -23,7 +23,7 @@ import { useGitHubStore } from "@/store/useGitHubStore";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
-import type { FileDiff, Label, AssignableUser, Milestone, Project, CommitSearchResult } from "@/lib/types";
+import type { FileDiff, ImageDiff, Label, AssignableUser, Milestone, Project, CommitSearchResult } from "@/lib/types";
 
 interface CreatePRDialogProps {
   open: boolean;
@@ -76,6 +76,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const [diffLoading, setDiffLoading] = useState(false);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [selectedDiff, setSelectedDiff] = useState<FileDiff | null>(null);
+  const [selectedImageDiff, setSelectedImageDiff] = useState<ImageDiff | null>(null);
   const [branchCommits, setBranchCommits] = useState<CommitSearchResult[]>([]);
   const [branchCommitsLoading, setBranchCommitsLoading] = useState(false);
 
@@ -134,9 +135,16 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   useEffect(() => {
     if (!repoPath || !branch || !base || !selectedFilePath) {
       setSelectedDiff(null);
+      setSelectedImageDiff(null);
       return;
     }
-    void api.getBranchDiffFile(repoPath, base, branch, selectedFilePath).then(setSelectedDiff);
+    setSelectedImageDiff(null);
+    void api.getBranchDiffFile(repoPath, base, branch, selectedFilePath).then((diff) => {
+      setSelectedDiff(diff);
+      if (diff.is_image) {
+        void api.getBranchImageDiff(repoPath, base, branch, selectedFilePath).then(setSelectedImageDiff);
+      }
+    });
   }, [repoPath, branch, base, selectedFilePath]);
 
   const filePaths = useMemo(() => diffFiles.map(([path]) => path), [diffFiles]);
@@ -289,7 +297,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <DiffView path={selectedFilePath} diff={selectedDiff} imageDiff={null} />
+                  <DiffView path={selectedFilePath} diff={selectedDiff} imageDiff={selectedImageDiff} />
                 </div>
               </div>
             ) : (

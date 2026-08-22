@@ -183,6 +183,20 @@ async fn rename_branch(repo_path: String, old_name: String, new_name: String) ->
 }
 
 #[tauri::command]
+async fn rename_branch_remote(
+    app: AppHandle,
+    repo_path: String,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_shell::rename_branch_remote(&app, &repo_path, &old_name, &new_name, &repo_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn merge_branch(repo_path: String, branch_name: String) -> Result<repo::CherryPickResult, String> {
     tauri::async_runtime::spawn_blocking(move || repo::merge_branch(&repo_path, &branch_name))
         .await
@@ -227,6 +241,18 @@ async fn get_branch_diff_file(
     path: String,
 ) -> Result<diff::FileDiff, String> {
     tauri::async_runtime::spawn_blocking(move || diff::get_branch_diff_file(&repo_path, &base, &head, &path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn get_branch_image_diff(
+    repo_path: String,
+    base: String,
+    head: String,
+    path: String,
+) -> Result<image_diff::ImageDiff, String> {
+    tauri::async_runtime::spawn_blocking(move || image_diff::get_branch_image_diff(&repo_path, &base, &head, &path))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -1030,6 +1056,18 @@ async fn github_list_pull_request_files(
 }
 
 #[tauri::command]
+async fn github_get_pull_request_image_diff(
+    repo_path: String,
+    login: String,
+    path: String,
+    base_sha: String,
+    head_sha: String,
+) -> Result<image_diff::ImageDiff, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_pull_request_image_diff(&host, &token, &owner, &repo, &path, &base_sha, &head_sha).await
+}
+
+#[tauri::command]
 async fn github_list_review_comments(
     repo_path: String,
     login: String,
@@ -1279,6 +1317,7 @@ pub fn run() {
             revert_commit,
             delete_branch,
             rename_branch,
+            rename_branch_remote,
             merge_branch,
             list_stashes,
             stash_save,
@@ -1292,6 +1331,7 @@ pub fn run() {
             get_commit_file_diff,
             get_branch_diff_files,
             get_branch_diff_file,
+            get_branch_image_diff,
             get_image_diff,
             get_commit_image_diff,
             get_log,
@@ -1387,6 +1427,7 @@ pub fn run() {
             github_add_pull_request_to_project,
             github_merge_pull_request,
             github_list_pull_request_files,
+            github_get_pull_request_image_diff,
             github_list_review_comments,
             github_create_review_comment,
             github_list_check_runs,

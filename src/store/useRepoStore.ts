@@ -83,7 +83,7 @@ interface RepoState {
   checkoutBranch: (branch: string) => Promise<void>;
   createBranch: (name: string, checkout: boolean) => Promise<void>;
   deleteBranch: (name: string) => Promise<void>;
-  renameBranch: (oldName: string, newName: string) => Promise<void>;
+  renameBranch: (oldName: string, newName: string, alsoRenameRemote?: boolean) => Promise<void>;
   mergeBranch: (name: string) => Promise<CherryPickResult>;
   cherryPick: (oid: string) => Promise<CherryPickResult>;
   revertCommit: (oid: string) => Promise<CherryPickResult>;
@@ -390,10 +390,16 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     await get().refreshBranches();
   },
 
-  renameBranch: async (oldName, newName) => {
+  renameBranch: async (oldName, newName, alsoRenameRemote) => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
     await api.renameBranch(repoPath, oldName, newName);
+    if (alsoRenameRemote) {
+      await runSync(get, set, repoPath, () => api.renameBranchRemote(repoPath, oldName, newName), {
+        description: `Renaming ${oldName} to ${newName} on origin…`,
+        doneMessage: `Renamed ${oldName} to ${newName} on origin`,
+      });
+    }
     await get().refreshBranches();
   },
 

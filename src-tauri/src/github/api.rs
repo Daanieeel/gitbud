@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use super::auth::{api_base, graphql_base};
 use crate::diff::{DiffHunk, DiffLine, FileDiff, LineKind};
-use crate::image_diff::is_image_path;
+use crate::image_diff::{is_image_path, mime_for, ImageDiff};
 
 const USER_AGENT: &str = "GitBud";
 
@@ -115,6 +115,7 @@ pub struct PullRequest {
     pub head_ref: String,
     pub head_sha: String,
     pub base_ref: String,
+    pub base_sha: String,
     pub merged: bool,
     pub mergeable: Option<bool>,
     pub labels: Vec<String>,
@@ -169,6 +170,7 @@ impl From<RawPullRequest> for PullRequest {
             head_ref: raw.head.ref_name,
             head_sha: raw.head.sha,
             base_ref: raw.base.ref_name,
+            base_sha: raw.base.sha,
             merged: raw.merged,
             mergeable: raw.mergeable,
             labels: raw.labels.into_iter().map(|l| l.name).collect(),
@@ -554,6 +556,54 @@ pub async fn list_pull_request_files(
             (f.filename, f.status, diff)
         })
         .collect())
+}
+
+#[derive(Deserialize)]
+struct ContentsResponse {
+    content: String,
+    encoding: String,
+}
+
+/// Fetches `path` as a `data:` URI at a specific commit via the Contents API, or `None` if it
+/// didn't exist there (a 404 — added or deleted files only have one real side) or GitHub
+/// returned something other than inline base64 (e.g. a file too large to inline).
+async fn fetch_file_as_data_uri(gh: &GhClient, owner: &str, repo: &str, path: &str, git_ref: &str) -> Option<String> {
+    let mut url = reqwest::Url::parse(&format!("{}/repos/{owner}/{repo}/contents/", gh.base)).ok()?;
+    {
+        let mut segments = url.path_segments_mut().ok()?;
+        for part in path.split('/') {
+            segments.push(part);
+        }
+    }
+    url.query_pairs_mut().append_pair("ref", git_ref);
+
+    let res = gh.http.get(url).send().await.ok()?;
+    if !res.status().is_success() {
+        return None;
+    }
+    let parsed: ContentsResponse = res.json().await.ok()?;
+    if parsed.encoding != "base64" {
+        return None;
+    }
+    let cleaned: String = parsed.content.chars().filter(|c| !c.is_whitespace()).collect();
+    Some(format!("data:{};base64,{cleaned}", mime_for(path)))
+}
+
+/// Image diff for a file changed in a PR — GitHub's PR-files `patch` text is empty for binary
+/// files, so this goes through the Contents API directly at each side's commit instead.
+pub async fn get_pull_request_image_diff(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    path: &str,
+    base_sha: &str,
+    head_sha: &str,
+) -> Result<ImageDiff, String> {
+    let gh = GhClient::new(host, token)?;
+    let old = fetch_file_as_data_uri(&gh, owner, repo, path, base_sha).await;
+    let new = fetch_file_as_data_uri(&gh, owner, repo, path, head_sha).await;
+    Ok(ImageDiff { old, new })
 }
 
 /// Parses GitHub's per-file unified-diff `patch` text (hunks only, no `diff --git`/`---`/`+++`

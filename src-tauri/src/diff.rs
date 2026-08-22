@@ -241,7 +241,7 @@ pub fn get_commit_file_diff(repo_path: &str, oid: &str, path: &str) -> Result<Fi
 /// Resolves the tree each side of a `base...head` (three-dot, merge-base) diff should compare
 /// against — the same comparison GitHub shows on a pull request, so the preview matches what
 /// will actually appear once opened.
-fn branch_diff_trees<'a>(
+pub(crate) fn branch_diff_trees<'a>(
     repo: &'a Repository,
     base: &str,
     head: &str,
