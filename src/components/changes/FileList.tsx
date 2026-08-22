@@ -122,7 +122,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                     transform: `translateY(${row.start}px)`,
                   }}
                   className={cn(
-                    "flex items-center gap-2 px-2 text-sm cursor-pointer hover:bg-accent",
+                    "flex items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
                     selectedPath === file.path && "bg-accent",
                     file.status === "conflicted" && "text-destructive",
                   )}

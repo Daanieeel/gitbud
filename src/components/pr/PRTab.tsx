@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PlusIcon, TriangleAlertIcon } from "lucide-react";
+import { GitPullRequestCreateArrow, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -24,6 +24,8 @@ export function PRTab() {
   const pulls = usePRStore((s) => s.pulls);
   const loading = usePRStore((s) => s.loading);
   const loadError = usePRStore((s) => s.loadError);
+  const hasMore = usePRStore((s) => s.hasMore);
+  const loadingMore = usePRStore((s) => s.loadingMore);
   const filter = usePRStore((s) => s.filter);
   const setFilter = usePRStore((s) => s.setFilter);
   const selectedNumber = usePRStore((s) => s.selectedNumber);
@@ -109,21 +111,25 @@ export function PRTab() {
               </button>
             ))}
           </div>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <PlusIcon className="size-3.5" />
-            New Pull Request
+          <Button size="sm" variant="positive" onClick={() => setCreateOpen(true)}>
+            <GitPullRequestCreateArrow className="size-3.5" />
+            Preview PR
           </Button>
         </div>
         <div className="border-b border-border px-2 py-1 text-xs text-muted-foreground">
-          {loading ? "Loading…" : `${pulls.length} ${filter}`}
+          {loading && pulls.length === 0 ? "Loading…" : `${pulls.length} ${filter}`}
         </div>
         {loadError && <div className="p-2 text-xs text-destructive">{loadError}</div>}
         <div className="min-h-0 flex-1">
           <PRList
+            loading={loading}
             repoPath={repoPath}
             login={currentLogin}
             pulls={pulls}
             selectedNumber={selectedNumber}
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            onLoadMore={() => void usePRStore.getState().loadMore(repoPath, currentLogin)}
             onSelect={(n) => void selectPR(repoPath, currentLogin, n)}
           />
         </div>

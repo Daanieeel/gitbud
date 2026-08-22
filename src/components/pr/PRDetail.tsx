@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { ExternalLinkIcon, GitBranchIcon, GitMergeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +16,18 @@ import { api } from "@/lib/tauri";
 import type { PullRequest } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { FileTypeIcon } from "@/lib/file-icons";
+import { FilePathLabel } from "@/components/changes/FilePathLabel";
+
+const PR_STATUS_COLOR: Record<string, string> = {
+  added: "bg-accent-green",
+  modified: "bg-accent-green",
+  changed: "bg-accent-green",
+  removed: "bg-accent-pink",
+  renamed: "bg-muted-foreground",
+  copied: "bg-muted-foreground",
+  unchanged: "bg-transparent",
+};
 
 interface PRDetailProps {
   repoPath: string;
@@ -53,6 +66,14 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
 
   const selectedFile = files.find((f) => f.filename === selectedFilePath);
   const fileComments = comments.filter((c) => c.path === selectedFilePath);
+
+  const filePaths = useMemo(() => files.map((f) => f.filename), [files]);
+  const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, (path) => selectFile(path));
+  const fileListRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fileListRef.current?.focus();
+  }, []);
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
@@ -126,18 +147,27 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
         )}
       </div>
       <div className="flex min-h-0 flex-1">
-        <div className="w-56 shrink-0 overflow-auto border-r border-border">
+        <div ref={fileListRef} tabIndex={0} onKeyDown={handleArrowNav} className="w-56 shrink-0 overflow-auto border-r border-border outline-none">
           {files.map((f) => (
             <Tooltip key={f.filename}>
               <TooltipTrigger asChild>
                 <div
                   className={cn(
-                    "cursor-pointer truncate px-2 py-1 text-sm hover:bg-accent",
+                    "flex cursor-pointer select-none items-center gap-2 px-2 py-1 text-sm hover:bg-accent",
                     selectedFilePath === f.filename && "bg-accent",
                   )}
                   onClick={() => selectFile(f.filename)}
                 >
-                  {f.filename}
+                  <span className="relative shrink-0">
+                    <FileTypeIcon path={f.filename} className="size-3.5" />
+                    <span
+                      className={cn(
+                        "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
+                        PR_STATUS_COLOR[f.status] || "bg-muted-foreground",
+                      )}
+                    />
+                  </span>
+                  <FilePathLabel path={f.filename} />
                 </div>
               </TooltipTrigger>
               <TooltipContent>{`${f.filename} (${f.status})`}</TooltipContent>

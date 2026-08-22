@@ -110,7 +110,13 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
 
   syncRepoIdentity: async (repoPath) => {
     const override = useRepoStore.getState().repos.find((r) => r.path === repoPath)?.identity_id ?? null;
-    const identityId = override ?? useSettingsStore.getState().settings.default_identity_id;
+    let identityId = override ?? useSettingsStore.getState().settings.default_identity_id;
+    if (!identityId) {
+      const currentLogin = useGitHubStore.getState().currentLogin;
+      if (currentLogin) {
+        identityId = githubIdentityId(currentLogin);
+      }
+    }
     const identity = identityId ? get().list().find((i) => i.id === identityId) : undefined;
     if (identity?.kind === "ssh") {
       await api.applySshIdentityToRepo(repoPath, identity.keyPath);

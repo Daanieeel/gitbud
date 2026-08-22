@@ -23,7 +23,7 @@ export function BranchPruner() {
 
   useEffect(() => {
     if (!open || !repoPath || !currentLogin) return;
-    void api.githubListPullRequests(repoPath, currentLogin, "closed").then((pulls) => {
+    void api.githubListPullRequests(repoPath, currentLogin, "closed", 1).then((pulls) => {
       setMerged(pulls.filter((p) => p.merged));
     });
   }, [open, repoPath, currentLogin]);

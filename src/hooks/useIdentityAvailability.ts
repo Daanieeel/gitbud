@@ -19,10 +19,11 @@ export function useIdentityAvailability(): { available: boolean; reason: string 
   const accounts = useGitHubStore((s) => s.accounts);
   const brokenLogin = useGitHubStore((s) => s.brokenLogin);
   const sshIdentities = useIdentityStore((s) => s.sshIdentities);
+  const currentLogin = useGitHubStore((s) => s.currentLogin);
 
   if (!selectedRepo || remoteProvider == null) return { available: true, reason: null };
-
-  const effectiveId = repoOverride ?? defaultIdentityId;
+  const effectiveId =
+    repoOverride ?? defaultIdentityId ?? (currentLogin ? githubIdentityId(currentLogin) : null);
   const githubAccount = accounts.find((a) => githubIdentityId(a.login) === effectiveId);
   const sshIdentity = sshIdentities.find((i) => sshIdentityId(i.id) === effectiveId);
 

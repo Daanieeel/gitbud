@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { GitPullRequestIcon } from "lucide-react";
+import { GitPullRequestCreateArrow } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -99,8 +99,9 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
               <Button
                 disabled={submitting || !title.trim()}
                 onClick={() => void submit()}
+                variant={'positive'}
               >
-                <GitPullRequestIcon className="size-3.5" />
+                <GitPullRequestCreateArrow className="size-3.5" />
                 {submitting ? "Creating…" : "Create Pull Request"}
               </Button>
             </TooltipTrigger>

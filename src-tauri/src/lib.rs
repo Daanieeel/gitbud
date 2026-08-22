@@ -618,9 +618,10 @@ async fn github_list_pull_requests(
     repo_path: String,
     login: String,
     state: String,
+    page: u32,
 ) -> Result<Vec<github::api::PullRequest>, String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::list_pull_requests(&host, &token, &owner, &repo, &state).await
+    github::api::list_pull_requests(&host, &token, &owner, &repo, &state, page).await
 }
 
 #[tauri::command]
@@ -807,6 +808,113 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .setup(|app| {
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::Manager;
+                use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+
+                let app_handle = app.handle();
+                let app_submenu = Submenu::with_items(
+                    app_handle,
+                    "GitBud",
+                    true,
+                    &[
+                        &PredefinedMenuItem::about(app_handle, None, None)?,
+                        &PredefinedMenuItem::separator(app_handle)?,
+                        &MenuItem::with_id(app_handle, "settings", "Settings...", true, Some("CmdOrCtrl+,"))?,
+                        &PredefinedMenuItem::separator(app_handle)?,
+                        &PredefinedMenuItem::services(app_handle, None)?,
+                        &PredefinedMenuItem::separator(app_handle)?,
+                        &PredefinedMenuItem::hide(app_handle, None)?,
+                        &PredefinedMenuItem::hide_others(app_handle, None)?,
+                        &PredefinedMenuItem::show_all(app_handle, None)?,
+                        &PredefinedMenuItem::separator(app_handle)?,
+                        &PredefinedMenuItem::quit(app_handle, None)?,
+                    ],
+                )?;
+
+                let file_submenu = Submenu::with_items(
+                    app_handle,
+                    "File",
+                    true,
+                    &[
+                        &MenuItem::with_id(app_handle, "add_repo", "Add Repository...", true, Some("CmdOrCtrl+O"))?,
+                        &PredefinedMenuItem::separator(app_handle)?,
+                        &MenuItem::with_id(app_handle, "close_window", "Close Window", true, Some("CmdOrCtrl+W"))?,
+                    ],
+                )?;
+
+                let edit_submenu = Submenu::with_items(
+                    app_handle,
+                    "Edit",
+                    true,
+                    &[
+                        &PredefinedMenuItem::undo(app_handle, None)?,
+                        &PredefinedMenuItem::redo(app_handle, None)?,
+                        &PredefinedMenuItem::separator(app_handle)?,
+                        &PredefinedMenuItem::cut(app_handle, None)?,
+                        &PredefinedMenuItem::copy(app_handle, None)?,
+                        &PredefinedMenuItem::paste(app_handle, None)?,
+                        &PredefinedMenuItem::select_all(app_handle, None)?,
+                    ],
+                )?;
+
+                let repo_submenu = Submenu::with_items(
+                    app_handle,
+                    "Repository",
+                    true,
+                    &[
+                        &MenuItem::with_id(app_handle, "fetch", "Fetch", true, Some("CmdOrCtrl+Shift+F"))?,
+                        &MenuItem::with_id(app_handle, "pull", "Pull", true, Some("CmdOrCtrl+Shift+Down"))?,
+                        &MenuItem::with_id(app_handle, "push", "Push", true, Some("CmdOrCtrl+Shift+Up"))?,
+                        &PredefinedMenuItem::separator(app_handle)?,
+                        &MenuItem::with_id(app_handle, "branch_switcher", "Switch Branch...", true, Some("CmdOrCtrl+B"))?,
+                        &MenuItem::with_id(app_handle, "create_pr", "Preview / Create PR...", true, Some("CmdOrCtrl+P"))?,
+                    ],
+                )?;
+
+                let window_submenu = Submenu::with_items(
+                    app_handle,
+                    "Window",
+                    true,
+                    &[
+                        &PredefinedMenuItem::minimize(app_handle, None)?,
+                        &PredefinedMenuItem::separator(app_handle)?,
+                        &PredefinedMenuItem::fullscreen(app_handle, None)?,
+                    ],
+                )?;
+
+                let menu = Menu::with_items(
+                    app_handle,
+                    &[
+                        &app_submenu,
+                        &file_submenu,
+                        &edit_submenu,
+                        &repo_submenu,
+                        &window_submenu,
+                    ],
+                )?;
+
+                app.set_menu(menu)?;
+
+                app.on_menu_event(move |app_handle, event| {
+                    use tauri::Emitter;
+                    match event.id.as_ref() {
+                        "settings" | "add_repo" | "fetch" | "pull" | "push" | "branch_switcher" | "create_pr" => {
+                            let _ = app_handle.emit("menu-event", event.id.as_ref());
+                        }
+                        "close_window" => {
+                            if let Some(window) = app_handle.get_webview_window("main") {
+                                let _ = window.close();
+                            }
+                        }
+                        _ => {}
+                    }
+                });
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_status,
             is_dirty,

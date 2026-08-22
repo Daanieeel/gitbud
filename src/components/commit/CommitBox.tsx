@@ -69,7 +69,7 @@ export function CommitBox() {
     <div className="flex shrink-0 flex-col gap-2 border-t border-border p-2">
       <Tooltip>
         <TooltipTrigger asChild>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+          <label className="flex cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground">
             <Checkbox
               checked={amending}
               disabled={!lastCommit}

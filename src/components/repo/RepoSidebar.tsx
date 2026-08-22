@@ -162,71 +162,73 @@ function RepoRow({
             </Tooltip>
           )}
           <span className="truncate flex-1">{repo.name}</span>
-          {showAheadBehind && ab && (ab.ahead > 0 || ab.behind > 0) && (
-            <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
-              {ab.ahead > 0 && `↑${ab.ahead}`}
-              {ab.behind > 0 && `↓${ab.behind}`}
-            </span>
-          )}
-          {sectionContext && onRemoveFromSection && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRemoveFromSection();
-                  }}
-                  className="shrink-0 rounded-md bg-muted p-1 text-muted-foreground opacity-0 hover:bg-accent hover:text-foreground group-hover:opacity-100"
-                >
-                  <MinusIcon className="size-3.5" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>{`Remove from "${sectionContext}"`}</TooltipContent>
-            </Tooltip>
-          )}
-          <Popover open={confirmRemove} onOpenChange={onConfirmRemoveChange}>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <PopoverTrigger asChild>
+          <div className="flex shrink-0 items-center">
+            {showAheadBehind && ab && (ab.ahead > 0 || ab.behind > 0) && (
+              <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
+                {ab.ahead > 0 && `↑${ab.ahead}`}
+                {ab.behind > 0 && `↓${ab.behind}`}
+              </span>
+            )}
+            {sectionContext && onRemoveFromSection && (
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onConfirmRemoveChange(true);
+                      onRemoveFromSection();
                     }}
-                    className={cn(
-                      "shrink-0 rounded-md bg-destructive/10 p-1 text-destructive opacity-0 hover:bg-destructive/20 group-hover:opacity-100",
-                      confirmRemove && "opacity-100",
-                    )}
+                    className="w-0 shrink-0 overflow-hidden rounded-md bg-muted p-1 text-muted-foreground opacity-0 transition-all hover:bg-accent hover:text-foreground group-hover:w-5 group-hover:ml-1 group-hover:opacity-100"
                   >
-                    <XIcon className="size-3.5" />
+                    <MinusIcon className="size-3.5" />
                   </button>
-                </PopoverTrigger>
-              </TooltipTrigger>
-              <TooltipContent>Remove from GitBud</TooltipContent>
-            </Tooltip>
-            <PopoverContent
-              align="end"
-              className="w-56 space-y-2 bg-accent-blue/5 p-3"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <p className="text-sm">Remove "{repo.name}" from the list?</p>
-              <div className="flex justify-end gap-2">
-                <Button size="sm" variant="ghost" onClick={() => onConfirmRemoveChange(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => {
-                    onConfirmRemoveChange(false);
-                    onRemove();
-                  }}
-                >
-                  Remove
-                </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
+                </TooltipTrigger>
+                <TooltipContent>{`Remove from "${sectionContext}"`}</TooltipContent>
+              </Tooltip>
+            )}
+            <Popover open={confirmRemove} onOpenChange={onConfirmRemoveChange}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <PopoverTrigger asChild>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onConfirmRemoveChange(true);
+                      }}
+                      className={cn(
+                        "aspect-square w-0 shrink-0 overflow-hidden rounded-md bg-destructive/10 p-1 text-destructive opacity-0 transition-all hover:bg-destructive/20 group-hover:w-5 group-hover:ml-1 group-hover:opacity-100 flex items-center justify-center",
+                        confirmRemove && "w-5 ml-1 opacity-100",
+                      )}
+                    >
+                      <XIcon className="size-3.5" />
+                    </button>
+                  </PopoverTrigger>
+                </TooltipTrigger>
+                <TooltipContent>Remove from GitBud</TooltipContent>
+              </Tooltip>
+              <PopoverContent
+                align="end"
+                className="w-56 space-y-2 bg-accent-blue/5 p-3"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <p className="text-sm">Remove "{repo.name}" from the list?</p>
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => onConfirmRemoveChange(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => {
+                      onConfirmRemoveChange(false);
+                      onRemove();
+                    }}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent>

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { GitPullRequestIcon } from "lucide-react";
+import { useState, useEffect } from "react";
+import { GitPullRequestCreateArrow } from "lucide-react";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { BranchSwitcher } from "@/components/repo/BranchSwitcher";
 import { BranchPruner } from "@/components/repo/BranchPruner";
@@ -18,6 +18,12 @@ export function Toolbar() {
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const [previewPrOpen, setPreviewPrOpen] = useState(false);
 
+  useEffect(() => {
+    const handleOpenCreatePr = () => setPreviewPrOpen(true);
+    window.addEventListener("open-create-pr", handleOpenCreatePr);
+    return () => window.removeEventListener("open-create-pr", handleOpenCreatePr);
+  }, []);
+
   return (
     <header className="flex shrink-0 items-center gap-2 p-2">
       <BranchSwitcher />
@@ -33,11 +39,11 @@ export function Toolbar() {
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant="secondary"
+              variant="positive"
               size="sm"
               onClick={() => setPreviewPrOpen(true)}
             >
-              <GitPullRequestIcon className="size-3.5" />
+              <GitPullRequestCreateArrow className="size-3.5" />
               Preview PR
             </Button>
           </TooltipTrigger>

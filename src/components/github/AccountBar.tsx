@@ -84,6 +84,12 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
     void init();
   }, [init]);
 
+  useEffect(() => {
+    const handleOpenSettings = () => setSettingsOpen(true);
+    window.addEventListener("open-settings", handleOpenSettings);
+    return () => window.removeEventListener("open-settings", handleOpenSettings);
+  }, []);
+
   const effectiveId = repoOverride ?? defaultIdentityId;
   const current = identities.find((i) => i.id === effectiveId) ?? identities[0];
 

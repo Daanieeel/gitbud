@@ -223,8 +223,8 @@ export const api = {
     invoke<PollResult>("github_poll_device_flow", { clientId, deviceCode }),
   githubRemoteOwnerRepo: (repoPath: string) =>
     invoke<[string, string] | null>("github_remote_owner_repo", { repoPath }),
-  githubListPullRequests: (repoPath: string, login: string, state: "open" | "closed" | "all") =>
-    invoke<PullRequest[]>("github_list_pull_requests", { repoPath, login, state }),
+  githubListPullRequests: (repoPath: string, login: string, state: "open" | "closed" | "all", page: number) =>
+    invoke<PullRequest[]>("github_list_pull_requests", { repoPath, login, state, page }),
   githubGetPullRequest: (repoPath: string, login: string, number: number) =>
     invoke<PullRequest>("github_get_pull_request", { repoPath, login, number }),
   githubCreatePullRequest: (

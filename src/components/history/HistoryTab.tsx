@@ -68,7 +68,7 @@ export function HistoryTab() {
             <TooltipTrigger asChild>
               <div
                 className={cn(
-                  "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer hover:bg-accent",
+                  "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
                   selectedCommitFilePath === path && "bg-accent",
                 )}
                 onClick={() => void selectCommitFile(path)}

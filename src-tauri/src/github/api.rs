@@ -138,9 +138,10 @@ pub async fn list_pull_requests(
     owner: &str,
     repo: &str,
     state: &str,
+    page: u32,
 ) -> Result<Vec<PullRequest>, String> {
     let gh = GhClient::new(host, token)?;
-    let path = format!("/repos/{owner}/{repo}/pulls?state={state}&per_page=50");
+    let path = format!("/repos/{owner}/{repo}/pulls?state={state}&per_page=50&page={page}");
     let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
     let raw: Vec<RawPullRequest> = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into_iter().map(PullRequest::from).collect())

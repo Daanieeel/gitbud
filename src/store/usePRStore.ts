@@ -13,6 +13,9 @@ interface PRState {
   loading: boolean;
   loadError: string | null;
   filter: PRFilter;
+  page: number;
+  hasMore: boolean;
+  loadingMore: boolean;
 
   selectedNumber: number | null;
   files: PullRequestFile[];
@@ -26,6 +29,7 @@ interface PRState {
   toggleWatch: (number: number) => void;
   pollWatchedChecks: (repoPath: string, login: string) => Promise<void>;
   load: (repoPath: string, login: string) => Promise<void>;
+  loadMore: (repoPath: string, login: string) => Promise<void>;
   selectPR: (repoPath: string, login: string, number: number | null) => Promise<void>;
   selectFile: (path: string | null) => void;
   addComment: (
@@ -52,6 +56,9 @@ export const usePRStore = create<PRState>((set, get) => ({
   loading: false,
   loadError: null,
   filter: "open",
+  page: 1,
+  hasMore: true,
+  loadingMore: false,
 
   selectedNumber: null,
   files: [],
@@ -87,10 +94,10 @@ export const usePRStore = create<PRState>((set, get) => ({
   },
 
   load: async (repoPath, login) => {
-    set({ loading: true, loadError: null });
+    set({ loading: true, loadError: null, page: 1, hasMore: true });
     try {
-      const pulls = await api.githubListPullRequests(repoPath, login, get().filter);
-      set({ pulls, loading: false });
+      const pulls = await api.githubListPullRequests(repoPath, login, get().filter, 1);
+      set({ pulls, loading: false, hasMore: pulls.length === 50 });
       useNetworkStore.getState().noteSuccess();
       useGitHubStore.getState().setBrokenLogin(null);
     } catch (err) {
@@ -98,6 +105,27 @@ export const usePRStore = create<PRState>((set, get) => ({
       set({ loading: false, loadError: message });
       useNetworkStore.getState().noteError(message);
       if (isBrokenTokenError(message)) useGitHubStore.getState().setBrokenLogin(login);
+    }
+  },
+
+  loadMore: async (repoPath, login) => {
+    const { loadingMore, hasMore, filter, page, pulls } = get();
+    if (loadingMore || !hasMore) return;
+    set({ loadingMore: true });
+    try {
+      const nextPage = page + 1;
+      const newPulls = await api.githubListPullRequests(repoPath, login, filter, nextPage);
+      set({
+        pulls: [...pulls, ...newPulls],
+        page: nextPage,
+        hasMore: newPulls.length === 50,
+        loadingMore: false,
+      });
+      useNetworkStore.getState().noteSuccess();
+    } catch (err) {
+      const message = String(err);
+      useNetworkStore.getState().noteError(message);
+      set({ loadingMore: false });
     }
   },
 

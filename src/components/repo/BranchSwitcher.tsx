@@ -56,6 +56,12 @@ export function BranchSwitcher() {
     return () => cancelAnimationFrame(raf);
   }, [renaming]);
 
+  useEffect(() => {
+    const handleOpenBranchSwitcher = () => setOpen(true);
+    window.addEventListener("open-branch-switcher", handleOpenBranchSwitcher);
+    return () => window.removeEventListener("open-branch-switcher", handleOpenBranchSwitcher);
+  }, []);
+
   const local = useMemo(
     () => branches.filter((b) => !b.is_remote && b.name.toLowerCase().includes(filter.toLowerCase())),
     [branches, filter],
