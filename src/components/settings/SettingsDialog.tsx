@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import {
   ColumnsIcon,
+  DownloadIcon,
   GitBranchIcon,
   PanelLeftIcon,
   SaveIcon,
   SettingsIcon,
   SlidersHorizontalIcon,
+  UploadIcon,
 } from "lucide-react";
+import { save, open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -72,7 +75,8 @@ function Select<T extends string>({
 }
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
-  const { settings, update } = useSettingsStore();
+  const { settings, update, exportTo, importFrom } = useSettingsStore();
+  const [importExportError, setImportExportError] = useState<string | null>(null);
   const clientId = useGitHubStore((s) => s.clientId);
   const setClientId = useGitHubStore((s) => s.setClientId);
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -97,6 +101,34 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const saveGitIdentity = async () => {
     if (!repoPath) return;
     await api.setGitIdentity(repoPath, gitName, gitEmail, gitScope === "global");
+  };
+
+  const exportSettings = async () => {
+    setImportExportError(null);
+    try {
+      const dest = await save({
+        title: "Export GitBud Settings",
+        defaultPath: "gitbud-settings.json",
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (dest) await exportTo(dest);
+    } catch (e) {
+      setImportExportError(String(e));
+    }
+  };
+
+  const importSettings = async () => {
+    setImportExportError(null);
+    try {
+      const src = await openFileDialog({
+        title: "Import GitBud Settings",
+        multiple: false,
+        filters: [{ name: "JSON", extensions: ["json"] }],
+      });
+      if (typeof src === "string") await importFrom(src);
+    } catch (e) {
+      setImportExportError(String(e));
+    }
   };
 
   return (
@@ -269,6 +301,21 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     onChange={(e) => void update({ fs_watch_enabled: e.target.checked })}
                   />
                 </Row>
+                <Row label="Settings backup">
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => void exportSettings()}>
+                      <DownloadIcon className="size-3.5" />
+                      Export…
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => void importSettings()}>
+                      <UploadIcon className="size-3.5" />
+                      Import…
+                    </Button>
+                  </div>
+                </Row>
+                {importExportError && (
+                  <p className="text-xs text-destructive">{importExportError}</p>
+                )}
               </>
             )}
           </div>

@@ -152,6 +152,8 @@ export const api = {
   openInTerminal: (path: string) => invoke<void>("open_in_terminal", { path }),
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
+  exportSettings: (destPath: string) => invoke<void>("export_settings", { destPath }),
+  importSettings: (srcPath: string) => invoke<Settings>("import_settings", { srcPath }),
   getGitIdentity: (repoPath: string) =>
     invoke<[string | null, string | null]>("get_git_identity", { repoPath }),
   setGitIdentity: (repoPath: string, name: string, email: string, global: boolean) =>

@@ -112,6 +112,22 @@ pub fn save_settings(settings: &Settings) -> Result<(), String> {
     fs::write(settings_file()?, contents).map_err(|e| e.to_string())
 }
 
+/// Exports the current settings (identity, preferences, sidebar layout, etc) as pretty JSON
+/// to an arbitrary file, so they can be carried over to another machine.
+pub fn export_settings(dest_path: &str) -> Result<(), String> {
+    let settings = get_settings()?;
+    let contents = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
+    fs::write(dest_path, contents).map_err(|e| e.to_string())
+}
+
+/// Imports settings previously written by `export_settings`, replacing the current settings.
+pub fn import_settings(src_path: &str) -> Result<Settings, String> {
+    let contents = fs::read_to_string(src_path).map_err(|e| e.to_string())?;
+    let settings: Settings = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+    save_settings(&settings)?;
+    Ok(settings)
+}
+
 /// Effective git binary to shell out to — the configured override, or plain "git" to
 /// resolve from PATH.
 pub fn git_binary() -> String {

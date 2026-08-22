@@ -24,7 +24,7 @@ Mark as done when the feature is implemented.
 Ordered low-hanging-fruit first (smallest lift → biggest lift).
 
 - [x] **Sidebar drag-to-reorder** — new "manual" sidebar sort mode (`Settings → Sidebar`); in that mode repo rows are HTML5-draggable and reordering persists via a new `set_repo_order` command that rewrites `repos.json`'s order.
-- [ ] **Settings import/export** — export `settings.json` (identity, preferences, sidebar layout) to a file and re-import on another machine.
+- [x] **Settings import/export** — `Settings → Advanced → Settings backup`; new `export_settings`/`import_settings` commands write/read the same `Settings` JSON to/from an arbitrary file via a save/open dialog.
 - [ ] **Desktop notifications** — optional OS notification when a long-running fetch/pull/push finishes, or when a watched PR's CI status changes.
 - [ ] **Multi-repo batch actions** — "fetch all" / "pull all" across every sidebar repo at once, with a combined progress/status summary instead of repo-by-repo.
 - [x] **Stash management panel** — clicking a stash now opens a dedicated dialog (`StashPanel.tsx`) with its file list and a real diff preview per file (reusing `DiffView`, backed by a new `get_stash_oid`/existing `get_commit_file_diff`), plus a per-file "restore from stash" partial-apply (new `stash_apply_file`, shells `git checkout stash@{n} -- <path>`) alongside the existing apply/pop/drop.

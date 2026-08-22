@@ -35,6 +35,8 @@ interface SettingsState {
   loaded: boolean;
   load: () => Promise<void>;
   update: (patch: Partial<Settings>) => Promise<void>;
+  exportTo: (destPath: string) => Promise<void>;
+  importFrom: (srcPath: string) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -52,5 +54,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set({ settings: next });
     if (patch.theme) applyTheme(next.theme);
     await api.saveSettings(next);
+  },
+
+  exportTo: async (destPath) => {
+    await api.exportSettings(destPath);
+  },
+
+  importFrom: async (srcPath) => {
+    const settings = await api.importSettings(srcPath);
+    applyTheme(settings.theme);
+    set({ settings });
   },
 }));

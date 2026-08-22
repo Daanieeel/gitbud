@@ -611,6 +611,16 @@ fn save_settings(settings: settings::Settings) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn export_settings(dest_path: String) -> Result<(), String> {
+    settings::export_settings(&dest_path)
+}
+
+#[tauri::command]
+fn import_settings(src_path: String) -> Result<settings::Settings, String> {
+    settings::import_settings(&src_path)
+}
+
+#[tauri::command]
 fn get_git_identity(repo_path: String) -> Result<(Option<String>, Option<String>), String> {
     settings::get_git_identity(&repo_path)
 }
@@ -721,6 +731,8 @@ pub fn run() {
             open_in_terminal,
             get_settings,
             save_settings,
+            export_settings,
+            import_settings,
             get_git_identity,
             set_git_identity,
             start_watch,
