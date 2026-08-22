@@ -77,6 +77,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                 >
                   <Checkbox
                     checked={file.staged}
+                    title={file.staged ? "Unstage" : "Stage"}
                     onClick={(e) => e.stopPropagation()}
                     onCheckedChange={(checked) => onToggle(file.path, checked === true)}
                   />

@@ -31,17 +31,17 @@ Mark as done when the feature is implemented.
 
 ## P1 — High-value quality of life
 
-- [ ] **Command palette (`Cmd+P`)** — fuzzy-search branches, commits (message/hash/author), and files in the current repo, jump straight to the relevant tab/view. Extend to jump between repos too, via `RepoSidebar.tsx`.
-- [ ] **General keyboard shortcuts** — `Cmd+Enter` to commit, `Cmd+Shift+P` to pull, `Cmd+K` to switch repos, arrow-key navigation through file/commit lists.
+- [x] **Command palette (`Cmd+P`)** — `CommandPalette.tsx`: substring search (not fuzzy-scored) over repos, local branches, currently-changed files, and full commit history (`history::search_commits`, not limited to what's paginated in). `Cmd+K` opens the same palette scoped to just repos.
+- [x] **General keyboard shortcuts** — `Cmd+Enter` to commit (`CommitBox.tsx`), `Cmd+Shift+P` to pull, `Cmd+K` to switch repos (global listener in `App.tsx`). Arrow-key navigation through file/commit lists not implemented.
 - [x] **Right-click context menus** — repos (`RepoSidebar.tsx`): Open in Terminal/Finder, Copy Path, Remove from Sidebar. Files (`FileList.tsx`): Copy Path, Reveal in Finder, Open in Terminal, View on GitHub, Discard Changes. Commits (`CommitList.tsx`): Copy SHA, Open on GitHub, Cherry-pick, Revert, Create Branch Here. Branches (`BranchSwitcher.tsx`): Copy Name, Open on GitHub, Rename, Merge into Current, Delete.
 - [x] **Amend last commit** — checkbox in `CommitBox.tsx`, pre-fills the last commit's message.
 - [x] **Ahead/behind badges** in the sidebar (`RepoSidebar.tsx`), toggleable in Settings.
 - [x] **Cherry-pick & revert** — `repo::cherry_pick`/`repo::revert_commit`, from the commit context menu.
-- [ ] **Inline blame view** — `git_blame(path)` command + gutter toggle in the diff/file view; click a blamed line to jump to that commit in `HistoryTab`.
-- [ ] **Tag management** — create, push, and delete tags from the UI; show tags alongside branch labels in history.
+- [x] **Inline blame view** — `blame::blame_file` + "Blame File" in the file context menu opens `BlameDialog.tsx` (full file + per-line author/commit gutter, click to jump to History). Not a gutter toggle inside `DiffView.tsx` itself — there's no full-file view in the diff pane to toggle within.
+- [x] **Tag management** — `TagsPanel.tsx` in the toolbar: create (lightweight or annotated), delete, push to origin; tag labels shown next to commits in `CommitList.tsx`.
 - [x] pre-filled commit message (summary, not description) for single-file commits — `CommitBox.tsx`, "Update {filename}", only when the summary field is empty.
 - [x] commit message + description inputs must stay filled out — lifted to `useRepoStore` (`commitSummary`/`commitDescription`) instead of `CommitBox` local state, so switching Changes/History/PRs tabs (which unmounts `CommitBox`) no longer loses the draft.
-- [ ] tooltips on all buttons in the UI to explain what they do (optionally showing a shortcut)
+- [~] tooltips on buttons — added to the highest-traffic ones (sync, tabs, commit/amend, stage-all/stage-file checkboxes, branch switcher, stash, PR checkout/merge/create). Not literally every button in the app yet.
 
 ## P2 — Nice to have
 

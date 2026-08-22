@@ -81,7 +81,11 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
           </label>
         </div>
         <DialogFooter>
-          <Button disabled={submitting || !title.trim()} onClick={() => void submit()}>
+          <Button
+            disabled={submitting || !title.trim()}
+            title={`Open a PR from ${branch ?? "this branch"} into ${base}`}
+            onClick={() => void submit()}
+          >
             {submitting ? "Creating…" : "Create Pull Request"}
           </Button>
         </DialogFooter>

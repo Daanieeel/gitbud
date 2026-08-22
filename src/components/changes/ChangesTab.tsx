@@ -54,6 +54,7 @@ export function ChangesTab() {
             <div className="flex shrink-0 items-center gap-2 border-b border-border p-2">
               <Checkbox
                 checked={allStaged}
+                title={allStaged ? "Unstage all" : "Stage all"}
                 onCheckedChange={(checked) =>
                   void toggleStaged(filtered.map((f) => f.path), checked === true)
                 }

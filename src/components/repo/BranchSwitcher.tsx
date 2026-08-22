@@ -61,7 +61,7 @@ export function BranchSwitcher() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="w-48 justify-between">
+        <Button variant="outline" className="w-48 justify-between" title="Switch or create a branch">
           <span className="flex min-w-0 items-center gap-2">
             <GitBranchIcon className="size-4 shrink-0" />
             <span className="truncate">{branch ?? "…"}</span>

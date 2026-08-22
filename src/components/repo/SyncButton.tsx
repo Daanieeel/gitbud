@@ -32,7 +32,13 @@ export function SyncButton() {
 
   return (
     <div className="flex flex-col items-start">
-      <Button variant="outline" size="sm" disabled={syncing} onClick={() => void action()}>
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={syncing}
+        title={`${label} (Cmd+Shift+P to pull)`}
+        onClick={() => void action()}
+      >
         <Icon className={cn("size-3.5", syncing && "animate-spin")} />
         {label}
       </Button>

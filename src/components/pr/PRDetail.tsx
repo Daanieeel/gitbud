@@ -76,13 +76,19 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
         >
           <ExternalLinkIcon className="size-4" />
         </a>
-        <Button variant="outline" size="sm" disabled={checkingOut} onClick={() => void checkout()}>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={checkingOut}
+          title={`Fetch and check out as local branch pr-${pr.number}`}
+          onClick={() => void checkout()}
+        >
           {checkingOut ? "Checking out…" : "Checkout"}
         </Button>
         {!pr.merged && pr.state === "open" && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button size="sm" disabled={merging}>
+              <Button size="sm" disabled={merging} title="Merge this pull request">
                 {merging ? "Merging…" : "Merge"}
               </Button>
             </DropdownMenuTrigger>

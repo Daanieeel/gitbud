@@ -41,7 +41,7 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" title="Stash uncommitted changes, or apply a saved stash">
           <ArchiveIcon className="size-3.5" />
           Stash{stashes.length > 0 ? ` (${stashes.length})` : ""}
         </Button>

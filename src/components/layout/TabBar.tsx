@@ -2,9 +2,9 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { cn } from "@/lib/utils";
 
 const TABS = [
-  { key: "changes", label: "Changes" },
-  { key: "history", label: "History" },
-  { key: "pulls", label: "Pull Requests" },
+  { key: "changes", label: "Changes", hint: "Staged/unstaged files and diffs" },
+  { key: "history", label: "History", hint: "Commit log and graph" },
+  { key: "pulls", label: "Pull Requests", hint: "Open, closed, and merged pull requests" },
 ] as const;
 
 export function TabBar() {
@@ -16,6 +16,7 @@ export function TabBar() {
       {TABS.map((tab) => (
         <button
           key={tab.key}
+          title={tab.hint}
           onClick={() => setActiveTab(tab.key)}
           className={cn(
             "rounded-md px-3 py-1 text-sm hover:bg-accent",

@@ -90,7 +90,11 @@ export function CommitBox() {
         rows={3}
         className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
       />
-      <Button disabled={disabled} onClick={() => void submit()}>
+      <Button
+        disabled={disabled}
+        title={amending ? "Rewrite the last commit with this message and any staged changes" : "Cmd+Enter"}
+        onClick={() => void submit()}
+      >
         {amending ? "Amend Last Commit" : `Commit to ${branch ?? "…"}`}
       </Button>
     </div>
