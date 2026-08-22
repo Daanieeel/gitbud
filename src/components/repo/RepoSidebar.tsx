@@ -7,6 +7,7 @@ import {
   MinusIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
+  PencilIcon,
   PinIcon,
   RefreshCwIcon,
   TerminalIcon,
@@ -23,6 +24,7 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
@@ -276,6 +278,9 @@ export function RepoSidebar() {
   const [pinSectionRepo, setPinSectionRepo] = useState<RepoEntry | null>(null);
   const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem("sidebar-collapsed") === "1");
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => loadCollapsedSections());
+  const [renamingSection, setRenamingSection] = useState<string | null>(null);
+  const [renameSectionValue, setRenameSectionValue] = useState("");
+  const [confirmRemoveSection, setConfirmRemoveSection] = useState<string | null>(null);
 
   useEffect(() => {
     window.localStorage.setItem("sidebar-collapsed", collapsed ? "1" : "0");
@@ -292,6 +297,34 @@ export function RepoSidebar() {
       else next.add(section);
       return next;
     });
+  };
+
+  const startRenameSection = (section: string) => {
+    setRenamingSection(section);
+    setRenameSectionValue(section);
+  };
+
+  const commitRenameSection = async () => {
+    if (!renamingSection) return;
+    const oldName = renamingSection;
+    const newName = renameSectionValue.trim();
+    setRenamingSection(null);
+    if (!newName || newName === oldName) return;
+    const updated = await api.renameSection(oldName, newName);
+    setReposLocal({ repos: updated });
+    setCollapsedSections((prev) => {
+      if (!prev.has(`pin:${oldName}`)) return prev;
+      const next = new Set(prev);
+      next.delete(`pin:${oldName}`);
+      next.add(`pin:${newName}`);
+      return next;
+    });
+  };
+
+  const removeSectionEntirely = async (section: string) => {
+    const updated = await api.removeSection(section);
+    setReposLocal({ repos: updated });
+    setConfirmRemoveSection(null);
   };
 
   useEffect(() => {
@@ -502,18 +535,58 @@ export function RepoSidebar() {
           );
           return (
             <div key={collapseKey}>
-              <button
-                className="flex w-full items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-                onClick={() => toggleSectionCollapsed(collapseKey)}
-              >
-                {isCollapsed ? (
-                  <ChevronRightIcon className="size-3 shrink-0" />
-                ) : (
-                  <ChevronDownIcon className="size-3 shrink-0" />
-                )}
-                <PinIcon className="size-3 shrink-0" />
-                <span className="truncate">{section}</span>
-              </button>
+              {renamingSection === section ? (
+                <div className="flex items-center gap-1 px-2 pt-2 pb-1">
+                  <PinIcon className="size-3 shrink-0 text-muted-foreground" />
+                  <Input
+                    autoFocus
+                    value={renameSectionValue}
+                    onChange={(e) => setRenameSectionValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void commitRenameSection();
+                      if (e.key === "Escape") setRenamingSection(null);
+                    }}
+                    onBlur={() => void commitRenameSection()}
+                    className="h-6 text-xs"
+                  />
+                </div>
+              ) : (
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <button
+                      className="flex w-full items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                      onClick={() => toggleSectionCollapsed(collapseKey)}
+                    >
+                      {isCollapsed ? (
+                        <ChevronRightIcon className="size-3 shrink-0" />
+                      ) : (
+                        <ChevronDownIcon className="size-3 shrink-0" />
+                      )}
+                      <PinIcon className="size-3 shrink-0" />
+                      <span className="truncate">{section}</span>
+                    </button>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onSelect={() => toggleSectionCollapsed(collapseKey)}>
+                      {isCollapsed ? (
+                        <ChevronRightIcon className="size-3.5" />
+                      ) : (
+                        <ChevronDownIcon className="size-3.5" />
+                      )}
+                      {isCollapsed ? "Expand" : "Collapse"}
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => startRenameSection(section)}>
+                      <PencilIcon className="size-3.5" />
+                      Rename Section…
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem variant="destructive" onSelect={() => setConfirmRemoveSection(section)}>
+                      <Trash2Icon className="size-3.5" />
+                      Remove Section
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+              )}
               {visibleRepos.map((repo) => (
                 <RepoRow
                   key={repo.path}
@@ -550,17 +623,31 @@ export function RepoSidebar() {
           return (
             <div key={group}>
               {group && (
-                <button
-                  className="flex w-full items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-                  onClick={() => toggleSectionCollapsed(collapseKey)}
-                >
-                  {isCollapsed ? (
-                    <ChevronRightIcon className="size-3 shrink-0" />
-                  ) : (
-                    <ChevronDownIcon className="size-3 shrink-0" />
-                  )}
-                  <span className="truncate">{group}</span>
-                </button>
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <button
+                      className="flex w-full items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                      onClick={() => toggleSectionCollapsed(collapseKey)}
+                    >
+                      {isCollapsed ? (
+                        <ChevronRightIcon className="size-3 shrink-0" />
+                      ) : (
+                        <ChevronDownIcon className="size-3 shrink-0" />
+                      )}
+                      <span className="truncate">{group}</span>
+                    </button>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onSelect={() => toggleSectionCollapsed(collapseKey)}>
+                      {isCollapsed ? (
+                        <ChevronRightIcon className="size-3.5" />
+                      ) : (
+                        <ChevronDownIcon className="size-3.5" />
+                      )}
+                      {isCollapsed ? "Expand" : "Collapse"}
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
               )}
               {visibleRepos.map((repo) => (
               <RepoRow
@@ -611,6 +698,31 @@ export function RepoSidebar() {
       onAddSection={(section) => void addSection(section)}
       onRemoveSection={(section) => pinSectionRepo && void removeSection(pinSectionRepo.path, section)}
     />
+    <Dialog
+      open={confirmRemoveSection !== null}
+      onOpenChange={(open) => !open && setConfirmRemoveSection(null)}
+    >
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Remove Section</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Remove "{confirmRemoveSection}"? Every repo pinned to it will be unpinned; nothing else
+          about them changes.
+        </p>
+        <DialogFooter>
+          <Button variant="ghost" onClick={() => setConfirmRemoveSection(null)}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => confirmRemoveSection && void removeSectionEntirely(confirmRemoveSection)}
+          >
+            Remove Section
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </div>
   );
 }

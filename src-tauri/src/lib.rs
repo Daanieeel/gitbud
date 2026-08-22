@@ -265,6 +265,16 @@ fn remove_repo_section(path: String, section: String) -> Result<Vec<config::Repo
 }
 
 #[tauri::command]
+fn remove_section(section: String) -> Result<Vec<config::RepoEntry>, String> {
+    config::remove_section(&section)
+}
+
+#[tauri::command]
+fn rename_section(old: String, new: String) -> Result<Vec<config::RepoEntry>, String> {
+    config::rename_section(&old, &new)
+}
+
+#[tauri::command]
 fn set_repo_identity(path: String, identity_id: Option<String>) -> Result<Vec<config::RepoEntry>, String> {
     config::set_repo_identity(&path, identity_id)
 }
@@ -846,6 +856,8 @@ pub fn run() {
             remove_repo,
             add_repo_section,
             remove_repo_section,
+            remove_section,
+            rename_section,
             set_repo_identity,
             set_repo_order,
             list_workspaces,

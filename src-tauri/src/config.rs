@@ -170,6 +170,35 @@ pub fn remove_repo_section(path: &str, section: &str) -> Result<Vec<RepoEntry>, 
     Ok(repos)
 }
 
+/// Unpins every repo from `section` — the section itself has no identity beyond the repos
+/// that reference it, so "removing" it just means no repo references it any more.
+pub fn remove_section(section: &str) -> Result<Vec<RepoEntry>, String> {
+    let mut repos = load_repos()?;
+    for entry in repos.iter_mut() {
+        entry.sections.retain(|s| s != section);
+    }
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
+pub fn rename_section(old: &str, new: &str) -> Result<Vec<RepoEntry>, String> {
+    let new = new.trim();
+    if new.is_empty() || new == old {
+        return load_repos();
+    }
+    let mut repos = load_repos()?;
+    for entry in repos.iter_mut() {
+        if entry.sections.iter().any(|s| s == old) {
+            entry.sections.retain(|s| s != old);
+            if !entry.sections.iter().any(|s| s == new) {
+                entry.sections.push(new.to_string());
+            }
+        }
+    }
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
 pub fn set_repo_identity(path: &str, identity_id: Option<String>) -> Result<Vec<RepoEntry>, String> {
     let mut repos = load_repos()?;
     if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {

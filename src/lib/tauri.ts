@@ -141,6 +141,9 @@ export const api = {
     invoke<RepoEntry[]>("add_repo_section", { path, section }),
   removeRepoSection: (path: string, section: string) =>
     invoke<RepoEntry[]>("remove_repo_section", { path, section }),
+  removeSection: (section: string) => invoke<RepoEntry[]>("remove_section", { section }),
+  renameSection: (oldName: string, newName: string) =>
+    invoke<RepoEntry[]>("rename_section", { old: oldName, new: newName }),
   setRepoIdentity: (path: string, identityId: string | null) =>
     invoke<RepoEntry[]>("set_repo_identity", { path, identityId }),
   setRepoOrder: (order: string[]) => invoke<RepoEntry[]>("set_repo_order", { order }),
