@@ -14,7 +14,8 @@ export function ChangesTab() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const files = useRepoStore((s) => s.status?.files ?? null);
   const selectedFilePath = useRepoStore((s) => s.selectedFilePath);
-  const selectedFileDiff = useRepoStore((s) => s.selectedFileDiff);
+  const selectedStagedDiff = useRepoStore((s) => s.selectedStagedDiff);
+  const selectedUnstagedDiff = useRepoStore((s) => s.selectedUnstagedDiff);
   const selectedFileImageDiff = useRepoStore((s) => s.selectedFileImageDiff);
   const selectFile = useRepoStore((s) => s.selectFile);
   const toggleStaged = useRepoStore((s) => s.toggleStaged);
@@ -114,15 +115,23 @@ export function ChangesTab() {
         ) : (
           <DiffView
             path={selectedFilePath}
-            diff={selectedFileDiff}
+            diff={selectedUnstagedDiff}
+            secondaryDiff={selectedStagedDiff}
             imageDiff={selectedFileImageDiff}
             hunkActions={
               selectedFilePath
                 ? {
-                    staged: files.find((f) => f.path === selectedFilePath)?.staged ?? false,
+                    staged: false,
                     onStage: (i) => void stageHunk(selectedFilePath, i),
-                    onUnstage: (i) => void unstageHunk(selectedFilePath, i),
                     onDiscard: (i) => void discardHunk(selectedFilePath, i),
+                  }
+                : undefined
+            }
+            secondaryHunkActions={
+              selectedFilePath
+                ? {
+                    staged: true,
+                    onUnstage: (i) => void unstageHunk(selectedFilePath, i),
                   }
                 : undefined
             }

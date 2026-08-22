@@ -25,6 +25,12 @@ interface DiffViewProps {
   onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
   onCopyPermalink?: (line: number) => void;
   hunkActions?: HunkActions;
+  /** The other side of the same file's changes (e.g. `diff` is unstaged, this is staged), shown
+   * as its own labeled section below the primary one instead of requiring a toggle between the
+   * two. Omitted entirely by read-only viewers (commit/PR/stash diffs) that only ever have one
+   * side to show. */
+  secondaryDiff?: FileDiff | null;
+  secondaryHunkActions?: HunkActions;
 }
 
 function commentsForLine(
@@ -100,10 +106,15 @@ function AddCommentComposer({
   );
 }
 
-function HunkHeader({ hunk }: { hunk: DiffHunk }) {
+function HunkHeader({ hunk, staged }: { hunk: DiffHunk; staged?: boolean }) {
   return (
-    <div className="bg-muted px-3 py-1 text-muted-foreground">
+    <div className="flex items-center gap-2 bg-muted px-3 py-1 text-muted-foreground">
       <span>{hunk.header}</span>
+      {staged && (
+        <span className="rounded-sm bg-accent-green/15 px-1 text-[10px] font-medium text-accent-green">
+          staged
+        </span>
+      )}
     </div>
   );
 }
@@ -312,6 +323,88 @@ function SplitCell({ line, language }: { line: DiffLine | null; language: string
   );
 }
 
+interface DiffSectionProps {
+  diff: FileDiff;
+  hunkActions?: HunkActions;
+  language: string | undefined;
+  diffViewMode: "unified" | "split";
+  label?: string;
+  comments?: ReviewComment[];
+  onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
+  onCopyPermalink?: (line: number) => void;
+  composerKey: string | null;
+  setComposerKey: (key: string | null) => void;
+}
+
+/** One side's hunks (all of `diff`), optionally under its own "Staged changes"/"Unstaged
+ * changes" label when rendered alongside the other side. Staged hunks get a green-tinted
+ * wrapper and a small "staged" pill instead of the default blue tint, so both sides can be
+ * visible together without being confused for each other. */
+function DiffSection({
+  diff,
+  hunkActions,
+  language,
+  diffViewMode,
+  label,
+  comments,
+  onAddComment,
+  onCopyPermalink,
+  composerKey,
+  setComposerKey,
+}: DiffSectionProps) {
+  if (diff.hunks.length === 0) return null;
+  const staged = hunkActions?.staged ?? false;
+  const tint = staged ? "bg-accent-green/5" : "bg-accent-blue/5";
+
+  return (
+    <div>
+      {label && (
+        <div className="sticky top-[29px] z-[9] bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground">
+          {label}
+        </div>
+      )}
+      {diff.hunks.map((hunk, hunkIdx) =>
+        diffViewMode === "split" ? (
+          <div key={hunkIdx}>
+            <HunkHeader hunk={hunk} staged={staged} />
+            <div className={tint}>
+              <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} />
+              {toSplitRows(hunk).map((row, rowIdx) => (
+                <div key={rowIdx} className="flex">
+                  <SplitCell line={row.left} language={language} />
+                  <div className="w-px shrink-0 bg-border" />
+                  <SplitCell line={row.right} language={language} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div key={hunkIdx}>
+            <HunkHeader hunk={hunk} staged={staged} />
+            <div className={tint}>
+              <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} />
+              {hunk.lines.map((line, lineIdx) => (
+                <UnifiedLine
+                  key={lineIdx}
+                  line={line}
+                  hunkIdx={hunkIdx}
+                  lineIdx={lineIdx}
+                  language={language}
+                  comments={comments}
+                  onAddComment={onAddComment}
+                  onCopyPermalink={onCopyPermalink}
+                  composerKey={composerKey}
+                  setComposerKey={setComposerKey}
+                />
+              ))}
+            </div>
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
 function DiffViewImpl({
   path,
   diff,
@@ -320,6 +413,8 @@ function DiffViewImpl({
   onAddComment,
   onCopyPermalink,
   hunkActions,
+  secondaryDiff,
+  secondaryHunkActions,
 }: DiffViewProps) {
   const [composerKey, setComposerKey] = useState<string | null>(null);
   const fontSize = useSettingsStore((s) => s.settings.diff_font_size);
@@ -370,40 +465,12 @@ function DiffViewImpl({
     );
   }
 
-  if (diff.hunks.length === 0) {
+  const showSecondary = secondaryDiff !== undefined;
+  const totalHunks = diff.hunks.length + (secondaryDiff?.hunks.length ?? 0);
+  if (totalHunks === 0) {
     return (
       <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
         No changes to display
-      </div>
-    );
-  }
-
-  // Split view drops per-line comments/permalink/hunk-actions affordances — those stay
-  // unified-only for now, split is a simpler read-focused layout.
-  if (diffViewMode === "split") {
-    return (
-      <div className="h-full overflow-auto font-mono" style={{ fontSize: `${fontSize}px` }}>
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-3 py-1.5 text-xs font-medium">
-          <span>{diff.path}</span>
-          {ViewToggle}
-        </div>
-        <div className="w-max min-w-full">
-          {diff.hunks.map((hunk, hunkIdx) => (
-            <div key={hunkIdx}>
-              <HunkHeader hunk={hunk} />
-              <div className="bg-accent-blue/5">
-                <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} />
-                {toSplitRows(hunk).map((row, rowIdx) => (
-                  <div key={rowIdx} className="flex">
-                    <SplitCell line={row.left} language={language} />
-                    <div className="w-px shrink-0 bg-border" />
-                    <SplitCell line={row.right} language={language} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
     );
   }
@@ -415,28 +482,32 @@ function DiffViewImpl({
         {ViewToggle}
       </div>
       <div className="w-max min-w-full">
-        {diff.hunks.map((hunk, hunkIdx) => (
-          <div key={hunkIdx}>
-            <HunkHeader hunk={hunk} />
-            <div className="bg-accent-blue/5">
-              <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} />
-              {hunk.lines.map((line, lineIdx) => (
-                <UnifiedLine
-                  key={lineIdx}
-                  line={line}
-                  hunkIdx={hunkIdx}
-                  lineIdx={lineIdx}
-                  language={language}
-                  comments={comments}
-                  onAddComment={onAddComment}
-                  onCopyPermalink={onCopyPermalink}
-                  composerKey={composerKey}
-                  setComposerKey={setComposerKey}
-                />
-              ))}
-            </div>
-          </div>
-        ))}
+        <DiffSection
+          diff={diff}
+          hunkActions={hunkActions}
+          language={language}
+          diffViewMode={diffViewMode}
+          label={showSecondary ? (hunkActions?.staged ? "Staged changes" : "Unstaged changes") : undefined}
+          comments={comments}
+          onAddComment={onAddComment}
+          onCopyPermalink={onCopyPermalink}
+          composerKey={composerKey}
+          setComposerKey={setComposerKey}
+        />
+        {secondaryDiff && (
+          <DiffSection
+            diff={secondaryDiff}
+            hunkActions={secondaryHunkActions}
+            language={language}
+            diffViewMode={diffViewMode}
+            label={secondaryHunkActions?.staged ? "Staged changes" : "Unstaged changes"}
+            comments={comments}
+            onAddComment={onAddComment}
+            onCopyPermalink={onCopyPermalink}
+            composerKey={composerKey}
+            setComposerKey={setComposerKey}
+          />
+        )}
       </div>
     </div>
   );

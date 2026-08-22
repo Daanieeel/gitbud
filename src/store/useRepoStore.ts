@@ -26,7 +26,8 @@ interface RepoState {
   branches: BranchInfo[];
   status: RepoStatus | null;
   selectedFilePath: string | null;
-  selectedFileDiff: FileDiff | null;
+  selectedStagedDiff: FileDiff | null;
+  selectedUnstagedDiff: FileDiff | null;
   selectedFileImageDiff: ImageDiff | null;
 
   // Lives here (not as local component state) so it survives switching away from the
@@ -108,7 +109,8 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   branches: [],
   status: null,
   selectedFilePath: null,
-  selectedFileDiff: null,
+  selectedStagedDiff: null,
+  selectedUnstagedDiff: null,
   selectedFileImageDiff: null,
 
   commitSummary: "",
@@ -159,7 +161,8 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       selectedRepo: path,
       status: null,
       selectedFilePath: null,
-      selectedFileDiff: null,
+      selectedStagedDiff: null,
+      selectedUnstagedDiff: null,
       selectedFileImageDiff: null,
       commits: [],
       historyExhausted: false,
@@ -201,7 +204,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
 
     const selected = get().selectedFilePath;
     if (selected && !status.files.some((f) => f.path === selected)) {
-      set({ selectedFilePath: null, selectedFileDiff: null, selectedFileImageDiff: null });
+      set({ selectedFilePath: null, selectedStagedDiff: null, selectedUnstagedDiff: null, selectedFileImageDiff: null });
     } else if (selected) {
       await get().selectFile(selected);
     }
@@ -246,7 +249,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     if (!repoPath) return;
     await api.discardFile(repoPath, path);
     if (get().selectedFilePath === path) {
-      set({ selectedFilePath: null, selectedFileDiff: null, selectedFileImageDiff: null });
+      set({ selectedFilePath: null, selectedStagedDiff: null, selectedUnstagedDiff: null, selectedFileImageDiff: null });
     }
     await get().refreshStatus();
   },
@@ -291,21 +294,25 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     set({ selectedFilePath: path, selectedFileImageDiff: null });
     const repoPath = get().selectedRepo;
     if (!repoPath || !path) {
-      set({ selectedFileDiff: null });
+      set({ selectedStagedDiff: null, selectedUnstagedDiff: null });
       return;
     }
-    const entry = get().status?.files.find((f) => f.path === path);
-    const staged = entry?.staged ?? false;
     try {
-      const diff = await api.getFileDiff(repoPath, path, staged);
+      const [staged, unstaged] = await Promise.all([
+        api.getFileDiff(repoPath, path, true),
+        api.getFileDiff(repoPath, path, false),
+      ]);
       if (get().selectedFilePath !== path) return;
-      set({ selectedFileDiff: diff });
-      if (diff.is_image) {
-        const imageDiff = await api.getImageDiff(repoPath, path, staged);
+      set({ selectedStagedDiff: staged, selectedUnstagedDiff: unstaged });
+      if (unstaged.is_image) {
+        // Whole-file image diffs have no staged/unstaged hunk split to show side by side —
+        // just show whichever side is actually fully staged.
+        const entryStaged = get().status?.files.find((f) => f.path === path)?.staged ?? false;
+        const imageDiff = await api.getImageDiff(repoPath, path, entryStaged);
         if (get().selectedFilePath === path) set({ selectedFileImageDiff: imageDiff });
       }
     } catch {
-      if (get().selectedFilePath === path) set({ selectedFileDiff: null });
+      if (get().selectedFilePath === path) set({ selectedStagedDiff: null, selectedUnstagedDiff: null });
     }
   },
 
@@ -321,7 +328,8 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     await api.commit(repoPath, summary, description);
     set({
       selectedFilePath: null,
-      selectedFileDiff: null,
+      selectedStagedDiff: null,
+      selectedUnstagedDiff: null,
       selectedFileImageDiff: null,
       commitSummary: "",
       commitDescription: "",
@@ -338,7 +346,8 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     await api.amendCommit(repoPath, summary, description);
     set({
       selectedFilePath: null,
-      selectedFileDiff: null,
+      selectedStagedDiff: null,
+      selectedUnstagedDiff: null,
       selectedFileImageDiff: null,
       commitSummary: "",
       commitDescription: "",
