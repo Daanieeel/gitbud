@@ -23,6 +23,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const branch = useRepoStore((s) => s.branch);
   const branches = useRepoStore((s) => s.branches);
+  const commits = useRepoStore((s) => s.commits);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const createPR = usePRStore((s) => s.createPR);
 
@@ -32,6 +33,15 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const [body, setBody] = useState("");
   const [draft, setDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Prefill the title from the branch's most recent commit so there's rarely a blank field
+  // to fill in — the user can still edit or replace it before creating the PR.
+  useEffect(() => {
+    if (!open || title) return;
+    const lastSummary = commits[0]?.summary;
+    if (lastSummary) setTitle(lastSummary);
+    else if (branch) setTitle(branch);
+  }, [open, title, commits, branch]);
 
   useEffect(() => {
     if (!open || !repoPath || body) return;
