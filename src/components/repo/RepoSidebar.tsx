@@ -3,6 +3,8 @@ import {
   CopyIcon,
   FolderInputIcon,
   FolderOpenIcon,
+  PanelLeftCloseIcon,
+  PanelLeftOpenIcon,
   RefreshCwIcon,
   TerminalIcon,
   Trash2Icon,
@@ -70,6 +72,11 @@ export function RepoSidebar() {
   const [aheadBehind, setAheadBehind] = useState<Record<string, AheadBehind>>({});
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const [confirmRemovePath, setConfirmRemovePath] = useState<string | null>(null);
+  const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem("sidebar-collapsed") === "1");
+
+  useEffect(() => {
+    window.localStorage.setItem("sidebar-collapsed", collapsed ? "1" : "0");
+  }, [collapsed]);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,6 +177,37 @@ export function RepoSidebar() {
     await api.setRepoOrder(next.map((r) => r.path));
   };
 
+  if (collapsed) {
+    return (
+      <aside className="flex h-full w-14 shrink-0 flex-col items-center gap-1 overflow-hidden rounded-xl bg-card p-1.5 shadow-md">
+        <Button variant="ghost" size="icon" title="Expand sidebar" onClick={() => setCollapsed(false)}>
+          <PanelLeftOpenIcon className="size-4" />
+        </Button>
+        <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-auto pt-1">
+          {sorted.map((repo) => (
+            <button
+              key={repo.path}
+              title={repo.name}
+              onClick={() => void selectRepo(repo.path)}
+              className={cn(
+                "relative flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-medium hover:bg-accent",
+                selectedRepo === repo.path && "bg-accent",
+              )}
+            >
+              {repo.name.slice(0, 2).toUpperCase()}
+              {dirty[repo.path] && (
+                <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary" />
+              )}
+              {syncing && selectedRepo === repo.path && (
+                <RefreshCwIcon className="absolute top-0.5 right-0.5 size-2.5 animate-spin text-primary" />
+              )}
+            </button>
+          ))}
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <div className="flex h-full shrink-0">
     <aside
@@ -188,6 +226,9 @@ export function RepoSidebar() {
             className="h-7"
           />
           <AddRepoMenu />
+          <Button variant="ghost" size="icon" title="Collapse sidebar" onClick={() => setCollapsed(true)}>
+            <PanelLeftCloseIcon className="size-4" />
+          </Button>
         </div>
         <div className="flex items-center justify-between gap-2">
           <WorkspacePicker />
