@@ -27,14 +27,8 @@ import { FileTypeIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { BlameDialog } from "./BlameDialog";
+import { FilePathLabel } from "./FilePathLabel";
 import type { LfsFileInfo } from "@/lib/types";
-
-/** Splits a repo-relative path into its directory prefix (trailing slash kept, empty for a
- * top-level file) and filename, so the two can be styled/truncated differently. */
-function splitPath(path: string): { dir: string; base: string } {
-  const idx = path.lastIndexOf("/");
-  return idx === -1 ? { dir: "", base: path } : { dir: path.slice(0, idx + 1), base: path.slice(idx + 1) };
-}
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -148,17 +142,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                       )}
                     />
                   </span>
-                  <span className="flex min-w-0 flex-1 items-center">
-                    {(() => {
-                      const { dir, base } = splitPath(file.path);
-                      return (
-                        <>
-                          {dir && <span className="truncate text-muted-foreground/70">{dir}</span>}
-                          <span className="shrink-0">{base}</span>
-                        </>
-                      );
-                    })()}
-                  </span>
+                  <FilePathLabel path={file.path} />
                   {lfsInfo[file.path] && (
                     <Tooltip>
                       <TooltipTrigger asChild>

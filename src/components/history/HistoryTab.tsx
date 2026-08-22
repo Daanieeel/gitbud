@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubFileUrl } from "@/lib/github-links";
 import { FileTypeIcon } from "@/lib/file-icons";
+import { FilePathLabel } from "@/components/changes/FilePathLabel";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -67,7 +68,7 @@ export function HistoryTab() {
             <TooltipTrigger asChild>
               <div
                 className={cn(
-                  "flex cursor-pointer items-center gap-1.5 truncate px-2 py-1 text-sm hover:bg-accent",
+                  "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer hover:bg-accent",
                   selectedCommitFilePath === path && "bg-accent",
                 )}
                 onClick={() => void selectCommitFile(path)}
@@ -81,7 +82,7 @@ export function HistoryTab() {
                     )}
                   />
                 </span>
-                <span className="truncate">{path}</span>
+                <FilePathLabel path={path} />
               </div>
             </TooltipTrigger>
             <TooltipContent>{`${path} (${status})`}</TooltipContent>

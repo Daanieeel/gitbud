@@ -10,6 +10,7 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useStashStore } from "@/store/useStashStore";
 import { cn } from "@/lib/utils";
 import { FileTypeIcon } from "@/lib/file-icons";
+import { FilePathLabel } from "./FilePathLabel";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import type { FileDiff } from "@/lib/types";
@@ -92,14 +93,14 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
           <div
             key={path}
             className={cn(
-              "group flex items-center gap-1.5 px-2 py-1 text-sm hover:bg-accent",
+              "group flex h-7 items-center gap-2 px-2 text-sm hover:bg-accent",
               selectedPath === path && "bg-accent",
             )}
           >
             <Tooltip>
               <TooltipTrigger asChild>
                 <span
-                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 truncate"
+                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-2"
                   onClick={() => setSelectedPath(path)}
                 >
                   <span className="relative shrink-0">
@@ -111,7 +112,7 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
                       )}
                     />
                   </span>
-                  <span className="truncate">{path}</span>
+                  <FilePathLabel path={path} />
                 </span>
               </TooltipTrigger>
               <TooltipContent>{`${path} (${status})`}</TooltipContent>
