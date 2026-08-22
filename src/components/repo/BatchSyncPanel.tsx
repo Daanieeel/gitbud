@@ -9,28 +9,40 @@ import type { RepoEntry } from "@/lib/types";
 
 const BATCH_TOAST_ID = "batch-sync";
 
-export function BatchSyncTrigger({ repos, totalCount }: { repos: RepoEntry[]; totalCount: number }) {
+export function BatchSyncTrigger({
+  repos,
+  totalCount,
+  iconOnly,
+}: {
+  repos: RepoEntry[];
+  totalCount: number;
+  iconOnly?: boolean;
+}) {
   const running = useBatchSyncStore((s) => s.running);
   const runPullAll = useBatchSyncStore((s) => s.runPullAll);
 
   if (repos.length === 0) return null;
   const filtered = repos.length < totalCount;
+  const title = filtered ? "Pull every repo currently matching the filter" : "Pull every repo in the sidebar";
+
+  const run = () => {
+    toast.custom((id) => <BatchSyncToastContent toastId={id} />, {
+      id: BATCH_TOAST_ID,
+      duration: Infinity,
+    });
+    void runPullAll(repos.map((r) => r.path));
+  };
+
+  if (iconOnly) {
+    return (
+      <Button variant="outline" size="icon" disabled={running} title={title} onClick={run}>
+        <RefreshCwIcon className={cn("size-4", running && "animate-spin")} />
+      </Button>
+    );
+  }
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      className="w-full"
-      disabled={running}
-      title={filtered ? "Pull every repo currently matching the filter" : "Pull every repo in the sidebar"}
-      onClick={() => {
-        toast.custom((id) => <BatchSyncToastContent toastId={id} />, {
-          id: BATCH_TOAST_ID,
-          duration: Infinity,
-        });
-        void runPullAll(repos.map((r) => r.path));
-      }}
-    >
+    <Button variant="outline" size="sm" className="w-full" disabled={running} title={title} onClick={run}>
       <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
       {filtered ? `Update ${repos.length}/${totalCount}` : "Update All"}
     </Button>

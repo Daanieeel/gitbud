@@ -177,46 +177,52 @@ export function RepoSidebar() {
     await api.setRepoOrder(next.map((r) => r.path));
   };
 
-  if (collapsed) {
-    return (
-      <aside className="flex h-full w-14 shrink-0 flex-col items-center gap-1 overflow-hidden rounded-xl bg-card p-1.5 shadow-md">
-        <Button variant="ghost" size="icon" title="Expand sidebar" onClick={() => setCollapsed(false)}>
-          <PanelLeftOpenIcon className="size-4" />
-        </Button>
-        <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-auto pt-1">
-          {sorted.map((repo) => (
-            <button
-              key={repo.path}
-              title={repo.name}
-              onClick={() => void selectRepo(repo.path)}
-              className={cn(
-                "relative flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-medium hover:bg-accent",
-                selectedRepo === repo.path && "bg-accent",
-              )}
-            >
-              {repo.name.slice(0, 2).toUpperCase()}
-              {dirty[repo.path] && (
-                <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary" />
-              )}
-              {syncing && selectedRepo === repo.path && (
-                <RefreshCwIcon className="absolute top-0.5 right-0.5 size-2.5 animate-spin text-primary" />
-              )}
-            </button>
-          ))}
-        </div>
-      </aside>
-    );
-  }
-
   return (
     <div className="flex h-full shrink-0">
     <aside
-      style={{ width }}
+      style={{ width: collapsed ? 56 : width }}
       className={cn(
-        "flex h-full shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md",
+        "flex h-full shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md transition-[width] duration-150 ease-in-out",
         dragOver && "ring-2 ring-inset ring-primary",
       )}
     >
+      {collapsed ? (
+        <>
+          <div className="flex shrink-0 justify-center border-b border-border p-1.5">
+            <Button variant="ghost" size="icon" title="Expand sidebar" onClick={() => setCollapsed(false)}>
+              <PanelLeftOpenIcon className="size-4" />
+            </Button>
+          </div>
+          <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-auto p-1.5">
+            {sorted.map((repo) => (
+              <button
+                key={repo.path}
+                title={repo.name}
+                onClick={() => void selectRepo(repo.path)}
+                className={cn(
+                  "relative flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-medium hover:bg-accent",
+                  selectedRepo === repo.path && "bg-accent",
+                )}
+              >
+                {repo.name.slice(0, 2).toUpperCase()}
+                {dirty[repo.path] && (
+                  <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary" />
+                )}
+                {syncing && selectedRepo === repo.path && (
+                  <RefreshCwIcon className="absolute top-0.5 right-0.5 size-2.5 animate-spin text-primary" />
+                )}
+              </button>
+            ))}
+          </div>
+          {repos.length > 0 && (
+            <div className="flex shrink-0 flex-col items-center gap-1 border-t border-border p-1.5">
+              <BatchSyncTrigger repos={filtered} totalCount={repos.length} iconOnly />
+            </div>
+          )}
+          <AccountBar collapsed />
+        </>
+      ) : (
+        <>
       <div className="flex shrink-0 flex-col gap-2 border-b border-border p-2">
         <div className="flex items-center gap-2">
           <Input
@@ -375,8 +381,10 @@ export function RepoSidebar() {
         </div>
       )}
       <AccountBar />
+        </>
+      )}
     </aside>
-    <ResizeHandle onPointerDown={onPointerDown} />
+    {!collapsed && <ResizeHandle onPointerDown={onPointerDown} />}
     </div>
   );
 }

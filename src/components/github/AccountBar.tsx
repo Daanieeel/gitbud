@@ -36,7 +36,7 @@ function identityLabel(identity: UnifiedIdentity): string {
   return identity.kind === "github" ? identity.login : identity.label;
 }
 
-export function AccountBar() {
+export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
   const init = useGitHubStore((s) => s.init);
   const removeAccount = useGitHubStore((s) => s.removeAccount);
   const removeSshIdentity = useIdentityStore((s) => s.removeSshIdentity);
@@ -84,7 +84,7 @@ export function AccountBar() {
 
   return (
     <div className="flex shrink-0 flex-col gap-2 border-t border-border p-2">
-      {brokenIdentity && (
+      {!collapsed && brokenIdentity && (
         <div className="flex flex-col gap-1.5 rounded-md bg-destructive/10 p-2 text-xs text-destructive">
           <span className="flex items-center gap-1.5 font-medium">
             <TriangleAlertIcon className="size-3.5 shrink-0" />
@@ -96,14 +96,20 @@ export function AccountBar() {
           </Button>
         </div>
       )}
-      <div className="flex items-center gap-1">
+      <div className={cn("flex items-center gap-1", collapsed && "flex-col")}>
       {identities.length === 0 ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="min-w-0 flex-1">
-              <LogInIcon className="size-3.5" />
-              Add identity
-            </Button>
+            {collapsed ? (
+              <Button variant="outline" size="icon" title="Add identity" className="bg-accent">
+                <LogInIcon className="size-4" />
+              </Button>
+            ) : (
+              <Button variant="outline" size="sm" className="min-w-0 flex-1 bg-accent">
+                <LogInIcon className="size-3.5" />
+                Add identity
+              </Button>
+            )}
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuItem onSelect={openSignIn}>
@@ -119,15 +125,24 @@ export function AccountBar() {
       ) : (
         <Popover open={switcherOpen} onOpenChange={setSwitcherOpen}>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start gap-2">
-              {current && <IdentityAvatar identity={current} />}
-              <span className="truncate">{current ? identityLabel(current) : "No identity"}</span>
-              {repoOverride && (
-                <span title="Pinned to this repo">
-                  <MapPinIcon className="size-3 shrink-0 text-accent-yellow" />
-                </span>
-              )}
-            </Button>
+            {collapsed ? (
+              <button
+                title={current ? identityLabel(current) : "No identity"}
+                className="flex size-9 items-center justify-center rounded-md hover:bg-accent"
+              >
+                {current ? <IdentityAvatar identity={current} /> : <LogInIcon className="size-4" />}
+              </button>
+            ) : (
+              <Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start gap-2">
+                {current && <IdentityAvatar identity={current} />}
+                <span className="truncate">{current ? identityLabel(current) : "No identity"}</span>
+                {repoOverride && (
+                  <span title="Pinned to this repo">
+                    <MapPinIcon className="size-3 shrink-0 text-accent-yellow" />
+                  </span>
+                )}
+              </Button>
+            )}
           </PopoverTrigger>
           <PopoverContent className="w-64 p-1" align="start">
             {identities.map((identity) => (
