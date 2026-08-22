@@ -27,6 +27,7 @@ import type {
   SubmoduleInfo,
   TagInfo,
   Workspace,
+  WorktreeInfo,
 } from "./types";
 
 export const api = {
@@ -132,6 +133,12 @@ export const api = {
   updateWorkspace: (id: string, name: string, repoPaths: string[]) =>
     invoke<Workspace[]>("update_workspace", { id, name, repoPaths }),
   deleteWorkspace: (id: string) => invoke<Workspace[]>("delete_workspace", { id }),
+
+  listWorktrees: (repoPath: string) => invoke<WorktreeInfo[]>("list_worktrees", { repoPath }),
+  addWorktree: (repoPath: string, path: string, branch: string, createBranch: boolean) =>
+    invoke<void>("add_worktree", { repoPath, path, branch, createBranch }),
+  removeWorktree: (repoPath: string, worktreePath: string, force: boolean) =>
+    invoke<void>("remove_worktree", { repoPath, worktreePath, force }),
   initRepo: (path: string) => invoke<void>("init_repo", { path }),
 
   listSshIdentities: () => invoke<SshIdentity[]>("list_ssh_identities"),

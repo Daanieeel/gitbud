@@ -115,6 +115,14 @@ export interface RepoEntry {
   identity_id: string | null;
 }
 
+export interface WorktreeInfo {
+  name: string;
+  path: string;
+  branch: string | null;
+  is_locked: boolean;
+  is_main: boolean;
+}
+
 export interface Workspace {
   id: string;
   name: string;

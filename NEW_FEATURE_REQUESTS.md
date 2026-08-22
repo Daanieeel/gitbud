@@ -34,7 +34,7 @@ Ordered low-hanging-fruit first (smallest lift → biggest lift).
 - [ ] **Git LFS awareness** — detect LFS-tracked files, show LFS status/size in the file list, surface `git lfs pull`/`push` progress instead of silently stalling on large binaries.
 - [ ] **Reflog / undo UI** — a panel exposing `git reflog` with 1-click "restore to here," giving users a safety net for undoing resets, rebases, and accidental branch moves.
 - [ ] **Visual 3-way merge tool** — upgrade the conflict resolution panel from raw-marker preview to a real base/mine/theirs 3-way diff view with per-block pick controls, not just whole-file "Use Mine"/"Use Theirs."
-- [ ] **Git worktree support** — list, create, and remove worktrees for a repo; switch the active pane to a worktree without disturbing the main checkout. Make sure this worktree experience is REALLY intuitive and easily accessible to people who have never worked with worktrees before (explanative tooltips are a great help, for example).
+- [x] **Git worktree support** — new `worktrees.rs` backend (git2 for listing, shells `git worktree add/remove` for mutation) + a `WorktreesPanel` in the toolbar with a plain-language explainer ("checks out a branch into its own folder, so you can work on it without disturbing what's checked out here"), a guided new-worktree form (folder picker + new-branch-or-existing-branch choice), and "Open" which adds the worktree folder to the sidebar as its own repo (so it gets the full normal UI without touching the main checkout) — remove requires an explicit second "Force Remove" confirmation if it has uncommitted changes.
 
 ## P3 — Later / exploratory
 

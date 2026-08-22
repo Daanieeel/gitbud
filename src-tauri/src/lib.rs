@@ -15,6 +15,7 @@ mod submodules;
 mod system;
 mod tags;
 mod watch;
+mod worktrees;
 mod workspaces;
 
 use std::collections::HashMap;
@@ -289,6 +290,23 @@ fn update_workspace(id: String, name: String, repo_paths: Vec<String>) -> Result
 #[tauri::command]
 fn delete_workspace(id: String) -> Result<Vec<workspaces::Workspace>, String> {
     workspaces::remove(&id)
+}
+
+// --- worktrees ---
+
+#[tauri::command]
+fn list_worktrees(repo_path: String) -> Result<Vec<worktrees::WorktreeInfo>, String> {
+    worktrees::list_worktrees(&repo_path)
+}
+
+#[tauri::command]
+fn add_worktree(repo_path: String, path: String, branch: String, create_branch: bool) -> Result<(), String> {
+    worktrees::add_worktree(&repo_path, &path, &branch, create_branch)
+}
+
+#[tauri::command]
+fn remove_worktree(repo_path: String, worktree_path: String, force: bool) -> Result<(), String> {
+    worktrees::remove_worktree(&repo_path, &worktree_path, force)
 }
 
 // --- git identities: GitHub accounts (see github/) plus plain SSH-key identities ---
@@ -739,6 +757,9 @@ pub fn run() {
             create_workspace,
             update_workspace,
             delete_workspace,
+            list_worktrees,
+            add_worktree,
+            remove_worktree,
             list_ssh_identities,
             add_ssh_identity,
             remove_ssh_identity,
