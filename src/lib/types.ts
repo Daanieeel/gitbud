@@ -115,6 +115,18 @@ export interface RepoEntry {
   identity_id: string | null;
 }
 
+export interface ConflictSide {
+  exists: boolean;
+  hunks: DiffHunk[];
+}
+
+export interface ConflictSides {
+  base_exists: boolean;
+  base_text: string;
+  ours: ConflictSide;
+  theirs: ConflictSide;
+}
+
 export interface LfsFileInfo {
   path: string;
   is_lfs: boolean;

@@ -6,6 +6,7 @@ import type {
   CheckRun,
   CherryPickResult,
   CommitEntry,
+  ConflictSides,
   CommitSearchResult,
   CommitVerification,
   DeviceCodeResponse,
@@ -50,6 +51,10 @@ export const api = {
   discardFile: (repoPath: string, path: string) => invoke<void>("discard_file", { repoPath, path }),
   resolveConflict: (repoPath: string, path: string, side: "ours" | "theirs") =>
     invoke<void>("resolve_conflict", { repoPath, path, side }),
+  getConflictSides: (repoPath: string, path: string) =>
+    invoke<ConflictSides>("get_conflict_sides", { repoPath, path }),
+  resolveConflictWithContent: (repoPath: string, path: string, content: string) =>
+    invoke<void>("resolve_conflict_with_content", { repoPath, path, content }),
   readWorkingFile: (repoPath: string, path: string) =>
     invoke<string>("read_working_file", { repoPath, path }),
   stageHunk: (repoPath: string, path: string, hunkIndex: number) =>

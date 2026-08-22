@@ -7,6 +7,7 @@ mod history;
 mod hunk;
 mod image_diff;
 mod lfs;
+mod merge3;
 mod rebase;
 mod reflog;
 mod repo;
@@ -343,6 +344,18 @@ fn git_lfs_pull(app: AppHandle, repo_path: String) -> Result<(), String> {
 #[tauri::command]
 fn git_lfs_push(app: AppHandle, repo_path: String, branch: String) -> Result<(), String> {
     git_shell::lfs_push(&app, &repo_path, &branch, &repo_path)
+}
+
+// --- 3-way merge conflict view ---
+
+#[tauri::command]
+fn get_conflict_sides(repo_path: String, path: String) -> Result<merge3::ConflictSides, String> {
+    merge3::get_conflict_sides(&repo_path, &path)
+}
+
+#[tauri::command]
+fn resolve_conflict_with_content(repo_path: String, path: String, content: String) -> Result<(), String> {
+    merge3::resolve_conflict_with_content(&repo_path, &path, &content)
 }
 
 // --- git identities: GitHub accounts (see github/) plus plain SSH-key identities ---
@@ -805,6 +818,8 @@ pub fn run() {
             check_lfs_files,
             git_lfs_pull,
             git_lfs_push,
+            get_conflict_sides,
+            resolve_conflict_with_content,
             list_ssh_identities,
             add_ssh_identity,
             remove_ssh_identity,
