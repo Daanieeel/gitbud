@@ -20,6 +20,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { AddRepoMenu } from "./AddRepoMenu";
+import { BatchSyncTrigger } from "./BatchSyncPanel";
 import { AccountBar } from "@/components/github/AccountBar";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
@@ -168,14 +169,17 @@ export function RepoSidebar() {
         dragOver && "ring-2 ring-inset ring-primary",
       )}
     >
-      <div className="flex shrink-0 items-center gap-2 border-b border-border p-2">
-        <Input
-          placeholder="Filter repositories"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="h-7"
-        />
-        <AddRepoMenu />
+      <div className="flex shrink-0 flex-col gap-2 border-b border-border p-2">
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Filter repositories"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="h-7"
+          />
+          <AddRepoMenu />
+        </div>
+        {repos.length > 1 && <BatchSyncTrigger />}
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-1">
         {filtered.length === 0 && (

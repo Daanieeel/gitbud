@@ -7,6 +7,7 @@ import { HistoryTab } from "@/components/history/HistoryTab";
 import { PRTab } from "@/components/pr/PRTab";
 import { UpstreamBanner } from "@/components/pr/UpstreamBanner";
 import { SyncLogToast } from "@/components/sync/SyncLogToast";
+import { BatchSyncStatus } from "@/components/repo/BatchSyncPanel";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
@@ -85,6 +86,7 @@ function App() {
         )}
       </div>
       <SyncLogToast />
+      <BatchSyncStatus />
       <CommandPalette
         open={palette.open}
         mode={palette.mode}
