@@ -55,7 +55,7 @@ export function ReflogPanel() {
             Reflog
           </Button>
         </TooltipTrigger>
-        <TooltipContent>Reflog — undo a reset, rebase, or accidental branch move</TooltipContent>
+        <TooltipContent>Reflog lets you undo a reset, rebase, or accidental branch move</TooltipContent>
       </Tooltip>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-lg">

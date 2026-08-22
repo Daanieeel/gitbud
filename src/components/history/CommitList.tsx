@@ -218,7 +218,7 @@ export function CommitList({
                     </ContextMenuItem>
                   </TooltipTrigger>
                   <TooltipContent>
-                    Rebase — replay the commits after this one on top of a new base, rewriting their
+                    Rebase replays the commits after this one on top of a new base, rewriting their
                     history
                   </TooltipContent>
                 </Tooltip>

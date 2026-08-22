@@ -223,7 +223,7 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
                     </TooltipTrigger>
                     <TooltipContent>
                       {repoOverride === identity.id
-                        ? `Unpin — use the global default identity for this repo again`
+                        ? `Unpin, and use the global default identity for this repo again`
                         : `Pin ${identityLabel(identity)} to this repo only`}
                     </TooltipContent>
                   </Tooltip>

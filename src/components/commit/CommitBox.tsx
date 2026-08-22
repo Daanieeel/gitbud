@@ -79,7 +79,7 @@ export function CommitBox() {
           </label>
         </TooltipTrigger>
         <TooltipContent>
-          Amend — replace the last commit with this message and any currently staged changes, instead of
+          Amend replaces the last commit with this message and any currently staged changes, instead of
           creating a new commit
         </TooltipContent>
       </Tooltip>
@@ -103,20 +103,23 @@ export function CommitBox() {
           You're committing directly to {branch}
         </div>
       )}
-      <Button
-        disabled={disabled || committing}
-        title={amending ? "Rewrite the last commit with this message and any staged changes" : "Cmd+Enter"}
-        onClick={() => void submit()}
-      >
-        <GitCommitIcon className={cn("size-3.5", committing && "animate-spin")} />
-        {committing
-          ? amending
-            ? "Amending…"
-            : "Committing…"
-          : amending
-            ? "Amend Last Commit"
-            : `Commit to ${branch ?? "…"}`}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button disabled={disabled || committing} onClick={() => void submit()}>
+            <GitCommitIcon className={cn("size-3.5", committing && "animate-spin")} />
+            {committing
+              ? amending
+                ? "Amending…"
+                : "Committing…"
+              : amending
+                ? "Amend Last Commit"
+                : `Commit to ${branch ?? "…"}`}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {amending ? "Rewrite the last commit with this message and any staged changes" : "Cmd+Enter"}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }

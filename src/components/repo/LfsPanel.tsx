@@ -35,7 +35,7 @@ export function LfsPanel() {
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent>Git LFS — this repo tracks large files via Git LFS</TooltipContent>
+        <TooltipContent>This repo tracks large files via Git LFS</TooltipContent>
       </Tooltip>
       <PopoverContent className="w-64 p-2" align="start">
         <p className="mb-2 text-xs text-muted-foreground">

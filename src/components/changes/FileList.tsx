@@ -129,7 +129,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                     </TooltipTrigger>
                     <TooltipContent>
                       {file.partially_staged
-                        ? "Partially staged — click to finish staging the rest"
+                        ? "Partially staged, click to finish staging the rest"
                         : file.staged
                           ? "Unstage"
                           : "Stage"}

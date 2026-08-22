@@ -127,7 +127,7 @@ function HunkActionsRow({ hunkIdx, hunkActions }: { hunkIdx: number; hunkActions
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  A chunk is this one contiguous block of changed lines — unstage just it, leaving the rest of the
+                  Unstage just this chunk, a contiguous block of changed lines, leaving the rest of the
                   file's staged changes alone
                 </TooltipContent>
               </Tooltip>
@@ -145,7 +145,7 @@ function HunkActionsRow({ hunkIdx, hunkActions }: { hunkIdx: number; hunkActions
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  A chunk is this one contiguous block of changed lines — stage just it, leaving the rest of the file
+                  Stage just this chunk, a contiguous block of changed lines, leaving the rest of the file
                   unstaged
                 </TooltipContent>
               </Tooltip>

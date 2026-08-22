@@ -62,7 +62,7 @@ export function SubmodulesPanel() {
           </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent>
-          Submodules — nested git repositories checked out at a specific commit inside this one
+          Submodules are nested git repositories checked out at a specific commit inside this one
         </TooltipContent>
       </Tooltip>
       <PopoverContent className="w-80 p-0" align="start">
