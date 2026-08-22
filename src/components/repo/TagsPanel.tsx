@@ -8,6 +8,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { githubRepoUrl } from "@/lib/github-links";
+import { cn } from "@/lib/utils";
 import type { TagInfo } from "@/lib/types";
 
 export function TagsPanel() {
@@ -16,7 +17,8 @@ export function TagsPanel() {
   const [tags, setTags] = useState<TagInfo[]>([]);
   const [newName, setNewName] = useState("");
   const [newMessage, setNewMessage] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const busy = busyKey !== null;
 
   const load = () => {
     if (!repoPath) return;
@@ -29,37 +31,34 @@ export function TagsPanel() {
 
   if (!repoPath) return null;
 
-  const create = async () => {
-    if (!newName.trim()) return;
-    setBusy(true);
+  const runBusy = async (key: string, fn: () => Promise<void>) => {
+    const startedAt = Date.now();
+    setBusyKey(key);
     try {
+      await fn();
+    } finally {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
+      setBusyKey(null);
+    }
+  };
+
+  const create = () =>
+    runBusy("create", async () => {
+      if (!newName.trim()) return;
       await api.createTag(repoPath, newName.trim(), newMessage.trim());
       setNewName("");
       setNewMessage("");
       load();
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
-  const remove = async (name: string) => {
-    setBusy(true);
-    try {
+  const remove = (name: string) =>
+    runBusy(`${name}:delete`, async () => {
       await api.deleteTag(repoPath, name);
       load();
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
-  const push = async (name: string) => {
-    setBusy(true);
-    try {
-      await api.pushTag(repoPath, name);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const push = (name: string) => runBusy(`${name}:push`, () => api.pushTag(repoPath, name));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -108,10 +107,13 @@ export function TagsPanel() {
                 <TooltipTrigger asChild>
                   <button
                     disabled={busy}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground"
+                    className={cn(
+                      "text-muted-foreground hover:text-foreground disabled:opacity-50",
+                      busyKey === `${t.name}:push` ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                    )}
                     onClick={() => void push(t.name)}
                   >
-                    <UploadIcon className="size-3.5" />
+                    <UploadIcon className={cn("size-3.5", busyKey === `${t.name}:push` && "animate-spin")} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>Push tag to origin</TooltipContent>
@@ -120,10 +122,13 @@ export function TagsPanel() {
                 <TooltipTrigger asChild>
                   <button
                     disabled={busy}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                    className={cn(
+                      "text-muted-foreground hover:text-destructive disabled:opacity-50",
+                      busyKey === `${t.name}:delete` ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                    )}
                     onClick={() => void remove(t.name)}
                   >
-                    <Trash2Icon className="size-3.5" />
+                    <Trash2Icon className={cn("size-3.5", busyKey === `${t.name}:delete` && "animate-spin")} />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>Delete tag</TooltipContent>
@@ -135,8 +140,8 @@ export function TagsPanel() {
           <Input placeholder="Tag name (e.g. v1.0.0)" value={newName} onChange={(e) => setNewName(e.target.value)} className="h-7" />
           <Input placeholder="Message (optional — annotated tag)" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="h-7" />
           <Button size="sm" disabled={!newName.trim() || busy} onClick={() => void create()}>
-            <PlusIcon className="size-3.5" />
-            Create Tag on HEAD
+            <PlusIcon className={cn("size-3.5", busyKey === "create" && "animate-spin")} />
+            {busyKey === "create" ? "Creating…" : "Create Tag on HEAD"}
           </Button>
         </div>
       </PopoverContent>
