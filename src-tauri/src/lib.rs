@@ -3,6 +3,7 @@ mod diff;
 mod git_shell;
 mod github;
 mod history;
+mod hunk;
 mod image_diff;
 mod repo;
 mod settings;
@@ -69,6 +70,21 @@ fn unstage_paths(repo_path: String, paths: Vec<String>) -> Result<(), String> {
 #[tauri::command]
 fn discard_file(repo_path: String, path: String) -> Result<(), String> {
     repo::discard_file(&repo_path, &path)
+}
+
+#[tauri::command]
+fn stage_hunk(repo_path: String, path: String, hunk_index: usize) -> Result<(), String> {
+    hunk::stage_hunk(&repo_path, &path, hunk_index)
+}
+
+#[tauri::command]
+fn unstage_hunk(repo_path: String, path: String, hunk_index: usize) -> Result<(), String> {
+    hunk::unstage_hunk(&repo_path, &path, hunk_index)
+}
+
+#[tauri::command]
+fn discard_hunk(repo_path: String, path: String, hunk_index: usize) -> Result<(), String> {
+    hunk::discard_hunk(&repo_path, &path, hunk_index)
 }
 
 #[tauri::command]
@@ -512,6 +528,9 @@ pub fn run() {
             stage_paths,
             unstage_paths,
             discard_file,
+            stage_hunk,
+            unstage_hunk,
+            discard_hunk,
             commit,
             amend_commit,
             cherry_pick,

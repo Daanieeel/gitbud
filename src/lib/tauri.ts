@@ -37,6 +37,12 @@ export const api = {
   unstagePaths: (repoPath: string, paths: string[]) =>
     invoke<void>("unstage_paths", { repoPath, paths }),
   discardFile: (repoPath: string, path: string) => invoke<void>("discard_file", { repoPath, path }),
+  stageHunk: (repoPath: string, path: string, hunkIndex: number) =>
+    invoke<void>("stage_hunk", { repoPath, path, hunkIndex }),
+  unstageHunk: (repoPath: string, path: string, hunkIndex: number) =>
+    invoke<void>("unstage_hunk", { repoPath, path, hunkIndex }),
+  discardHunk: (repoPath: string, path: string, hunkIndex: number) =>
+    invoke<void>("discard_hunk", { repoPath, path, hunkIndex }),
   commit: (repoPath: string, summary: string, description: string) =>
     invoke<string>("commit", { repoPath, summary, description }),
   amendCommit: (repoPath: string, summary: string, description: string) =>

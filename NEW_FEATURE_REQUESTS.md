@@ -22,15 +22,9 @@ Mark as done when the feature is implemented.
 
 - [ ] **Hunk / line-level staging** — stage/unstage individual hunks or lines from `DiffView.tsx`, not just whole files. Needs `stage_hunk`/`unstage_hunk` Tauri commands (patch + `git apply --cached`). Table-stakes vs GitHub Desktop, Fork, Tower.
 - [ ] **Merge conflict resolution UI** — surface conflicted files distinctly in `ChangesTab.tsx` (conflict badge, not just "modified"), with a 3-way view ("Use Mine" / "Use Theirs" / "Edit Manually") and "Mark Resolved" to stage. Biggest current gap vs. Fork/SourceTree.
-- [ ] **Real settings view (modal/popup)** — no settings surface exists today (only ad-hoc dialogs like `CloneDialog.tsx`). Gear icon in `Toolbar.tsx` opening a settings modal (built on existing `dialog.tsx` primitive), sectioned into:
-  - [ ] **General** — theme (light/dark/system), accent color, default clone directory.
-  - [ ] **Git** — user name/email (global vs. per-repo override via `config.rs`), default branch name, pull strategy (merge/rebase/ff-only).
-  - [ ] **Diff** — default view (split/unified), whitespace handling, font size/family.
-  - [ ] **Sidebar** — toggle ahead/behind badges, default repo sort order.
-  - [ ] **Advanced** — git binary path override, fs-watch on/off (ties into `watch.rs`).
-  - [ ] Persist to a config file via `config.rs` so settings survive restarts.
+- [x] **Real settings view (modal/popup)** — `SettingsDialog.tsx`, gear icon in `Toolbar.tsx`, backed by `settings.rs` (`~/.config/gitbud/settings.json`). All sections wired to real effect: theme (live class toggle), git identity (global/per-repo via `settings::set_git_identity`), default branch name (used by `init_repo`), pull strategy (`--rebase`/`--ff-only` flags on `git pull`), diff ignore-whitespace + font size, sidebar ahead/behind toggle + sort order, git binary path override (`settings::git_binary()`), fs-watch on/off gate in `start_watch`. GitHub host (GHES) also lives here.
 - [ ] **Commit graph visualization** — branch/merge graph column (like `git log --graph`) with lane layout and branch/tag labels, computed server-side in `history.rs` and returned from `get_log`.
-- [ ] **Discard changes per-file/per-hunk** — scoped "discard" action next to stage/unstage, not all-or-nothing.
+- [x] **Discard changes per-file** — `repo::discard_file` + "Discard Changes" in the file context menu (`FileList.tsx`). Per-hunk discard still open (depends on hunk-level staging plumbing above).
 - [ ] files need file icons. use the ones from https://github.com/miguelsolorio/vscode-symbols for a very minimalistic, yet effective icon set that reacts to file/folder names
 - [ ] code syntax highlighting. Show syntax highlighting for code files, using the same colors as VS Code. only color the plus and minus signs in diff views in the red and green (or yellow and blue)
 - [ ] create an open-source ready short REAMDE for this project that explains how to get started, what features are available, and how to contribute. it should have a short introduction that is a bit of a "marketingy" pitch for the project.

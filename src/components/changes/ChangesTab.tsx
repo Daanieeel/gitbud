@@ -14,6 +14,9 @@ export function ChangesTab() {
   const selectedFileImageDiff = useRepoStore((s) => s.selectedFileImageDiff);
   const selectFile = useRepoStore((s) => s.selectFile);
   const toggleStaged = useRepoStore((s) => s.toggleStaged);
+  const stageHunk = useRepoStore((s) => s.stageHunk);
+  const unstageHunk = useRepoStore((s) => s.unstageHunk);
+  const discardHunk = useRepoStore((s) => s.discardHunk);
 
   const [filter, setFilter] = useState("");
 
@@ -73,7 +76,21 @@ export function ChangesTab() {
         <CommitBox />
       </div>
       <div className="min-w-0 flex-1">
-        <DiffView path={selectedFilePath} diff={selectedFileDiff} imageDiff={selectedFileImageDiff} />
+        <DiffView
+          path={selectedFilePath}
+          diff={selectedFileDiff}
+          imageDiff={selectedFileImageDiff}
+          hunkActions={
+            selectedFilePath
+              ? {
+                  staged: files.find((f) => f.path === selectedFilePath)?.staged ?? false,
+                  onStage: (i) => void stageHunk(selectedFilePath, i),
+                  onUnstage: (i) => void unstageHunk(selectedFilePath, i),
+                  onDiscard: (i) => void discardHunk(selectedFilePath, i),
+                }
+              : undefined
+          }
+        />
       </div>
     </div>
   );

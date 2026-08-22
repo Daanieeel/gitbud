@@ -57,6 +57,9 @@ interface RepoState {
 
   toggleStaged: (paths: string[], staged: boolean) => Promise<void>;
   discardFile: (path: string) => Promise<void>;
+  stageHunk: (path: string, hunkIndex: number) => Promise<void>;
+  unstageHunk: (path: string, hunkIndex: number) => Promise<void>;
+  discardHunk: (path: string, hunkIndex: number) => Promise<void>;
   selectFile: (path: string | null) => Promise<void>;
   doCommit: (summary: string, description: string) => Promise<void>;
   doAmendCommit: (summary: string, description: string) => Promise<void>;
@@ -220,6 +223,27 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     if (get().selectedFilePath === path) {
       set({ selectedFilePath: null, selectedFileDiff: null, selectedFileImageDiff: null });
     }
+    await get().refreshStatus();
+  },
+
+  stageHunk: async (path, hunkIndex) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    await api.stageHunk(repoPath, path, hunkIndex);
+    await get().refreshStatus();
+  },
+
+  unstageHunk: async (path, hunkIndex) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    await api.unstageHunk(repoPath, path, hunkIndex);
+    await get().refreshStatus();
+  },
+
+  discardHunk: async (path, hunkIndex) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    await api.discardHunk(repoPath, path, hunkIndex);
     await get().refreshStatus();
   },
 

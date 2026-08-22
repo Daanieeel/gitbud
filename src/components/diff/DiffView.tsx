@@ -6,6 +6,14 @@ import { ImageDiffView } from "./ImageDiffView";
 import { Button } from "@/components/ui/button";
 import { useSettingsStore } from "@/store/useSettingsStore";
 
+interface HunkActions {
+  /** Whether the diff being shown is the staged (HEAD->index) or unstaged (index->workdir) side. */
+  staged: boolean;
+  onStage?: (hunkIndex: number) => void;
+  onUnstage?: (hunkIndex: number) => void;
+  onDiscard?: (hunkIndex: number) => void;
+}
+
 interface DiffViewProps {
   path: string | null;
   diff: FileDiff | null;
@@ -13,6 +21,7 @@ interface DiffViewProps {
   comments?: ReviewComment[];
   onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
   onCopyPermalink?: (line: number) => void;
+  hunkActions?: HunkActions;
 }
 
 function commentsForLine(
@@ -88,7 +97,15 @@ function AddCommentComposer({
   );
 }
 
-function DiffViewImpl({ path, diff, imageDiff, comments, onAddComment, onCopyPermalink }: DiffViewProps) {
+function DiffViewImpl({
+  path,
+  diff,
+  imageDiff,
+  comments,
+  onAddComment,
+  onCopyPermalink,
+  hunkActions,
+}: DiffViewProps) {
   const [composerKey, setComposerKey] = useState<string | null>(null);
   const fontSize = useSettingsStore((s) => s.settings.diff_font_size);
 
@@ -136,7 +153,38 @@ function DiffViewImpl({ path, diff, imageDiff, comments, onAddComment, onCopyPer
       </div>
       {diff.hunks.map((hunk, hunkIdx) => (
         <div key={hunkIdx}>
-          <div className="bg-muted px-3 py-1 text-muted-foreground">{hunk.header}</div>
+          <div className="flex items-center justify-between bg-muted px-3 py-1 text-muted-foreground">
+            <span>{hunk.header}</span>
+            {hunkActions && (
+              <span className="flex gap-2 text-xs">
+                {hunkActions.staged
+                  ? hunkActions.onUnstage && (
+                      <button
+                        className="hover:text-foreground"
+                        onClick={() => hunkActions.onUnstage?.(hunkIdx)}
+                      >
+                        Unstage Hunk
+                      </button>
+                    )
+                  : hunkActions.onStage && (
+                      <button
+                        className="hover:text-foreground"
+                        onClick={() => hunkActions.onStage?.(hunkIdx)}
+                      >
+                        Stage Hunk
+                      </button>
+                    )}
+                {!hunkActions.staged && hunkActions.onDiscard && (
+                  <button
+                    className="hover:text-destructive"
+                    onClick={() => hunkActions.onDiscard?.(hunkIdx)}
+                  >
+                    Discard Hunk
+                  </button>
+                )}
+              </span>
+            )}
+          </div>
           {hunk.lines.map((line, lineIdx) => {
             const key = `${hunkIdx}:${lineIdx}`;
             const lineComments = commentsForLine(comments, line.old_lineno, line.new_lineno);
