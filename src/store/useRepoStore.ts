@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "@/lib/tauri";
 import { pushRecentCommitMessage } from "@/lib/commit-history";
+import { notify } from "@/lib/notify";
 import type {
   AheadBehind,
   BranchInfo,
@@ -423,20 +424,20 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   fetch: async () => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    await runSync(get, set, repoPath, () => api.gitFetch(repoPath));
+    await runSync(get, set, repoPath, () => api.gitFetch(repoPath), "Fetch");
     await Promise.all([get().refreshBranches(), get().refreshStatus(), get().refreshAheadBehind()]);
     void get().loadRepos();
   },
   pull: async () => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    await runSync(get, set, repoPath, () => api.gitPull(repoPath));
+    await runSync(get, set, repoPath, () => api.gitPull(repoPath), "Pull");
     await Promise.all([get().refreshStatus(), get().resetHistory(), get().refreshAheadBehind()]);
   },
   push: async () => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    await runSync(get, set, repoPath, () => api.gitPush(repoPath));
+    await runSync(get, set, repoPath, () => api.gitPush(repoPath), "Push");
     await get().refreshAheadBehind();
   },
   pullLfs: async () => {
@@ -483,18 +484,26 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   },
 }));
 
+const NOTIFY_THRESHOLD_MS = 4000;
+
 async function runSync(
   get: () => RepoState,
   set: (partial: Partial<RepoState>) => void,
   eventId: string,
   action: () => Promise<void>,
+  label?: string,
 ) {
   set({ syncing: true, syncLog: [], syncError: null, syncEventId: eventId });
   const unlisten = await listen<GitOutputLine>(`git://${eventId}`, (event) => {
     set({ syncLog: [...get().syncLog, event.payload] });
   });
+  const startedAt = Date.now();
   try {
     await action();
+    if (label && Date.now() - startedAt > NOTIFY_THRESHOLD_MS) {
+      const repoName = get().repos.find((r) => r.path === eventId)?.name ?? eventId;
+      void notify(`${label} complete`, repoName);
+    }
   } catch (e) {
     set({ syncError: String(e) });
   } finally {

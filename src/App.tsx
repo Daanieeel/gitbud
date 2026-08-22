@@ -12,6 +12,8 @@ import { CommandPalette } from "@/components/palette/CommandPalette";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useIdentityStore } from "@/store/useIdentityStore";
+import { useGitHubStore } from "@/store/useGitHubStore";
+import { usePRStore } from "@/store/usePRStore";
 
 function App() {
   const initGlobalListeners = useRepoStore((s) => s.initGlobalListeners);
@@ -23,6 +25,8 @@ function App() {
   const loadSettings = useSettingsStore((s) => s.load);
   const initIdentities = useIdentityStore((s) => s.init);
   const syncRepoIdentity = useIdentityStore((s) => s.syncRepoIdentity);
+  const currentLogin = useGitHubStore((s) => s.currentLogin);
+  const pollWatchedChecks = usePRStore((s) => s.pollWatchedChecks);
   const pull = useRepoStore((s) => s.pull);
 
   const [palette, setPalette] = useState<{ open: boolean; mode: "all" | "repos" }>({
@@ -40,6 +44,14 @@ function App() {
   useEffect(() => {
     if (selectedRepo) void syncRepoIdentity(selectedRepo);
   }, [selectedRepo, syncRepoIdentity]);
+
+  useEffect(() => {
+    if (!selectedRepo || !currentLogin) return;
+    const interval = setInterval(() => {
+      void pollWatchedChecks(selectedRepo, currentLogin);
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [selectedRepo, currentLogin, pollWatchedChecks]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { GitPullRequestIcon, GitPullRequestDraftIcon } from "lucide-react";
+import { BellIcon, BellRingIcon, GitPullRequestIcon, GitPullRequestDraftIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { PullRequest } from "@/lib/types";
+import { usePRStore } from "@/store/usePRStore";
 import { CIBadge } from "./CIBadge";
 
 interface PRListProps {
@@ -15,6 +16,8 @@ interface PRListProps {
 
 export function PRList({ repoPath, login, pulls, selectedNumber, onSelect }: PRListProps) {
   const [filter, setFilter] = useState("");
+  const watched = usePRStore((s) => s.watched);
+  const toggleWatch = usePRStore((s) => s.toggleWatch);
 
   const filtered = useMemo(() => {
     if (!filter.trim()) return pulls;
@@ -65,6 +68,27 @@ export function PRList({ repoPath, login, pulls, selectedNumber, onSelect }: PRL
                     #{pr.number} by {pr.author_login}
                   </span>
                   <CIBadge repoPath={repoPath} login={login} sha={pr.head_sha} />
+                  <button
+                    title={
+                      watched.includes(pr.number)
+                        ? "Stop notifying me when CI status changes"
+                        : "Notify me when CI status changes"
+                    }
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleWatch(pr.number);
+                    }}
+                    className={cn(
+                      "text-muted-foreground hover:text-foreground",
+                      watched.includes(pr.number) && "text-accent-yellow",
+                    )}
+                  >
+                    {watched.includes(pr.number) ? (
+                      <BellRingIcon className="size-3" />
+                    ) : (
+                      <BellIcon className="size-3" />
+                    )}
+                  </button>
                   {pr.merged && (
                     <span className="rounded bg-accent-purple/20 px-1 text-accent-purple">merged</span>
                   )}

@@ -171,6 +171,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     onChange={(e) => void update({ default_clone_dir: e.target.value || null })}
                   />
                 </Row>
+                <Row label="Desktop notifications">
+                  <input
+                    type="checkbox"
+                    checked={settings.desktop_notifications}
+                    onChange={(e) => void update({ desktop_notifications: e.target.checked })}
+                  />
+                </Row>
               </>
             )}
 

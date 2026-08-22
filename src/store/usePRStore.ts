@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { api } from "@/lib/tauri";
+import { notify } from "@/lib/notify";
+import { overallFrom, type Overall } from "@/components/pr/CIBadge";
 import type { PullRequest, PullRequestFile, ReviewComment } from "@/lib/types";
 
 export type PRFilter = "open" | "closed" | "all";
@@ -15,7 +17,12 @@ interface PRState {
   selectedFilePath: string | null;
   comments: ReviewComment[];
 
+  watched: number[];
+  ciOverall: Record<number, Overall>;
+
   setFilter: (filter: PRFilter) => void;
+  toggleWatch: (number: number) => void;
+  pollWatchedChecks: (repoPath: string, login: string) => Promise<void>;
   load: (repoPath: string, login: string) => Promise<void>;
   selectPR: (repoPath: string, login: string, number: number | null) => Promise<void>;
   selectFile: (path: string | null) => void;
@@ -49,7 +56,33 @@ export const usePRStore = create<PRState>((set, get) => ({
   selectedFilePath: null,
   comments: [],
 
+  watched: [],
+  ciOverall: {},
+
   setFilter: (filter) => set({ filter }),
+
+  toggleWatch: (number) =>
+    set((s) => ({
+      watched: s.watched.includes(number) ? s.watched.filter((n) => n !== number) : [...s.watched, number],
+    })),
+
+  pollWatchedChecks: async (repoPath, login) => {
+    const { watched, pulls, ciOverall } = get();
+    if (watched.length === 0) return;
+    const nextOverall = { ...ciOverall };
+    for (const number of watched) {
+      const pr = pulls.find((p) => p.number === number);
+      if (!pr) continue;
+      const runs = await api.githubListCheckRuns(repoPath, login, pr.head_sha).catch(() => []);
+      const overall = overallFrom(runs);
+      const previous = ciOverall[number];
+      if (previous && previous !== overall && (overall === "passing" || overall === "failing")) {
+        void notify(`CI ${overall} — #${number}`, pr.title);
+      }
+      nextOverall[number] = overall;
+    }
+    set({ ciOverall: nextOverall });
+  },
 
   load: async (repoPath, login) => {
     set({ loading: true, loadError: null });

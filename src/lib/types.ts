@@ -184,6 +184,7 @@ export interface Settings {
   git_binary_path: string | null;
   fs_watch_enabled: boolean;
   default_identity_id: string | null;
+  desktop_notifications: boolean;
 }
 
 // --- GitHub ---

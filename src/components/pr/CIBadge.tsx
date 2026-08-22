@@ -14,9 +14,9 @@ interface CIBadgeProps {
   sha: string;
 }
 
-type Overall = "passing" | "failing" | "pending" | "none";
+export type Overall = "passing" | "failing" | "pending" | "none";
 
-function overallFrom(runs: CheckRun[]): Overall {
+export function overallFrom(runs: CheckRun[]): Overall {
   if (runs.length === 0) return "none";
   if (runs.some((r) => r.status !== "completed")) return "pending";
   if (runs.some((r) => r.conclusion && !["success", "neutral", "skipped"].includes(r.conclusion))) {

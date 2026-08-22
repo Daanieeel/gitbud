@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS: Settings = {
   git_binary_path: null,
   fs_watch_enabled: true,
   default_identity_id: null,
+  desktop_notifications: true,
 };
 
 function applyTheme(theme: Settings["theme"]) {
