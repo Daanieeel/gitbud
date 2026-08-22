@@ -506,6 +506,13 @@ const NOTIFY_THRESHOLD_MS = 4000;
 // matter what, the UI recovers after this long and the underlying op is asked to cancel.
 const SYNC_TIMEOUT_MS = 90_000;
 
+// A button's disabled/spinning state tied directly to an async action can finish and flip
+// back off faster than a human eye (or even a browser paint) reliably registers, which reads
+// as "the loading state never showed, then flashed on after the fact" once the surrounding UI
+// (label, ahead/behind counts, ...) updates a moment later. Holding `syncing` on for at least
+// this long guarantees the loading state is actually visible before it clears.
+const MIN_SYNCING_MS = 400;
+
 async function runSync(
   get: () => RepoState,
   set: (partial: Partial<RepoState>) => void,
@@ -513,6 +520,7 @@ async function runSync(
   action: () => Promise<void>,
   opts?: { description: string; doneMessage: string },
 ) {
+  const startedAt = Date.now();
   set({ syncing: true });
   const label = opts?.description ?? "Working…";
   const cancelAction = { label: "Cancel", onClick: () => void api.cancelGitOperation(eventId) };
@@ -521,7 +529,6 @@ async function runSync(
   const unlisten = await listen<GitOutputLine>(`git://${eventId}`, (event) => {
     toast.loading(label, { id: eventId, description: event.payload.line, cancel: cancelAction });
   });
-  const startedAt = Date.now();
   try {
     const settled = action().then(
       () => ({ ok: true as const }),
@@ -556,6 +563,10 @@ async function runSync(
     }
   } finally {
     unlisten();
+    const elapsed = Date.now() - startedAt;
+    if (elapsed < MIN_SYNCING_MS) {
+      await new Promise((resolve) => setTimeout(resolve, MIN_SYNCING_MS - elapsed));
+    }
     set({ syncing: false });
   }
 }
