@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { KeyRoundIcon, MapPinIcon, PlusIcon, XIcon } from "lucide-react";
+import { KeyRoundIcon, MapPinIcon, PlusIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { GitHubMark } from "./GitHubMark";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -41,6 +41,11 @@ export function AccountBar() {
   const removeSshIdentity = useIdentityStore((s) => s.removeSshIdentity);
   const setActive = useIdentityStore((s) => s.setActive);
   const accounts = useGitHubStore((s) => s.accounts);
+  const brokenLogin = useGitHubStore((s) => s.brokenLogin);
+  const signInOpen = useGitHubStore((s) => s.signInOpen);
+  const openSignIn = useGitHubStore((s) => s.openSignIn);
+  const closeSignIn = useGitHubStore((s) => s.closeSignIn);
+  const reauth = useGitHubStore((s) => s.reauth);
   const sshIdentities = useIdentityStore((s) => s.sshIdentities);
   const identities = useMemo<UnifiedIdentity[]>(
     () => [
@@ -56,7 +61,6 @@ export function AccountBar() {
   );
   const clearRepoOverride = useIdentityStore((s) => s.clearRepoOverride);
 
-  const [signInOpen, setSignInOpen] = useState(false);
   const [sshDialogOpen, setSshDialogOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
 
@@ -72,10 +76,26 @@ export function AccountBar() {
     else void removeSshIdentity(identity.id.replace(/^ssh:/, ""));
   };
 
+  const brokenIdentity = identities.find(
+    (i) => i.kind === "github" && i.login === brokenLogin,
+  );
+
   return (
-    <div className="flex shrink-0 items-center gap-2 border-t border-border p-2">
+    <div className="flex shrink-0 flex-col gap-2 border-t border-border p-2">
+      {brokenIdentity && (
+        <div className="flex flex-col gap-1.5 rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+          <span className="flex items-center gap-1.5 font-medium">
+            <TriangleAlertIcon className="size-3.5 shrink-0" />
+            GitHub sign-in for {identityLabel(brokenIdentity)} expired
+          </span>
+          <span>Its token is missing from the system keychain — reconnect to keep using it.</span>
+          <Button size="sm" variant="outline" onClick={() => void reauth(brokenLogin as string)}>
+            Reconnect GitHub
+          </Button>
+        </div>
+      )}
       {identities.length === 0 ? (
-        <Button variant="outline" size="sm" className="w-full" onClick={() => setSignInOpen(true)}>
+        <Button variant="outline" size="sm" className="w-full" onClick={openSignIn}>
           <GitHubMark className="size-3.5" />
           Sign in with GitHub
         </Button>
@@ -160,7 +180,7 @@ export function AccountBar() {
                   <DropdownMenuItem
                     onSelect={() => {
                       setSwitcherOpen(false);
-                      setSignInOpen(true);
+                      openSignIn();
                     }}
                   >
                     <GitHubMark className="size-3.5" />
@@ -181,7 +201,7 @@ export function AccountBar() {
           </PopoverContent>
         </Popover>
       )}
-      <SignInDialog open={signInOpen} onOpenChange={setSignInOpen} />
+      <SignInDialog open={signInOpen} onOpenChange={(open) => (open ? openSignIn() : closeSignIn())} />
       <AddSshIdentityDialog open={sshDialogOpen} onOpenChange={setSshDialogOpen} />
     </div>
   );

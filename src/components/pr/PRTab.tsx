@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useRepoStore } from "@/store/useRepoStore";
-import { useGitHubStore } from "@/store/useGitHubStore";
+import { isBrokenTokenError, useGitHubStore } from "@/store/useGitHubStore";
 import { usePRStore, type PRFilter } from "@/store/usePRStore";
 import { PRList } from "./PRList";
 import { PRDetail } from "./PRDetail";
@@ -29,6 +29,7 @@ export function PRTab() {
   const selectedNumber = usePRStore((s) => s.selectedNumber);
   const load = usePRStore((s) => s.load);
   const selectPR = usePRStore((s) => s.selectPR);
+  const reauth = useGitHubStore((s) => s.reauth);
 
   const [hasRemote, setHasRemote] = useState<boolean | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -49,6 +50,18 @@ export function PRTab() {
     return (
       <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
         Sign in with GitHub (bottom of the sidebar) to see pull requests
+      </div>
+    );
+  }
+
+  if (loadError && isBrokenTokenError(loadError)) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-dot-grid text-center text-sm text-muted-foreground">
+        <TriangleAlertIcon className="size-8 text-destructive" />
+        <p className="max-w-sm">{loadError}</p>
+        <Button variant="outline" onClick={() => void reauth(currentLogin)}>
+          Reconnect GitHub
+        </Button>
       </div>
     );
   }

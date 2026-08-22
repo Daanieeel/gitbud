@@ -3,6 +3,7 @@ import { api } from "@/lib/tauri";
 import { notify } from "@/lib/notify";
 import { overallFrom, type Overall } from "@/components/pr/CIBadge";
 import { useNetworkStore } from "./useNetworkStore";
+import { isBrokenTokenError, useGitHubStore } from "./useGitHubStore";
 import type { PullRequest, PullRequestFile, ReviewComment } from "@/lib/types";
 
 export type PRFilter = "open" | "closed" | "all";
@@ -91,9 +92,12 @@ export const usePRStore = create<PRState>((set, get) => ({
       const pulls = await api.githubListPullRequests(repoPath, login, get().filter);
       set({ pulls, loading: false });
       useNetworkStore.getState().noteSuccess();
+      useGitHubStore.getState().setBrokenLogin(null);
     } catch (err) {
-      set({ loading: false, loadError: String(err) });
-      useNetworkStore.getState().noteError(String(err));
+      const message = String(err);
+      set({ loading: false, loadError: message });
+      useNetworkStore.getState().noteError(message);
+      if (isBrokenTokenError(message)) useGitHubStore.getState().setBrokenLogin(login);
     }
   },
 
