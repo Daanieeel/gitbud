@@ -5,12 +5,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { cn } from "@/lib/utils";
 import type { SubmoduleInfo } from "@/lib/types";
 
 export function SubmodulesPanel() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const [submodules, setSubmodules] = useState<SubmoduleInfo[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const busy = busyKey !== null;
 
   useEffect(() => {
     if (!repoPath) return;
@@ -21,25 +23,29 @@ export function SubmodulesPanel() {
 
   const refresh = () => void api.listSubmodules(repoPath).then(setSubmodules);
 
-  const updateOne = async (path: string) => {
-    setBusy(true);
+  const runBusy = async (key: string, fn: () => Promise<void>) => {
+    const startedAt = Date.now();
+    setBusyKey(key);
     try {
-      await api.updateSubmodule(repoPath, path);
-      refresh();
+      await fn();
     } finally {
-      setBusy(false);
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
+      setBusyKey(null);
     }
   };
 
-  const updateAll = async () => {
-    setBusy(true);
-    try {
+  const updateOne = (path: string) =>
+    runBusy(path, async () => {
+      await api.updateSubmodule(repoPath, path);
+      refresh();
+    });
+
+  const updateAll = () =>
+    runBusy("__all__", async () => {
       await api.updateAllSubmodules(repoPath);
       refresh();
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
   const uninitialized = submodules.filter((s) => !s.initialized).length;
 
@@ -85,19 +91,21 @@ export function SubmodulesPanel() {
                 onClick={() => void updateOne(sub.path)}
               >
                 {sub.initialized ? (
-                  <RefreshCwIcon className="size-3.5" />
+                  <RefreshCwIcon className={cn("size-3.5", busyKey === sub.path && "animate-spin")} />
                 ) : (
-                  <DownloadIcon className="size-3.5" />
+                  <DownloadIcon className={cn("size-3.5", busyKey === sub.path && "animate-spin")} />
                 )}
-                {sub.initialized ? "Update" : "Init"}
+                {busyKey === sub.path
+                  ? sub.initialized ? "Updating…" : "Initializing…"
+                  : sub.initialized ? "Update" : "Init"}
               </Button>
             </div>
           ))}
         </div>
         <div className="border-t border-border p-2">
           <Button size="sm" className="w-full" disabled={busy} onClick={() => void updateAll()}>
-            <RefreshCwIcon className="size-3.5" />
-            Update All Submodules
+            <RefreshCwIcon className={cn("size-3.5", busyKey === "__all__" && "animate-spin")} />
+            {busyKey === "__all__" ? "Updating…" : "Update All Submodules"}
           </Button>
         </div>
       </PopoverContent>
