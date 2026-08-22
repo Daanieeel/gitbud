@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { LockIcon, XIcon } from "lucide-react";
+import { LockIcon, RefreshCwIcon, XIcon } from "lucide-react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,6 +34,7 @@ export function RepoSidebar() {
   const selectRepo = useRepoStore((s) => s.selectRepo);
   const removeRepo = useRepoStore((s) => s.removeRepo);
   const setReposLocal = useRepoStore.setState;
+  const syncing = useRepoStore((s) => s.syncing);
   const sidebarSort = useSettingsStore((s) => s.settings.sidebar_sort);
   const showAheadBehind = useSettingsStore((s) => s.settings.show_ahead_behind);
 
@@ -131,13 +132,19 @@ export function RepoSidebar() {
                       )}
                       onClick={() => void selectRepo(repo.path)}
                     >
-                      <span
-                        className={cn(
-                          "size-1.5 shrink-0 rounded-full",
-                          dirty[repo.path] ? "bg-primary" : "bg-transparent",
-                        )}
-                        title={dirty[repo.path] ? "Uncommitted changes" : undefined}
-                      />
+                      {syncing && selectedRepo === repo.path ? (
+                        <span title="Syncing…">
+                          <RefreshCwIcon className="size-3 shrink-0 animate-spin text-primary" />
+                        </span>
+                      ) : (
+                        <span
+                          className={cn(
+                            "size-1.5 shrink-0 rounded-full",
+                            dirty[repo.path] ? "bg-primary" : "bg-transparent",
+                          )}
+                          title={dirty[repo.path] ? "Uncommitted changes" : undefined}
+                        />
+                      )}
                       <span className="truncate flex-1">{repo.name}</span>
                       {showAheadBehind && ab && (ab.ahead > 0 || ab.behind > 0) && (
                         <span className="shrink-0 font-mono text-[10px] text-muted-foreground">

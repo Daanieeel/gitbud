@@ -45,8 +45,8 @@ Mark as done when the feature is implemented.
 
 ## P2 — Nice to have
 
-- [ ] **Diff view toggles** — split vs. unified view, ignore-whitespace, word-wrap.
-- [ ] **File search/filter** in `ChangesTab.tsx`/`FileList.tsx` for repos with large changesets.
+- [x] **Diff view toggles** — split (side-by-side, structural pairing not full LCS alignment) vs. unified, quick toggle button in `DiffView.tsx` plus the Settings dropdown; ignore-whitespace already in Settings → Diff. Word-wrap not implemented (diffs stay horizontally scrollable, matching most git tools' default).
+- [x] **File search/filter** in `ChangesTab.tsx`/`FileList.tsx` — already existed since the initial build (filter input above the file list).
 - [ ] **Interactive rebase** — reorder/squash/edit/drop commits via a drag-orderable list before running `git rebase -i`.
 - [ ] **Custom sidebar sections** (Favorites, Work, Personal, etc.) to organize repositories instead of one flat list.
 - [ ] **Commit message templates / history** — recall recently used commit messages, or load a repo's `.gitmessage` template.

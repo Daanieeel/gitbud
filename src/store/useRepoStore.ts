@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "@/lib/tauri";
+import { pushRecentCommitMessage } from "@/lib/commit-history";
 import type {
   AheadBehind,
   BranchInfo,
@@ -277,6 +278,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
     await api.commit(repoPath, summary, description);
+    pushRecentCommitMessage(summary);
     set({
       selectedFilePath: null,
       selectedFileDiff: null,
@@ -291,6 +293,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
     await api.amendCommit(repoPath, summary, description);
+    pushRecentCommitMessage(summary);
     set({
       selectedFilePath: null,
       selectedFileDiff: null,
