@@ -145,11 +145,11 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="flex h-[75vh] w-[75vw] max-w-none flex-col">
         <DialogHeader>
           <DialogTitle>Settings</DialogTitle>
         </DialogHeader>
-        <div className="flex min-h-80 gap-4">
+        <div className="flex min-h-0 flex-1 gap-4">
           <div className="flex w-32 shrink-0 flex-col gap-0.5">
             {SECTIONS.map((s) => (
               <button
@@ -165,7 +165,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               </button>
             ))}
           </div>
-          <div className="min-w-0 flex-1 divide-y divide-border">
+          <div className="min-w-0 flex-1 divide-y divide-border overflow-auto">
             {section === "General" && (
               <>
                 <Row label="Theme">
