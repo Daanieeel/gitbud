@@ -79,8 +79,7 @@ export function CommitBox() {
           </label>
         </TooltipTrigger>
         <TooltipContent>
-          Amend replaces the last commit with this message and any currently staged changes, instead of
-          creating a new commit
+          Replace the last commit with this message and add the current changes to it
         </TooltipContent>
       </Tooltip>
       <Input
@@ -112,7 +111,7 @@ export function CommitBox() {
                 ? "Amending…"
                 : "Committing…"
               : amending
-                ? "Amend Last Commit"
+                ? `Amend Last Commit on ${branch ?? "…"}`
                 : `Commit to ${branch ?? "…"}`}
           </Button>
         </TooltipTrigger>
