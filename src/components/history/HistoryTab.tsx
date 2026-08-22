@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubFileUrl } from "@/lib/github-links";
 import { FileTypeIcon } from "@/lib/file-icons";
+import { ResizeHandle } from "@/components/layout/ResizeHandle";
+import { useResizableWidth } from "@/hooks/useResizableWidth";
 
 const COMMIT_STATUS_DOT_COLOR: Record<string, string> = {
   Added: "bg-accent-green",
@@ -34,6 +36,8 @@ export function HistoryTab() {
 
   const [branchAtOid, setBranchAtOid] = useState<string | null>(null);
   const [rebaseBaseOid, setRebaseBaseOid] = useState<string | null>(null);
+  const commitList = useResizableWidth("panel-width:history-commits", 288, 200, 560);
+  const fileList = useResizableWidth("panel-width:history-files", 224, 160, 480);
 
   if (commits.length === 0) {
     return (
@@ -45,7 +49,7 @@ export function HistoryTab() {
 
   return (
     <div className="flex h-full min-w-0 flex-1">
-      <div className="w-72 shrink-0 border-r border-border">
+      <div style={{ width: commitList.width }} className="shrink-0">
         <CommitList
           commits={commits}
           selectedOid={selectedCommitOid}
@@ -55,7 +59,8 @@ export function HistoryTab() {
           onRebaseFromHere={setRebaseBaseOid}
         />
       </div>
-      <div className="w-56 shrink-0 border-r border-border overflow-auto">
+      <ResizeHandle onPointerDown={commitList.onPointerDown} />
+      <div style={{ width: fileList.width }} className="shrink-0 overflow-auto">
         {selectedCommitFiles.map(([path, status]) => (
           <div
             key={path}
@@ -79,6 +84,7 @@ export function HistoryTab() {
           </div>
         ))}
       </div>
+      <ResizeHandle onPointerDown={fileList.onPointerDown} />
       <div className="min-w-0 flex-1">
         <DiffView
           path={selectedCommitFilePath}

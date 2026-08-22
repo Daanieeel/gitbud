@@ -23,6 +23,8 @@ import { AddRepoMenu } from "./AddRepoMenu";
 import { BatchSyncTrigger } from "./BatchSyncPanel";
 import { WorkspacePicker } from "./WorkspacePicker";
 import { AccountBar } from "@/components/github/AccountBar";
+import { ResizeHandle } from "@/components/layout/ResizeHandle";
+import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useWorkspaceStore } from "@/store/useWorkspaceStore";
@@ -61,6 +63,7 @@ export function RepoSidebar() {
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeId);
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
 
+  const { width, onPointerDown } = useResizableWidth("sidebar-width:repos", 256, 200, 480);
   const [filter, setFilter] = useState("");
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const [aheadBehind, setAheadBehind] = useState<Record<string, AheadBehind>>({});
@@ -171,9 +174,11 @@ export function RepoSidebar() {
   };
 
   return (
+    <>
     <aside
+      style={{ width }}
       className={cn(
-        "flex h-full w-64 shrink-0 flex-col border-r border-border",
+        "flex h-full shrink-0 flex-col",
         dragOver && "ring-2 ring-inset ring-primary",
       )}
     >
@@ -306,5 +311,7 @@ export function RepoSidebar() {
       </div>
       <AccountBar />
     </aside>
+    <ResizeHandle onPointerDown={onPointerDown} />
+    </>
   );
 }

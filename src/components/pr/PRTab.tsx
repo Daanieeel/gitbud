@@ -8,6 +8,8 @@ import { usePRStore, type PRFilter } from "@/store/usePRStore";
 import { PRList } from "./PRList";
 import { PRDetail } from "./PRDetail";
 import { CreatePRDialog } from "./CreatePRDialog";
+import { ResizeHandle } from "@/components/layout/ResizeHandle";
+import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { api } from "@/lib/tauri";
 
 const FILTERS: { key: PRFilter; label: string }[] = [
@@ -30,6 +32,7 @@ export function PRTab() {
 
   const [hasRemote, setHasRemote] = useState<boolean | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const { width, onPointerDown } = useResizableWidth("panel-width:pr-list", 320, 240, 640);
 
   useEffect(() => {
     if (!repoPath) return;
@@ -62,7 +65,7 @@ export function PRTab() {
 
   return (
     <div className="flex h-full min-w-0 flex-1">
-      <div className="flex w-80 shrink-0 flex-col border-r border-border">
+      <div style={{ width }} className="flex shrink-0 flex-col">
         <div className="flex shrink-0 items-center justify-between border-b border-border p-2">
           <div className="flex gap-1">
             {FILTERS.map((f) => (
@@ -97,6 +100,7 @@ export function PRTab() {
           />
         </div>
       </div>
+      <ResizeHandle onPointerDown={onPointerDown} />
       {selected ? (
         <PRDetail repoPath={repoPath} login={currentLogin} pr={selected} />
       ) : (
