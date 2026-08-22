@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { KeyRoundIcon, MapPinIcon, PlusIcon, XIcon } from "lucide-react";
 import { GitHubMark } from "./GitHubMark";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useGitHubStore } from "@/store/useGitHubStore";
-import { useIdentityStore, type UnifiedIdentity } from "@/store/useIdentityStore";
+import { useIdentityStore, githubIdentityId, sshIdentityId, type UnifiedIdentity } from "@/store/useIdentityStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { SignInDialog } from "./SignInDialog";
@@ -40,7 +40,15 @@ export function AccountBar() {
   const removeAccount = useGitHubStore((s) => s.removeAccount);
   const removeSshIdentity = useIdentityStore((s) => s.removeSshIdentity);
   const setActive = useIdentityStore((s) => s.setActive);
-  const identities = useIdentityStore((s) => s.list());
+  const accounts = useGitHubStore((s) => s.accounts);
+  const sshIdentities = useIdentityStore((s) => s.sshIdentities);
+  const identities = useMemo<UnifiedIdentity[]>(
+    () => [
+      ...accounts.map((a) => ({ id: githubIdentityId(a.login), kind: "github" as const, login: a.login, avatarUrl: a.avatar_url })),
+      ...sshIdentities.map((i) => ({ id: sshIdentityId(i.id), kind: "ssh" as const, label: i.label, host: i.host, keyPath: i.key_path })),
+    ],
+    [accounts, sshIdentities],
+  );
   const defaultIdentityId = useSettingsStore((s) => s.settings.default_identity_id);
   const selectedRepo = useRepoStore((s) => s.selectedRepo);
   const repoOverride = useRepoStore(
