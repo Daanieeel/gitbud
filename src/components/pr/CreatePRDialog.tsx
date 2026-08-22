@@ -4,7 +4,7 @@ import { GitPullRequestCreateArrow, GitPullRequestDraftIcon } from "lucide-react
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog,
@@ -86,12 +86,18 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
     setBase((prev) => (localBranches.some((b) => b.name === prev) ? prev : defaultBase));
   }, [open]);
 
-  // Prefill the title with the branch name so there's rarely a blank field to fill in — the
-  // user can still edit or replace it before creating the PR.
+  // Prefill the title with the branch name so there's rarely a blank field to fill in — but
+  // only once, right at the moment the dialog opens (and only if there's nothing there already,
+  // e.g. left over from a prior cancelled open). Keyed strictly off the open transition itself
+  // rather than depending on `branch`/`title`, so nothing later — switching branches in the
+  // background, or the user clearing the field — touches it again while the dialog stays open.
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (!open || title || !branch) return;
-    setTitle(branch);
-  }, [open, title, branch]);
+    if (open && !wasOpenRef.current && branch) {
+      setTitle((prev) => prev || branch);
+    }
+    wasOpenRef.current = open;
+  }, [open, branch]);
 
   useEffect(() => {
     if (!open || !repoPath || body) return;
@@ -385,10 +391,13 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
           </div>
         </div>
         <DialogFooter className="sm:items-center sm:gap-4">
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Checkbox checked={draft} onCheckedChange={(checked) => setDraft(checked === true)} />
+          <CheckboxGroup
+            className="text-sm text-muted-foreground"
+            checked={draft}
+            onCheckedChange={(checked) => setDraft(checked === true)}
+          >
             Create as draft
-          </label>
+          </CheckboxGroup>
           <Button
             disabled={submitting || !title.trim()}
             onClick={() => void submit()}

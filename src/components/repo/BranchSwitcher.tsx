@@ -14,8 +14,9 @@ import {
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -120,6 +121,7 @@ export function BranchSwitcher() {
   };
 
   return (
+    <>
     <Popover open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -168,36 +170,27 @@ export function BranchSwitcher() {
         </div>
         <div className="flex max-h-64 flex-col gap-1 overflow-auto p-1">
           {local.map((b) => (
-            <Popover
-              key={b.name}
-              open={renaming === b.name}
-              onOpenChange={(isOpen) => {
-                if (!isOpen) setRenaming(null);
-              }}
-            >
-              <ContextMenu>
+              <ContextMenu key={b.name}>
                 <ContextMenuTrigger asChild>
-                  <PopoverAnchor asChild>
-                    <div
-                      className={cn(
-                        "flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
-                        b.is_head && "bg-accent",
-                      )}
-                      onClick={() => void doCheckout(b.name)}
-                    >
-                      <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                      {isLocalOnly(b.name) && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="shrink-0 rounded-full bg-accent-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-blue">
-                              local
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent>{`${b.name} has never been pushed`}</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-                  </PopoverAnchor>
+                  <div
+                    className={cn(
+                      "flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
+                      b.is_head && "bg-accent",
+                    )}
+                    onClick={() => void doCheckout(b.name)}
+                  >
+                    <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                    {isLocalOnly(b.name) && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="shrink-0 rounded-full bg-accent-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-blue">
+                            local
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>{`${b.name} has never been pushed`}</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                 </ContextMenuTrigger>
                 <ContextMenuContent>
                   <ContextMenuItem onSelect={() => void copyToClipboard(b.name)}>
@@ -243,42 +236,6 @@ export function BranchSwitcher() {
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
-              <PopoverContent align="start" className="w-56 space-y-2 p-3">
-                <Input
-                  autoFocus
-                  disabled={renameBusy}
-                  value={renameValue}
-                  onChange={(e) => setRenameValue(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void commitRename();
-                    if (e.key === "Escape") setRenaming(null);
-                  }}
-                  className="h-7"
-                />
-                {!isLocalOnly(b.name) && (
-                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Checkbox
-                      checked={renameRemote}
-                      disabled={renameBusy}
-                      onCheckedChange={(checked) => setRenameRemote(checked === true)}
-                    />
-                    Also rename on remote
-                  </label>
-                )}
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => setRenaming(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={renameBusy || !renameValue.trim()}
-                    onClick={() => void commitRename()}
-                  >
-                    Rename
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
           ))}
           {canCreate && (
             <div
@@ -292,5 +249,48 @@ export function BranchSwitcher() {
         </div>
       </PopoverContent>
     </Popover>
+      <Dialog
+        open={renaming !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setRenaming(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Rename "{renaming}"</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            disabled={renameBusy}
+            value={renameValue}
+            onChange={(e) => setRenameValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void commitRename();
+            }}
+          />
+          {renaming && !isLocalOnly(renaming) && (
+            <CheckboxGroup
+              className="text-sm text-muted-foreground"
+              checked={renameRemote}
+              disabled={renameBusy}
+              onCheckedChange={(checked) => setRenameRemote(checked === true)}
+            >
+              Rename on remote
+            </CheckboxGroup>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setRenaming(null)}>
+              Cancel
+            </Button>
+            <Button disabled={renameBusy || !renameValue.trim()} onClick={() => void commitRename()}>
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

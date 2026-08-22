@@ -393,12 +393,26 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   renameBranch: async (oldName, newName, alsoRenameRemote) => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    await api.renameBranch(repoPath, oldName, newName);
+    try {
+      await api.renameBranch(repoPath, oldName, newName);
+    } catch (err) {
+      toast.error(String(err));
+      throw err;
+    }
     if (alsoRenameRemote) {
+      // The remote step gets its own loading/success/error toast via runSync — this one is
+      // just for the (near-instant, no-toast-otherwise) local rename that already happened.
+      toast.success(`Renamed ${oldName} to ${newName} locally`);
       await runSync(get, set, repoPath, () => api.renameBranchRemote(repoPath, oldName, newName), {
         description: `Renaming ${oldName} to ${newName} on origin…`,
         doneMessage: `Renamed ${oldName} to ${newName} on origin`,
       });
+      // The push (with -u) already made the new name the upstream at the git level — refresh
+      // immediately so the "published"/ahead-behind indicators reflect that right away instead
+      // of waiting on the fs-watcher's debounce to notice.
+      await get().refreshAheadBehind();
+    } else {
+      toast.success(`Renamed ${oldName} to ${newName}`);
     }
     await get().refreshBranches();
   },

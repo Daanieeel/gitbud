@@ -2,7 +2,7 @@ import { useState } from "react";
 import { GitBranchPlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import {
   Dialog,
   DialogContent,
@@ -51,10 +51,13 @@ export function CreateBranchAtDialog({ oid, onOpenChange }: CreateBranchAtDialog
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && void submit()}
         />
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Checkbox checked={checkout} onCheckedChange={(checked) => setCheckout(checked === true)} />
+        <CheckboxGroup
+          className="text-sm text-muted-foreground"
+          checked={checkout}
+          onCheckedChange={(checked) => setCheckout(checked === true)}
+        >
           Switch to new branch
-        </label>
+        </CheckboxGroup>
         <DialogFooter>
           <Button disabled={!name.trim() || creating} onClick={() => void submit()}>
             <GitBranchPlusIcon className="size-3.5" />

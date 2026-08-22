@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ChevronDownIcon, XIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
 
 export interface MultiSelectOption {
   key: string;
@@ -75,13 +75,14 @@ export function MultiSelectField({ label, placeholder, options, selected, onChan
           <div className="max-h-48 overflow-auto">
             {filtered.length === 0 && <div className="p-2 text-center text-xs text-muted-foreground">No matches</div>}
             {filtered.map((o) => (
-              <label
+              <CheckboxGroup
                 key={o.key}
-                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-sm hover:bg-accent"
+                className="rounded-sm px-2 py-1 text-sm hover:bg-accent"
+                checked={selected.includes(o.key)}
+                onCheckedChange={() => toggle(o.key)}
               >
-                <Checkbox checked={selected.includes(o.key)} onCheckedChange={() => toggle(o.key)} />
                 {o.label}
-              </label>
+              </CheckboxGroup>
             ))}
           </div>
         </PopoverContent>

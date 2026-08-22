@@ -667,8 +667,27 @@ pub fn delete_branch(repo_path: &str, name: &str) -> Result<(), String> {
     branch.delete().map_err(|e| e.message().to_string())
 }
 
+/// On the case-insensitive-but-case-preserving filesystems most desktop OSes default to (APFS,
+/// NTFS, ...), a rename that only changes case (`Develop` -> `develop`) has the same on-disk
+/// ref path for source and destination — libgit2's rename can't go there directly since the
+/// "destination" already exists (it's literally the same file). Real `git branch -m` sidesteps
+/// this the same way: through a throwaway intermediate name that can't collide with either.
 pub fn rename_branch(repo_path: &str, old_name: &str, new_name: &str) -> Result<(), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+
+    if old_name.eq_ignore_ascii_case(new_name) && old_name != new_name {
+        let tmp_name = format!("{new_name}-gitbud-rename-tmp");
+        let mut branch = repo
+            .find_branch(old_name, git2::BranchType::Local)
+            .map_err(|e| e.message().to_string())?;
+        branch.rename(&tmp_name, false).map_err(|e| e.message().to_string())?;
+        let mut branch = repo
+            .find_branch(&tmp_name, git2::BranchType::Local)
+            .map_err(|e| e.message().to_string())?;
+        branch.rename(new_name, false).map_err(|e| e.message().to_string())?;
+        return Ok(());
+    }
+
     let mut branch = repo
         .find_branch(old_name, git2::BranchType::Local)
         .map_err(|e| e.message().to_string())?;
