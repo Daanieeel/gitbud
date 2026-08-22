@@ -189,7 +189,8 @@ export function RepoSidebar() {
     >
       {collapsed ? (
         <>
-          <div className="flex shrink-0 justify-center border-b border-border p-1.5">
+          <div className="flex shrink-0 flex-col items-center gap-1 border-b border-border p-1.5">
+            <AddRepoMenu />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" onClick={() => setCollapsed(false)}>
