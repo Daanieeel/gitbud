@@ -109,7 +109,6 @@ export interface RepoEntry {
   path: string;
   name: string;
   group: string;
-  is_private: boolean;
   last_fetched: number | null;
   section: string | null;
   identity_id: string | null;

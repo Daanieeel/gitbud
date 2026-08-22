@@ -255,11 +255,6 @@ fn remove_repo(path: String) -> Result<Vec<config::RepoEntry>, String> {
 }
 
 #[tauri::command]
-fn set_repo_private(path: String, is_private: bool) -> Result<Vec<config::RepoEntry>, String> {
-    config::set_repo_private(&path, is_private)
-}
-
-#[tauri::command]
 fn set_repo_section(path: String, section: Option<String>) -> Result<Vec<config::RepoEntry>, String> {
     config::set_repo_section(&path, section)
 }
@@ -844,7 +839,6 @@ pub fn run() {
             load_repos,
             add_repo,
             remove_repo,
-            set_repo_private,
             set_repo_section,
             set_repo_identity,
             set_repo_order,

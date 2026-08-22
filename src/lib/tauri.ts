@@ -137,8 +137,6 @@ export const api = {
   loadRepos: () => invoke<RepoEntry[]>("load_repos"),
   addRepo: (path: string) => invoke<RepoEntry[]>("add_repo", { path }),
   removeRepo: (path: string) => invoke<RepoEntry[]>("remove_repo", { path }),
-  setRepoPrivate: (path: string, isPrivate: boolean) =>
-    invoke<RepoEntry[]>("set_repo_private", { path, isPrivate }),
   setRepoSection: (path: string, section: string | null) =>
     invoke<RepoEntry[]>("set_repo_section", { path, section }),
   setRepoIdentity: (path: string, identityId: string | null) =>

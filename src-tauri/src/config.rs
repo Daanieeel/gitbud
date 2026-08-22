@@ -9,7 +9,6 @@ pub struct RepoEntry {
     pub path: String,
     pub name: String,
     pub group: String,
-    pub is_private: bool,
     #[serde(default)]
     pub last_fetched: Option<i64>,
     /// User-assigned sidebar section (e.g. "Work", "Personal"), overriding the auto-derived
@@ -113,7 +112,6 @@ pub fn add_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
         path: canonical,
         name,
         group,
-        is_private: false,
         last_fetched: None,
         section: None,
         identity_id: None,
@@ -125,15 +123,6 @@ pub fn add_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
 pub fn remove_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
     let mut repos = load_repos()?;
     repos.retain(|r| r.path != path);
-    save_repos(&repos)?;
-    Ok(repos)
-}
-
-pub fn set_repo_private(path: &str, is_private: bool) -> Result<Vec<RepoEntry>, String> {
-    let mut repos = load_repos()?;
-    if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
-        entry.is_private = is_private;
-    }
     save_repos(&repos)?;
     Ok(repos)
 }
