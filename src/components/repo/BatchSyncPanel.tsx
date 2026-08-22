@@ -1,9 +1,13 @@
-import { CheckIcon, CircleIcon, RefreshCwIcon, XCircleIcon, XIcon } from "lucide-react";
+import { useEffect } from "react";
+import { CheckIcon, CircleIcon, RefreshCwIcon, XCircleIcon } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useBatchSyncStore } from "@/store/useBatchSyncStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { cn } from "@/lib/utils";
 import type { RepoEntry } from "@/lib/types";
+
+const BATCH_TOAST_ID = "batch-sync";
 
 export function BatchSyncTrigger({ repos, totalCount }: { repos: RepoEntry[]; totalCount: number }) {
   const running = useBatchSyncStore((s) => s.running);
@@ -19,7 +23,13 @@ export function BatchSyncTrigger({ repos, totalCount }: { repos: RepoEntry[]; to
       className="w-full"
       disabled={running}
       title={filtered ? "Pull every repo currently matching the filter" : "Pull every repo in the sidebar"}
-      onClick={() => void runPullAll(repos.map((r) => r.path))}
+      onClick={() => {
+        toast.custom((id) => <BatchSyncToastContent toastId={id} />, {
+          id: BATCH_TOAST_ID,
+          duration: Infinity,
+        });
+        void runPullAll(repos.map((r) => r.path));
+      }}
     >
       <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
       {filtered ? `Update ${repos.length}/${totalCount}` : "Update All"}
@@ -27,7 +37,7 @@ export function BatchSyncTrigger({ repos, totalCount }: { repos: RepoEntry[]; to
   );
 }
 
-export function BatchSyncStatus() {
+function BatchSyncToastContent({ toastId }: { toastId: string | number }) {
   const repos = useRepoStore((s) => s.repos);
   const running = useBatchSyncStore((s) => s.running);
   const outcomes = useBatchSyncStore((s) => s.outcomes);
@@ -35,28 +45,27 @@ export function BatchSyncStatus() {
   const dismiss = useBatchSyncStore((s) => s.dismiss);
 
   const entries = Object.entries(outcomes);
-  if (entries.length === 0) return null;
-
   const doneCount = entries.filter(([, v]) => v === "done").length;
   const errorCount = entries.filter(([, v]) => v === "error").length;
 
+  // Once every repo has settled, leave the summary up for a few seconds, then clean up.
+  useEffect(() => {
+    if (running) return;
+    const t = setTimeout(() => {
+      toast.dismiss(toastId);
+      dismiss();
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [running, toastId, dismiss]);
+
   return (
-    <div className="fixed bottom-4 left-4 z-50 flex w-72 flex-col gap-1.5 rounded-md border border-border bg-card p-2 shadow-lg">
-      <div className="flex items-center justify-between text-xs font-medium">
-        <span>
-          Update All — {running ? "running…" : "done"}
+    <div className="flex w-[22rem] flex-col gap-1.5 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg">
+      <div className="flex items-center justify-between text-sm font-medium">
+        <span>Update All — {running ? "running…" : "done"}</span>
+        <span className="text-xs text-muted-foreground">
+          {doneCount}/{entries.length}
+          {errorCount > 0 && ` (${errorCount} failed)`}
         </span>
-        <div className="flex items-center gap-2">
-          <span className="text-muted-foreground">
-            {doneCount}/{entries.length}
-            {errorCount > 0 && ` (${errorCount} failed)`}
-          </span>
-          {!running && (
-            <button onClick={dismiss} className="text-muted-foreground hover:text-foreground">
-              <XIcon className="size-3.5" />
-            </button>
-          )}
-        </div>
       </div>
       <div className="max-h-56 overflow-auto">
         {entries.map(([path, status]) => {

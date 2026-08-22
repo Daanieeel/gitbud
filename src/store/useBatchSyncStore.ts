@@ -8,7 +8,6 @@ type RepoOutcome = "pending" | "running" | "done" | "error";
 
 interface BatchSyncState {
   running: boolean;
-  op: "pull" | null;
   outcomes: Record<string, RepoOutcome>;
   errors: Record<string, string>;
 
@@ -30,14 +29,12 @@ async function runPool(paths: string[], concurrency: number, task: (path: string
 function run(
   set: (partial: Partial<BatchSyncState>) => void,
   get: () => BatchSyncState,
-  op: "pull",
   repoPaths: string[],
   action: (repoPath: string) => Promise<void>,
 ) {
   return async () => {
     set({
       running: true,
-      op,
       outcomes: Object.fromEntries(repoPaths.map((p) => [p, "pending" as RepoOutcome])),
       errors: {},
     });
@@ -59,15 +56,14 @@ function run(
 
 export const useBatchSyncStore = create<BatchSyncState>((set, get) => ({
   running: false,
-  op: null,
   outcomes: {},
   errors: {},
 
   runPullAll: (repoPaths) =>
-    run(set, get, "pull", repoPaths, async (path) => {
+    run(set, get, repoPaths, async (path) => {
       await api.gitPull(path);
       await useRepoStore.getState().loadRepos();
     })(),
 
-  dismiss: () => set({ outcomes: {}, errors: {}, op: null }),
+  dismiss: () => set({ outcomes: {}, errors: {} }),
 }));

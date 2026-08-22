@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
+import { toast } from "sonner";
 import { api } from "@/lib/tauri";
 import { notify } from "@/lib/notify";
 import { useNetworkStore } from "./useNetworkStore";
@@ -45,10 +46,6 @@ interface RepoState {
 
   aheadBehind: AheadBehind;
   syncing: boolean;
-  syncLog: GitOutputLine[];
-  syncError: string | null;
-  syncEventId: string | null;
-  syncDescription: string | null;
 
   globalListenersReady: boolean;
 
@@ -90,7 +87,6 @@ interface RepoState {
   push: () => Promise<void>;
   pullLfs: () => Promise<void>;
   pushLfs: () => Promise<void>;
-  cancelSync: () => Promise<void>;
 
   addExistingRepo: (path: string) => Promise<void>;
   cloneRepo: (url: string, dest: string) => Promise<void>;
@@ -124,10 +120,6 @@ export const useRepoStore = create<RepoState>((set, get) => ({
 
   aheadBehind: { ahead: 0, behind: 0, published: true },
   syncing: false,
-  syncLog: [],
-  syncError: null,
-  syncEventId: null,
-  syncDescription: null,
 
   globalListenersReady: false,
 
@@ -475,11 +467,6 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       doneMessage: `Pushed LFS objects for ${branch} to origin`,
     });
   },
-  cancelSync: async () => {
-    const eventId = get().syncEventId;
-    if (!eventId) return;
-    await api.cancelGitOperation(eventId);
-  },
 
   addExistingRepo: async (path) => {
     const repos = await api.addRepo(path);
@@ -513,6 +500,12 @@ export const useRepoStore = create<RepoState>((set, get) => ({
 
 const NOTIFY_THRESHOLD_MS = 4000;
 
+// Backend has its own 45s no-output watchdog (git_shell.rs), but that only protects against
+// git itself going quiet — not against a hung/unresponsive backend, a stale build missing
+// that fix, or the IPC event just never arriving. This is the hard client-side backstop: no
+// matter what, the UI recovers after this long and the underlying op is asked to cancel.
+const SYNC_TIMEOUT_MS = 90_000;
+
 async function runSync(
   get: () => RepoState,
   set: (partial: Partial<RepoState>) => void,
@@ -520,23 +513,49 @@ async function runSync(
   action: () => Promise<void>,
   opts?: { description: string; doneMessage: string },
 ) {
-  set({ syncing: true, syncLog: [], syncError: null, syncEventId: eventId, syncDescription: opts?.description ?? null });
+  set({ syncing: true });
+  const label = opts?.description ?? "Working…";
+  const cancelAction = { label: "Cancel", onClick: () => void api.cancelGitOperation(eventId) };
+  toast.loading(label, { id: eventId, description: undefined, cancel: cancelAction });
+
   const unlisten = await listen<GitOutputLine>(`git://${eventId}`, (event) => {
-    set({ syncLog: [...get().syncLog, event.payload] });
+    toast.loading(label, { id: eventId, description: event.payload.line, cancel: cancelAction });
   });
   const startedAt = Date.now();
   try {
-    await action();
-    useNetworkStore.getState().noteSuccess();
-    if (opts && Date.now() - startedAt > NOTIFY_THRESHOLD_MS) {
-      const repoName = get().repos.find((r) => r.path === eventId)?.name ?? eventId;
-      void notify(opts.doneMessage, repoName);
+    const settled = action().then(
+      () => ({ ok: true as const }),
+      (err: unknown) => ({ ok: false as const, error: String(err) }),
+    );
+    const timedOut = new Promise<"timeout">((resolve) => {
+      setTimeout(() => resolve("timeout"), SYNC_TIMEOUT_MS);
+    });
+    const outcome = await Promise.race([settled, timedOut]);
+
+    if (outcome === "timeout") {
+      void api.cancelGitOperation(eventId).catch(() => {});
+      const message = `${label.replace(/…$/, "")} timed out after ${SYNC_TIMEOUT_MS / 1000}s with no response and was cancelled.`;
+      toast.error(message, { id: eventId });
+      useNetworkStore.getState().noteError(message);
+      return;
     }
-  } catch (e) {
-    set({ syncError: String(e) });
-    useNetworkStore.getState().noteError(String(e));
+    if (!outcome.ok) {
+      toast.error(outcome.error, { id: eventId });
+      useNetworkStore.getState().noteError(outcome.error);
+      return;
+    }
+    useNetworkStore.getState().noteSuccess();
+    if (opts) {
+      toast.success(opts.doneMessage, { id: eventId });
+      if (Date.now() - startedAt > NOTIFY_THRESHOLD_MS) {
+        const repoName = get().repos.find((r) => r.path === eventId)?.name ?? eventId;
+        void notify(opts.doneMessage, repoName);
+      }
+    } else {
+      toast.dismiss(eventId);
+    }
   } finally {
     unlisten();
-    set({ syncing: false, syncEventId: null, syncDescription: null });
+    set({ syncing: false });
   }
 }
