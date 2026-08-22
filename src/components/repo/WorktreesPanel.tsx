@@ -86,7 +86,7 @@ export function WorktreesPanel() {
     } catch (e) {
       if (!force) {
         setConfirmForcePath(wt.path);
-        setError(`${String(e)} — it likely has uncommitted changes.`);
+        setError(`${String(e)}. It likely has uncommitted changes.`);
       } else {
         setError(String(e));
       }

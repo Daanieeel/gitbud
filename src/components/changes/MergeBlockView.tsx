@@ -36,13 +36,13 @@ export function MergeBlockView({ sides, block, pick, onPick }: MergeBlockViewPro
       <div className="mb-1.5 flex items-center gap-2 text-xs">
         <span className="text-muted-foreground">
           Base lines {block.baseStart}
-          {block.baseEnd !== block.baseStart ? `–${block.baseEnd}` : ""}
+          {block.baseEnd !== block.baseStart ? ` to ${block.baseEnd}` : ""}
         </span>
         {conflict ? (
-          <span className="font-medium text-destructive">conflict — pick one</span>
+          <span className="font-medium text-destructive">conflict, pick one</span>
         ) : (
           <span className="text-muted-foreground">
-            only changed by {block.oursHunk ? "you" : "them"} — kept automatically
+            only changed by {block.oursHunk ? "you" : "them"}, kept automatically
           </span>
         )}
       </div>

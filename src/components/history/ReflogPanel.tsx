@@ -63,7 +63,7 @@ export function ReflogPanel() {
             <DialogTitle>Reflog</DialogTitle>
             <DialogDescription>
               Every place HEAD has pointed in this repo, most recent first. Restoring hard-resets
-              HEAD and the working tree to that point — but that too is recorded here, so it can
+              HEAD and the working tree to that point, but that too is recorded here, so it can
               be undone the same way.
             </DialogDescription>
           </DialogHeader>

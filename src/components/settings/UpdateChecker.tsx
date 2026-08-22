@@ -65,7 +65,7 @@ export function UpdateChecker() {
       {status === "up-to-date" && <p className="text-xs text-muted-foreground">You're up to date.</p>}
       {status === "unconfigured" && (
         <p className="text-xs text-muted-foreground">
-          This build has no update endpoint configured yet — auto-update isn't set up for this
+          This build has no update endpoint configured yet. Auto-update isn't set up for this
           distribution channel.
         </p>
       )}

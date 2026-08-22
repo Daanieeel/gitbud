@@ -84,7 +84,7 @@ function BatchSyncToastContent({ toastId }: { toastId: string | number }) {
   return (
     <div className="flex w-[22rem] flex-col gap-1.5 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg">
       <div className="flex items-center justify-between text-sm font-medium">
-        <span>Update All — {running ? "running…" : "done"}</span>
+        <span>Update All: {running ? "running…" : "done"}</span>
         <span className="text-xs text-muted-foreground">
           {doneCount}/{entries.length}
           {errorCount > 0 && ` (${errorCount} failed)`}

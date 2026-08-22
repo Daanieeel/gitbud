@@ -79,7 +79,7 @@ export const usePRStore = create<PRState>((set, get) => ({
       const overall = overallFrom(runs);
       const previous = ciOverall[number];
       if (previous && previous !== overall && (overall === "passing" || overall === "failing")) {
-        void notify(`CI ${overall} — #${number}`, pr.title);
+        void notify(`CI ${overall}: #${number}`, pr.title);
       }
       nextOverall[number] = overall;
     }

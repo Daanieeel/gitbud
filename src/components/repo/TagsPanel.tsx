@@ -138,7 +138,7 @@ export function TagsPanel() {
         </div>
         <div className="flex flex-col gap-2 border-t border-border p-2">
           <Input placeholder="Tag name (e.g. v1.0.0)" value={newName} onChange={(e) => setNewName(e.target.value)} className="h-7" />
-          <Input placeholder="Message (optional — annotated tag)" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="h-7" />
+          <Input placeholder="Message (optional, annotated tag)" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="h-7" />
           <Button size="sm" disabled={!newName.trim() || busy} onClick={() => void create()}>
             <PlusIcon className={cn("size-3.5", busyKey === "create" && "animate-spin")} />
             {busyKey === "create" ? "Creating…" : "Create Tag on HEAD"}

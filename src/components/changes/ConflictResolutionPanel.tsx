@@ -86,7 +86,7 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
   return (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2">
-        <span className="mr-2 truncate text-sm font-medium text-destructive">{path} — conflicted</span>
+        <span className="mr-2 truncate text-sm font-medium text-destructive">{path}, conflicted</span>
         <div className="flex rounded-md border border-input p-0.5 text-xs">
           <button
             className={cn("rounded-sm px-2 py-0.5", view === "merge" && "bg-accent")}
@@ -119,7 +119,7 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
         </Button>
         {hasMarkers && (
           <span className="text-xs text-muted-foreground">
-            Conflict markers still present — resolve them before marking as resolved.
+            Conflict markers still present. Resolve them before marking as resolved.
           </span>
         )}
       </div>
@@ -129,7 +129,7 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
         </pre>
       ) : blocks.length === 0 ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-          No line-level differences found vs. the common ancestor — use one of the whole-file
+          No line-level differences found vs. the common ancestor. Use one of the whole-file
           actions above, or switch to Raw.
         </div>
       ) : (

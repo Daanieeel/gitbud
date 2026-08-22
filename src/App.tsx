@@ -110,7 +110,7 @@ function App() {
           ) : (
             <div className="flex flex-1 items-center justify-center bg-dot-grid text-sm text-muted-foreground">
               {repos.length === 0
-                ? 'No repositories yet — use the "+" button to add one'
+                ? 'No repositories yet. Use the "+" button to add one'
                 : "Select a repository"}
             </div>
           )}

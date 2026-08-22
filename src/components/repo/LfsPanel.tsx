@@ -40,7 +40,7 @@ export function LfsPanel() {
       <PopoverContent className="w-64 p-2" align="start">
         <p className="mb-2 text-xs text-muted-foreground">
           This repo tracks large files with Git LFS. Fetch/pull/push don't always transfer LFS
-          objects on their own — use these if a large file looks stuck as a pointer.
+          objects on their own. Use these if a large file looks stuck as a pointer.
         </p>
         <div className="flex gap-2">
           <Button size="sm" variant="secondary" className="flex-1" disabled={syncing} onClick={() => void pullLfs()}>

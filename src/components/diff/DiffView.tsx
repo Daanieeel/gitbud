@@ -127,8 +127,7 @@ function HunkActionsRow({ hunkIdx, hunkActions }: { hunkIdx: number; hunkActions
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Unstage just this chunk, a contiguous block of changed lines, leaving the rest of the
-                  file's staged changes alone
+                  Unstage just this chunk
                 </TooltipContent>
               </Tooltip>
             )
@@ -145,8 +144,7 @@ function HunkActionsRow({ hunkIdx, hunkActions }: { hunkIdx: number; hunkActions
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  Stage just this chunk, a contiguous block of changed lines, leaving the rest of the file
-                  unstaged
+                  Stage just this chunk
                 </TooltipContent>
               </Tooltip>
             )}
@@ -163,7 +161,7 @@ function HunkActionsRow({ hunkIdx, hunkActions }: { hunkIdx: number; hunkActions
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              Permanently discard just this chunk's changes, leaving the rest of the file's edits intact
+              Permanently discard just this chunk
             </TooltipContent>
           </Tooltip>
         )}

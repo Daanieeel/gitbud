@@ -303,7 +303,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </Row>
                 <p className="pt-2 text-xs text-muted-foreground">
                   For GitHub Enterprise Server, set Host to your GHES domain (e.g.
-                  github.example.com) — API and web links adjust automatically.
+                  github.example.com). API and web links adjust automatically.
                 </p>
               </>
             )}

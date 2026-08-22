@@ -94,7 +94,7 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
             <KeyRoundIcon className="size-4" /> Add SSH Identity
           </DialogTitle>
           <DialogDescription>
-            A plain git identity authenticated by an SSH key — no hosted-provider account or API
+            A plain git identity authenticated by an SSH key. No hosted-provider account or API
             access, just this host and key used when pushing/pulling.
           </DialogDescription>
         </DialogHeader>

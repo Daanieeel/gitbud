@@ -98,7 +98,7 @@ export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRe
         close();
       } else {
         setError(
-          `Stopped at "${result.conflicted_summary ?? result.conflicted_oid}" — it doesn't apply cleanly here. Nothing was changed; adjust the plan (e.g. drop it) and try again.`,
+          `Stopped at "${result.conflicted_summary ?? result.conflicted_oid}". It doesn't apply cleanly here. Nothing was changed; adjust the plan (e.g. drop it) and try again.`,
         );
       }
     } finally {
@@ -113,7 +113,7 @@ export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRe
           <DialogTitle>Interactive Rebase</DialogTitle>
           <DialogDescription>
             Drag to reorder, click the action to cycle pick → squash → drop. Any conflict aborts
-            cleanly with no changes made — there's no partial state to recover from.
+            cleanly with no changes made. There's no partial state to recover from.
           </DialogDescription>
         </DialogHeader>
         <div className="max-h-96 overflow-auto rounded-md border border-border">

@@ -72,7 +72,7 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
             <DialogTitle>Connect GitHub</DialogTitle>
             <DialogDescription>
               If you already use the GitHub CLI (`gh`) and are logged in there, GitBud can reuse
-              that login with one click — no setup needed.
+              that login with one click, no setup needed.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-between">
@@ -97,7 +97,7 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
             <DialogTitle>Connect GitHub</DialogTitle>
             <DialogDescription>
               {ghCliChecked && "No gh CLI login found. "}
-              GitBud has no bundled credentials — register your own OAuth App (free, one-time)
+              GitBud has no bundled credentials. Register your own OAuth App (free, one-time)
               with Device Flow enabled, then paste its Client ID here.
             </DialogDescription>
           </DialogHeader>
@@ -135,7 +135,7 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
           <DialogHeader>
             <DialogTitle>Sign in with GitHub</DialogTitle>
             <DialogDescription>
-              You'll get a one-time code to enter at github.com — no password is ever seen by
+              You'll get a one-time code to enter at github.com. No password is ever seen by
               GitBud.
             </DialogDescription>
           </DialogHeader>
@@ -180,7 +180,7 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
           <p className="text-sm text-destructive">Sign-in was denied.</p>
         )}
         {deviceFlow.status === "expired" && (
-          <p className="text-sm text-destructive">Code expired — try again.</p>
+          <p className="text-sm text-destructive">Code expired. Try again.</p>
         )}
         {deviceFlow.status === "error" && (
           <p className="text-sm text-destructive">{deviceFlow.error}</p>

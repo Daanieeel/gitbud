@@ -85,7 +85,7 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
 
   return (
     <div className="flex min-h-0 flex-1">
-      <div style={{ width }} className="shrink-0 overflow-auto">
+      <div style={{ width }} className="shrink-0 overflow-auto border-r border-border">
         {files.length === 0 && (
           <div className="p-3 text-center text-sm text-muted-foreground">No files</div>
         )}
