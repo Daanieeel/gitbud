@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
   CopyIcon,
   FolderOpenIcon,
   MinusIcon,
@@ -409,6 +411,20 @@ export function RepoSidebar() {
     return new Map([...groups.entries()].sort(([a], [b]) => a.localeCompare(b)));
   }, [sorted, sidebarSort]);
 
+  const allSectionKeys = useMemo(() => {
+    const keys: string[] = [];
+    for (const section of pinned.keys()) keys.push(`pin:${section}`);
+    for (const group of grouped.keys()) if (group) keys.push(`grp:${group}`);
+    return keys;
+  }, [pinned, grouped]);
+
+  const allSectionsCollapsed =
+    allSectionKeys.length > 0 && allSectionKeys.every((key) => collapsedSections.has(key));
+
+  const toggleAllSections = () => {
+    setCollapsedSections(allSectionsCollapsed ? new Set() : new Set(allSectionKeys));
+  };
+
   const knownSections = useMemo(
     () => Array.from(new Set(repos.flatMap((r) => r.sections))).sort((a, b) => a.localeCompare(b)),
     [repos],
@@ -447,7 +463,7 @@ export function RepoSidebar() {
   return (
     <div className="flex h-full shrink-0">
     <aside
-      style={{ width: collapsed ? 56 : width }}
+      style={{ width: collapsed ? 48 : width }}
       className={cn(
         "flex h-full shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md transition-[width] duration-150 ease-in-out",
         dragOver && "ring-2 ring-inset ring-primary",
@@ -455,8 +471,7 @@ export function RepoSidebar() {
     >
       {collapsed ? (
         <>
-          <div className="flex shrink-0 flex-col items-center gap-1 border-b border-border p-1.5">
-            <AddRepoMenu />
+          <div className="flex shrink-0 flex-col items-center gap-2 border-b border-border p-1.5">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button variant="ghost" size="icon" onClick={() => setCollapsed(false)}>
@@ -465,6 +480,7 @@ export function RepoSidebar() {
               </TooltipTrigger>
               <TooltipContent>Expand sidebar</TooltipContent>
             </Tooltip>
+            <AddRepoMenu />
           </div>
           <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-auto p-1.5">
             {sorted.map((repo) => (
@@ -500,13 +516,7 @@ export function RepoSidebar() {
       ) : (
         <>
       <div className="flex shrink-0 flex-col gap-2 border-b border-border p-2">
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Filter repositories"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="h-7"
-          />
+        <div className="flex items-center justify-between gap-2">
           <AddRepoMenu />
           <Tooltip>
             <TooltipTrigger asChild>
@@ -519,6 +529,26 @@ export function RepoSidebar() {
         </div>
         <div className="flex items-center justify-between gap-2">
           <WorkspacePicker />
+        </div>
+        <div className="flex items-center gap-2">
+          <Input
+            placeholder="Filter repositories"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="h-9"
+          />
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="secondary" size="icon" className="shrink-0" onClick={toggleAllSections}>
+                {allSectionsCollapsed ? (
+                  <ChevronsUpDownIcon className="size-4" />
+                ) : (
+                  <ChevronsDownUpIcon className="size-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{allSectionsCollapsed ? "Expand all sections" : "Collapse all sections"}</TooltipContent>
+          </Tooltip>
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-1">
@@ -690,7 +720,7 @@ export function RepoSidebar() {
         </>
       )}
     </aside>
-    {!collapsed && <ResizeHandle onPointerDown={onPointerDown} tooltip={false} />}
+    {!collapsed && <ResizeHandle onPointerDown={onPointerDown} />}
     <PinToSectionDialog
       repo={pinSectionRepo}
       sections={knownSections}
