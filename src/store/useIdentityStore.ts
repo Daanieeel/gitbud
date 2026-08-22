@@ -9,7 +9,7 @@ import type { SshIdentity } from "@/lib/types";
 // SSH-key-based identity (host + key, no hosted-provider API) used to authenticate git
 // operations. `id` is what's persisted as the per-repo override / global default.
 export type UnifiedIdentity =
-  | { id: string; kind: "github"; login: string; avatarUrl: string }
+  | { id: string; kind: "github"; login: string; name: string | null; email: string; avatarUrl: string }
   | { id: string; kind: "ssh"; label: string; host: string; keyPath: string };
 
 export function githubIdentityId(login: string): string {
@@ -18,6 +18,12 @@ export function githubIdentityId(login: string): string {
 
 export function sshIdentityId(id: string): string {
   return `ssh:${id}`;
+}
+
+/** The commit-attributable email for a GitHub identity — its stored email, falling back to
+ * the noreply address for accounts saved before that field existed. */
+function githubEmail(identity: { login: string; email: string }): string {
+  return identity.email.trim() || `${identity.login}@users.noreply.github.com`;
 }
 
 interface IdentityState {
@@ -46,7 +52,14 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
   list: () => {
     const github: UnifiedIdentity[] = useGitHubStore
       .getState()
-      .accounts.map((a) => ({ id: githubIdentityId(a.login), kind: "github", login: a.login, avatarUrl: a.avatar_url }));
+      .accounts.map((a) => ({
+        id: githubIdentityId(a.login),
+        kind: "github",
+        login: a.login,
+        name: a.name,
+        email: a.email,
+        avatarUrl: a.avatar_url,
+      }));
     const ssh: UnifiedIdentity[] = get().sshIdentities.map((i) => ({
       id: sshIdentityId(i.id),
       kind: "ssh",
@@ -103,6 +116,11 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
       await api.applySshIdentityToRepo(repoPath, identity.keyPath);
     } else {
       await api.clearSshIdentityFromRepo(repoPath);
+    }
+    if (identity?.kind === "github") {
+      // No per-repo override here means this identity is the global default, so it should
+      // become the global git profile rather than just this one repo's local config.
+      await api.setGitIdentity(repoPath, identity.name ?? identity.login, githubEmail(identity), override === null);
     }
   },
 }));

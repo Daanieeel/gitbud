@@ -215,6 +215,7 @@ export interface GitHubAccount {
   login: string;
   name: string | null;
   avatar_url: string;
+  email: string;
 }
 
 export interface DeviceCodeResponse {

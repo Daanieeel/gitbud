@@ -9,6 +9,12 @@ pub struct Account {
     pub login: String,
     pub name: Option<String>,
     pub avatar_url: String,
+    /// The account's commit-attributable email — its public GitHub email if set, otherwise
+    /// the `login@users.noreply.github.com` fallback GitHub itself uses for commit
+    /// attribution when no public email is available. Empty for accounts saved before this
+    /// field existed; callers should fall back to the noreply address themselves in that case.
+    #[serde(default)]
+    pub email: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,10 +170,15 @@ async fn complete_login(host: &str, token: &str) -> Result<Account, String> {
         .await
         .map_err(|e| e.to_string())?;
 
+    let email = user
+        .email
+        .filter(|e| !e.trim().is_empty())
+        .unwrap_or_else(|| format!("{}@users.noreply.github.com", user.login));
     let account = Account {
         login: user.login,
         name: user.name,
         avatar_url: user.avatar_url,
+        email,
     };
     save_account(account.clone(), token)?;
     Ok(account)
@@ -223,6 +234,7 @@ struct GitHubUserResponse {
     login: String,
     name: Option<String>,
     avatar_url: String,
+    email: Option<String>,
 }
 
 /// Polls the token endpoint once. The caller (frontend) is responsible for waiting

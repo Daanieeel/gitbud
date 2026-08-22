@@ -53,7 +53,14 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
   const sshIdentities = useIdentityStore((s) => s.sshIdentities);
   const identities = useMemo<UnifiedIdentity[]>(
     () => [
-      ...accounts.map((a) => ({ id: githubIdentityId(a.login), kind: "github" as const, login: a.login, avatarUrl: a.avatar_url })),
+      ...accounts.map((a) => ({
+        id: githubIdentityId(a.login),
+        kind: "github" as const,
+        login: a.login,
+        name: a.name,
+        email: a.email,
+        avatarUrl: a.avatar_url,
+      })),
       ...sshIdentities.map((i) => ({ id: sshIdentityId(i.id), kind: "ssh" as const, label: i.label, host: i.host, keyPath: i.key_path })),
     ],
     [accounts, sshIdentities],
@@ -109,7 +116,7 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
             <TriangleAlertIcon className="size-3.5 shrink-0" />
             GitHub sign-in expired
           </span>
-          <span>Token for <code>{identityLabel(brokenIdentity)}</code> is missing from the system keychain — reconnect to keep using it.</span>
+          <span>Token for <code>{identityLabel(brokenIdentity)}</code> is missing from the system keychain. Reconnect to keep using it.</span>
           <Button
             size="sm"
             variant="secondary"
@@ -120,7 +127,7 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
           </Button>
         </div>
       )}
-      <div className={cn("flex items-center gap-1", collapsed && "flex-col")}>
+      <div className={cn("flex items-center gap-2", collapsed && "flex-col")}>
       {identities.length === 0 ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
