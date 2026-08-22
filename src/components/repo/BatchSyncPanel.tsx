@@ -1,11 +1,5 @@
-import { CheckIcon, ChevronDownIcon, CircleIcon, RefreshCwIcon, XCircleIcon, XIcon } from "lucide-react";
+import { CheckIcon, CircleIcon, RefreshCwIcon, XCircleIcon, XIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { useBatchSyncStore } from "@/store/useBatchSyncStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { cn } from "@/lib/utils";
@@ -19,30 +13,30 @@ export function BatchSyncTrigger({ repos }: { repos: RepoEntry[] }) {
   if (repos.length === 0) return null;
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={running}
-          title="Run fetch/pull across every repo in the sidebar"
-        >
-          <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
-          Batch
-          <ChevronDownIcon className="size-3 opacity-50" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start">
-        <DropdownMenuItem onSelect={() => void runFetchAll(repos.map((r) => r.path))}>
-          <RefreshCwIcon className="size-3.5" />
-          Fetch All ({repos.length})
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void runPullAll(repos.map((r) => r.path))}>
-          <RefreshCwIcon className="size-3.5" />
-          Pull All ({repos.length})
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div className="flex gap-1.5">
+      <Button
+        variant="outline"
+        size="sm"
+        className="flex-1"
+        disabled={running}
+        title="Fetch every repo in the sidebar"
+        onClick={() => void runFetchAll(repos.map((r) => r.path))}
+      >
+        <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
+        Fetch All ({repos.length})
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="flex-1"
+        disabled={running}
+        title="Pull every repo in the sidebar"
+        onClick={() => void runPullAll(repos.map((r) => r.path))}
+      >
+        <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
+        Pull All ({repos.length})
+      </Button>
+    </div>
   );
 }
 

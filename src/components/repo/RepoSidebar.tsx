@@ -194,7 +194,6 @@ export function RepoSidebar() {
         </div>
         <div className="flex items-center justify-between gap-2">
           <WorkspacePicker />
-          {filtered.length > 1 && <BatchSyncTrigger repos={filtered} />}
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-1">
@@ -309,6 +308,11 @@ export function RepoSidebar() {
           </div>
         ))}
       </div>
+      {filtered.length > 1 && (
+        <div className="shrink-0 border-t border-border p-2">
+          <BatchSyncTrigger repos={filtered} />
+        </div>
+      )}
       <AccountBar />
     </aside>
     <ResizeHandle onPointerDown={onPointerDown} />
