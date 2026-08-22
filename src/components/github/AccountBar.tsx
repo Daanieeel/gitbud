@@ -207,49 +207,51 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
                     <span className="ml-1 text-xs text-muted-foreground">{identity.host}</span>
                   )}
                 </span>
-                {selectedRepo && (
+                <div className="flex shrink-0 items-center gap-1">
+                  {selectedRepo && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          className={cn(
+                            "shrink-0 rounded-md bg-accent-yellow/10 p-1.5 text-accent-yellow hover:bg-accent-yellow/20",
+                            repoOverride === identity.id && "bg-accent-yellow/25",
+                          )}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (repoOverride === identity.id) {
+                              void clearRepoOverride(selectedRepo);
+                            } else {
+                              void setActive(identity.id, selectedRepo);
+                            }
+                            setSwitcherOpen(false);
+                          }}
+                        >
+                          <MapPinIcon className="size-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {repoOverride === identity.id
+                          ? `Unpin, and use the global default identity for this repo again`
+                          : `Pin ${identityLabel(identity)} to this repo only`}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        className={cn(
-                          "shrink-0 rounded-md bg-accent-yellow/10 p-1.5 text-accent-yellow hover:bg-accent-yellow/20",
-                          repoOverride === identity.id && "bg-accent-yellow/25",
-                        )}
+                        className="shrink-0 rounded-md bg-destructive/10 p-1.5 text-destructive hover:bg-destructive/20 disabled:opacity-50"
+                        disabled={removingId !== null}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (repoOverride === identity.id) {
-                            void clearRepoOverride(selectedRepo);
-                          } else {
-                            void setActive(identity.id, selectedRepo);
-                          }
-                          setSwitcherOpen(false);
+                          void remove(identity);
                         }}
                       >
-                        <MapPinIcon className="size-4" />
+                        <XIcon className={cn("size-4", removingId === identity.id && "animate-spin")} />
                       </button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      {repoOverride === identity.id
-                        ? `Unpin, and use the global default identity for this repo again`
-                        : `Pin ${identityLabel(identity)} to this repo only`}
-                    </TooltipContent>
+                    <TooltipContent>{`Remove ${identityLabel(identity)}`}</TooltipContent>
                   </Tooltip>
-                )}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      className="shrink-0 rounded-md bg-destructive/10 p-1.5 text-destructive hover:bg-destructive/20 disabled:opacity-50"
-                      disabled={removingId !== null}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void remove(identity);
-                      }}
-                    >
-                      <XIcon className={cn("size-4", removingId === identity.id && "animate-spin")} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>{`Remove ${identityLabel(identity)}`}</TooltipContent>
-                </Tooltip>
+                </div>
               </div>
             ))}
             <div className="mt-1 border-t border-border pt-1">
