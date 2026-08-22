@@ -40,6 +40,10 @@ interface GitHubState {
   startSignIn: () => Promise<void>;
   cancelSignIn: () => void;
   tryGhCli: () => Promise<boolean>;
+
+  signInOpen: boolean;
+  openSignIn: () => void;
+  closeSignIn: () => void;
 }
 
 export const useGitHubStore = create<GitHubState>((set, get) => ({

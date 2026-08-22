@@ -11,7 +11,6 @@ import { CreatePRDialog } from "./CreatePRDialog";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { api } from "@/lib/tauri";
-import { openUrl } from "@tauri-apps/plugin-opener";
 
 const FILTERS: { key: PRFilter; label: string }[] = [
   { key: "open", label: "Open" },
@@ -80,29 +79,7 @@ export function PRTab() {
     );
   }
 
-  if (loadError && (loadError.includes("404") || loadError.includes("403"))) {
-    return (
-      <div className="flex h-full items-center justify-center bg-dot-grid p-6">
-        <div className="flex w-full max-w-sm flex-col items-center gap-2 rounded-md border border-destructive/20 bg-destructive/10 p-4 text-center text-destructive">
-          <span className="flex items-center justify-center gap-1.5 font-medium">
-            <TriangleAlertIcon className="size-4 shrink-0" />
-            Access Denied
-          </span>
-          <p className="text-xs leading-relaxed">
-            GitHub blocked access to this repository. If it belongs to an organization, you must explicitly grant GitBud access to that organization in your GitHub settings.
-          </p>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="mt-2 text-foreground"
-            onClick={() => void openUrl("https://github.com/settings/connections/applications/Ov23li3VnSdamGm6SrSm")}
-          >
-            Grant Organization Access
-          </Button>
-        </div>
-      </div>
-    );
-  }
+
 
   if (hasRemote === false) {
     return (
