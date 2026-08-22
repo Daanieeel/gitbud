@@ -47,7 +47,7 @@ export function PRTab() {
 
   if (!currentLogin) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
         Sign in with GitHub (bottom of the sidebar) to see pull requests
       </div>
     );
@@ -55,7 +55,7 @@ export function PRTab() {
 
   if (hasRemote === false) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
         This repository has no GitHub origin remote
       </div>
     );
@@ -104,7 +104,7 @@ export function PRTab() {
       {selected ? (
         <PRDetail repoPath={repoPath} login={currentLogin} pr={selected} />
       ) : (
-        <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
+        <div className="flex flex-1 items-center justify-center bg-dot-grid text-sm text-muted-foreground">
           Select a pull request
         </div>
       )}

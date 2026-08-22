@@ -178,7 +178,7 @@ export function RepoSidebar() {
     <aside
       style={{ width }}
       className={cn(
-        "flex h-full shrink-0 flex-col",
+        "flex h-full shrink-0 flex-col bg-card shadow-sm",
         dragOver && "ring-2 ring-inset ring-primary",
       )}
     >

@@ -41,7 +41,7 @@ export function HistoryTab() {
 
   if (commits.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
         No commits yet
       </div>
     );

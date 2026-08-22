@@ -8,7 +8,9 @@
  * yellow used for git + status semantics (green = added/modified, pink = deleted).
  */
 :root {
-  --background: #ffffff;
+  /* Page bg is a soft neutral (same tone as --muted) so raised --card surfaces (dialogs,
+     popovers, the toolbar, the sidebar) actually read as elevated instead of blending in. */
+  --background: #f2f2f2;
   --foreground: #0a0a0a;
   --card: #ffffff;
   --card-foreground: #0a0a0a;
@@ -27,7 +29,7 @@
   --border: #e2e2e2;
   --input: #d4d4d4;
   --ring: #0070f3;
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 
   --diff-add-bg: #e6f9ee;
   --diff-add-fg: #00873d;
@@ -42,11 +44,13 @@
 }
 
 .dark {
+  /* Card surfaces are a lighter charcoal than the page bg (same tone as --muted) so they
+     read as raised toward the light, mirroring the light theme's white-card-on-gray-page. */
   --background: #000000;
   --foreground: #eeeeee;
-  --card: #000000;
+  --card: #1a1a1a;
   --card-foreground: #eeeeee;
-  --popover: #000000;
+  --popover: #1a1a1a;
   --popover-foreground: #eeeeee;
   --primary: #0070f3;
   --primary-foreground: #ffffff;
@@ -123,6 +127,13 @@
   [role="button"]:not([aria-disabled="true"]) {
     cursor: pointer;
   }
+}
+
+/* Subtle dot-grid texture for large empty-state areas, so they read as intentional
+ * negative space rather than a blank/broken panel. Uses --border, no new colors. */
+.bg-dot-grid {
+  background-image: radial-gradient(color-mix(in srgb, var(--border) 70%, transparent) 1px, transparent 1px);
+  background-size: 16px 16px;
 }
 
 /*

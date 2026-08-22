@@ -310,7 +310,7 @@ function DiffViewImpl({
 
   if (!path) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
         Select a file to view its diff
       </div>
     );
@@ -318,7 +318,7 @@ function DiffViewImpl({
 
   if (!diff) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
         Loading diff…
       </div>
     );
@@ -330,7 +330,7 @@ function DiffViewImpl({
 
   if (diff.is_binary) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-1 text-sm text-muted-foreground">
+      <div className="flex h-full flex-col items-center justify-center gap-1 bg-dot-grid text-sm text-muted-foreground">
         <span className="font-medium text-foreground">{diff.path}</span>
         <span>Binary file changed</span>
       </div>
@@ -339,7 +339,7 @@ function DiffViewImpl({
 
   if (diff.hunks.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
         No changes to display
       </div>
     );
