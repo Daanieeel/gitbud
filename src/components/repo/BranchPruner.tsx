@@ -1,0 +1,101 @@
+import { useEffect, useMemo, useState } from "react";
+import { Trash2Icon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useRepoStore } from "@/store/useRepoStore";
+import { useGitHubStore } from "@/store/useGitHubStore";
+import { api } from "@/lib/tauri";
+import { isProtectedBranch } from "@/lib/utils";
+import type { PullRequest } from "@/lib/types";
+
+export function BranchPruner() {
+  const repoPath = useRepoStore((s) => s.selectedRepo);
+  const branches = useRepoStore((s) => s.branches);
+  const deleteBranch = useRepoStore((s) => s.deleteBranch);
+  const currentLogin = useGitHubStore((s) => s.currentLogin);
+
+  const [open, setOpen] = useState(false);
+  const [merged, setMerged] = useState<PullRequest[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [pruning, setPruning] = useState(false);
+
+  useEffect(() => {
+    if (!open || !repoPath || !currentLogin) return;
+    void api.githubListPullRequests(repoPath, currentLogin, "closed").then((pulls) => {
+      setMerged(pulls.filter((p) => p.merged));
+    });
+  }, [open, repoPath, currentLogin]);
+
+  const candidates = useMemo(() => {
+    const mergedRefs = new Set(merged.map((p) => p.head_ref));
+    return branches.filter(
+      (b) => !b.is_remote && !b.is_head && !isProtectedBranch(b.name) && mergedRefs.has(b.name),
+    );
+  }, [branches, merged]);
+
+  if (!repoPath || !currentLogin || candidates.length === 0) return null;
+
+  const toggle = (name: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
+
+  const pruneSelected = async () => {
+    setPruning(true);
+    try {
+      for (const name of selected) {
+        await deleteBranch(name);
+      }
+      setSelected(new Set());
+      setOpen(false);
+    } finally {
+      setPruning(false);
+    }
+  };
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" title="Branches with a merged PR">
+          <Trash2Icon className="size-3.5" />
+          {candidates.length} merged
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-72 p-0" align="start">
+        <div className="border-b border-border p-2 text-xs text-muted-foreground">
+          These branches' pull requests were merged on GitHub.
+        </div>
+        <div className="max-h-56 overflow-auto p-1">
+          {candidates.map((b) => (
+            <label
+              key={b.name}
+              className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+            >
+              <input
+                type="checkbox"
+                checked={selected.has(b.name)}
+                onChange={() => toggle(b.name)}
+              />
+              <span className="truncate">{b.name}</span>
+            </label>
+          ))}
+        </div>
+        <div className="border-t border-border p-2">
+          <Button
+            size="sm"
+            variant="destructive"
+            className="w-full"
+            disabled={selected.size === 0 || pruning}
+            onClick={() => void pruneSelected()}
+          >
+            {pruning ? "Pruning…" : `Prune ${selected.size || ""} Local Branch${selected.size === 1 ? "" : "es"}`}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}

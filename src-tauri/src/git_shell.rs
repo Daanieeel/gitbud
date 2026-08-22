@@ -18,7 +18,7 @@ pub struct AheadBehind {
 /// Runs a system `git` subcommand in `repo_path`, streaming each output line to the frontend
 /// as a `git://<event_id>` event so long-running fetch/pull/push can show live progress.
 fn run_streaming(app: &AppHandle, repo_path: &str, args: &[&str], event_id: &str) -> Result<(), String> {
-    let mut child = Command::new("git")
+    let mut child = Command::new(crate::settings::git_binary())
         .args(args)
         .current_dir(repo_path)
         .stdout(Stdio::piped())
@@ -61,7 +61,14 @@ pub fn fetch(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), Str
 }
 
 pub fn pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
-    run_streaming(app, repo_path, &["pull"], event_id)
+    use crate::settings::PullStrategy;
+    let strategy = crate::settings::get_settings().map(|s| s.pull_strategy).unwrap_or(PullStrategy::Merge);
+    let args: &[&str] = match strategy {
+        PullStrategy::Merge => &["pull"],
+        PullStrategy::Rebase => &["pull", "--rebase"],
+        PullStrategy::FfOnly => &["pull", "--ff-only"],
+    };
+    run_streaming(app, repo_path, args, event_id)
 }
 
 pub fn push(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
@@ -69,7 +76,7 @@ pub fn push(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), Stri
 }
 
 pub fn clone(app: &AppHandle, url: &str, dest: &str, event_id: &str) -> Result<(), String> {
-    let mut child = Command::new("git")
+    let mut child = Command::new(crate::settings::git_binary())
         .args(["clone", "--progress", url, dest])
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())

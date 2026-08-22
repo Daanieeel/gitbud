@@ -8,6 +8,7 @@ import { PRTab } from "@/components/pr/PRTab";
 import { UpstreamBanner } from "@/components/pr/UpstreamBanner";
 import { SyncLogToast } from "@/components/sync/SyncLogToast";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
 
 function App() {
   const initGlobalListeners = useRepoStore((s) => s.initGlobalListeners);
@@ -16,11 +17,13 @@ function App() {
   const branch = useRepoStore((s) => s.branch);
   const activeTab = useRepoStore((s) => s.activeTab);
   const repos = useRepoStore((s) => s.repos);
+  const loadSettings = useSettingsStore((s) => s.load);
 
   useEffect(() => {
     void initGlobalListeners();
     void loadRepos();
-  }, [initGlobalListeners, loadRepos]);
+    void loadSettings();
+  }, [initGlobalListeners, loadRepos, loadSettings]);
 
   return (
     <div className="flex h-screen w-screen bg-background text-foreground">

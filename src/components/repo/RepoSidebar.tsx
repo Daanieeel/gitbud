@@ -12,6 +12,7 @@ import {
 import { AddRepoMenu } from "./AddRepoMenu";
 import { AccountBar } from "@/components/github/AccountBar";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -33,6 +34,8 @@ export function RepoSidebar() {
   const selectRepo = useRepoStore((s) => s.selectRepo);
   const removeRepo = useRepoStore((s) => s.removeRepo);
   const setReposLocal = useRepoStore.setState;
+  const sidebarSort = useSettingsStore((s) => s.settings.sidebar_sort);
+  const showAheadBehind = useSettingsStore((s) => s.settings.show_ahead_behind);
 
   const [filter, setFilter] = useState("");
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
@@ -68,7 +71,24 @@ export function RepoSidebar() {
     );
   }, [repos, filter]);
 
-  const grouped = useMemo(() => groupRepos(filtered), [filtered]);
+  const sorted = useMemo(() => {
+    const copy = [...filtered];
+    if (sidebarSort === "name") {
+      copy.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sidebarSort === "recent") {
+      copy.sort((a, b) => (b.last_fetched ?? 0) - (a.last_fetched ?? 0));
+    }
+    return copy;
+  }, [filtered, sidebarSort]);
+
+  const grouped = useMemo(() => {
+    if (sidebarSort !== "group") {
+      return new Map([["", sorted]]);
+    }
+    const groups = groupRepos(sorted);
+    for (const list of groups.values()) list.sort((a, b) => a.name.localeCompare(b.name));
+    return new Map([...groups.entries()].sort(([a], [b]) => a.localeCompare(b)));
+  }, [sorted, sidebarSort]);
 
   const togglePrivate = async (repo: RepoEntry) => {
     const updated = await api.setRepoPrivate(repo.path, !repo.is_private);
@@ -94,9 +114,11 @@ export function RepoSidebar() {
         )}
         {[...grouped.entries()].map(([group, groupRepos]) => (
           <div key={group}>
-            <div className="px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground">
-              {group}
-            </div>
+            {group && (
+              <div className="px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground">
+                {group}
+              </div>
+            )}
             {groupRepos.map((repo) => {
               const ab = aheadBehind[repo.path];
               return (
@@ -117,7 +139,7 @@ export function RepoSidebar() {
                         title={dirty[repo.path] ? "Uncommitted changes" : undefined}
                       />
                       <span className="truncate flex-1">{repo.name}</span>
-                      {ab && (ab.ahead > 0 || ab.behind > 0) && (
+                      {showAheadBehind && ab && (ab.ahead > 0 || ab.behind > 0) && (
                         <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
                           {ab.ahead > 0 && `↑${ab.ahead}`}
                           {ab.behind > 0 && `↓${ab.behind}`}

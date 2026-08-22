@@ -17,6 +17,7 @@ import type {
   RepoEntry,
   RepoStatus,
   ReviewComment,
+  Settings,
   StashEntry,
 } from "./types";
 
@@ -94,6 +95,12 @@ export const api = {
     invoke<string>("checkout_pull_request", { repoPath, number }),
 
   openInTerminal: (path: string) => invoke<void>("open_in_terminal", { path }),
+  getSettings: () => invoke<Settings>("get_settings"),
+  saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
+  getGitIdentity: (repoPath: string) =>
+    invoke<[string | null, string | null]>("get_git_identity", { repoPath }),
+  setGitIdentity: (repoPath: string, name: string, email: string, global: boolean) =>
+    invoke<void>("set_git_identity", { repoPath, name, email, global }),
   startWatch: (repoPath: string) => invoke<void>("start_watch", { repoPath }),
   stopWatch: (repoPath: string) => invoke<void>("stop_watch", { repoPath }),
 

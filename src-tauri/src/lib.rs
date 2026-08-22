@@ -5,6 +5,7 @@ mod github;
 mod history;
 mod image_diff;
 mod repo;
+mod settings;
 mod stash;
 mod system;
 mod watch;
@@ -163,7 +164,12 @@ fn set_repo_private(path: String, is_private: bool) -> Result<Vec<config::RepoEn
 
 #[tauri::command]
 fn init_repo(path: String) -> Result<(), String> {
-    git2::Repository::init(&path).map_err(|e| e.message().to_string())?;
+    let default_branch = settings::get_settings()
+        .map(|s| s.default_branch_name)
+        .unwrap_or_else(|_| "main".to_string());
+    let mut opts = git2::RepositoryInitOptions::new();
+    opts.initial_head(&default_branch);
+    git2::Repository::init_opts(&path, &opts).map_err(|e| e.message().to_string())?;
     Ok(())
 }
 
@@ -444,10 +450,35 @@ fn open_in_terminal(path: String) -> Result<(), String> {
     system::open_in_terminal(&path)
 }
 
+// --- settings ---
+
+#[tauri::command]
+fn get_settings() -> Result<settings::Settings, String> {
+    settings::get_settings()
+}
+
+#[tauri::command]
+fn save_settings(settings: settings::Settings) -> Result<(), String> {
+    settings::save_settings(&settings)
+}
+
+#[tauri::command]
+fn get_git_identity(repo_path: String) -> Result<(Option<String>, Option<String>), String> {
+    settings::get_git_identity(&repo_path)
+}
+
+#[tauri::command]
+fn set_git_identity(repo_path: String, name: String, email: String, global: bool) -> Result<(), String> {
+    settings::set_git_identity(&repo_path, &name, &email, global)
+}
+
 // --- filesystem watch ---
 
 #[tauri::command]
 fn start_watch(app: AppHandle, state: State<AppState>, repo_path: String) -> Result<(), String> {
+    if !settings::get_settings().map(|s| s.fs_watch_enabled).unwrap_or(true) {
+        return Ok(());
+    }
     let mut watchers = state.watchers.lock().map_err(|e| e.to_string())?;
     if watchers.contains_key(&repo_path) {
         return Ok(());
@@ -514,6 +545,10 @@ pub fn run() {
             sync_upstream,
             checkout_pull_request,
             open_in_terminal,
+            get_settings,
+            save_settings,
+            get_git_identity,
+            set_git_identity,
             start_watch,
             stop_watch,
             github_get_client_id,

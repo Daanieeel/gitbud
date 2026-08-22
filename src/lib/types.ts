@@ -88,6 +88,29 @@ export interface CherryPickResult {
   new_oid: string | null;
 }
 
+// --- Settings ---
+
+export type ThemeMode = "light" | "dark" | "system";
+export type PullStrategy = "merge" | "rebase" | "ff-only";
+export type DiffViewMode = "unified" | "split";
+export type SidebarSort = "name" | "recent" | "group";
+
+export interface Settings {
+  theme: ThemeMode;
+  default_clone_dir: string | null;
+  git_name: string | null;
+  git_email: string | null;
+  default_branch_name: string;
+  pull_strategy: PullStrategy;
+  diff_view: DiffViewMode;
+  ignore_whitespace: boolean;
+  diff_font_size: number;
+  show_ahead_behind: boolean;
+  sidebar_sort: SidebarSort;
+  git_binary_path: string | null;
+  fs_watch_enabled: boolean;
+}
+
 // --- GitHub ---
 
 export interface GitHubAccount {

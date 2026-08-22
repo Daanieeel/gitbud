@@ -4,6 +4,7 @@ import type { FileDiff, ImageDiff, ReviewComment } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ImageDiffView } from "./ImageDiffView";
 import { Button } from "@/components/ui/button";
+import { useSettingsStore } from "@/store/useSettingsStore";
 
 interface DiffViewProps {
   path: string | null;
@@ -89,6 +90,7 @@ function AddCommentComposer({
 
 function DiffViewImpl({ path, diff, imageDiff, comments, onAddComment, onCopyPermalink }: DiffViewProps) {
   const [composerKey, setComposerKey] = useState<string | null>(null);
+  const fontSize = useSettingsStore((s) => s.settings.diff_font_size);
 
   if (!path) {
     return (
@@ -128,7 +130,7 @@ function DiffViewImpl({ path, diff, imageDiff, comments, onAddComment, onCopyPer
   }
 
   return (
-    <div className="h-full overflow-auto font-mono text-xs">
+    <div className="h-full overflow-auto font-mono" style={{ fontSize: `${fontSize}px` }}>
       <div className="sticky top-0 z-10 border-b border-border bg-card px-3 py-1.5 text-xs font-medium">
         {diff.path}
       </div>

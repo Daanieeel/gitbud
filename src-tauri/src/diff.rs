@@ -85,10 +85,18 @@ fn build_file_diff(path: &str, old_path: Option<&str>, diff: &Diff) -> Result<Fi
 }
 
 /// Diff a single file, either the staged side (HEAD -> index) or unstaged side (index -> workdir).
+/// Applies the user's whitespace-handling preference to a set of diff options.
+fn apply_whitespace_setting(opts: &mut DiffOptions) {
+    if crate::settings::get_settings().map(|s| s.ignore_whitespace).unwrap_or(false) {
+        opts.ignore_whitespace(true);
+    }
+}
+
 pub fn get_file_diff(repo_path: &str, path: &str, staged: bool) -> Result<FileDiff, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut opts = DiffOptions::new();
     opts.pathspec(path).include_untracked(true).recurse_untracked_dirs(true);
+    apply_whitespace_setting(&mut opts);
 
     let diff = if staged {
         let head_tree = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
@@ -221,6 +229,7 @@ pub fn get_commit_file_diff(repo_path: &str, oid: &str, path: &str) -> Result<Fi
 
     let mut opts = DiffOptions::new();
     opts.pathspec(path);
+    apply_whitespace_setting(&mut opts);
 
     let diff = repo
         .diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut opts))
