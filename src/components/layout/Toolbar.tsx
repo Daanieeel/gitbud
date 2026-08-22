@@ -13,6 +13,7 @@ import { SyncButton } from "@/components/repo/SyncButton";
 import { CreatePRDialog } from "@/components/pr/CreatePRDialog";
 import { OfflineIndicator } from "./OfflineIndicator";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function Toolbar() {
   const currentName = useRepoStore(
@@ -34,15 +35,19 @@ export function Toolbar() {
       <div className="flex-1" />
       <OfflineIndicator />
       {currentLogin && (
-        <Button
-          variant="outline"
-          size="sm"
-          title="Preview and open a pull request for this branch"
-          onClick={() => setPreviewPrOpen(true)}
-        >
-          <GitPullRequestIcon className="size-3.5" />
-          Preview PR
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPreviewPrOpen(true)}
+            >
+              <GitPullRequestIcon className="size-3.5" />
+              Preview PR
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Preview and open a pull request for this branch</TooltipContent>
+        </Tooltip>
       )}
       <SyncButton />
       <CreatePRDialog open={previewPrOpen} onOpenChange={setPreviewPrOpen} />

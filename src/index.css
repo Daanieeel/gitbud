@@ -137,6 +137,13 @@
     -webkit-user-select: none;
     user-select: none;
   }
+  code:not(pre code) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--muted);
+    border-radius: 0.25rem;
+    padding: 0.1em 0.4em;
+    font-size: 0.85em;
+  }
 }
 
 /* Subtle dot-grid texture for large empty-state areas, so they read as intentional
