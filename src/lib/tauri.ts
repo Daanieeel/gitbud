@@ -110,6 +110,8 @@ export const api = {
   removeRepo: (path: string) => invoke<RepoEntry[]>("remove_repo", { path }),
   setRepoPrivate: (path: string, isPrivate: boolean) =>
     invoke<RepoEntry[]>("set_repo_private", { path, isPrivate }),
+  setRepoSection: (path: string, section: string | null) =>
+    invoke<RepoEntry[]>("set_repo_section", { path, section }),
   initRepo: (path: string) => invoke<void>("init_repo", { path }),
 
   gitFetch: (repoPath: string) => invoke<void>("git_fetch", { repoPath }),

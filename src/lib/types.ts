@@ -100,6 +100,7 @@ export interface RepoEntry {
   group: string;
   is_private: boolean;
   last_fetched: number | null;
+  section: string | null;
 }
 
 export interface AheadBehind {

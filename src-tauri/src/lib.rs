@@ -243,6 +243,11 @@ fn set_repo_private(path: String, is_private: bool) -> Result<Vec<config::RepoEn
 }
 
 #[tauri::command]
+fn set_repo_section(path: String, section: Option<String>) -> Result<Vec<config::RepoEntry>, String> {
+    config::set_repo_section(&path, section)
+}
+
+#[tauri::command]
 fn init_repo(path: String) -> Result<(), String> {
     let default_branch = settings::get_settings()
         .map(|s| s.default_branch_name)
@@ -628,6 +633,7 @@ pub fn run() {
             add_repo,
             remove_repo,
             set_repo_private,
+            set_repo_section,
             init_repo,
             git_fetch,
             git_pull,

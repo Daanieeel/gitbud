@@ -19,12 +19,17 @@ import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { AheadBehind, RepoEntry } from "@/lib/types";
 
+function groupKey(repo: RepoEntry): string {
+  return repo.section ?? repo.group;
+}
+
 function groupRepos(repos: RepoEntry[]): Map<string, RepoEntry[]> {
   const groups = new Map<string, RepoEntry[]>();
   for (const repo of repos) {
-    const list = groups.get(repo.group) ?? [];
+    const key = groupKey(repo);
+    const list = groups.get(key) ?? [];
     list.push(repo);
-    groups.set(repo.group, list);
+    groups.set(key, list);
   }
   return groups;
 }
@@ -92,7 +97,10 @@ export function RepoSidebar() {
     if (!filter.trim()) return repos;
     const needle = filter.toLowerCase();
     return repos.filter(
-      (r) => r.name.toLowerCase().includes(needle) || r.group.toLowerCase().includes(needle),
+      (r) =>
+        r.name.toLowerCase().includes(needle) ||
+        r.group.toLowerCase().includes(needle) ||
+        r.section?.toLowerCase().includes(needle),
     );
   }, [repos, filter]);
 
@@ -117,6 +125,16 @@ export function RepoSidebar() {
 
   const togglePrivate = async (repo: RepoEntry) => {
     const updated = await api.setRepoPrivate(repo.path, !repo.is_private);
+    setReposLocal({ repos: updated });
+  };
+
+  const moveToSection = async (repo: RepoEntry) => {
+    const input = window.prompt(
+      "Move to section (leave blank to use the default grouping):",
+      repo.section ?? "",
+    );
+    if (input === null) return;
+    const updated = await api.setRepoSection(repo.path, input.trim() || null);
     setReposLocal({ repos: updated });
   };
 
@@ -215,6 +233,9 @@ export function RepoSidebar() {
                     </ContextMenuItem>
                     <ContextMenuItem onSelect={() => void copyToClipboard(repo.path)}>
                       Copy Path
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => void moveToSection(repo)}>
+                      Move to Section…
                     </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem variant="destructive" onSelect={() => void removeRepo(repo.path)}>

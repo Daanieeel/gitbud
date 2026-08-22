@@ -51,5 +51,5 @@ Mark as done when the feature is implemented.
 - [ ] **Custom sidebar sections** (Favorites, Work, Personal, etc.) to organize repositories instead of one flat list.
 - [x] **Commit message history** — `lib/commit-history.ts` (localStorage, per-machine not per-repo), history icon next to the summary field in `CommitBox.tsx`. Loading a repo's `.gitmessage` template is not implemented.
 - [x] **Drag-and-drop** a folder to add it as a repo (`RepoSidebar.tsx`, via Tauri's window-level `onDragDropEvent` — the drop target is the whole window, not hit-tested to the sidebar's DOM bounds specifically, but the sidebar highlights during drag as the visual target).
-- [ ] **Submodule support** — detect and show submodule status, allow update/init from the UI.
+- [x] **Submodule support** — `submodules.rs` (list via git2) + `SubmodulesPanel.tsx` (toolbar, only shown when the repo has any); init/update per-submodule or all at once, shelled out to system `git submodule update --init` (same auth reasoning as fetch/pull/push).
 - [x] **Animated status icons** — spinning refresh icon on the active repo's sidebar row while fetch/pull/push is running (`RepoSidebar.tsx`).

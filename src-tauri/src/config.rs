@@ -11,6 +11,10 @@ pub struct RepoEntry {
     pub is_private: bool,
     #[serde(default)]
     pub last_fetched: Option<i64>,
+    /// User-assigned sidebar section (e.g. "Work", "Personal"), overriding the auto-derived
+    /// `group` for display purposes. `None` means "use the auto-derived group".
+    #[serde(default)]
+    pub section: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -105,6 +109,7 @@ pub fn add_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
         group,
         is_private: false,
         last_fetched: None,
+        section: None,
     });
     save_repos(&repos)?;
     Ok(repos)
@@ -121,6 +126,15 @@ pub fn set_repo_private(path: &str, is_private: bool) -> Result<Vec<RepoEntry>, 
     let mut repos = load_repos()?;
     if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
         entry.is_private = is_private;
+    }
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
+pub fn set_repo_section(path: &str, section: Option<String>) -> Result<Vec<RepoEntry>, String> {
+    let mut repos = load_repos()?;
+    if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
+        entry.section = section.filter(|s| !s.trim().is_empty());
     }
     save_repos(&repos)?;
     Ok(repos)
