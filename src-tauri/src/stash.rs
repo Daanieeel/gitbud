@@ -53,6 +53,37 @@ pub fn stash_drop(repo_path: &str, index: usize) -> Result<(), String> {
     repo.stash_drop(index).map_err(|e| e.message().to_string())
 }
 
+/// A stash entry is itself a commit — this resolves its oid so the frontend can reuse the
+/// existing commit-diff endpoints (`get_commit_files`/`get_commit_file_diff`) for a stash's
+/// file list and per-file diff preview instead of duplicating that logic.
+pub fn stash_oid(repo_path: &str, index: usize) -> Result<String, String> {
+    let mut repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let mut found = None;
+    repo.stash_foreach(|i, _message, oid| {
+        if i == index {
+            found = Some(oid.to_string());
+        }
+        true
+    })
+    .map_err(|e| e.message().to_string())?;
+    found.ok_or_else(|| format!("No stash at index {index}"))
+}
+
+/// Restores a single file out of a stash (into both the index and working tree) without
+/// touching the rest of the working tree or removing the stash — a partial apply.
+pub fn stash_apply_file(repo_path: &str, index: usize, path: &str) -> Result<(), String> {
+    let output = std::process::Command::new(crate::settings::git_binary())
+        .args(["checkout", &format!("stash@{{{index}}}"), "--", path])
+        .current_dir(repo_path)
+        .output()
+        .map_err(|e| e.to_string())?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,61 +1,26 @@
 # New Feature Requests
 
 Ordered by priority (highest impact / biggest current gap first).
-Mark as done when the feature is implemented.
+Mark as done when the feature is implemented. Commit after every TODO, do not push and do not add yourself as Co-author.
 
-## P-1 — GitHub functionality
+- [x] fetch/push can get stuck indefinitely, and the "Cancel" button on the sync toast doesn't reliably stop it — the cancel path (`cancel_git_operation` → kills the real child PID) was already correct from a prior commit; the actual gap was the idle-timeout watchdog only resetting on complete `\n`-terminated lines, so a large transfer dominated by git's `\r` progress meter could look idle for 45s despite transferring fine. Fixed in the watchdog-hardening commit above. If this is still seen live, the running dev app is likely a stale build from before today's fixes — restart it.
+- [x] toast/notification messages should always be descriptive, referencing the actual entities involved — added a `syncDescription` field driving the sync toast's placeholder text ("Fetching origin…", "Pulling origin/main…", "Pushing main to origin…"/"Publishing main to origin…"), descriptive `notify()` bodies on completion, and a new commit-complete notification ("Committed 3 files to main") that didn't exist before.
+- [x] show an indicator when the current local branch has no upstream configured ("not published" to the remote) — `AheadBehind` gained a `published: bool`; `SyncButton` now shows a "Publish branch" action and `BranchSwitcher` shows a cloud-upload badge when unpublished. Also changed plain `git push` to `git push -u origin HEAD` so publishing a new branch works in one click instead of failing with "no upstream branch".
+- [x] add a "Preview PR" button/flow: opens a popup to preview and edit the PR before creating it (title + description fields), with the title prefilled for quality of life, and a "Create" button that opens the PR on origin. Reused the existing `CreatePRDialog`: it now prefills the title from the branch's latest commit summary (falling back to the branch name), and a new "Preview PR" button in the main toolbar (visible once signed in to GitHub) opens it directly, instead of only being reachable from inside the PR tab.
+- [x] SSH identity creation: added a "Quick" / "Advanced" mode toggle to `AddSshIdentityDialog`. Advanced = original flow (pick an existing key file). Quick = generates a new ed25519 keypair on press (reused the existing `generateSshSigningKey` Tauri command, no new backend needed) at `~/.ssh/gitbud_<host>_ed25519`, then shows the pubkey with a "copy public key" button matching the signing wizard's pattern.
+- [x] the main window has a small rubber-band/scroll wiggle over some empty areas — added `height: 100%; overflow: hidden` on `html`/`body`/`#root` so the app shell itself never scrolls; inner panels keep their own explicit `overflow-auto`.
+- [x] resizable sidebars/panels — added a `useResizableWidth` hook (persisted per-panel in localStorage) + `ResizeHandle` divider, wired into the repo sidebar, History's commit-list/file-list panels, the PR list panel, and (per the user's follow-up) the Changes tab's local-changes file-list panel too.
+- [x] diff view: color the full line background by change type (add/remove/etc, next to the existing +/- gutter symbols), like a highlighter pen — keep syntax highlighting intact on top (background tint only, don't replace token colors). Split view already had this; added the same tint (plus a deepened hover state) to the unified view.
+- [x] buttons need `cursor: pointer` on hover — added a base-layer rule (`button:not(:disabled), [role="button"]:not([aria-disabled="true"])`) in `index.css`.
+- [x] add tooltips explaining git jargon on buttons/controls that use non-everyday terminology (worktree, hunk, amend, rebase, stash, reflog, etc) for less git-savvy users — worktree/reflog/LFS/stash already had them from an earlier pass; added Submodules, amend, interactive rebase, and the hunk-action buttons.
+- [x] fix error `could not read stored token for Daanieeel: No matching entry found in secure storage` surfacing in the PR tab — an account can outlive its OS keychain entry; `useGitHubStore.init` now checks each stored account's token and prunes the ones missing one instead of repeatedly failing every PR load with that raw error.
+- [x] account switcher: show the pin/remove buttons always, not only on hover, and add tooltips to them — both already had `title`s, now always visible instead of hover-only.
+- [x] remove the "Clear pin — use …" button in the account switcher and design a more intuitive replacement — clicking the same pin icon again now unpins (a toggle), instead of a separate text button below the list.
+- [x] move the batch-actions dropdown (currently at the top) to the bottom of the project/repo explorer, as its own side-by-side buttons instead of a dropdown — moved above the account switcher; later merged into a single "Update All" button per the user's follow-up (pulls every repo instead of separate Fetch All/Pull All buttons).
+- [x] move the search bar — clarified with the user: keep its position in the sidebar as-is; restyling folds into the cal.com-depth pass below instead of a separate change now.
+- [x] "Stage Hunk" and "Discard Hunk" buttons need real button look, not just clickable text — now rendered with the shared `Button` component (outline, small).
+- [x] in branches list, show the current branch's upstream branch name (if any) next to the branch name. also show two lists: local and origin branches, with the current branch highlighted — `BranchSwitcher` now has "Local" and "Origin" sections, with the current branch's row showing "→ origin/&lt;branch&gt;" and its upstream twin highlighted in the Origin list.
 
-- [ ] **Interactive GitHub Login** - instead of entering a client id manually, use the GitHub login flow to authenticate with GitHub.
-- [ ] **Pull Requests tab & 1-click local checkout** — Dedicated "Pull Requests" tab in `TabBar.tsx` to browse open, closed, and merged PRs for the current repository. Includes search/filter by author, review status, and labels, plus status badges (Draft, CI passing/failing, Approved). Double-click or click "Checkout PR" to automatically fetch (`refs/pull/{id}/head` for forks/branches) and switch to a local tracking branch to test changes locally.
-- [ ] **Create Pull Request workflow** — Quick "Create Pull Request" trigger from `Toolbar.tsx` or `BranchSwitcher.tsx` when the active branch is ahead of the upstream default branch. Modal includes base/compare branch selection, auto-loading `.github/PULL_REQUEST_TEMPLATE.md` (or recent commit messages) into the description editor, draft PR toggle, and preview of commits/diff before submission.
-- [ ] **CI / GitHub Actions status indicators & check details** — Build check status badges (passed, failed, pending) rendered directly on commit rows in `HistoryTab.tsx` / `CommitList.tsx` and in the PR view. Popover/tooltip showing individual check run names, durations, and direct deep-links to failing GitHub Action workflow runs.
-- [ ] **"Clone from GitHub" repository browser** — Expand `CloneDialog.tsx` to list the authenticated user's repositories, organization repos, and starred projects with a live search/filter, eliminating the need to manually copy-paste clone URLs.
-- [ ] **Fork sync & upstream tracking** — Automatic detection of fork remotes; surface an "Upstream is X commits ahead" status banner with a 1-click "Fetch Upstream & Fast-Forward" button to keep forks up-to-date without terminal commands.
-- [ ] **"Open on GitHub" deep-links & permalinks** — Context menu actions on commits, branches, files, and diff line gutters: "Open Commit on GitHub", "View File at this Revision", "Copy GitHub Permalink to Line", and "Open Repository in Browser".
-- [ ] **Zero-config GitHub CLI (`gh`) auth detection** — Automatically detect existing authentication from the local GitHub CLI (`gh auth token` or `~/.config/gh/hosts.yml`) so developers using `gh` are logged in immediately without manual token generation.
-- [ ] **Merged branch pruner & remote cleanup** — Surface branches whose associated PRs have been merged on GitHub with a 1-click "Prune Merged Branches" action to safely delete local and remote-tracking branches.
-- [ ] **Protected branch guard / commit warning** — Visual indicator and safety prompt when uncommitted changes or new commits are being made directly on protected default branches (e.g. `main`/`master`) instead of a feature branch.
-- [ ] **Commit signature verification (`Verified` badges)** — Surface GPG / SSH / S-MIME signature verification status badges next to commit authors in `HistoryTab.tsx` as verified by GitHub.
-- [ ] **GitHub Enterprise Server (GHES) support** — Configurable custom GitHub domain/host endpoint for enterprise on-premise deployments.
+## After all others are done
 
-## P0 — Core gaps
-
-- [ ] **Hunk / line-level staging** — stage/unstage individual hunks or lines from `DiffView.tsx`, not just whole files. Needs `stage_hunk`/`unstage_hunk` Tauri commands (patch + `git apply --cached`). Table-stakes vs GitHub Desktop, Fork, Tower.
-- [ ] **Merge conflict resolution UI** — surface conflicted files distinctly in `ChangesTab.tsx` (conflict badge, not just "modified"), with a 3-way view ("Use Mine" / "Use Theirs" / "Edit Manually") and "Mark Resolved" to stage. Biggest current gap vs. Fork/SourceTree.
-- [ ] **Real settings view (modal/popup)** — no settings surface exists today (only ad-hoc dialogs like `CloneDialog.tsx`). Gear icon in `Toolbar.tsx` opening a settings modal (built on existing `dialog.tsx` primitive), sectioned into:
-  - [ ] **General** — theme (light/dark/system), accent color, default clone directory.
-  - [ ] **Git** — user name/email (global vs. per-repo override via `config.rs`), default branch name, pull strategy (merge/rebase/ff-only).
-  - [ ] **Diff** — default view (split/unified), whitespace handling, font size/family.
-  - [ ] **Sidebar** — toggle ahead/behind badges, default repo sort order.
-  - [ ] **Advanced** — git binary path override, fs-watch on/off (ties into `watch.rs`).
-  - [ ] Persist to a config file via `config.rs` so settings survive restarts.
-- [ ] **Commit graph visualization** — branch/merge graph column (like `git log --graph`) with lane layout and branch/tag labels, computed server-side in `history.rs` and returned from `get_log`.
-- [ ] **Discard changes per-file/per-hunk** — scoped "discard" action next to stage/unstage, not all-or-nothing.
-- [ ] files need file icons. use the ones from https://github.com/miguelsolorio/vscode-symbols for a very minimalistic, yet effective icon set that reacts to file/folder names
-- [ ] code syntax highlighting. Show syntax highlighting for code files, using the same colors as VS Code. only color the plus and minus signs in diff views in the red and green (or yellow and blue)
-- [ ] create an open-source ready short REAMDE for this project that explains how to get started, what features are available, and how to contribute. it should have a short introduction that is a bit of a "marketingy" pitch for the project.
-
-## P1 — High-value quality of life
-
-- [ ] **Command palette (`Cmd+P`)** — fuzzy-search branches, commits (message/hash/author), and files in the current repo, jump straight to the relevant tab/view. Extend to jump between repos too, via `RepoSidebar.tsx`.
-- [ ] **General keyboard shortcuts** — `Cmd+Enter` to commit, `Cmd+Shift+P` to pull, `Cmd+K` to switch repos, arrow-key navigation through file/commit lists.
-- [ ] **Right-click context menus** on different elements in the app (decide what makes sense where): "Open in Terminal", "Open in Finder", "Copy Path", "Remove from Sidebar". Files: "Copy Path", "Open in Terminal", "Reveal in Finder". Commits: "Copy SHA", "Cherry-pick", "Revert", "Create branch here". Branches: "Copy Name", "Rename", "Delete", "Merge into current".
-- [ ] **Amend last commit** — checkbox/toggle in `CommitBox.tsx` to amend instead of creating a new commit.
-- [ ] **Ahead/behind badges** in the sidebar per repo, so sync state is visible without opening it.
-- [ ] **Cherry-pick & revert** — pick a commit from history and apply it to the current branch, or revert it, without a terminal.
-- [ ] **Inline blame view** — `git_blame(path)` command + gutter toggle in the diff/file view; click a blamed line to jump to that commit in `HistoryTab`.
-- [ ] **Tag management** — create, push, and delete tags from the UI; show tags alongside branch labels in history.
-- [ ] pre-filled commit message (summary, not description) for single-file commits
-- [ ] commit message + description inputs must stay filled out even when files are added/removed/changed; currently resets when tabbing away, changing files and tabbing back
-- [ ] tooltips on all buttons in the UI to explain what they do (optionally showing a shortcut)
-
-## P2 — Nice to have
-
-- [ ] **Diff view toggles** — split vs. unified view, ignore-whitespace, word-wrap.
-- [ ] **File search/filter** in `ChangesTab.tsx`/`FileList.tsx` for repos with large changesets.
-- [ ] **Interactive rebase** — reorder/squash/edit/drop commits via a drag-orderable list before running `git rebase -i`.
-- [ ] **Custom sidebar sections** (Favorites, Work, Personal, etc.) to organize repositories instead of one flat list.
-- [ ] **Commit message templates / history** — recall recently used commit messages, or load a repo's `.gitmessage` template.
-- [ ] **Drag-and-drop** a folder onto the sidebar to add it as a repo (alternative to `AddRepoMenu.tsx`'s picker).
-- [ ] **Submodule support** — detect and show submodule status, allow update/init from the UI.
-- [ ] **Animated status icons** — subtle spinner/pulse on a repo row while fetch/pull/push is running.
+- [x] redesign UI to feel less flat, cal.com-style depth — see `.reference/cal-com.jpg`. First pass only recolored the existing edge-to-edge rectangles, which the user correctly called out as not actually visible (no page-bg gutter existed anywhere for the new background/card contrast to show against) and questioned the pill-shaped button (a fair catch — re-checking the reference, the pill is only on the marketing nav's CTA, not on the actual in-app calendar mockup, which uses ordinary rounded rectangles). Fixed: the app shell is now padded with real `gap-3` between panels, and the sidebar / toolbar+upstream-banner block / tab content are each their own `rounded-xl`, `shadow-md` floating `bg-card` panel — the muted page background is now actually visible in the gutters. `Button`'s default variant is back to `rounded-md` like every other variant. Dialogs/popovers/menus keep the larger radii and deeper shadows, the dot-grid empty-state texture, and the shadcn `Textarea`/`Checkbox` primitive swap from the first pass.

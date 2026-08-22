@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { PlusIcon } from "lucide-react";
+import { DownloadIcon, FolderOpenIcon, FolderPlusIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CloneDialog } from "./CloneDialog";
 import { useRepoStore } from "@/store/useRepoStore";
 
@@ -30,19 +31,27 @@ export function AddRepoMenu() {
   return (
     <>
       <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" title="Add repository">
-            <PlusIcon />
-          </Button>
-        </DropdownMenuTrigger>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <Button variant="secondary" size="icon">
+                <PlusIcon />
+              </Button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Add repository</TooltipContent>
+        </Tooltip>
         <DropdownMenuContent align="start">
           <DropdownMenuItem onSelect={() => setCloneOpen(true)}>
+            <DownloadIcon className="size-3.5" />
             Clone Repository…
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void createNew()}>
+            <FolderPlusIcon className="size-3.5" />
             Create New Repository…
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void addExisting()}>
+            <FolderOpenIcon className="size-3.5" />
             Add Existing Repository…
           </DropdownMenuItem>
         </DropdownMenuContent>

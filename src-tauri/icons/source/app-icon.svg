@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- ears: outer teal ring + inner yellow tip, peeking out from behind the head -->
+  <circle cx="172" cy="146" r="72" fill="#2BC8DE"/>
+  <circle cx="340" cy="146" r="72" fill="#2BC8DE"/>
+  <circle cx="172" cy="158" r="34" fill="#FFC233"/>
+  <circle cx="340" cy="158" r="34" fill="#FFC233"/>
+
+  <!-- head -->
+  <circle cx="256" cy="266" r="158" fill="#2BC8DE"/>
+
+  <!-- muzzle -->
+  <ellipse cx="256" cy="314" rx="102" ry="86" fill="#FFFFFF"/>
+
+  <!-- eyes -->
+  <circle cx="214" cy="258" r="14" fill="#0E3A40"/>
+  <circle cx="298" cy="258" r="14" fill="#0E3A40"/>
+
+  <!-- nose: the "commit" node -->
+  <circle cx="256" cy="302" r="19" fill="#FFC233"/>
+
+  <!-- tiny git branch/merge glyph as a collar charm -->
+  <g stroke="#0E3A40" stroke-width="6" fill="#0E3A40" stroke-linecap="round">
+    <line x1="234" y1="366" x2="256" y2="380"/>
+    <line x1="278" y1="366" x2="256" y2="380"/>
+    <circle cx="234" cy="366" r="7"/>
+    <circle cx="278" cy="366" r="7"/>
+    <circle cx="256" cy="384" r="7"/>
+  </g>
+</svg>

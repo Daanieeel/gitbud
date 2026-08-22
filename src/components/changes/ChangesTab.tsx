@@ -1,23 +1,31 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRepoStore } from "@/store/useRepoStore";
 import { FileList } from "./FileList";
-import { StashPanel } from "./StashPanel";
+import { ConflictResolutionPanel } from "./ConflictResolutionPanel";
 import { DiffView } from "@/components/diff/DiffView";
 import { CommitBox } from "@/components/commit/CommitBox";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ResizeHandle } from "@/components/layout/ResizeHandle";
+import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 
 export function ChangesTab() {
+  const repoPath = useRepoStore((s) => s.selectedRepo);
   const files = useRepoStore((s) => s.status?.files ?? null);
   const selectedFilePath = useRepoStore((s) => s.selectedFilePath);
-  const selectedFileDiff = useRepoStore((s) => s.selectedFileDiff);
+  const selectedStagedDiff = useRepoStore((s) => s.selectedStagedDiff);
+  const selectedUnstagedDiff = useRepoStore((s) => s.selectedUnstagedDiff);
   const selectedFileImageDiff = useRepoStore((s) => s.selectedFileImageDiff);
-  const branch = useRepoStore((s) => s.branch);
   const selectFile = useRepoStore((s) => s.selectFile);
   const toggleStaged = useRepoStore((s) => s.toggleStaged);
-  const doCommit = useRepoStore((s) => s.doCommit);
+  const stageHunk = useRepoStore((s) => s.stageHunk);
+  const unstageHunk = useRepoStore((s) => s.unstageHunk);
+  const discardHunk = useRepoStore((s) => s.discardHunk);
 
   const [filter, setFilter] = useState("");
+  const { width, onPointerDown } = useResizableWidth("panel-width:changes-files", 288, 200, 560);
 
   const filtered = useMemo(() => {
     if (!files) return [];
@@ -25,6 +33,14 @@ export function ChangesTab() {
     const needle = filter.toLowerCase();
     return files.filter((f) => f.path.toLowerCase().includes(needle));
   }, [files, filter]);
+
+  const filePaths = useMemo(() => filtered.map((f) => f.path), [filtered]);
+  const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, (path) => void selectFile(path));
+  const fileListRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fileListRef.current?.focus();
+  }, []);
 
   if (files === null) {
     return (
@@ -35,14 +51,10 @@ export function ChangesTab() {
   }
 
   const allStaged = filtered.length > 0 && filtered.every((f) => f.staged);
-  const hasStagedChanges = files.some((f) => f.staged);
 
   return (
     <div className="flex h-full min-w-0 flex-1">
-      <div className="flex w-72 shrink-0 flex-col border-r border-border">
-        <div className="flex shrink-0 items-center justify-end border-b border-border p-2">
-          <StashPanel hasChanges={files.length > 0} />
-        </div>
+      <div style={{ width }} className="flex shrink-0 flex-col border-r border-border">
         {files.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-4 text-center text-sm text-muted-foreground">
             No local changes
@@ -50,20 +62,25 @@ export function ChangesTab() {
         ) : (
           <>
             <div className="flex shrink-0 items-center gap-2 border-b border-border p-2">
-              <Checkbox
-                checked={allStaged}
-                onCheckedChange={(checked) =>
-                  void toggleStaged(filtered.map((f) => f.path), checked === true)
-                }
-              />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Checkbox
+                    checked={allStaged}
+                    onCheckedChange={(checked) =>
+                      void toggleStaged(filtered.map((f) => f.path), checked === true)
+                    }
+                  />
+                </TooltipTrigger>
+                <TooltipContent>{allStaged ? "Unstage all" : "Stage all"}</TooltipContent>
+              </Tooltip>
               <Input
                 placeholder="Filter files"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="h-7"
+                className="h-8"
               />
             </div>
-            <div className="min-h-0 flex-1">
+            <div ref={fileListRef} tabIndex={0} onKeyDown={handleArrowNav} className="min-h-0 flex-1 outline-none">
               <FileList
                 files={filtered}
                 selectedPath={selectedFilePath}
@@ -73,14 +90,39 @@ export function ChangesTab() {
             </div>
           </>
         )}
-        <CommitBox
-          branch={branch}
-          hasStagedChanges={hasStagedChanges}
-          onCommit={(summary, description) => doCommit(summary, description)}
-        />
+        <CommitBox />
       </div>
+      <ResizeHandle onPointerDown={onPointerDown} />
       <div className="min-w-0 flex-1">
-        <DiffView path={selectedFilePath} diff={selectedFileDiff} imageDiff={selectedFileImageDiff} />
+        {selectedFilePath &&
+        repoPath &&
+        files.find((f) => f.path === selectedFilePath)?.status === "conflicted" ? (
+          <ConflictResolutionPanel repoPath={repoPath} path={selectedFilePath} />
+        ) : (
+          <DiffView
+            path={selectedFilePath}
+            diff={selectedUnstagedDiff}
+            secondaryDiff={selectedStagedDiff}
+            imageDiff={selectedFileImageDiff}
+            hunkActions={
+              selectedFilePath
+                ? {
+                    staged: false,
+                    onStage: (i) => void stageHunk(selectedFilePath, i),
+                    onDiscard: (i) => void discardHunk(selectedFilePath, i),
+                  }
+                : undefined
+            }
+            secondaryHunkActions={
+              selectedFilePath
+                ? {
+                    staged: true,
+                    onUnstage: (i) => void unstageHunk(selectedFilePath, i),
+                  }
+                : undefined
+            }
+          />
+        )}
       </div>
     </div>
   );

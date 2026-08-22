@@ -13,8 +13,9 @@
     "windows": [
       {
         "title": "GitBud",
-        "width": 800,
-        "height": 600
+        "width": 1200,
+        "height": 900,
+        "minWidth": 1000
       }
     ],
     "security": {
@@ -31,5 +32,11 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": []
+    }
   }
 }

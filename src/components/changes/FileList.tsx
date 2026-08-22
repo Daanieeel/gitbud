@@ -1,28 +1,57 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { FileIcon, FilePlus, FileMinus, FileEdit, FileSymlink } from "lucide-react";
+import {
+  CopyIcon,
+  ExternalLinkIcon,
+  FolderOpenIcon,
+  TerminalIcon,
+  Trash2Icon,
+  TriangleAlertIcon,
+  UserIcon,
+} from "lucide-react";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { ChangeKind, FileEntry } from "@/lib/types";
+import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { copyToClipboard } from "@/lib/clipboard";
+import { githubFileUrl } from "@/lib/github-links";
+import { FileTypeIcon } from "@/lib/file-icons";
+import { api } from "@/lib/tauri";
+import { useRepoStore } from "@/store/useRepoStore";
+import { BlameDialog } from "./BlameDialog";
+import { FilePathLabel } from "./FilePathLabel";
+import type { LfsFileInfo } from "@/lib/types";
 
-const STATUS_ICON: Record<ChangeKind, typeof FileIcon> = {
-  added: FilePlus,
-  untracked: FilePlus,
-  modified: FileEdit,
-  deleted: FileMinus,
-  renamed: FileSymlink,
-  type_change: FileEdit,
-  conflicted: FileEdit,
-};
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
+}
 
-const STATUS_COLOR: Record<ChangeKind, string> = {
-  added: "text-accent-green",
-  untracked: "text-accent-green",
-  modified: "text-accent-green",
-  deleted: "text-accent-pink",
-  renamed: "text-muted-foreground",
-  type_change: "text-muted-foreground",
-  conflicted: "text-destructive",
+const STATUS_DOT_COLOR: Record<ChangeKind, string> = {
+  added: "bg-accent-green",
+  untracked: "bg-accent-green",
+  modified: "bg-accent-green",
+  deleted: "bg-accent-pink",
+  renamed: "bg-muted-foreground",
+  type_change: "bg-muted-foreground",
+  conflicted: "bg-destructive",
 };
 
 interface FileListProps {
@@ -34,6 +63,27 @@ interface FileListProps {
 
 export function FileList({ files, selectedPath, onSelect, onToggle }: FileListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const repoPath = useRepoStore((s) => s.selectedRepo);
+  const branch = useRepoStore((s) => s.branch);
+  const discardFile = useRepoStore((s) => s.discardFile);
+  const [blamePath, setBlamePath] = useState<string | null>(null);
+  const [confirmDiscardPath, setConfirmDiscardPath] = useState<string | null>(null);
+  const [lfsInfo, setLfsInfo] = useState<Record<string, LfsFileInfo>>({});
+
+  useEffect(() => {
+    if (!repoPath || files.length === 0) {
+      setLfsInfo({});
+      return;
+    }
+    let cancelled = false;
+    void api.checkLfsFiles(repoPath, files.map((f) => f.path)).then((infos) => {
+      if (cancelled) return;
+      setLfsInfo(Object.fromEntries(infos.filter((i) => i.is_lfs).map((i) => [i.path, i])));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath, files]);
 
   const virtualizer = useVirtualizer({
     count: files.length,
@@ -42,40 +92,164 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
     overscan: 12,
   });
 
+  useEffect(() => {
+    if (!selectedPath) return;
+    const index = files.findIndex((f) => f.path === selectedPath);
+    if (index === -1) return;
+    virtualizer.scrollToIndex(index, { align: "auto" });
+  }, [selectedPath, files, virtualizer]);
+
   return (
     <div ref={parentRef} className="h-full overflow-auto">
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {virtualizer.getVirtualItems().map((row) => {
           const file = files[row.index];
-          const Icon = STATUS_ICON[file.status];
           return (
-            <div
-              key={file.path}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: row.size,
-                transform: `translateY(${row.start}px)`,
-              }}
-              className={cn(
-                "flex items-center gap-2 px-2 text-sm cursor-pointer hover:bg-accent",
-                selectedPath === file.path && "bg-accent",
-              )}
-              onClick={() => onSelect(file.path)}
+            <ContextMenu key={file.path}>
+            <Popover
+              open={confirmDiscardPath === file.path}
+              onOpenChange={(o) => !o && setConfirmDiscardPath(null)}
             >
-              <Checkbox
-                checked={file.staged}
-                onClick={(e) => e.stopPropagation()}
-                onCheckedChange={(checked) => onToggle(file.path, checked === true)}
-              />
-              <Icon className={cn("size-3.5 shrink-0", STATUS_COLOR[file.status])} />
-              <span className="truncate">{file.path}</span>
-            </div>
+              <PopoverAnchor asChild>
+              <ContextMenuTrigger asChild>
+                <div
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    height: row.size,
+                    transform: `translateY(${row.start}px)`,
+                  }}
+                  className={cn(
+                    "flex items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
+                    selectedPath === file.path && "bg-accent",
+                    file.status === "conflicted" && "text-destructive",
+                  )}
+                  onClick={() => onSelect(file.path)}
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Checkbox
+                        checked={file.partially_staged ? "indeterminate" : file.staged}
+                        onClick={(e) => e.stopPropagation()}
+                        onCheckedChange={(checked) => onToggle(file.path, checked === true)}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {file.partially_staged
+                        ? "Partially staged, click to finish staging the rest"
+                        : file.staged
+                          ? "Unstage"
+                          : "Stage"}
+                    </TooltipContent>
+                  </Tooltip>
+                  <span className="relative shrink-0">
+                    {file.status === "conflicted" ? (
+                      <TriangleAlertIcon className="size-3.5 text-destructive" />
+                    ) : (
+                      <FileTypeIcon path={file.path} className="size-3.5" />
+                    )}
+                    <span
+                      className={cn(
+                        "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
+                        STATUS_DOT_COLOR[file.status],
+                      )}
+                    />
+                  </span>
+                  <FilePathLabel path={file.path} />
+                  {lfsInfo[file.path] && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-medium text-muted-foreground">
+                          LFS{lfsInfo[file.path].size != null && ` · ${formatBytes(lfsInfo[file.path].size!)}`}
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>Tracked by Git LFS</TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+              </ContextMenuTrigger>
+              </PopoverAnchor>
+              <ContextMenuContent>
+                <ContextMenuItem onSelect={() => void copyToClipboard(file.path)}>
+                  <CopyIcon className="size-3.5" />
+                  Copy Path
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onSelect={() => {
+                    if (!repoPath) return;
+                    void revealItemInDir(`${repoPath}/${file.path}`);
+                  }}
+                >
+                  <FolderOpenIcon className="size-3.5" />
+                  Reveal in Finder
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onSelect={() => {
+                    if (!repoPath) return;
+                    void api.openInTerminal(repoPath);
+                  }}
+                >
+                  <TerminalIcon className="size-3.5" />
+                  Open in Terminal
+                </ContextMenuItem>
+                {branch && (
+                  <ContextMenuItem
+                    onSelect={() => {
+                      if (!repoPath) return;
+                      void githubFileUrl(repoPath, branch, file.path).then((url) => {
+                        if (url) void openUrl(url);
+                      });
+                    }}
+                  >
+                    <ExternalLinkIcon className="size-3.5" />
+                    View File on GitHub
+                  </ContextMenuItem>
+                )}
+                <ContextMenuItem onSelect={() => setBlamePath(file.path)}>
+                  <UserIcon className="size-3.5" />
+                  Blame File
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  variant="destructive"
+                  onSelect={() => setConfirmDiscardPath(file.path)}
+                >
+                  <Trash2Icon className="size-3.5" />
+                  Discard Changes
+                </ContextMenuItem>
+              </ContextMenuContent>
+              <PopoverContent align="start" className="w-56 space-y-2 p-3">
+                <p className="text-sm">Permanently discard changes to "{file.path}"?</p>
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => setConfirmDiscardPath(null)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => {
+                      setConfirmDiscardPath(null);
+                      void discardFile(file.path);
+                    }}
+                  >
+                    Discard
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
+            </ContextMenu>
           );
         })}
       </div>
+      {repoPath && (
+        <BlameDialog
+          repoPath={repoPath}
+          path={blamePath}
+          onOpenChange={(open) => !open && setBlamePath(null)}
+        />
+      )}
     </div>
   );
 }

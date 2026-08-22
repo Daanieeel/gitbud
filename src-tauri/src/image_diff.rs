@@ -21,7 +21,7 @@ pub fn is_image_path(path: &str) -> bool {
     )
 }
 
-fn mime_for(path: &str) -> &'static str {
+pub(crate) fn mime_for(path: &str) -> &'static str {
     let ext = Path::new(path)
         .extension()
         .and_then(|e| e.to_str())
@@ -80,6 +80,17 @@ pub fn get_image_diff(repo_path: &str, path: &str, staged: bool) -> Result<Image
             new: working_bytes,
         })
     }
+}
+
+/// Image diff for a file as part of a `base...head` branch comparison (see
+/// `diff::get_branch_diff_files`) — the same merge-base comparison GitHub's PR diff uses.
+pub fn get_branch_image_diff(repo_path: &str, base: &str, head: &str, path: &str) -> Result<ImageDiff, String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let (base_tree, head_tree) = crate::diff::branch_diff_trees(&repo, base, head)?;
+    Ok(ImageDiff {
+        old: blob_at_path(&repo, &base_tree, path),
+        new: blob_at_path(&repo, &head_tree, path),
+    })
 }
 
 /// Image diff for a file within a commit, against its first parent (or nothing, for a root commit).

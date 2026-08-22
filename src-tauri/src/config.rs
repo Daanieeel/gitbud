@@ -1,5 +1,6 @@
 use git2::Repository;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -8,9 +9,18 @@ pub struct RepoEntry {
     pub path: String,
     pub name: String,
     pub group: String,
-    pub is_private: bool,
     #[serde(default)]
     pub last_fetched: Option<i64>,
+    /// User-assigned sidebar sections (e.g. "Work", "Personal") this repo is pinned to, for
+    /// quick access. Additive — a repo can belong to any number of sections at once, and stays
+    /// visible under its auto-derived `group` regardless.
+    #[serde(default)]
+    pub sections: Vec<String>,
+    /// Per-repo override of which git identity (a GitHub account or SSH identity, opaque id
+    /// interpreted by the frontend) authenticates git operations here. `None` means "use the
+    /// global default identity".
+    #[serde(default)]
+    pub identity_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -29,13 +39,34 @@ fn repos_file() -> Result<PathBuf, String> {
     Ok(config_dir()?.join("repos.json"))
 }
 
+/// Migrates the old single, overriding `section: Option<String>` field (from before repos
+/// could be pinned to more than one section) into the new `sections: Vec<String>` field, so
+/// upgrading doesn't silently drop anyone's existing pin.
+fn migrate_legacy_section(mut value: serde_json::Value) -> serde_json::Value {
+    if let Some(repos) = value.get_mut("repos").and_then(|r| r.as_array_mut()) {
+        for repo in repos {
+            let Some(obj) = repo.as_object_mut() else { continue };
+            let has_sections = obj.get("sections").is_some_and(|s| s.is_array());
+            if has_sections {
+                continue;
+            }
+            if let Some(section) = obj.remove("section").and_then(|s| s.as_str().map(str::to_string)) {
+                obj.insert("sections".to_string(), serde_json::json!([section]));
+            }
+        }
+    }
+    value
+}
+
 pub fn load_repos() -> Result<Vec<RepoEntry>, String> {
     let file = repos_file()?;
     if !file.exists() {
         return Ok(Vec::new());
     }
     let contents = fs::read_to_string(&file).map_err(|e| e.to_string())?;
-    let config: RepoConfig = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+    let value: serde_json::Value = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+    let config: RepoConfig =
+        serde_json::from_value(migrate_legacy_section(value)).map_err(|e| e.to_string())?;
     Ok(config.repos)
 }
 
@@ -56,14 +87,15 @@ pub fn remote_owner_repo(repo_path: &str) -> Option<(String, String)> {
 
     let trimmed = url.trim_end_matches(".git").trim_end_matches('/');
     let path_part = if let Some(idx) = trimmed.find("://") {
-        &trimmed[idx + 3..]
+        let after_scheme = &trimmed[idx + 3..];
+        // Drop the host segment
+        after_scheme.splitn(2, '/').nth(1)?
     } else if let Some(idx) = trimmed.find(':') {
         &trimmed[idx + 1..]
     } else {
         trimmed
     };
-    // Drop the host segment (everything up to the first '/').
-    let path_part = path_part.splitn(2, '/').nth(1)?;
+    
     let mut segments = path_part.rsplitn(2, '/');
     let repo_name = segments.next()?.to_string();
     let owner = segments.next()?.to_string();
@@ -103,8 +135,9 @@ pub fn add_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
         path: canonical,
         name,
         group,
-        is_private: false,
         last_fetched: None,
+        sections: Vec::new(),
+        identity_id: None,
     });
     save_repos(&repos)?;
     Ok(repos)
@@ -117,13 +150,83 @@ pub fn remove_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
     Ok(repos)
 }
 
-pub fn set_repo_private(path: &str, is_private: bool) -> Result<Vec<RepoEntry>, String> {
+pub fn add_repo_section(path: &str, section: &str) -> Result<Vec<RepoEntry>, String> {
+    let section = section.trim();
     let mut repos = load_repos()?;
     if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
-        entry.is_private = is_private;
+        if !section.is_empty() && !entry.sections.iter().any(|s| s == section) {
+            entry.sections.push(section.to_string());
+        }
     }
     save_repos(&repos)?;
     Ok(repos)
+}
+
+pub fn remove_repo_section(path: &str, section: &str) -> Result<Vec<RepoEntry>, String> {
+    let mut repos = load_repos()?;
+    if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
+        entry.sections.retain(|s| s != section);
+    }
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
+/// Unpins every repo from `section` — the section itself has no identity beyond the repos
+/// that reference it, so "removing" it just means no repo references it any more.
+pub fn remove_section(section: &str) -> Result<Vec<RepoEntry>, String> {
+    let mut repos = load_repos()?;
+    for entry in repos.iter_mut() {
+        entry.sections.retain(|s| s != section);
+    }
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
+pub fn rename_section(old: &str, new: &str) -> Result<Vec<RepoEntry>, String> {
+    let new = new.trim();
+    if new.is_empty() || new == old {
+        return load_repos();
+    }
+    let mut repos = load_repos()?;
+    for entry in repos.iter_mut() {
+        if entry.sections.iter().any(|s| s == old) {
+            entry.sections.retain(|s| s != old);
+            if !entry.sections.iter().any(|s| s == new) {
+                entry.sections.push(new.to_string());
+            }
+        }
+    }
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
+pub fn set_repo_identity(path: &str, identity_id: Option<String>) -> Result<Vec<RepoEntry>, String> {
+    let mut repos = load_repos()?;
+    if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
+        entry.identity_id = identity_id.filter(|s| !s.trim().is_empty());
+    }
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
+/// Reorders the repo list to match `order` (a list of paths), for manual drag-to-reorder in
+/// the sidebar. Repos not mentioned in `order` (shouldn't normally happen) keep their
+/// relative order and are appended at the end.
+pub fn set_repo_order(order: &[String]) -> Result<Vec<RepoEntry>, String> {
+    let repos = load_repos()?;
+    let mut by_path: HashMap<String, RepoEntry> =
+        repos.into_iter().map(|r| (r.path.clone(), r)).collect();
+
+    let mut reordered = Vec::with_capacity(by_path.len());
+    for path in order {
+        if let Some(entry) = by_path.remove(path) {
+            reordered.push(entry);
+        }
+    }
+    reordered.extend(by_path.into_values());
+
+    save_repos(&reordered)?;
+    Ok(reordered)
 }
 
 pub fn touch_last_fetched(path: &str, timestamp: i64) -> Result<Vec<RepoEntry>, String> {

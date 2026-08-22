@@ -1,34 +1,87 @@
-import { useState } from "react";
+import { useEffect } from "react";
+import { GitCommitIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useRepoStore } from "@/store/useRepoStore";
+import { cn, isProtectedBranch } from "@/lib/utils";
+import { useBusyAction } from "@/hooks/useBusyAction";
 
-interface CommitBoxProps {
-  branch: string | null;
-  hasStagedChanges: boolean;
-  onCommit: (summary: string, description: string) => Promise<void>;
-}
+export function CommitBox() {
+  const branch = useRepoStore((s) => s.branch);
+  const status = useRepoStore((s) => s.status);
+  const commits = useRepoStore((s) => s.commits);
+  const summary = useRepoStore((s) => s.commitSummary);
+  const description = useRepoStore((s) => s.commitDescription);
+  const amending = useRepoStore((s) => s.amending);
+  const setSummary = useRepoStore((s) => s.setCommitSummary);
+  const setDescription = useRepoStore((s) => s.setCommitDescription);
+  const setAmending = useRepoStore((s) => s.setAmending);
+  const doCommit = useRepoStore((s) => s.doCommit);
+  const doAmendCommit = useRepoStore((s) => s.doAmendCommit);
 
-export function CommitBox({ branch, hasStagedChanges, onCommit }: CommitBoxProps) {
-  const [summary, setSummary] = useState("");
-  const [description, setDescription] = useState("");
-  const [committing, setCommitting] = useState(false);
+  const [committing, runCommit] = useBusyAction();
+  const stagedFiles = status?.files.filter((f) => f.staged) ?? [];
+  const hasStagedChanges = stagedFiles.length > 0;
+  const lastCommit = commits[0];
 
-  const disabled = !hasStagedChanges || summary.trim().length === 0 || committing;
+  // Pre-fill a sensible summary for the common single-file-change case, without
+  // clobbering anything the user has already typed.
+  useEffect(() => {
+    if (summary.trim() || amending) return;
+    if (stagedFiles.length === 1) {
+      const name = stagedFiles[0].path.split("/").pop();
+      setSummary(`Update ${name}`);
+    }
+    // Only re-run when the staged set changes, not on every keystroke.
+  }, [stagedFiles.map((f) => f.path).join("|")]);
 
-  const submit = async () => {
-    if (disabled) return;
-    setCommitting(true);
-    try {
-      await onCommit(summary.trim(), description.trim());
+  const toggleAmend = (next: boolean) => {
+    setAmending(next);
+    if (next && lastCommit) {
+      setSummary(lastCommit.summary);
+    } else if (!next) {
       setSummary("");
       setDescription("");
-    } finally {
-      setCommitting(false);
     }
   };
 
+  const disabled = amending
+    ? summary.trim().length === 0
+    : !hasStagedChanges || summary.trim().length === 0;
+
+  const submit = async () => {
+    if (disabled || committing) return;
+    await runCommit(async () => {
+      if (amending) {
+        await doAmendCommit(summary.trim(), description.trim());
+      } else {
+        await doCommit(summary.trim(), description.trim());
+      }
+    });
+  };
+
+  const protectedWarning = branch && isProtectedBranch(branch);
+
   return (
     <div className="flex shrink-0 flex-col gap-2 border-t border-border p-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <label className="flex cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground">
+            <Checkbox
+              checked={amending}
+              disabled={!lastCommit}
+              onCheckedChange={(checked) => toggleAmend(checked === true)}
+            />
+            Amend last commit
+          </label>
+        </TooltipTrigger>
+        <TooltipContent>
+          Replace the last commit with this message and add the current changes to it
+        </TooltipContent>
+      </Tooltip>
       <Input
         placeholder="Summary (required)"
         value={summary}
@@ -37,16 +90,35 @@ export function CommitBox({ branch, hasStagedChanges, onCommit }: CommitBoxProps
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
         }}
       />
-      <textarea
+      <Textarea
         placeholder="Description"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         rows={3}
-        className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
       />
-      <Button disabled={disabled} onClick={() => void submit()}>
-        Commit to {branch ?? "…"}
-      </Button>
+      {protectedWarning && (
+        <div className="flex items-center gap-1.5 rounded-md bg-accent-yellow/10 px-2 py-1 text-xs text-accent-yellow">
+          <TriangleAlertIcon className="size-3.5 shrink-0" />
+          You're committing directly to {branch}
+        </div>
+      )}
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button disabled={disabled || committing} onClick={() => void submit()}>
+            <GitCommitIcon className={cn("size-3.5", committing && "animate-spin")} />
+            {committing
+              ? amending
+                ? "Amending…"
+                : "Committing…"
+              : amending
+                ? `Amend Last Commit on ${branch ?? "…"}`
+                : `Commit to ${branch ?? "…"}`}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          {amending ? "Rewrite the last commit with this message and any staged changes" : "Cmd+Enter"}
+        </TooltipContent>
+      </Tooltip>
     </div>
   );
 }

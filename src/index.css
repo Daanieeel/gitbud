@@ -2,17 +2,17 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/*
- * Palette sourced from .reference/color-pallette.json ("Vercel" VS Code theme):
- * pure black surfaces, off-white text, #0070f3 blue accent, and green/pink/purple/
- * yellow used for git + status semantics (green = added/modified, pink = deleted).
- */
 :root {
-  --background: #ffffff;
+  /* Page bg is a soft neutral (same tone as --muted) so raised --card surfaces (dialogs,
+     popovers, the toolbar, the sidebar) actually read as elevated instead of blending in. */
+  --background: #f2f2f2;
   --foreground: #0a0a0a;
   --card: #ffffff;
   --card-foreground: #0a0a0a;
-  --popover: #ffffff;
+  /* Popovers/dropdowns/menus get the page's muted tone rather than the card's white, so they
+     read as a distinct floating layer instead of just "another white rectangle" on top of
+     the panes they open from. */
+  --popover: #f2f2f2;
   --popover-foreground: #0a0a0a;
   --primary: #0070f3;
   --primary-foreground: #ffffff;
@@ -27,7 +27,7 @@
   --border: #e2e2e2;
   --input: #d4d4d4;
   --ring: #0070f3;
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 
   --diff-add-bg: #e6f9ee;
   --diff-add-fg: #00873d;
@@ -42,11 +42,13 @@
 }
 
 .dark {
+  /* Card surfaces are a lighter charcoal than the page bg (same tone as --muted) so they
+     read as raised toward the light, mirroring the light theme's white-card-on-gray-page. */
   --background: #000000;
   --foreground: #eeeeee;
-  --card: #000000;
+  --card: #1a1a1a;
   --card-foreground: #eeeeee;
-  --popover: #000000;
+  --popover: #1a1a1a;
   --popover-foreground: #eeeeee;
   --primary: #0070f3;
   --primary-foreground: #ffffff;
@@ -58,7 +60,7 @@
   --accent-foreground: #eeeeee;
   --destructive: #ff4d8d;
   --destructive-foreground: #ffffff;
-  --border: #1a1a1a;
+  --border: #2a2a2a;
   --input: #3a3a3a;
   --ring: #0070f3;
 
@@ -109,8 +111,103 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body,
+  #root {
+    height: 100%;
+    overflow: hidden;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground;
+    background-color: #000;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+  button,
+  [role="button"],
+  [role="tab"],
+  .cursor-pointer {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  code:not(pre code) {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--muted);
+    border-radius: 0.25rem;
+    padding: 0.1em 0.4em;
+    font-size: 0.85em;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+}
+
+/* Subtle dot-grid texture for large empty-state areas, so they read as intentional
+ * negative space rather than a blank/broken panel. Uses --border, no new colors. */
+.bg-dot-grid {
+  background-image: radial-gradient(color-mix(in srgb, var(--border) 70%, transparent) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+
+/*
+ * Syntax highlighting token colors, mapped from the same Vercel theme's tokenColors
+ * (.reference/color-pallette.json) that the diff +/- and status colors use.
+ */
+.hljs-comment,
+.hljs-quote {
+  color: var(--muted-foreground);
+}
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-subst,
+.hljs-doctag,
+.hljs-name,
+.hljs-deletion {
+  color: var(--accent-pink);
+}
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: var(--accent-green);
+}
+.hljs-title,
+.hljs-title.function_,
+.hljs-section,
+.hljs-selector-id {
+  color: var(--accent-purple);
+}
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-title.class_,
+.hljs-tag,
+.hljs-built_in {
+  color: var(--accent-blue);
+}
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: var(--accent-purple);
+}
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-params {
+  color: var(--foreground);
+}
+.hljs-emphasis {
+  font-style: italic;
+}
+.hljs-strong {
+  font-weight: bold;
 }

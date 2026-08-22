@@ -8,10 +8,13 @@ const DEBOUNCE: Duration = Duration::from_millis(150);
 fn is_noise(event: &Event) -> bool {
     event.paths.iter().all(|p| {
         let s = p.to_string_lossy();
-        // Ignore churn inside .git/ itself (lock files, index writes from our own
-        // commands) — the app already knows when it mutates the repo; we only need
-        // fs-watch for changes made *outside* the app (editor saves, external checkout).
-        s.contains("/.git/") || s.ends_with("/.git")
+        // Lock files and loose objects churn constantly during *any* git operation
+        // (ours or an external `git` process's) without being a meaningful state change
+        // by themselves — the ref/index/HEAD update that follows is what we care about,
+        // and that isn't inside these. Everything else in .git/ (refs, HEAD, index,
+        // logs, stash) is watched, so a commit/checkout/stash/merge run from a terminal
+        // or another tool is picked up here too, not just edits to tracked files.
+        s.ends_with(".lock") || s.contains("/.git/objects/")
     })
 }
 

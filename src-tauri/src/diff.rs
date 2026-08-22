@@ -85,10 +85,21 @@ fn build_file_diff(path: &str, old_path: Option<&str>, diff: &Diff) -> Result<Fi
 }
 
 /// Diff a single file, either the staged side (HEAD -> index) or unstaged side (index -> workdir).
+/// Applies the user's whitespace-handling preference to a set of diff options.
+pub(crate) fn apply_whitespace_setting(opts: &mut DiffOptions) {
+    if crate::settings::get_settings().map(|s| s.ignore_whitespace).unwrap_or(false) {
+        opts.ignore_whitespace(true);
+    }
+}
+
 pub fn get_file_diff(repo_path: &str, path: &str, staged: bool) -> Result<FileDiff, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut opts = DiffOptions::new();
-    opts.pathspec(path).include_untracked(true).recurse_untracked_dirs(true);
+    opts.pathspec(path)
+        .include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .show_untracked_content(true);
+    apply_whitespace_setting(&mut opts);
 
     let diff = if staged {
         let head_tree = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
@@ -221,9 +232,75 @@ pub fn get_commit_file_diff(repo_path: &str, oid: &str, path: &str) -> Result<Fi
 
     let mut opts = DiffOptions::new();
     opts.pathspec(path);
+    apply_whitespace_setting(&mut opts);
 
     let diff = repo
         .diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut opts))
+        .map_err(|e| e.message().to_string())?;
+
+    build_file_diff(path, None, &diff)
+}
+
+/// Resolves the tree each side of a `base...head` (three-dot, merge-base) diff should compare
+/// against — the same comparison GitHub shows on a pull request, so the preview matches what
+/// will actually appear once opened.
+pub(crate) fn branch_diff_trees<'a>(
+    repo: &'a Repository,
+    base: &str,
+    head: &str,
+) -> Result<(git2::Tree<'a>, git2::Tree<'a>), String> {
+    let base_oid = repo
+        .revparse_single(base)
+        .map_err(|e| e.message().to_string())?
+        .peel_to_commit()
+        .map_err(|e| e.message().to_string())?
+        .id();
+    let head_oid = repo
+        .revparse_single(head)
+        .map_err(|e| e.message().to_string())?
+        .peel_to_commit()
+        .map_err(|e| e.message().to_string())?
+        .id();
+    let merge_base = repo.merge_base(base_oid, head_oid).map_err(|e| e.message().to_string())?;
+    let base_tree = repo.find_commit(merge_base).and_then(|c| c.tree()).map_err(|e| e.message().to_string())?;
+    let head_tree = repo.find_commit(head_oid).and_then(|c| c.tree()).map_err(|e| e.message().to_string())?;
+    Ok((base_tree, head_tree))
+}
+
+/// List the files a pull request from `head` into `base` would show, per the same
+/// merge-base comparison GitHub uses.
+pub fn get_branch_diff_files(repo_path: &str, base: &str, head: &str) -> Result<Vec<(String, String)>, String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let (base_tree, head_tree) = branch_diff_trees(&repo, base, head)?;
+
+    let diff = repo
+        .diff_tree_to_tree(Some(&base_tree), Some(&head_tree), None)
+        .map_err(|e| e.message().to_string())?;
+
+    let mut files = Vec::new();
+    for delta in diff.deltas() {
+        let path = delta
+            .new_file()
+            .path()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+        let status = format!("{:?}", delta.status());
+        files.push((path, status));
+    }
+    Ok(files)
+}
+
+/// Diff a single file as part of a `base...head` branch comparison (see `get_branch_diff_files`).
+pub fn get_branch_diff_file(repo_path: &str, base: &str, head: &str, path: &str) -> Result<FileDiff, String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let (base_tree, head_tree) = branch_diff_trees(&repo, base, head)?;
+
+    let mut opts = DiffOptions::new();
+    opts.pathspec(path);
+    apply_whitespace_setting(&mut opts);
+
+    let diff = repo
+        .diff_tree_to_tree(Some(&base_tree), Some(&head_tree), Some(&mut opts))
         .map_err(|e| e.message().to_string())?;
 
     build_file_diff(path, None, &diff)
