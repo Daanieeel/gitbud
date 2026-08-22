@@ -115,6 +115,12 @@ export interface RepoEntry {
   identity_id: string | null;
 }
 
+export interface Workspace {
+  id: string;
+  name: string;
+  repo_paths: string[];
+}
+
 export interface AheadBehind {
   ahead: number;
   behind: number;

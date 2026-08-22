@@ -9,9 +9,9 @@ import {
 import { useBatchSyncStore } from "@/store/useBatchSyncStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { cn } from "@/lib/utils";
+import type { RepoEntry } from "@/lib/types";
 
-export function BatchSyncTrigger() {
-  const repos = useRepoStore((s) => s.repos);
+export function BatchSyncTrigger({ repos }: { repos: RepoEntry[] }) {
   const running = useBatchSyncStore((s) => s.running);
   const runFetchAll = useBatchSyncStore((s) => s.runFetchAll);
   const runPullAll = useBatchSyncStore((s) => s.runPullAll);

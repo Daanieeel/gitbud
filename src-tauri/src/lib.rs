@@ -15,6 +15,7 @@ mod submodules;
 mod system;
 mod tags;
 mod watch;
+mod workspaces;
 
 use std::collections::HashMap;
 use std::sync::Mutex;
@@ -266,6 +267,28 @@ fn set_repo_identity(path: String, identity_id: Option<String>) -> Result<Vec<co
 #[tauri::command]
 fn set_repo_order(order: Vec<String>) -> Result<Vec<config::RepoEntry>, String> {
     config::set_repo_order(&order)
+}
+
+// --- workspaces: user-defined saved sets of repos ---
+
+#[tauri::command]
+fn list_workspaces() -> Result<Vec<workspaces::Workspace>, String> {
+    workspaces::list()
+}
+
+#[tauri::command]
+fn create_workspace(name: String, repo_paths: Vec<String>) -> Result<Vec<workspaces::Workspace>, String> {
+    workspaces::create(&name, repo_paths)
+}
+
+#[tauri::command]
+fn update_workspace(id: String, name: String, repo_paths: Vec<String>) -> Result<Vec<workspaces::Workspace>, String> {
+    workspaces::update(&id, &name, repo_paths)
+}
+
+#[tauri::command]
+fn delete_workspace(id: String) -> Result<Vec<workspaces::Workspace>, String> {
+    workspaces::remove(&id)
 }
 
 // --- git identities: GitHub accounts (see github/) plus plain SSH-key identities ---
@@ -712,6 +735,10 @@ pub fn run() {
             set_repo_section,
             set_repo_identity,
             set_repo_order,
+            list_workspaces,
+            create_workspace,
+            update_workspace,
+            delete_workspace,
             list_ssh_identities,
             add_ssh_identity,
             remove_ssh_identity,

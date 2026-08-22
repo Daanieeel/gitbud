@@ -26,6 +26,7 @@ import type {
   StashEntry,
   SubmoduleInfo,
   TagInfo,
+  Workspace,
 } from "./types";
 
 export const api = {
@@ -124,6 +125,13 @@ export const api = {
   setRepoIdentity: (path: string, identityId: string | null) =>
     invoke<RepoEntry[]>("set_repo_identity", { path, identityId }),
   setRepoOrder: (order: string[]) => invoke<RepoEntry[]>("set_repo_order", { order }),
+
+  listWorkspaces: () => invoke<Workspace[]>("list_workspaces"),
+  createWorkspace: (name: string, repoPaths: string[]) =>
+    invoke<Workspace[]>("create_workspace", { name, repoPaths }),
+  updateWorkspace: (id: string, name: string, repoPaths: string[]) =>
+    invoke<Workspace[]>("update_workspace", { id, name, repoPaths }),
+  deleteWorkspace: (id: string) => invoke<Workspace[]>("delete_workspace", { id }),
   initRepo: (path: string) => invoke<void>("init_repo", { path }),
 
   listSshIdentities: () => invoke<SshIdentity[]>("list_ssh_identities"),

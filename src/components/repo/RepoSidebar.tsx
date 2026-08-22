@@ -21,9 +21,11 @@ import {
 } from "@/components/ui/context-menu";
 import { AddRepoMenu } from "./AddRepoMenu";
 import { BatchSyncTrigger } from "./BatchSyncPanel";
+import { WorkspacePicker } from "./WorkspacePicker";
 import { AccountBar } from "@/components/github/AccountBar";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
+import { useWorkspaceStore } from "@/store/useWorkspaceStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -55,6 +57,9 @@ export function RepoSidebar() {
   const [dragOver, setDragOver] = useState(false);
   const sidebarSort = useSettingsStore((s) => s.settings.sidebar_sort);
   const showAheadBehind = useSettingsStore((s) => s.settings.show_ahead_behind);
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeId);
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
 
   const [filter, setFilter] = useState("");
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
@@ -105,15 +110,18 @@ export function RepoSidebar() {
   }, [addExistingRepo]);
 
   const filtered = useMemo(() => {
-    if (!filter.trim()) return repos;
+    const scoped = activeWorkspace
+      ? repos.filter((r) => activeWorkspace.repo_paths.includes(r.path))
+      : repos;
+    if (!filter.trim()) return scoped;
     const needle = filter.toLowerCase();
-    return repos.filter(
+    return scoped.filter(
       (r) =>
         r.name.toLowerCase().includes(needle) ||
         r.group.toLowerCase().includes(needle) ||
         r.section?.toLowerCase().includes(needle),
     );
-  }, [repos, filter]);
+  }, [repos, filter, activeWorkspace]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -179,7 +187,10 @@ export function RepoSidebar() {
           />
           <AddRepoMenu />
         </div>
-        {repos.length > 1 && <BatchSyncTrigger />}
+        <div className="flex items-center justify-between gap-2">
+          <WorkspacePicker />
+          {filtered.length > 1 && <BatchSyncTrigger repos={filtered} />}
+        </div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto p-1">
         {filtered.length === 0 && (
