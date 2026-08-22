@@ -110,41 +110,43 @@ function HunkHeader({ hunk }: { hunk: DiffHunk }) {
 function HunkActionsRow({ hunkIdx, hunkActions }: { hunkIdx: number; hunkActions?: HunkActions }) {
   if (!hunkActions) return null;
   return (
-    <div className="flex gap-1.5 px-3 py-1.5 text-xs">
-      {hunkActions.staged
-        ? hunkActions.onUnstage && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-6 px-2 text-xs"
-              title="A chunk is this one contiguous block of changed lines — unstage just it, leaving the rest of the file's staged changes alone"
-              onClick={() => hunkActions.onUnstage?.(hunkIdx)}
-            >
-              Unstage Chunk
-            </Button>
-          )
-        : hunkActions.onStage && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-6 px-2 text-xs"
-              title="A chunk is this one contiguous block of changed lines — stage just it, leaving the rest of the file unstaged"
-              onClick={() => hunkActions.onStage?.(hunkIdx)}
-            >
-              Stage Chunk
-            </Button>
-          )}
-      {!hunkActions.staged && hunkActions.onDiscard && (
-        <Button
-          size="sm"
-          variant="outline"
-          className="h-6 px-2 text-xs hover:border-destructive hover:text-destructive"
-          title="Permanently discard just this chunk's changes, leaving the rest of the file's edits intact"
-          onClick={() => hunkActions.onDiscard?.(hunkIdx)}
-        >
-          Discard Chunk
-        </Button>
-      )}
+    <div className="flex justify-end">
+      <div className="sticky right-3 flex gap-1.5 py-1.5 text-xs">
+        {hunkActions.staged
+          ? hunkActions.onUnstage && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                title="A chunk is this one contiguous block of changed lines — unstage just it, leaving the rest of the file's staged changes alone"
+                onClick={() => hunkActions.onUnstage?.(hunkIdx)}
+              >
+                Unstage
+              </Button>
+            )
+          : hunkActions.onStage && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                title="A chunk is this one contiguous block of changed lines — stage just it, leaving the rest of the file unstaged"
+                onClick={() => hunkActions.onStage?.(hunkIdx)}
+              >
+                Stage
+              </Button>
+            )}
+        {!hunkActions.staged && hunkActions.onDiscard && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-6 px-2 text-xs hover:border-destructive hover:text-destructive"
+            title="Permanently discard just this chunk's changes, leaving the rest of the file's edits intact"
+            onClick={() => hunkActions.onDiscard?.(hunkIdx)}
+          >
+            Discard
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
