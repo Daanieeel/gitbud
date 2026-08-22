@@ -97,7 +97,7 @@ export function AccountBar() {
               <div
                 key={identity.id}
                 className={cn(
-                  "group flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer",
+                  "flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer",
                   effectiveId === identity.id && "bg-accent",
                 )}
                 onClick={() => {
@@ -114,14 +114,22 @@ export function AccountBar() {
                 </span>
                 {selectedRepo && (
                   <button
-                    title={`Use ${identityLabel(identity)} only for this repo`}
+                    title={
+                      repoOverride === identity.id
+                        ? `Unpin — use the global default identity for this repo again`
+                        : `Pin ${identityLabel(identity)} to this repo only`
+                    }
                     className={cn(
                       "shrink-0 text-muted-foreground hover:text-accent-yellow",
-                      repoOverride === identity.id ? "opacity-100 text-accent-yellow" : "opacity-0 group-hover:opacity-100",
+                      repoOverride === identity.id && "text-accent-yellow",
                     )}
                     onClick={(e) => {
                       e.stopPropagation();
-                      void setActive(identity.id, selectedRepo);
+                      if (repoOverride === identity.id) {
+                        void clearRepoOverride(selectedRepo);
+                      } else {
+                        void setActive(identity.id, selectedRepo);
+                      }
                       setSwitcherOpen(false);
                     }}
                   >
@@ -129,8 +137,8 @@ export function AccountBar() {
                   </button>
                 )}
                 <button
-                  title="Remove"
-                  className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                  title={`Remove ${identityLabel(identity)}`}
+                  className="shrink-0 text-muted-foreground hover:text-destructive"
                   onClick={(e) => {
                     e.stopPropagation();
                     remove(identity);
@@ -140,17 +148,6 @@ export function AccountBar() {
                 </button>
               </div>
             ))}
-            {repoOverride && selectedRepo && (
-              <button
-                className="mt-1 w-full rounded-sm px-2 py-1 text-left text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
-                onClick={() => {
-                  void clearRepoOverride(selectedRepo);
-                  setSwitcherOpen(false);
-                }}
-              >
-                Clear pin — use global default for this repo
-              </button>
-            )}
             <div className="mt-1 border-t border-border pt-1">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
