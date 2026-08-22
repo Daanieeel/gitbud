@@ -53,9 +53,7 @@
   --foreground: #eeeeee;
   --card: #1a1a1a;
   --card-foreground: #eeeeee;
-  /* Popovers/dropdowns/menus stay at the page's near-black tone rather than the card's
-     lighter charcoal, so they read as a distinct floating layer, not just another card. */
-  --popover: #000000;
+  --popover: #1a1a1a;
   --popover-foreground: #eeeeee;
   --primary: #0070f3;
   --primary-foreground: #ffffff;
