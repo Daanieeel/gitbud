@@ -6,6 +6,8 @@ GitBud is a desktop Git client with the workflow you already know from GitHub De
 
 It's also not trying to be GitHub-branded. Distinct dark-first design, a Vercel-inspired palette, and a git core written in Rust (`git2` + shelling out to your real `git`/`gh` for anything auth-related) so it never gets in the way of your actual toolchain.
 
+![Preview Screenshots](resources/screenshots.png)
+
 ## Features
 
 - **Repo sidebar** — grouped by owner/remote, filterable, dirty-state and ahead/behind badges, right-click for terminal/Finder/copy-path actions
