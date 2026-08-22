@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ChevronDownIcon,
+  ChevronRightIcon,
   CopyIcon,
   FolderOpenIcon,
+  MinusIcon,
   PanelLeftCloseIcon,
   PanelLeftOpenIcon,
   PinIcon,
@@ -54,13 +57,23 @@ function groupRepos(repos: RepoEntry[]): Map<string, RepoEntry[]> {
 function pinnedGroups(repos: RepoEntry[]): Map<string, RepoEntry[]> {
   const groups = new Map<string, RepoEntry[]>();
   for (const repo of repos) {
-    if (!repo.section) continue;
-    const list = groups.get(repo.section) ?? [];
-    list.push(repo);
-    groups.set(repo.section, list);
+    for (const section of repo.sections) {
+      const list = groups.get(section) ?? [];
+      list.push(repo);
+      groups.set(section, list);
+    }
   }
   for (const list of groups.values()) list.sort((a, b) => a.name.localeCompare(b.name));
   return new Map([...groups.entries()].sort(([a], [b]) => a.localeCompare(b)));
+}
+
+function loadCollapsedSections(): Set<string> {
+  try {
+    const raw = window.localStorage.getItem("sidebar-collapsed-sections");
+    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+  } catch {
+    return new Set();
+  }
 }
 
 interface RepoRowProps {
@@ -81,6 +94,10 @@ interface RepoRowProps {
   onConfirmRemoveChange: (open: boolean) => void;
   onRemove: () => void;
   onPinToSection: () => void;
+  /** Name of the pinned section this row is being rendered under, if any — enables the extra
+   * unpin-from-this-section action alongside the always-available full removal. */
+  sectionContext?: string;
+  onRemoveFromSection?: () => void;
 }
 
 function RepoRow({
@@ -101,6 +118,8 @@ function RepoRow({
   onConfirmRemoveChange,
   onRemove,
   onPinToSection,
+  sectionContext,
+  onRemoveFromSection,
 }: RepoRowProps) {
   return (
     <ContextMenu>
@@ -145,6 +164,22 @@ function RepoRow({
               {ab.behind > 0 && `↓${ab.behind}`}
             </span>
           )}
+          {sectionContext && onRemoveFromSection && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveFromSection();
+                  }}
+                  className="shrink-0 rounded-md bg-muted p-1 text-muted-foreground opacity-0 hover:bg-accent hover:text-foreground group-hover:opacity-100"
+                >
+                  <MinusIcon className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>{`Remove from "${sectionContext}"`}</TooltipContent>
+            </Tooltip>
+          )}
           <Popover open={confirmRemove} onOpenChange={onConfirmRemoveChange}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -163,7 +198,7 @@ function RepoRow({
                   </button>
                 </PopoverTrigger>
               </TooltipTrigger>
-              <TooltipContent>Remove from list</TooltipContent>
+              <TooltipContent>Remove from GitBud</TooltipContent>
             </Tooltip>
             <PopoverContent
               align="end"
@@ -240,10 +275,24 @@ export function RepoSidebar() {
   const [confirmRemovePath, setConfirmRemovePath] = useState<string | null>(null);
   const [pinSectionRepo, setPinSectionRepo] = useState<RepoEntry | null>(null);
   const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem("sidebar-collapsed") === "1");
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => loadCollapsedSections());
 
   useEffect(() => {
     window.localStorage.setItem("sidebar-collapsed", collapsed ? "1" : "0");
   }, [collapsed]);
+
+  useEffect(() => {
+    window.localStorage.setItem("sidebar-collapsed-sections", JSON.stringify([...collapsedSections]));
+  }, [collapsedSections]);
+
+  const toggleSectionCollapsed = (section: string) => {
+    setCollapsedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(section)) next.delete(section);
+      else next.add(section);
+      return next;
+    });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -298,7 +347,7 @@ export function RepoSidebar() {
       (r) =>
         r.name.toLowerCase().includes(needle) ||
         r.group.toLowerCase().includes(needle) ||
-        r.section?.toLowerCase().includes(needle),
+        r.sections.some((s) => s.toLowerCase().includes(needle)),
     );
   }, [repos, filter, activeWorkspace]);
 
@@ -328,18 +377,26 @@ export function RepoSidebar() {
   }, [sorted, sidebarSort]);
 
   const knownSections = useMemo(
-    () =>
-      Array.from(new Set(repos.map((r) => r.section).filter((s): s is string => !!s))).sort((a, b) =>
-        a.localeCompare(b),
-      ),
+    () => Array.from(new Set(repos.flatMap((r) => r.sections))).sort((a, b) => a.localeCompare(b)),
     [repos],
   );
 
-  const pinToSection = async (section: string | null) => {
+  const addSection = async (section: string) => {
     if (!pinSectionRepo) return;
-    const updated = await api.setRepoSection(pinSectionRepo.path, section);
+    const targetPath = pinSectionRepo.path;
+    const updated = await api.addRepoSection(targetPath, section);
     setReposLocal({ repos: updated });
-    setPinSectionRepo(null);
+    setPinSectionRepo((current) =>
+      current?.path === targetPath ? updated.find((r) => r.path === targetPath) ?? current : current,
+    );
+  };
+
+  const removeSection = async (path: string, section: string) => {
+    const updated = await api.removeRepoSection(path, section);
+    setReposLocal({ repos: updated });
+    setPinSectionRepo((current) =>
+      current?.path === path ? updated.find((r) => r.path === path) ?? current : current,
+    );
   };
 
   const reorder = async (overPath: string) => {
@@ -437,44 +494,75 @@ export function RepoSidebar() {
             {repos.length === 0 ? 'Use "+" to add a repository' : "No matches"}
           </div>
         )}
-        {[...pinned.entries()].map(([section, sectionRepos]) => (
-          <div key={`pin:${section}`}>
-            <div className="flex items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground">
-              <PinIcon className="size-3" />
-              {section}
+        {[...pinned.entries()].map(([section, sectionRepos]) => {
+          const collapseKey = `pin:${section}`;
+          const isCollapsed = collapsedSections.has(collapseKey);
+          const visibleRepos = sectionRepos.filter(
+            (repo) => !isCollapsed || repo.path === selectedRepo,
+          );
+          return (
+            <div key={collapseKey}>
+              <button
+                className="flex w-full items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                onClick={() => toggleSectionCollapsed(collapseKey)}
+              >
+                {isCollapsed ? (
+                  <ChevronRightIcon className="size-3 shrink-0" />
+                ) : (
+                  <ChevronDownIcon className="size-3 shrink-0" />
+                )}
+                <PinIcon className="size-3 shrink-0" />
+                <span className="truncate">{section}</span>
+              </button>
+              {visibleRepos.map((repo) => (
+                <RepoRow
+                  key={repo.path}
+                  repo={repo}
+                  selected={selectedRepo === repo.path}
+                  syncingHere={syncing && selectedRepo === repo.path}
+                  dirty={!!dirty[repo.path]}
+                  ab={aheadBehind[repo.path]}
+                  showAheadBehind={showAheadBehind}
+                  draggable={false}
+                  dragged={false}
+                  confirmRemove={confirmRemovePath === repo.path}
+                  onSelect={() => void selectRepo(repo.path)}
+                  onDragStart={() => {}}
+                  onDragOver={() => {}}
+                  onDrop={() => {}}
+                  onDragEnd={() => {}}
+                  onConfirmRemoveChange={(open) => setConfirmRemovePath(open ? repo.path : null)}
+                  onRemove={() => void removeRepo(repo.path)}
+                  onPinToSection={() => setPinSectionRepo(repo)}
+                  sectionContext={section}
+                  onRemoveFromSection={() => void removeSection(repo.path, section)}
+                />
+              ))}
             </div>
-            {sectionRepos.map((repo) => (
-              <RepoRow
-                key={repo.path}
-                repo={repo}
-                selected={selectedRepo === repo.path}
-                syncingHere={syncing && selectedRepo === repo.path}
-                dirty={!!dirty[repo.path]}
-                ab={aheadBehind[repo.path]}
-                showAheadBehind={showAheadBehind}
-                draggable={false}
-                dragged={false}
-                confirmRemove={confirmRemovePath === repo.path}
-                onSelect={() => void selectRepo(repo.path)}
-                onDragStart={() => {}}
-                onDragOver={() => {}}
-                onDrop={() => {}}
-                onDragEnd={() => {}}
-                onConfirmRemoveChange={(open) => setConfirmRemovePath(open ? repo.path : null)}
-                onRemove={() => void removeRepo(repo.path)}
-                onPinToSection={() => setPinSectionRepo(repo)}
-              />
-            ))}
-          </div>
-        ))}
-        {[...grouped.entries()].map(([group, groupRepos]) => (
-          <div key={group}>
-            {group && (
-              <div className="px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground">
-                {group}
-              </div>
-            )}
-            {groupRepos.map((repo) => (
+          );
+        })}
+        {[...grouped.entries()].map(([group, groupRepos]) => {
+          const collapseKey = `grp:${group}`;
+          const isCollapsed = group !== "" && collapsedSections.has(collapseKey);
+          const visibleRepos = groupRepos.filter(
+            (repo) => !isCollapsed || repo.path === selectedRepo,
+          );
+          return (
+            <div key={group}>
+              {group && (
+                <button
+                  className="flex w-full items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  onClick={() => toggleSectionCollapsed(collapseKey)}
+                >
+                  {isCollapsed ? (
+                    <ChevronRightIcon className="size-3 shrink-0" />
+                  ) : (
+                    <ChevronDownIcon className="size-3 shrink-0" />
+                  )}
+                  <span className="truncate">{group}</span>
+                </button>
+              )}
+              {visibleRepos.map((repo) => (
               <RepoRow
                 key={repo.path}
                 repo={repo}
@@ -501,9 +589,10 @@ export function RepoSidebar() {
                 onRemove={() => void removeRepo(repo.path)}
                 onPinToSection={() => setPinSectionRepo(repo)}
               />
-            ))}
-          </div>
-        ))}
+              ))}
+            </div>
+          );
+        })}
       </div>
       {repos.length > 0 && (
         <div className="shrink-0 border-t border-border p-2">
@@ -519,7 +608,8 @@ export function RepoSidebar() {
       repo={pinSectionRepo}
       sections={knownSections}
       onOpenChange={(open) => !open && setPinSectionRepo(null)}
-      onPin={(section) => void pinToSection(section)}
+      onAddSection={(section) => void addSection(section)}
+      onRemoveSection={(section) => pinSectionRepo && void removeSection(pinSectionRepo.path, section)}
     />
     </div>
   );

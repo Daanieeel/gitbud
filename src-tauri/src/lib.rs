@@ -255,8 +255,13 @@ fn remove_repo(path: String) -> Result<Vec<config::RepoEntry>, String> {
 }
 
 #[tauri::command]
-fn set_repo_section(path: String, section: Option<String>) -> Result<Vec<config::RepoEntry>, String> {
-    config::set_repo_section(&path, section)
+fn add_repo_section(path: String, section: String) -> Result<Vec<config::RepoEntry>, String> {
+    config::add_repo_section(&path, &section)
+}
+
+#[tauri::command]
+fn remove_repo_section(path: String, section: String) -> Result<Vec<config::RepoEntry>, String> {
+    config::remove_repo_section(&path, &section)
 }
 
 #[tauri::command]
@@ -839,7 +844,8 @@ pub fn run() {
             load_repos,
             add_repo,
             remove_repo,
-            set_repo_section,
+            add_repo_section,
+            remove_repo_section,
             set_repo_identity,
             set_repo_order,
             list_workspaces,

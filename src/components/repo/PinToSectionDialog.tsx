@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { FolderInputIcon, PinIcon } from "lucide-react";
+import { CheckIcon, FolderInputIcon, PinIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,14 +10,22 @@ interface PinToSectionDialogProps {
   repo: RepoEntry | null;
   sections: string[];
   onOpenChange: (open: boolean) => void;
-  onPin: (section: string | null) => void;
+  onAddSection: (section: string) => void;
+  onRemoveSection: (section: string) => void;
 }
 
-export function PinToSectionDialog({ repo, sections, onOpenChange, onPin }: PinToSectionDialogProps) {
+export function PinToSectionDialog({
+  repo,
+  sections,
+  onOpenChange,
+  onAddSection,
+  onRemoveSection,
+}: PinToSectionDialogProps) {
   const [newSection, setNewSection] = useState("");
 
-  const pin = (section: string | null) => {
-    onPin(section);
+  const create = () => {
+    if (!newSection.trim()) return;
+    onAddSection(newSection.trim());
     setNewSection("");
   };
 
@@ -34,31 +42,29 @@ export function PinToSectionDialog({ repo, sections, onOpenChange, onPin }: PinT
           <DialogTitle>Pin "{repo?.name}" to Section</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground">
-          Pinning adds this repository to a section for quick access. It still shows up under
-          its own organization, too.
+          A repository can be pinned to any number of sections for quick access. It still shows
+          up under its own organization, too.
         </p>
         <div className="flex max-h-48 flex-col gap-0.5 overflow-auto">
-          <button
-            className={cn(
-              "rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent",
-              !repo?.section && "bg-accent font-medium",
-            )}
-            onClick={() => pin(null)}
-          >
-            No section
-          </button>
-          {sections.map((s) => (
-            <button
-              key={s}
-              className={cn(
-                "rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent",
-                repo?.section === s && "bg-accent font-medium",
-              )}
-              onClick={() => pin(s)}
-            >
-              {s}
-            </button>
-          ))}
+          {sections.length === 0 && (
+            <p className="px-2 py-1.5 text-sm text-muted-foreground">No sections yet</p>
+          )}
+          {sections.map((s) => {
+            const pinned = !!repo?.sections.includes(s);
+            return (
+              <button
+                key={s}
+                className={cn(
+                  "flex items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent",
+                  pinned && "font-medium",
+                )}
+                onClick={() => (pinned ? onRemoveSection(s) : onAddSection(s))}
+              >
+                {s}
+                {pinned && <CheckIcon className="size-3.5 shrink-0" />}
+              </button>
+            );
+          })}
         </div>
         <div className="flex gap-2 border-t border-border pt-3">
           <Input
@@ -66,9 +72,9 @@ export function PinToSectionDialog({ repo, sections, onOpenChange, onPin }: PinT
             placeholder="New section name"
             value={newSection}
             onChange={(e) => setNewSection(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && newSection.trim() && pin(newSection.trim())}
+            onKeyDown={(e) => e.key === "Enter" && create()}
           />
-          <Button size="sm" disabled={!newSection.trim()} onClick={() => pin(newSection.trim())}>
+          <Button size="sm" disabled={!newSection.trim()} onClick={create}>
             <FolderInputIcon className="size-3.5" />
             Create
           </Button>

@@ -11,10 +11,11 @@ pub struct RepoEntry {
     pub group: String,
     #[serde(default)]
     pub last_fetched: Option<i64>,
-    /// User-assigned sidebar section (e.g. "Work", "Personal"), overriding the auto-derived
-    /// `group` for display purposes. `None` means "use the auto-derived group".
+    /// User-assigned sidebar sections (e.g. "Work", "Personal") this repo is pinned to, for
+    /// quick access. Additive — a repo can belong to any number of sections at once, and stays
+    /// visible under its auto-derived `group` regardless.
     #[serde(default)]
-    pub section: Option<String>,
+    pub sections: Vec<String>,
     /// Per-repo override of which git identity (a GitHub account or SSH identity, opaque id
     /// interpreted by the frontend) authenticates git operations here. `None` means "use the
     /// global default identity".
@@ -38,13 +39,34 @@ fn repos_file() -> Result<PathBuf, String> {
     Ok(config_dir()?.join("repos.json"))
 }
 
+/// Migrates the old single, overriding `section: Option<String>` field (from before repos
+/// could be pinned to more than one section) into the new `sections: Vec<String>` field, so
+/// upgrading doesn't silently drop anyone's existing pin.
+fn migrate_legacy_section(mut value: serde_json::Value) -> serde_json::Value {
+    if let Some(repos) = value.get_mut("repos").and_then(|r| r.as_array_mut()) {
+        for repo in repos {
+            let Some(obj) = repo.as_object_mut() else { continue };
+            let has_sections = obj.get("sections").is_some_and(|s| s.is_array());
+            if has_sections {
+                continue;
+            }
+            if let Some(section) = obj.remove("section").and_then(|s| s.as_str().map(str::to_string)) {
+                obj.insert("sections".to_string(), serde_json::json!([section]));
+            }
+        }
+    }
+    value
+}
+
 pub fn load_repos() -> Result<Vec<RepoEntry>, String> {
     let file = repos_file()?;
     if !file.exists() {
         return Ok(Vec::new());
     }
     let contents = fs::read_to_string(&file).map_err(|e| e.to_string())?;
-    let config: RepoConfig = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+    let value: serde_json::Value = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+    let config: RepoConfig =
+        serde_json::from_value(migrate_legacy_section(value)).map_err(|e| e.to_string())?;
     Ok(config.repos)
 }
 
@@ -113,7 +135,7 @@ pub fn add_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
         name,
         group,
         last_fetched: None,
-        section: None,
+        sections: Vec::new(),
         identity_id: None,
     });
     save_repos(&repos)?;
@@ -127,10 +149,22 @@ pub fn remove_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
     Ok(repos)
 }
 
-pub fn set_repo_section(path: &str, section: Option<String>) -> Result<Vec<RepoEntry>, String> {
+pub fn add_repo_section(path: &str, section: &str) -> Result<Vec<RepoEntry>, String> {
+    let section = section.trim();
     let mut repos = load_repos()?;
     if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
-        entry.section = section.filter(|s| !s.trim().is_empty());
+        if !section.is_empty() && !entry.sections.iter().any(|s| s == section) {
+            entry.sections.push(section.to_string());
+        }
+    }
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
+pub fn remove_repo_section(path: &str, section: &str) -> Result<Vec<RepoEntry>, String> {
+    let mut repos = load_repos()?;
+    if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
+        entry.sections.retain(|s| s != section);
     }
     save_repos(&repos)?;
     Ok(repos)

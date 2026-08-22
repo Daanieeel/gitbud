@@ -137,8 +137,10 @@ export const api = {
   loadRepos: () => invoke<RepoEntry[]>("load_repos"),
   addRepo: (path: string) => invoke<RepoEntry[]>("add_repo", { path }),
   removeRepo: (path: string) => invoke<RepoEntry[]>("remove_repo", { path }),
-  setRepoSection: (path: string, section: string | null) =>
-    invoke<RepoEntry[]>("set_repo_section", { path, section }),
+  addRepoSection: (path: string, section: string) =>
+    invoke<RepoEntry[]>("add_repo_section", { path, section }),
+  removeRepoSection: (path: string, section: string) =>
+    invoke<RepoEntry[]>("remove_repo_section", { path, section }),
   setRepoIdentity: (path: string, identityId: string | null) =>
     invoke<RepoEntry[]>("set_repo_identity", { path, identityId }),
   setRepoOrder: (order: string[]) => invoke<RepoEntry[]>("set_repo_order", { order }),

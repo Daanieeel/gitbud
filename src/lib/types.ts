@@ -113,7 +113,7 @@ export interface RepoEntry {
   name: string;
   group: string;
   last_fetched: number | null;
-  section: string | null;
+  sections: string[];
   identity_id: string | null;
 }
 
