@@ -80,6 +80,17 @@ pub fn push_ref(app: &AppHandle, repo_path: &str, ref_name: &str, event_id: &str
     run_streaming(app, repo_path, &["push", "origin", ref_name], event_id)
 }
 
+/// Initializes and updates one submodule (by its path within the superproject). Shelled out
+/// to system `git` rather than git2, same reasoning as fetch/pull/push/clone: submodule
+/// update can require cloning over the network, and that means auth.
+pub fn update_submodule(app: &AppHandle, repo_path: &str, submodule_path: &str, event_id: &str) -> Result<(), String> {
+    run_streaming(app, repo_path, &["submodule", "update", "--init", "--", submodule_path], event_id)
+}
+
+pub fn update_all_submodules(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
+    run_streaming(app, repo_path, &["submodule", "update", "--init", "--recursive"], event_id)
+}
+
 pub fn clone(app: &AppHandle, url: &str, dest: &str, event_id: &str) -> Result<(), String> {
     let mut child = Command::new(crate::settings::git_binary())
         .args(["clone", "--progress", url, dest])

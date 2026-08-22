@@ -21,6 +21,7 @@ import type {
   ReviewComment,
   Settings,
   StashEntry,
+  SubmoduleInfo,
   TagInfo,
 } from "./types";
 
@@ -97,6 +98,12 @@ export const api = {
 
   blameFile: (repoPath: string, path: string) =>
     invoke<BlameLine[]>("blame_file", { repoPath, path }),
+
+  listSubmodules: (repoPath: string) => invoke<SubmoduleInfo[]>("list_submodules", { repoPath }),
+  updateSubmodule: (repoPath: string, submodulePath: string) =>
+    invoke<void>("update_submodule", { repoPath, submodulePath }),
+  updateAllSubmodules: (repoPath: string) =>
+    invoke<void>("update_all_submodules", { repoPath }),
 
   loadRepos: () => invoke<RepoEntry[]>("load_repos"),
   addRepo: (path: string) => invoke<RepoEntry[]>("add_repo", { path }),

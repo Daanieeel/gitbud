@@ -86,6 +86,14 @@ export interface BlameLine {
   timestamp: number;
 }
 
+export interface SubmoduleInfo {
+  name: string;
+  path: string;
+  url: string | null;
+  head_oid: string | null;
+  initialized: boolean;
+}
+
 export interface RepoEntry {
   path: string;
   name: string;

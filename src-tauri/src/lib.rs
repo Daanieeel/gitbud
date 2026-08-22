@@ -9,6 +9,7 @@ mod image_diff;
 mod repo;
 mod settings;
 mod stash;
+mod submodules;
 mod system;
 mod tags;
 mod watch;
@@ -193,6 +194,23 @@ fn delete_tag(repo_path: String, name: String) -> Result<(), String> {
 #[tauri::command]
 fn push_tag(app: AppHandle, repo_path: String, name: String) -> Result<(), String> {
     git_shell::push_ref(&app, &repo_path, &name, &repo_path)
+}
+
+// --- submodules ---
+
+#[tauri::command]
+fn list_submodules(repo_path: String) -> Result<Vec<submodules::SubmoduleInfo>, String> {
+    submodules::list_submodules(&repo_path)
+}
+
+#[tauri::command]
+fn update_submodule(app: AppHandle, repo_path: String, submodule_path: String) -> Result<(), String> {
+    git_shell::update_submodule(&app, &repo_path, &submodule_path, &repo_path)
+}
+
+#[tauri::command]
+fn update_all_submodules(app: AppHandle, repo_path: String) -> Result<(), String> {
+    git_shell::update_all_submodules(&app, &repo_path, &repo_path)
 }
 
 // --- blame ---
@@ -603,6 +621,9 @@ pub fn run() {
             delete_tag,
             push_tag,
             blame_file,
+            list_submodules,
+            update_submodule,
+            update_all_submodules,
             load_repos,
             add_repo,
             remove_repo,
