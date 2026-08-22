@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import type {
   AheadBehind,
+  AssignableUser,
   BlameLine,
   BranchInfo,
   CheckRun,
@@ -14,6 +15,9 @@ import type {
   GitHubAccount,
   GitHubRepo,
   ImageDiff,
+  Label,
+  Milestone,
+  Project,
   LfsFileInfo,
   PollResult,
   PullRequest,
@@ -106,6 +110,10 @@ export const api = {
     invoke<[string, string][]>("get_commit_files", { repoPath, oid }),
   getCommitFileDiff: (repoPath: string, oid: string, path: string) =>
     invoke<FileDiff>("get_commit_file_diff", { repoPath, oid, path }),
+  getBranchDiffFiles: (repoPath: string, base: string, head: string) =>
+    invoke<[string, string][]>("get_branch_diff_files", { repoPath, base, head }),
+  getBranchDiffFile: (repoPath: string, base: string, head: string, path: string) =>
+    invoke<FileDiff>("get_branch_diff_file", { repoPath, base, head, path }),
   getImageDiff: (repoPath: string, path: string, staged: boolean) =>
     invoke<ImageDiff>("get_image_diff", { repoPath, path, staged }),
   getCommitImageDiff: (repoPath: string, oid: string, path: string) =>
@@ -246,6 +254,24 @@ export const api = {
       draft,
     }),
   readPrTemplate: (repoPath: string) => invoke<string | null>("read_pr_template", { repoPath }),
+  githubListLabels: (repoPath: string, login: string) =>
+    invoke<Label[]>("github_list_labels", { repoPath, login }),
+  githubListAssignableUsers: (repoPath: string, login: string) =>
+    invoke<AssignableUser[]>("github_list_assignable_users", { repoPath, login }),
+  githubAddLabels: (repoPath: string, login: string, number: number, labels: string[]) =>
+    invoke<void>("github_add_labels", { repoPath, login, number, labels }),
+  githubAddAssignees: (repoPath: string, login: string, number: number, assignees: string[]) =>
+    invoke<void>("github_add_assignees", { repoPath, login, number, assignees }),
+  githubRequestReviewers: (repoPath: string, login: string, number: number, reviewers: string[]) =>
+    invoke<void>("github_request_reviewers", { repoPath, login, number, reviewers }),
+  githubListMilestones: (repoPath: string, login: string) =>
+    invoke<Milestone[]>("github_list_milestones", { repoPath, login }),
+  githubSetMilestone: (repoPath: string, login: string, number: number, milestone: number) =>
+    invoke<void>("github_set_milestone", { repoPath, login, number, milestone }),
+  githubListProjects: (repoPath: string, login: string) =>
+    invoke<Project[]>("github_list_projects", { repoPath, login }),
+  githubAddPullRequestToProject: (repoPath: string, login: string, number: number, projectId: string) =>
+    invoke<void>("github_add_pull_request_to_project", { repoPath, login, number, projectId }),
   githubMergePullRequest: (repoPath: string, login: string, number: number, mergeMethod: string) =>
     invoke<void>("github_merge_pull_request", { repoPath, login, number, mergeMethod }),
   githubListPullRequestFiles: (repoPath: string, login: string, number: number) =>

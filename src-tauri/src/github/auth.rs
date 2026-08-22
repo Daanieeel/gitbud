@@ -105,6 +105,16 @@ pub fn web_base(host: &str) -> String {
     format!("https://{host}")
 }
 
+/// GitHub Projects (v2) is GraphQL-only — there's no REST equivalent — so it needs a different
+/// base URL than `api_base`'s REST root.
+pub fn graphql_base(host: &str) -> String {
+    if host == "github.com" {
+        "https://api.github.com/graphql".to_string()
+    } else {
+        format!("https://{host}/api/graphql")
+    }
+}
+
 pub fn list_accounts() -> Result<Vec<Account>, String> {
     let file = accounts_file()?;
     if !file.exists() {

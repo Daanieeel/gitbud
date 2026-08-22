@@ -268,6 +268,26 @@ export interface ReviewComment {
   in_reply_to_id: number | null;
 }
 
+export interface Label {
+  name: string;
+  color: string;
+}
+
+export interface Milestone {
+  number: number;
+  title: string;
+}
+
+export interface Project {
+  id: string;
+  title: string;
+}
+
+export interface AssignableUser {
+  login: string;
+  avatar_url: string;
+}
+
 export interface PullRequestFile {
   filename: string;
   status: string;

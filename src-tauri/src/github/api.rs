@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::auth::api_base;
+use super::auth::{api_base, graphql_base};
 use crate::diff::{DiffHunk, DiffLine, FileDiff, LineKind};
 use crate::image_diff::is_image_path;
 
@@ -11,6 +11,7 @@ const USER_AGENT: &str = "GitBud";
 struct GhClient {
     http: reqwest::Client,
     base: String,
+    graphql: String,
 }
 
 impl GhClient {
@@ -27,7 +28,7 @@ impl GhClient {
             .default_headers(headers)
             .build()
             .map_err(|e| e.to_string())?;
-        Ok(Self { http, base: api_base(host) })
+        Ok(Self { http, base: api_base(host), graphql: graphql_base(host) })
     }
 
     fn url(&self, path: &str) -> String {
@@ -44,6 +45,51 @@ impl GhClient {
 
     fn put(&self, path: &str) -> reqwest::RequestBuilder {
         self.http.put(self.url(path))
+    }
+
+    fn patch(&self, path: &str) -> reqwest::RequestBuilder {
+        self.http.patch(self.url(path))
+    }
+
+    /// GitHub Projects (v2) has no REST surface — `query`/`variables` go straight to the
+    /// GraphQL endpoint. Unlike REST, GraphQL returns 200 even on a semantic failure, with the
+    /// problem described in an `errors` array instead, so that has to be checked explicitly.
+    async fn graphql<T: for<'de> Deserialize<'de>>(
+        &self,
+        query: &str,
+        variables: serde_json::Value,
+    ) -> Result<T, String> {
+        #[derive(Serialize)]
+        struct Body<'a> {
+            query: &'a str,
+            variables: serde_json::Value,
+        }
+        #[derive(Deserialize)]
+        struct GraphQlError {
+            message: String,
+        }
+        #[derive(Deserialize)]
+        struct GraphQlResponse<T> {
+            data: Option<T>,
+            #[serde(default)]
+            errors: Vec<GraphQlError>,
+        }
+
+        let res = check(
+            self.http
+                .post(&self.graphql)
+                .json(&Body { query, variables })
+                .send()
+                .await
+                .map_err(|e| e.to_string())?,
+        )
+        .await?;
+        let parsed: GraphQlResponse<T> = res.json().await.map_err(|e| e.to_string())?;
+        if !parsed.errors.is_empty() {
+            let messages: Vec<String> = parsed.errors.into_iter().map(|e| e.message).collect();
+            return Err(messages.join("; "));
+        }
+        parsed.data.ok_or_else(|| "GraphQL response had no data".to_string())
     }
 }
 
@@ -194,6 +240,257 @@ pub async fn create_pull_request(
     .await?;
     let raw: RawPullRequest = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Label {
+    pub name: String,
+    pub color: String,
+}
+
+pub async fn list_labels(host: &str, token: &str, owner: &str, repo: &str) -> Result<Vec<Label>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/labels?per_page=100");
+    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    res.json().await.map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AssignableUser {
+    pub login: String,
+    pub avatar_url: String,
+}
+
+/// Users who can be assigned to issues/PRs on this repo — also used as the reviewer candidate
+/// list, since requesting a review from a non-collaborator isn't possible anyway.
+pub async fn list_assignable_users(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<Vec<AssignableUser>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/assignees?per_page=100");
+    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    res.json().await.map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Serialize)]
+struct LabelsBody<'a> {
+    labels: &'a [String],
+}
+
+pub async fn add_labels(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    labels: &[String],
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/labels");
+    check(
+        gh.post(&path)
+            .json(&LabelsBody { labels })
+            .send()
+            .await
+            .map_err(|e| e.to_string())?,
+    )
+    .await?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct AssigneesBody<'a> {
+    assignees: &'a [String],
+}
+
+pub async fn add_assignees(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    assignees: &[String],
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/assignees");
+    check(
+        gh.post(&path)
+            .json(&AssigneesBody { assignees })
+            .send()
+            .await
+            .map_err(|e| e.to_string())?,
+    )
+    .await?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct ReviewersBody<'a> {
+    reviewers: &'a [String],
+}
+
+pub async fn request_reviewers(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    reviewers: &[String],
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/requested_reviewers");
+    check(
+        gh.post(&path)
+            .json(&ReviewersBody { reviewers })
+            .send()
+            .await
+            .map_err(|e| e.to_string())?,
+    )
+    .await?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Milestone {
+    pub number: u64,
+    pub title: String,
+}
+
+pub async fn list_milestones(host: &str, token: &str, owner: &str, repo: &str) -> Result<Vec<Milestone>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/milestones?state=open&per_page=100");
+    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    res.json().await.map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Serialize)]
+struct MilestoneBody {
+    milestone: u64,
+}
+
+pub async fn set_milestone(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    milestone: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}");
+    check(
+        gh.patch(&path)
+            .json(&MilestoneBody { milestone })
+            .send()
+            .await
+            .map_err(|e| e.to_string())?,
+    )
+    .await?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Project {
+    pub id: String,
+    pub title: String,
+}
+
+const LIST_PROJECTS_QUERY: &str = r#"
+query($owner: String!, $repo: String!) {
+  repository(owner: $owner, name: $repo) {
+    projectsV2(first: 50) {
+      nodes { id title }
+    }
+  }
+}
+"#;
+
+/// Lists the (Projects v2) projects linked to this repo — classic projects are deprecated
+/// GitHub-wide and have no v2 equivalent surface here.
+pub async fn list_projects(host: &str, token: &str, owner: &str, repo: &str) -> Result<Vec<Project>, String> {
+    #[derive(Deserialize)]
+    struct Nodes {
+        nodes: Vec<Project>,
+    }
+    #[derive(Deserialize)]
+    struct RepositoryData {
+        #[serde(rename = "projectsV2")]
+        projects_v2: Nodes,
+    }
+    #[derive(Deserialize)]
+    struct Data {
+        repository: RepositoryData,
+    }
+
+    let gh = GhClient::new(host, token)?;
+    let data: Data = gh
+        .graphql(LIST_PROJECTS_QUERY, serde_json::json!({ "owner": owner, "repo": repo }))
+        .await?;
+    Ok(data.repository.projects_v2.nodes)
+}
+
+const PR_NODE_ID_QUERY: &str = r#"
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) { id }
+  }
+}
+"#;
+
+const ADD_PROJECT_ITEM_MUTATION: &str = r#"
+mutation($projectId: ID!, $contentId: ID!) {
+  addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
+    item { id }
+  }
+}
+"#;
+
+pub async fn add_pull_request_to_project(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    project_id: &str,
+) -> Result<(), String> {
+    #[derive(Deserialize)]
+    struct PullRequestId {
+        id: String,
+    }
+    #[derive(Deserialize)]
+    struct RepositoryData {
+        #[serde(rename = "pullRequest")]
+        pull_request: PullRequestId,
+    }
+    #[derive(Deserialize)]
+    struct NodeIdData {
+        repository: RepositoryData,
+    }
+    #[derive(Deserialize)]
+    struct MutationData {
+        #[allow(dead_code)]
+        #[serde(rename = "addProjectV2ItemById")]
+        add_project_v2_item_by_id: serde_json::Value,
+    }
+
+    let gh = GhClient::new(host, token)?;
+    let node_id_data: NodeIdData = gh
+        .graphql(
+            PR_NODE_ID_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "number": number }),
+        )
+        .await?;
+    let content_id = node_id_data.repository.pull_request.id;
+    let _: MutationData = gh
+        .graphql(
+            ADD_PROJECT_ITEM_MUTATION,
+            serde_json::json!({ "projectId": project_id, "contentId": content_id }),
+        )
+        .await?;
+    Ok(())
 }
 
 #[derive(Debug, Serialize)]

@@ -213,6 +213,25 @@ async fn get_commit_file_diff(repo_path: String, oid: String, path: String) -> R
 }
 
 #[tauri::command]
+async fn get_branch_diff_files(repo_path: String, base: String, head: String) -> Result<Vec<(String, String)>, String> {
+    tauri::async_runtime::spawn_blocking(move || diff::get_branch_diff_files(&repo_path, &base, &head))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn get_branch_diff_file(
+    repo_path: String,
+    base: String,
+    head: String,
+    path: String,
+) -> Result<diff::FileDiff, String> {
+    tauri::async_runtime::spawn_blocking(move || diff::get_branch_diff_file(&repo_path, &base, &head, &path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn get_image_diff(repo_path: String, path: String, staged: bool) -> Result<image_diff::ImageDiff, String> {
     tauri::async_runtime::spawn_blocking(move || image_diff::get_image_diff(&repo_path, &path, staged))
         .await
@@ -866,6 +885,78 @@ async fn github_create_pull_request(
 }
 
 #[tauri::command]
+async fn github_list_labels(repo_path: String, login: String) -> Result<Vec<github::api::Label>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_labels(&host, &token, &owner, &repo).await
+}
+
+#[tauri::command]
+async fn github_list_assignable_users(
+    repo_path: String,
+    login: String,
+) -> Result<Vec<github::api::AssignableUser>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_assignable_users(&host, &token, &owner, &repo).await
+}
+
+#[tauri::command]
+async fn github_add_labels(repo_path: String, login: String, number: u64, labels: Vec<String>) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::add_labels(&host, &token, &owner, &repo, number, &labels).await
+}
+
+#[tauri::command]
+async fn github_add_assignees(
+    repo_path: String,
+    login: String,
+    number: u64,
+    assignees: Vec<String>,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::add_assignees(&host, &token, &owner, &repo, number, &assignees).await
+}
+
+#[tauri::command]
+async fn github_request_reviewers(
+    repo_path: String,
+    login: String,
+    number: u64,
+    reviewers: Vec<String>,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::request_reviewers(&host, &token, &owner, &repo, number, &reviewers).await
+}
+
+#[tauri::command]
+async fn github_list_milestones(repo_path: String, login: String) -> Result<Vec<github::api::Milestone>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_milestones(&host, &token, &owner, &repo).await
+}
+
+#[tauri::command]
+async fn github_set_milestone(repo_path: String, login: String, number: u64, milestone: u64) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::set_milestone(&host, &token, &owner, &repo, number, milestone).await
+}
+
+#[tauri::command]
+async fn github_list_projects(repo_path: String, login: String) -> Result<Vec<github::api::Project>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_projects(&host, &token, &owner, &repo).await
+}
+
+#[tauri::command]
+async fn github_add_pull_request_to_project(
+    repo_path: String,
+    login: String,
+    number: u64,
+    project_id: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::add_pull_request_to_project(&host, &token, &owner, &repo, number, &project_id).await
+}
+
+#[tauri::command]
 async fn github_list_check_runs(
     repo_path: String,
     login: String,
@@ -1192,6 +1283,8 @@ pub fn run() {
             get_file_diff,
             get_commit_files,
             get_commit_file_diff,
+            get_branch_diff_files,
+            get_branch_diff_file,
             get_image_diff,
             get_commit_image_diff,
             get_log,
@@ -1275,6 +1368,15 @@ pub fn run() {
             github_list_pull_requests,
             github_get_pull_request,
             github_create_pull_request,
+            github_list_labels,
+            github_list_assignable_users,
+            github_add_labels,
+            github_add_assignees,
+            github_request_reviewers,
+            github_list_milestones,
+            github_set_milestone,
+            github_list_projects,
+            github_add_pull_request_to_project,
             github_merge_pull_request,
             github_list_pull_request_files,
             github_list_review_comments,

@@ -47,7 +47,10 @@ interface PRState {
     base: string,
     body: string,
     draft: boolean,
-  ) => Promise<void>;
+    labels: string[],
+    assignees: string[],
+    reviewers: string[],
+  ) => Promise<PullRequest>;
   mergePR: (repoPath: string, login: string, number: number, method: string) => Promise<void>;
 }
 
@@ -160,9 +163,17 @@ export const usePRStore = create<PRState>((set, get) => ({
     set((s) => ({ comments: [...s.comments, comment] }));
   },
 
-  createPR: async (repoPath, login, title, head, base, body, draft) => {
-    await api.githubCreatePullRequest(repoPath, login, title, head, base, body, draft);
+  createPR: async (repoPath, login, title, head, base, body, draft, labels, assignees, reviewers) => {
+    const pr = await api.githubCreatePullRequest(repoPath, login, title, head, base, body, draft);
+    // Labels/assignees/reviewers can only be attached once the PR (and its number) exists —
+    // skip calls with nothing selected rather than sending pointless empty-array requests.
+    await Promise.all([
+      labels.length > 0 ? api.githubAddLabels(repoPath, login, pr.number, labels) : Promise.resolve(),
+      assignees.length > 0 ? api.githubAddAssignees(repoPath, login, pr.number, assignees) : Promise.resolve(),
+      reviewers.length > 0 ? api.githubRequestReviewers(repoPath, login, pr.number, reviewers) : Promise.resolve(),
+    ]);
     await get().load(repoPath, login);
+    return pr;
   },
 
   mergePR: async (repoPath, login, number, method) => {

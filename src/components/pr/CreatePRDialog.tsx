@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { GitPullRequestCreateArrow } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { GitPullRequestCreateArrow, GitPullRequestDraftIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,15 +12,35 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DiffView } from "@/components/diff/DiffView";
+import { FileTypeIcon } from "@/lib/file-icons";
+import { FilePathLabel } from "@/components/changes/FilePathLabel";
+import { MultiSelectField } from "./MultiSelectField";
+import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
+import { cn } from "@/lib/utils";
+import type { FileDiff, Label, AssignableUser, Milestone, Project } from "@/lib/types";
 
 interface CreatePRDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+// Matches git2's `Delta` Debug-formatted variants, which is what get_branch_diff_files reports
+// (a local tree-to-tree diff, not the GitHub API) — distinct casing from the GitHub-backed
+// PRDetail's lowercase file statuses.
+const BRANCH_DIFF_STATUS_COLOR: Record<string, string> = {
+  Added: "bg-accent-green",
+  Modified: "bg-accent-green",
+  Typechange: "bg-accent-green",
+  Deleted: "bg-accent-pink",
+  Conflicted: "bg-accent-pink",
+  Renamed: "bg-muted-foreground",
+  Copied: "bg-muted-foreground",
+};
 
 export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -30,12 +50,37 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const createPR = usePRStore((s) => s.createPR);
 
-  const defaultBase = branches.find((b) => !b.is_remote && (b.name === "main" || b.name === "master"))?.name ?? "main";
+  const localBranches = useMemo(
+    () => branches.filter((b) => !b.is_remote && b.name !== branch),
+    [branches, branch],
+  );
+  const defaultBase = localBranches.find((b) => b.name === "main" || b.name === "master")?.name ?? localBranches[0]?.name ?? "main";
   const [base, setBase] = useState(defaultBase);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [draft, setDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const [labels, setLabels] = useState<Label[]>([]);
+  const [assignableUsers, setAssignableUsers] = useState<AssignableUser[]>([]);
+  const [milestones, setMilestones] = useState<Milestone[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [selectedLabels, setSelectedLabels] = useState<string[]>([]);
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [selectedReviewers, setSelectedReviewers] = useState<string[]>([]);
+  const [selectedMilestone, setSelectedMilestone] = useState<string>("");
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+
+  const [diffFiles, setDiffFiles] = useState<[string, string][]>([]);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
+  const [selectedDiff, setSelectedDiff] = useState<FileDiff | null>(null);
+
+  // Reset per-open state and pick a sane default base once the dialog is (re)opened.
+  useEffect(() => {
+    if (!open) return;
+    setBase((prev) => (localBranches.some((b) => b.name === prev) ? prev : defaultBase));
+  }, [open]);
 
   // Prefill the title from the branch's most recent commit so there's rarely a blank field
   // to fill in — the user can still edit or replace it before creating the PR.
@@ -53,14 +98,78 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
     });
   }, [open, repoPath, body]);
 
+  useEffect(() => {
+    if (!open || !repoPath || !currentLogin) return;
+    void api.githubListLabels(repoPath, currentLogin).then(setLabels).catch(() => setLabels([]));
+    void api
+      .githubListAssignableUsers(repoPath, currentLogin)
+      .then(setAssignableUsers)
+      .catch(() => setAssignableUsers([]));
+    void api.githubListMilestones(repoPath, currentLogin).then(setMilestones).catch(() => setMilestones([]));
+    // Projects (v2) is GraphQL-only and errors on repos it isn't enabled for — swallow rather
+    // than blocking the rest of the dialog on a feature most repos won't have configured.
+    void api.githubListProjects(repoPath, currentLogin).then(setProjects).catch(() => setProjects([]));
+  }, [open, repoPath, currentLogin]);
+
+  useEffect(() => {
+    if (!open || !repoPath || !branch || !base) return;
+    setDiffLoading(true);
+    setSelectedFilePath(null);
+    setSelectedDiff(null);
+    void api
+      .getBranchDiffFiles(repoPath, base, branch)
+      .then(setDiffFiles)
+      .catch(() => setDiffFiles([]))
+      .finally(() => setDiffLoading(false));
+  }, [open, repoPath, branch, base]);
+
+  useEffect(() => {
+    if (!repoPath || !branch || !base || !selectedFilePath) {
+      setSelectedDiff(null);
+      return;
+    }
+    void api.getBranchDiffFile(repoPath, base, branch, selectedFilePath).then(setSelectedDiff);
+  }, [repoPath, branch, base, selectedFilePath]);
+
+  const filePaths = useMemo(() => diffFiles.map(([path]) => path), [diffFiles]);
+  const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, setSelectedFilePath);
+  const fileListRef = useRef<HTMLDivElement>(null);
+
   const submit = async () => {
     if (!repoPath || !currentLogin || !branch || !title.trim()) return;
     setSubmitting(true);
     try {
-      await createPR(repoPath, currentLogin, title.trim(), branch, base, body, draft);
+      const pr = await createPR(
+        repoPath,
+        currentLogin,
+        title.trim(),
+        branch,
+        base,
+        body,
+        draft,
+        selectedLabels,
+        selectedAssignees,
+        selectedReviewers,
+      );
+      // Milestone and projects go through separate endpoints from labels/assignees/reviewers
+      // (a single-value issue field, and a GraphQL-only surface, respectively), so they're
+      // applied here rather than folded into createPR.
+      await Promise.all([
+        selectedMilestone
+          ? api.githubSetMilestone(repoPath, currentLogin, pr.number, Number(selectedMilestone))
+          : Promise.resolve(),
+        ...selectedProjects.map((projectId) =>
+          api.githubAddPullRequestToProject(repoPath, currentLogin, pr.number, projectId),
+        ),
+      ]);
       onOpenChange(false);
       setTitle("");
       setBody("");
+      setSelectedLabels([]);
+      setSelectedAssignees([]);
+      setSelectedReviewers([]);
+      setSelectedMilestone("");
+      setSelectedProjects([]);
     } finally {
       setSubmitting(false);
     }
@@ -68,45 +177,162 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
 
   if (!repoPath || !currentLogin) return null;
 
+  const userOptions = assignableUsers.map((u) => ({
+    key: u.login,
+    label: (
+      <span className="flex items-center gap-1.5">
+        <img src={u.avatar_url} alt="" className="size-4 rounded-full" />
+        {u.login}
+      </span>
+    ),
+  }));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="flex h-[75vh] w-[75vw] max-w-none flex-col">
         <DialogHeader>
-          <DialogTitle>Create Pull Request</DialogTitle>
+          <DialogTitle>Preview Pull Request</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-muted-foreground">base:</span>
-            <Input value={base} onChange={(e) => setBase(e.target.value)} className="h-7 w-32" />
-            <span className="text-muted-foreground">← compare:</span>
-            <span className="font-mono">{branch}</span>
+        <div className="flex min-h-0 flex-1 gap-4">
+          <div className="flex min-w-0 flex-[2] flex-col gap-3">
+            <div className="flex shrink-0 items-center gap-2 text-sm">
+              <select
+                value={base}
+                onChange={(e) => setBase(e.target.value)}
+                className="h-7 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {localBranches.map((b) => (
+                  <option key={b.name} value={b.name}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+              <span className="text-muted-foreground">←</span>
+              <span className="font-mono">{branch}</span>
+            </div>
+            <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} className="shrink-0" />
+            <Textarea
+              placeholder="Description"
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={4}
+              className="shrink-0"
+            />
+            <div className="flex min-h-0 flex-1 overflow-hidden rounded-md border border-border">
+              <div
+                ref={fileListRef}
+                tabIndex={0}
+                onKeyDown={handleArrowNav}
+                className="w-56 shrink-0 overflow-auto border-r border-border outline-none"
+              >
+                {diffLoading ? (
+                  <div className="p-2 text-center text-xs text-muted-foreground">Loading…</div>
+                ) : diffFiles.length === 0 ? (
+                  <div className="p-2 text-center text-xs text-muted-foreground">
+                    No changes between {base} and {branch}
+                  </div>
+                ) : (
+                  diffFiles.map(([path, status]) => (
+                    <Tooltip key={path}>
+                      <TooltipTrigger asChild>
+                        <div
+                          className={cn(
+                            "flex cursor-pointer select-none items-center gap-2 px-2 py-1 text-sm hover:bg-accent",
+                            selectedFilePath === path && "bg-accent",
+                          )}
+                          onClick={() => setSelectedFilePath(path)}
+                        >
+                          <span className="relative shrink-0">
+                            <FileTypeIcon path={path} className="size-3.5" />
+                            <span
+                              className={cn(
+                                "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
+                                BRANCH_DIFF_STATUS_COLOR[status] || "bg-muted-foreground",
+                              )}
+                            />
+                          </span>
+                          <FilePathLabel path={path} />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent>{`${path} (${status})`}</TooltipContent>
+                    </Tooltip>
+                  ))
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <DiffView path={selectedFilePath} diff={selectedDiff} imageDiff={null} />
+              </div>
+            </div>
           </div>
-          <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <Textarea
-            placeholder="Description (loads .github/PULL_REQUEST_TEMPLATE.md if present)"
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            rows={6}
-          />
+          <div className="flex w-56 shrink-0 flex-col gap-4 overflow-auto border-l border-border pl-4">
+            <MultiSelectField
+              label="Labels"
+              placeholder="No labels"
+              options={labels.map((l) => ({
+                key: l.name,
+                label: (
+                  <span className="flex items-center gap-1.5">
+                    <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: `#${l.color}` }} />
+                    {l.name}
+                  </span>
+                ),
+              }))}
+              selected={selectedLabels}
+              onChange={setSelectedLabels}
+            />
+            <MultiSelectField
+              label="Assignees"
+              placeholder="No assignees"
+              options={userOptions}
+              selected={selectedAssignees}
+              onChange={setSelectedAssignees}
+            />
+            <MultiSelectField
+              label="Reviewers"
+              placeholder="No reviewers"
+              options={userOptions}
+              selected={selectedReviewers}
+              onChange={setSelectedReviewers}
+            />
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-muted-foreground">Milestone</span>
+              <select
+                value={selectedMilestone}
+                onChange={(e) => setSelectedMilestone(e.target.value)}
+                className="h-7 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="">No milestone</option>
+                {milestones.map((m) => (
+                  <option key={m.number} value={m.number}>
+                    {m.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {projects.length > 0 && (
+              <MultiSelectField
+                label="Projects"
+                placeholder="No projects"
+                options={projects.map((p) => ({ key: p.id, label: p.title }))}
+                selected={selectedProjects}
+                onChange={setSelectedProjects}
+              />
+            )}
+          </div>
+        </div>
+        <DialogFooter className="sm:items-center sm:gap-4">
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
             <Checkbox checked={draft} onCheckedChange={(checked) => setDraft(checked === true)} />
             Create as draft
           </label>
-        </div>
-        <DialogFooter>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                disabled={submitting || !title.trim()}
-                onClick={() => void submit()}
-                variant={'positive'}
-              >
-                <GitPullRequestCreateArrow className="size-3.5" />
-                {submitting ? "Creating…" : "Create Pull Request"}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{`Open a PR from ${branch ?? "this branch"} into ${base}`}</TooltipContent>
-          </Tooltip>
+          <Button
+            disabled={submitting || !title.trim()}
+            onClick={() => void submit()}
+            variant={draft ? "neutral" : "positive"}
+          >
+            {draft ? <GitPullRequestDraftIcon className="size-3.5" /> : <GitPullRequestCreateArrow className="size-3.5" />}
+            {submitting ? "Creating…" : draft ? "Create Draft Pull Request" : "Create Pull Request"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
