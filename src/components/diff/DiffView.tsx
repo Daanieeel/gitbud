@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from "react";
-import { LinkIcon, MessageSquarePlusIcon } from "lucide-react";
-import type { FileDiff, ImageDiff, ReviewComment } from "@/lib/types";
+import { ColumnsIcon, LinkIcon, MessageSquarePlusIcon, RowsIcon } from "lucide-react";
+import type { DiffHunk, DiffLine, FileDiff, ImageDiff, ReviewComment } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ImageDiffView } from "./ImageDiffView";
 import { Button } from "@/components/ui/button";
@@ -98,6 +98,160 @@ function AddCommentComposer({
   );
 }
 
+function HunkHeader({ hunk, hunkIdx, hunkActions }: { hunk: DiffHunk; hunkIdx: number; hunkActions?: HunkActions }) {
+  return (
+    <div className="flex items-center justify-between bg-muted px-3 py-1 text-muted-foreground">
+      <span>{hunk.header}</span>
+      {hunkActions && (
+        <span className="flex gap-2 text-xs">
+          {hunkActions.staged
+            ? hunkActions.onUnstage && (
+                <button className="hover:text-foreground" onClick={() => hunkActions.onUnstage?.(hunkIdx)}>
+                  Unstage Hunk
+                </button>
+              )
+            : hunkActions.onStage && (
+                <button className="hover:text-foreground" onClick={() => hunkActions.onStage?.(hunkIdx)}>
+                  Stage Hunk
+                </button>
+              )}
+          {!hunkActions.staged && hunkActions.onDiscard && (
+            <button className="hover:text-destructive" onClick={() => hunkActions.onDiscard?.(hunkIdx)}>
+              Discard Hunk
+            </button>
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function UnifiedLine({
+  line,
+  hunkIdx,
+  lineIdx,
+  language,
+  comments,
+  onAddComment,
+  onCopyPermalink,
+  composerKey,
+  setComposerKey,
+}: {
+  line: DiffLine;
+  hunkIdx: number;
+  lineIdx: number;
+  language: string | undefined;
+  comments: ReviewComment[] | undefined;
+  onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
+  onCopyPermalink?: (line: number) => void;
+  composerKey: string | null;
+  setComposerKey: (key: string | null) => void;
+}) {
+  const key = `${hunkIdx}:${lineIdx}`;
+  const lineComments = commentsForLine(comments, line.old_lineno, line.new_lineno);
+  const canComment = Boolean(onAddComment) && line.new_lineno != null;
+  return (
+    <div>
+      <div className="group flex px-3 py-px whitespace-pre hover:bg-accent/40">
+        <span className="mr-3 inline-block w-8 shrink-0 select-none text-right text-muted-foreground/60">
+          {line.old_lineno ?? ""}
+        </span>
+        <span className="mr-3 inline-block w-8 shrink-0 select-none text-right text-muted-foreground/60">
+          {line.new_lineno ?? ""}
+        </span>
+        <span
+          className={cn(
+            "mr-2 shrink-0 select-none font-semibold",
+            line.kind === "addition" && "text-accent-green",
+            line.kind === "deletion" && "text-accent-pink",
+          )}
+        >
+          {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
+        </span>
+        <span
+          className="min-w-0 flex-1"
+          dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }}
+        />
+        {onCopyPermalink && line.new_lineno != null && (
+          <button
+            title="Copy GitHub permalink to this line"
+            className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
+            onClick={() => onCopyPermalink(line.new_lineno as number)}
+          >
+            <LinkIcon className="size-3.5" />
+          </button>
+        )}
+        {canComment && (
+          <button
+            title="Add comment"
+            className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
+            onClick={() => setComposerKey(composerKey === key ? null : key)}
+          >
+            <MessageSquarePlusIcon className="size-3.5" />
+          </button>
+        )}
+      </div>
+      <CommentThread comments={lineComments} />
+      {composerKey === key && onAddComment && (
+        <AddCommentComposer
+          onCancel={() => setComposerKey(null)}
+          onSubmit={(body) => onAddComment(line.new_lineno as number, "RIGHT", body)}
+        />
+      )}
+    </div>
+  );
+}
+
+interface SplitRow {
+  left: DiffLine | null;
+  right: DiffLine | null;
+}
+
+/** Structural (not LCS-aligned) pairing: context lines occupy both columns, deletions only
+ * the left column, additions only the right — simple and correct, if not perfectly aligned
+ * for large replaced blocks the way a full diff-alignment algorithm would be. */
+function toSplitRows(hunk: DiffHunk): SplitRow[] {
+  const rows: SplitRow[] = [];
+  for (const line of hunk.lines) {
+    if (line.kind === "deletion") rows.push({ left: line, right: null });
+    else if (line.kind === "addition") rows.push({ left: null, right: line });
+    else rows.push({ left: line, right: line });
+  }
+  return rows;
+}
+
+function SplitCell({ line, language }: { line: DiffLine | null; language: string | undefined }) {
+  if (!line) {
+    return <div className="flex-1 bg-muted/30 px-3 py-px" />;
+  }
+  return (
+    <div
+      className={cn(
+        "flex flex-1 px-3 py-px whitespace-pre",
+        line.kind === "addition" && "bg-[color-mix(in_srgb,var(--accent-green)_10%,transparent)]",
+        line.kind === "deletion" && "bg-[color-mix(in_srgb,var(--accent-pink)_10%,transparent)]",
+      )}
+    >
+      <span className="mr-3 inline-block w-8 shrink-0 select-none text-right text-muted-foreground/60">
+        {line.old_lineno ?? line.new_lineno ?? ""}
+      </span>
+      <span
+        className={cn(
+          "mr-2 shrink-0 select-none font-semibold",
+          line.kind === "addition" && "text-accent-green",
+          line.kind === "deletion" && "text-accent-pink",
+        )}
+      >
+        {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
+      </span>
+      <span
+        className="min-w-0 flex-1"
+        dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }}
+      />
+    </div>
+  );
+}
+
 function DiffViewImpl({
   path,
   diff,
@@ -109,7 +263,19 @@ function DiffViewImpl({
 }: DiffViewProps) {
   const [composerKey, setComposerKey] = useState<string | null>(null);
   const fontSize = useSettingsStore((s) => s.settings.diff_font_size);
+  const diffViewMode = useSettingsStore((s) => s.settings.diff_view);
+  const updateSettings = useSettingsStore((s) => s.update);
   const language = useMemo(() => (diff ? languageForPath(diff.path) : undefined), [diff]);
+
+  const ViewToggle = (
+    <button
+      title={diffViewMode === "split" ? "Switch to unified view" : "Switch to split view"}
+      className="text-muted-foreground hover:text-foreground"
+      onClick={() => void updateSettings({ diff_view: diffViewMode === "split" ? "unified" : "split" })}
+    >
+      {diffViewMode === "split" ? <RowsIcon className="size-3.5" /> : <ColumnsIcon className="size-3.5" />}
+    </button>
+  );
 
   if (!path) {
     return (
@@ -148,100 +314,54 @@ function DiffViewImpl({
     );
   }
 
+  // Split view drops per-line comments/permalink/hunk-actions affordances — those stay
+  // unified-only for now, split is a simpler read-focused layout.
+  if (diffViewMode === "split") {
+    return (
+      <div className="h-full overflow-auto font-mono" style={{ fontSize: `${fontSize}px` }}>
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-3 py-1.5 text-xs font-medium">
+          <span>{diff.path}</span>
+          {ViewToggle}
+        </div>
+        {diff.hunks.map((hunk, hunkIdx) => (
+          <div key={hunkIdx}>
+            <HunkHeader hunk={hunk} hunkIdx={hunkIdx} hunkActions={hunkActions} />
+            {toSplitRows(hunk).map((row, rowIdx) => (
+              <div key={rowIdx} className="flex">
+                <SplitCell line={row.left} language={language} />
+                <div className="w-px shrink-0 bg-border" />
+                <SplitCell line={row.right} language={language} />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="h-full overflow-auto font-mono" style={{ fontSize: `${fontSize}px` }}>
-      <div className="sticky top-0 z-10 border-b border-border bg-card px-3 py-1.5 text-xs font-medium">
-        {diff.path}
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-3 py-1.5 text-xs font-medium">
+        <span>{diff.path}</span>
+        {ViewToggle}
       </div>
       {diff.hunks.map((hunk, hunkIdx) => (
         <div key={hunkIdx}>
-          <div className="flex items-center justify-between bg-muted px-3 py-1 text-muted-foreground">
-            <span>{hunk.header}</span>
-            {hunkActions && (
-              <span className="flex gap-2 text-xs">
-                {hunkActions.staged
-                  ? hunkActions.onUnstage && (
-                      <button
-                        className="hover:text-foreground"
-                        onClick={() => hunkActions.onUnstage?.(hunkIdx)}
-                      >
-                        Unstage Hunk
-                      </button>
-                    )
-                  : hunkActions.onStage && (
-                      <button
-                        className="hover:text-foreground"
-                        onClick={() => hunkActions.onStage?.(hunkIdx)}
-                      >
-                        Stage Hunk
-                      </button>
-                    )}
-                {!hunkActions.staged && hunkActions.onDiscard && (
-                  <button
-                    className="hover:text-destructive"
-                    onClick={() => hunkActions.onDiscard?.(hunkIdx)}
-                  >
-                    Discard Hunk
-                  </button>
-                )}
-              </span>
-            )}
-          </div>
-          {hunk.lines.map((line, lineIdx) => {
-            const key = `${hunkIdx}:${lineIdx}`;
-            const lineComments = commentsForLine(comments, line.old_lineno, line.new_lineno);
-            const canComment = Boolean(onAddComment) && line.new_lineno != null;
-            return (
-              <div key={lineIdx}>
-                <div className="group flex px-3 py-px whitespace-pre hover:bg-accent/40">
-                  <span className="mr-3 inline-block w-8 shrink-0 select-none text-right text-muted-foreground/60">
-                    {line.old_lineno ?? ""}
-                  </span>
-                  <span className="mr-3 inline-block w-8 shrink-0 select-none text-right text-muted-foreground/60">
-                    {line.new_lineno ?? ""}
-                  </span>
-                  <span
-                    className={cn(
-                      "mr-2 shrink-0 select-none font-semibold",
-                      line.kind === "addition" && "text-accent-green",
-                      line.kind === "deletion" && "text-accent-pink",
-                    )}
-                  >
-                    {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
-                  </span>
-                  <span
-                    className="min-w-0 flex-1"
-                    dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }}
-                  />
-                  {onCopyPermalink && line.new_lineno != null && (
-                    <button
-                      title="Copy GitHub permalink to this line"
-                      className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
-                      onClick={() => onCopyPermalink(line.new_lineno as number)}
-                    >
-                      <LinkIcon className="size-3.5" />
-                    </button>
-                  )}
-                  {canComment && (
-                    <button
-                      title="Add comment"
-                      className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
-                      onClick={() => setComposerKey(composerKey === key ? null : key)}
-                    >
-                      <MessageSquarePlusIcon className="size-3.5" />
-                    </button>
-                  )}
-                </div>
-                <CommentThread comments={lineComments} />
-                {composerKey === key && onAddComment && (
-                  <AddCommentComposer
-                    onCancel={() => setComposerKey(null)}
-                    onSubmit={(body) => onAddComment(line.new_lineno as number, "RIGHT", body)}
-                  />
-                )}
-              </div>
-            );
-          })}
+          <HunkHeader hunk={hunk} hunkIdx={hunkIdx} hunkActions={hunkActions} />
+          {hunk.lines.map((line, lineIdx) => (
+            <UnifiedLine
+              key={lineIdx}
+              line={line}
+              hunkIdx={hunkIdx}
+              lineIdx={lineIdx}
+              language={language}
+              comments={comments}
+              onAddComment={onAddComment}
+              onCopyPermalink={onCopyPermalink}
+              composerKey={composerKey}
+              setComposerKey={setComposerKey}
+            />
+          ))}
         </div>
       ))}
     </div>
