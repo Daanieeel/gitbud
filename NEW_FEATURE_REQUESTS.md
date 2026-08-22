@@ -19,7 +19,7 @@ Mark as done when the feature is implemented. Commit after every TODO, do not pu
 - [x] move the batch-actions dropdown (currently at the top) to the bottom of the project/repo explorer, as its own side-by-side buttons instead of a dropdown — now "Fetch All"/"Pull All" buttons above the account switcher.
 - [ ] move the search bar — TODO: user's request cut off mid-sentence ("move the search bar to where "), needs clarification on destination.
 - [x] "Stage Hunk" and "Discard Hunk" buttons need real button look, not just clickable text — now rendered with the shared `Button` component (outline, small).
-- [ ] in branches list, show the current branch's upstream branch name (if any) next to the branch name. also show two lists: local and origin branches, with the current branch highlighted.
+- [x] in branches list, show the current branch's upstream branch name (if any) next to the branch name. also show two lists: local and origin branches, with the current branch highlighted — `BranchSwitcher` now has "Local" and "Origin" sections, with the current branch's row showing "→ origin/&lt;branch&gt;" and its upstream twin highlighted in the Origin list.
 
 ## After all others are done
 
