@@ -23,12 +23,12 @@ Mark as done when the feature is implemented.
 
 Ordered low-hanging-fruit first (smallest lift → biggest lift).
 
-- [ ] **Sidebar drag-to-reorder** — manually reorder repos in the sidebar via drag, independent of the existing sort/section logic.
+- [x] **Sidebar drag-to-reorder** — new "manual" sidebar sort mode (`Settings → Sidebar`); in that mode repo rows are HTML5-draggable and reordering persists via a new `set_repo_order` command that rewrites `repos.json`'s order.
 - [ ] **Settings import/export** — export `settings.json` (identity, preferences, sidebar layout) to a file and re-import on another machine.
 - [ ] **Desktop notifications** — optional OS notification when a long-running fetch/pull/push finishes, or when a watched PR's CI status changes.
 - [ ] **Multi-repo batch actions** — "fetch all" / "pull all" across every sidebar repo at once, with a combined progress/status summary instead of repo-by-repo.
-- [ ] **Stash management panel** — dedicated view listing all stashes (not just create/pop inline) with diff preview per stash, partial-apply, and drop.
-- [ ] **Image / binary diff viewer** — side-by-side or overlay preview for changed image assets instead of a "binary file changed" placeholder.
+- [x] **Stash management panel** — clicking a stash now opens a dedicated dialog (`StashPanel.tsx`) with its file list and a real diff preview per file (reusing `DiffView`, backed by a new `get_stash_oid`/existing `get_commit_file_diff`), plus a per-file "restore from stash" partial-apply (new `stash_apply_file`, shells `git checkout stash@{n} -- <path>`) alongside the existing apply/pop/drop.
+- [x] **Image / binary diff viewer** — already shipped (`ImageDiffView.tsx` + `image_diff.rs`), wired into `DiffView.tsx` for both the Changes and History tabs; checklist was stale.
 - [ ] **Repo workspaces/groups** — user-defined groups of repos (beyond the auto-derived owner grouping) that can be opened together as a saved workspace.
 - [ ] **Auto-update** — in-app update check/download for new GitBud releases instead of requiring a manual reinstall.
 - [ ] **Git LFS awareness** — detect LFS-tracked files, show LFS status/size in the file list, surface `git lfs pull`/`push` progress instead of silently stalling on large binaries.

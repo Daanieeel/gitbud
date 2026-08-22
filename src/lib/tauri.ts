@@ -76,6 +76,9 @@ export const api = {
     invoke<void>("stash_apply", { repoPath, index }),
   stashPop: (repoPath: string, index: number) => invoke<void>("stash_pop", { repoPath, index }),
   stashDrop: (repoPath: string, index: number) => invoke<void>("stash_drop", { repoPath, index }),
+  getStashOid: (repoPath: string, index: number) => invoke<string>("get_stash_oid", { repoPath, index }),
+  stashApplyFile: (repoPath: string, index: number, path: string) =>
+    invoke<void>("stash_apply_file", { repoPath, index, path }),
 
   getFileDiff: (repoPath: string, path: string, staged: boolean) =>
     invoke<FileDiff>("get_file_diff", { repoPath, path, staged }),
@@ -120,6 +123,7 @@ export const api = {
     invoke<RepoEntry[]>("set_repo_section", { path, section }),
   setRepoIdentity: (path: string, identityId: string | null) =>
     invoke<RepoEntry[]>("set_repo_identity", { path, identityId }),
+  setRepoOrder: (order: string[]) => invoke<RepoEntry[]>("set_repo_order", { order }),
   initRepo: (path: string) => invoke<void>("init_repo", { path }),
 
   listSshIdentities: () => invoke<SshIdentity[]>("list_ssh_identities"),

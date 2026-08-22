@@ -140,7 +140,7 @@ export interface CherryPickResult {
 export type ThemeMode = "light" | "dark" | "system";
 export type PullStrategy = "merge" | "rebase" | "ff-only";
 export type DiffViewMode = "unified" | "split";
-export type SidebarSort = "name" | "recent" | "group";
+export type SidebarSort = "name" | "recent" | "group" | "manual";
 
 export interface Settings {
   theme: ThemeMode;

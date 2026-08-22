@@ -58,6 +58,7 @@ export function RepoSidebar() {
   const [filter, setFilter] = useState("");
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const [aheadBehind, setAheadBehind] = useState<Record<string, AheadBehind>>({});
+  const [draggedPath, setDraggedPath] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -120,6 +121,7 @@ export function RepoSidebar() {
     } else if (sidebarSort === "recent") {
       copy.sort((a, b) => (b.last_fetched ?? 0) - (a.last_fetched ?? 0));
     }
+    // "manual" keeps whatever order repos.json is in — drag-to-reorder rewrites that order.
     return copy;
   }, [filtered, sidebarSort]);
 
@@ -145,6 +147,18 @@ export function RepoSidebar() {
     if (input === null) return;
     const updated = await api.setRepoSection(repo.path, input.trim() || null);
     setReposLocal({ repos: updated });
+  };
+
+  const reorder = async (overPath: string) => {
+    if (!draggedPath || draggedPath === overPath) return;
+    const next = [...repos];
+    const fromIndex = next.findIndex((r) => r.path === draggedPath);
+    const toIndex = next.findIndex((r) => r.path === overPath);
+    if (fromIndex === -1 || toIndex === -1) return;
+    const [moved] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, moved);
+    setReposLocal({ repos: next });
+    await api.setRepoOrder(next.map((r) => r.path));
   };
 
   return (
@@ -182,9 +196,22 @@ export function RepoSidebar() {
                 <ContextMenu key={repo.path}>
                   <ContextMenuTrigger asChild>
                     <div
+                      draggable={sidebarSort === "manual"}
+                      onDragStart={() => setDraggedPath(repo.path)}
+                      onDragOver={(e) => {
+                        if (sidebarSort === "manual") e.preventDefault();
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        void reorder(repo.path);
+                        setDraggedPath(null);
+                      }}
+                      onDragEnd={() => setDraggedPath(null)}
                       className={cn(
                         "group flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent cursor-pointer",
                         selectedRepo === repo.path && "bg-accent",
+                        sidebarSort === "manual" && "cursor-grab active:cursor-grabbing",
+                        draggedPath === repo.path && "opacity-50",
                       )}
                       onClick={() => void selectRepo(repo.path)}
                     >

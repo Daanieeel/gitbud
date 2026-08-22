@@ -219,7 +219,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 <Row label="Sort repos by">
                   <Select
                     value={settings.sidebar_sort}
-                    options={["group", "name", "recent"] as SidebarSort[]}
+                    options={["group", "name", "recent", "manual"] as SidebarSort[]}
                     onChange={(sidebar_sort) => void update({ sidebar_sort })}
                   />
                 </Row>

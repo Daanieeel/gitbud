@@ -31,6 +31,7 @@ pub enum SidebarSort {
     Name,
     Recent,
     Group,
+    Manual,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

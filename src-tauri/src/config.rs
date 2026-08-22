@@ -1,5 +1,6 @@
 use git2::Repository;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -153,6 +154,26 @@ pub fn set_repo_identity(path: &str, identity_id: Option<String>) -> Result<Vec<
     }
     save_repos(&repos)?;
     Ok(repos)
+}
+
+/// Reorders the repo list to match `order` (a list of paths), for manual drag-to-reorder in
+/// the sidebar. Repos not mentioned in `order` (shouldn't normally happen) keep their
+/// relative order and are appended at the end.
+pub fn set_repo_order(order: &[String]) -> Result<Vec<RepoEntry>, String> {
+    let repos = load_repos()?;
+    let mut by_path: HashMap<String, RepoEntry> =
+        repos.into_iter().map(|r| (r.path.clone(), r)).collect();
+
+    let mut reordered = Vec::with_capacity(by_path.len());
+    for path in order {
+        if let Some(entry) = by_path.remove(path) {
+            reordered.push(entry);
+        }
+    }
+    reordered.extend(by_path.into_values());
+
+    save_repos(&reordered)?;
+    Ok(reordered)
 }
 
 pub fn touch_last_fetched(path: &str, timestamp: i64) -> Result<Vec<RepoEntry>, String> {

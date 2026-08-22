@@ -263,6 +263,11 @@ fn set_repo_identity(path: String, identity_id: Option<String>) -> Result<Vec<co
     config::set_repo_identity(&path, identity_id)
 }
 
+#[tauri::command]
+fn set_repo_order(order: Vec<String>) -> Result<Vec<config::RepoEntry>, String> {
+    config::set_repo_order(&order)
+}
+
 // --- git identities: GitHub accounts (see github/) plus plain SSH-key identities ---
 
 #[tauri::command]
@@ -696,6 +701,7 @@ pub fn run() {
             set_repo_private,
             set_repo_section,
             set_repo_identity,
+            set_repo_order,
             list_ssh_identities,
             add_ssh_identity,
             remove_ssh_identity,
