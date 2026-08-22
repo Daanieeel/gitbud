@@ -1,0 +1,63 @@
+{
+  "fill" : "system-dark",
+  "groups" : [
+    {
+      "layers" : [
+        {
+          "fill-specializations" : [
+            {
+              "value" : {
+                "linear-gradient" : [
+                  "display-p3:0.11951,0.90000,0.88166,1.00000",
+                  "display-p3:0.19228,1.00000,0.26889,1.00000"
+                ],
+                "orientation" : {
+                  "start" : {
+                    "x" : 0.5,
+                    "y" : 1
+                  },
+                  "stop" : {
+                    "x" : 0.5332670904730774,
+                    "y" : 0
+                  }
+                }
+              }
+            },
+            {
+              "appearance" : "dark",
+              "value" : {
+                "linear-gradient" : [
+                  "display-p3:0.32415,1.00000,0.25214,1.00000",
+                  "display-p3:0.16991,0.94229,0.96783,1.00000"
+                ]
+              }
+            }
+          ],
+          "image-name" : "arrows-big.png",
+          "name" : "arrows-big",
+          "position" : {
+            "scale" : 1.5,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}
