@@ -9,6 +9,8 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useStashStore } from "@/store/useStashStore";
 import { cn } from "@/lib/utils";
 import { FileTypeIcon } from "@/lib/file-icons";
+import { ResizeHandle } from "@/components/layout/ResizeHandle";
+import { useResizableWidth } from "@/hooks/useResizableWidth";
 import type { FileDiff } from "@/lib/types";
 
 interface StashPanelProps {
@@ -47,6 +49,7 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [diff, setDiff] = useState<FileDiff | null>(null);
   const [applyingPath, setApplyingPath] = useState<string | null>(null);
+  const { width, onPointerDown } = useResizableWidth("panel-width:stash-files", 224, 160, 480);
 
   useEffect(() => {
     setSelectedPath(null);
@@ -80,7 +83,7 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
 
   return (
     <div className="flex min-h-0 flex-1">
-      <div className="w-56 shrink-0 overflow-auto border-r border-border">
+      <div style={{ width }} className="shrink-0 overflow-auto">
         {files.length === 0 && (
           <div className="p-3 text-center text-sm text-muted-foreground">No files</div>
         )}
@@ -110,7 +113,10 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
             </span>
             <button
               title="Restore this file from the stash, without popping it"
-              className="shrink-0 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground disabled:opacity-50"
+              className={cn(
+                "shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-50",
+                selectedPath === path ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+              )}
               disabled={applyingPath === path}
               onClick={() => void applyFile(path)}
             >
@@ -119,6 +125,7 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
           </div>
         ))}
       </div>
+      <ResizeHandle onPointerDown={onPointerDown} />
       <div className="min-w-0 flex-1">
         <DiffView path={selectedPath} diff={diff} />
       </div>

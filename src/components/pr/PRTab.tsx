@@ -30,6 +30,7 @@ export function PRTab() {
   const load = usePRStore((s) => s.load);
   const selectPR = usePRStore((s) => s.selectPR);
   const reauth = useGitHubStore((s) => s.reauth);
+  const openSignIn = useGitHubStore((s) => s.openSignIn);
 
   const [hasRemote, setHasRemote] = useState<boolean | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
@@ -48,8 +49,12 @@ export function PRTab() {
 
   if (!currentLogin) {
     return (
-      <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
-        Sign in with GitHub (bottom of the sidebar) to see pull requests
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-dot-grid text-center text-sm text-muted-foreground">
+        <TriangleAlertIcon className="size-8 text-destructive" />
+        <p className="max-w-sm">Sign in with GitHub to see pull requests</p>
+        <Button variant="outline" onClick={openSignIn}>
+          Sign in with GitHub
+        </Button>
       </div>
     );
   }
