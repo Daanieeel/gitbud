@@ -18,6 +18,9 @@ import type {
 } from "@/lib/types";
 
 const LOG_PAGE_SIZE = 100;
+/** Restores the last-open repo across app restarts, so launching GitBud doesn't always land
+ * back on whatever repo happens to be first in the sidebar. */
+const LAST_REPO_KEY = "last-selected-repo";
 
 interface RepoState {
   repos: RepoEntry[];
@@ -148,7 +151,9 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     const repos = await api.loadRepos();
     set({ repos });
     if (!get().selectedRepo && repos.length > 0) {
-      await get().selectRepo(repos[0].path);
+      const lastPath = window.localStorage.getItem(LAST_REPO_KEY);
+      const last = lastPath ? repos.find((r) => r.path === lastPath) : undefined;
+      await get().selectRepo((last ?? repos[0]).path);
     }
   },
 
@@ -156,6 +161,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     const prev = get().selectedRepo;
     if (prev === path) return;
     if (prev) await api.stopWatch(prev).catch(() => {});
+    window.localStorage.setItem(LAST_REPO_KEY, path);
 
     set({
       selectedRepo: path,
