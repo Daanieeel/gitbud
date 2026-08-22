@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ExternalLinkIcon, LogInIcon, PencilIcon, PlayIcon, RotateCcwIcon, SaveIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +30,16 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
   const [ghCliChecked, setGhCliChecked] = useState(false);
   const [ghCliTrying, setGhCliTrying] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const [starting, setStarting] = useState(false);
+
+  const doStart = async () => {
+    setStarting(true);
+    try {
+      await startSignIn();
+    } finally {
+      setStarting(false);
+    }
+  };
 
   const handleOpenChange = (next: boolean) => {
     if (!next) {
@@ -133,9 +144,9 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
               <PencilIcon className="size-3.5" />
               Change Client ID
             </Button>
-            <Button onClick={() => void startSignIn()}>
-              <PlayIcon className="size-3.5" />
-              Start
+            <Button disabled={starting} onClick={() => void doStart()}>
+              <PlayIcon className={cn("size-3.5", starting && "animate-spin")} />
+              {starting ? "Starting…" : "Start"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -176,9 +187,9 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
         )}
         {deviceFlow.status !== "waiting" && (
           <DialogFooter>
-            <Button onClick={() => void startSignIn()}>
-              <RotateCcwIcon className="size-3.5" />
-              Retry
+            <Button disabled={starting} onClick={() => void doStart()}>
+              <RotateCcwIcon className={cn("size-3.5", starting && "animate-spin")} />
+              {starting ? "Retrying…" : "Retry"}
             </Button>
           </DialogFooter>
         )}

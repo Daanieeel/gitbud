@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { cn } from "@/lib/utils";
 import type { WorktreeInfo } from "@/lib/types";
 
 export function WorktreesPanel() {
@@ -15,6 +16,7 @@ export function WorktreesPanel() {
   const addExistingRepo = useRepoStore((s) => s.addExistingRepo);
   const [worktrees, setWorktrees] = useState<WorktreeInfo[]>([]);
   const [busy, setBusy] = useState(false);
+  const [actionPath, setActionPath] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [confirmForcePath, setConfirmForcePath] = useState<string | null>(null);
@@ -63,11 +65,19 @@ export function WorktreesPanel() {
   };
 
   const openWorktree = async (wt: WorktreeInfo) => {
-    await addExistingRepo(wt.path);
+    setActionPath(wt.path);
+    const startedAt = Date.now();
+    try {
+      await addExistingRepo(wt.path);
+    } finally {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
+      setActionPath(null);
+    }
   };
 
   const removeOne = async (wt: WorktreeInfo, force: boolean) => {
-    setBusy(true);
+    setActionPath(wt.path);
     setError(null);
     try {
       await api.removeWorktree(repoPath, wt.path, force);
@@ -81,7 +91,7 @@ export function WorktreesPanel() {
         setError(String(e));
       }
     } finally {
-      setBusy(false);
+      setActionPath(null);
     }
   };
 
@@ -140,11 +150,11 @@ export function WorktreesPanel() {
                       <Button
                         size="sm"
                         variant="secondary"
-                        disabled={busy}
+                        disabled={busy || actionPath !== null}
                         onClick={() => void openWorktree(wt)}
                       >
-                        <FolderOpenIcon className="size-3.5" />
-                        Open
+                        <FolderOpenIcon className={cn("size-3.5", actionPath === wt.path && "animate-spin")} />
+                        {actionPath === wt.path ? "Opening…" : "Open"}
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>Open this worktree as its own repo in the sidebar</TooltipContent>
@@ -155,10 +165,10 @@ export function WorktreesPanel() {
                         <Button
                           size="sm"
                           variant="destructive"
-                          disabled={busy}
+                          disabled={busy || actionPath !== null}
                           onClick={() => void removeOne(wt, true)}
                         >
-                          Force Remove
+                          {actionPath === wt.path ? "Removing…" : "Force Remove"}
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Discard uncommitted changes in this worktree and remove it anyway</TooltipContent>
@@ -167,10 +177,11 @@ export function WorktreesPanel() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
-                          className="shrink-0 text-muted-foreground hover:text-destructive"
+                          className="shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-50"
+                          disabled={busy || actionPath !== null}
                           onClick={() => void removeOne(wt, false)}
                         >
-                          <Trash2Icon className="size-3.5" />
+                          <Trash2Icon className={cn("size-3.5", actionPath === wt.path && "animate-spin")} />
                         </button>
                       </TooltipTrigger>
                       <TooltipContent>Remove worktree</TooltipContent>
@@ -247,7 +258,7 @@ export function WorktreesPanel() {
                   Cancel
                 </Button>
                 <Button size="sm" disabled={busy} onClick={() => void create()}>
-                  Create
+                  {busy ? "Creating…" : "Create"}
                 </Button>
               </div>
             </div>
