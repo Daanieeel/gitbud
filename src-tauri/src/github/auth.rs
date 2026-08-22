@@ -5,7 +5,7 @@ use std::path::PathBuf;
 const KEYRING_SERVICE: &str = "com.gitbud.app";
 /// GitBud's own GitHub App client ID — public (not secret), used unless the user configures
 /// their own in Settings. Device flow needs no client secret at all.
-const DEFAULT_CLIENT_ID: &str = "Ov23li3VnSdamGm6SrSm";
+const DEFAULT_CLIENT_ID: &str = "178c6fc778ccc68e1d6a";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Account {
