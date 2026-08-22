@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ArchiveIcon, ExpandIcon, Trash2Icon, Undo2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -13,6 +13,7 @@ import { FileTypeIcon } from "@/lib/file-icons";
 import { FilePathLabel } from "./FilePathLabel";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import type { FileDiff } from "@/lib/types";
 
 interface StashPanelProps {
@@ -52,6 +53,9 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
   const [diff, setDiff] = useState<FileDiff | null>(null);
   const [applyingPath, setApplyingPath] = useState<string | null>(null);
   const { width, onPointerDown } = useResizableWidth("panel-width:stash-files", 224, 160, 480);
+  const filePaths = useMemo(() => files.map(([path]) => path), [files]);
+  const handleArrowNav = useArrowKeyFileNav(filePaths, selectedPath, setSelectedPath);
+  const fileListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSelectedPath(null);
@@ -60,6 +64,10 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
       .getStashOid(repoPath, index)
       .then((oid) => api.getCommitFiles(repoPath, oid))
       .then(setFiles);
+  }, [repoPath, index]);
+
+  useEffect(() => {
+    fileListRef.current?.focus();
   }, [repoPath, index]);
 
   useEffect(() => {
@@ -85,7 +93,13 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
 
   return (
     <div className="flex min-h-0 flex-1">
-      <div style={{ width }} className="shrink-0 overflow-auto border-r border-border">
+      <div
+        ref={fileListRef}
+        tabIndex={0}
+        onKeyDown={handleArrowNav}
+        style={{ width }}
+        className="shrink-0 overflow-auto border-r border-border outline-none"
+      >
         {files.length === 0 && (
           <div className="p-3 text-center text-sm text-muted-foreground">No files</div>
         )}

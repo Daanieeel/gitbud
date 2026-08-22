@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRepoStore } from "@/store/useRepoStore";
 import { FileList } from "./FileList";
 import { ConflictResolutionPanel } from "./ConflictResolutionPanel";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 
 export function ChangesTab() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -33,28 +34,13 @@ export function ChangesTab() {
     return files.filter((f) => f.path.toLowerCase().includes(needle));
   }, [files, filter]);
 
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const target = e.target as HTMLElement | null;
-      const tag = target?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
-      if (filtered.length === 0) return;
+  const filePaths = useMemo(() => filtered.map((f) => f.path), [filtered]);
+  const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, (path) => void selectFile(path));
+  const fileListRef = useRef<HTMLDivElement>(null);
 
-      e.preventDefault();
-      const index = filtered.findIndex((f) => f.path === selectedFilePath);
-      const nextIndex =
-        index === -1
-          ? 0
-          : e.key === "ArrowDown"
-            ? Math.min(index + 1, filtered.length - 1)
-            : Math.max(index - 1, 0);
-      void selectFile(filtered[nextIndex].path);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [filtered, selectedFilePath, selectFile]);
+  useEffect(() => {
+    fileListRef.current?.focus();
+  }, []);
 
   if (files === null) {
     return (
@@ -91,10 +77,10 @@ export function ChangesTab() {
                 placeholder="Filter files"
                 value={filter}
                 onChange={(e) => setFilter(e.target.value)}
-                className="h-7"
+                className="h-8"
               />
             </div>
-            <div className="min-h-0 flex-1">
+            <div ref={fileListRef} tabIndex={0} onKeyDown={handleArrowNav} className="min-h-0 flex-1 outline-none">
               <FileList
                 files={filtered}
                 selectedPath={selectedFilePath}
