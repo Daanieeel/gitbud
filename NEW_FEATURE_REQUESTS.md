@@ -12,7 +12,7 @@ Mark as done when the feature is implemented. Commit after every TODO, do not pu
 - [x] resizable sidebars/panels — added a `useResizableWidth` hook (persisted per-panel in localStorage) + `ResizeHandle` divider, wired into the repo sidebar, History's commit-list/file-list panels, and the PR list panel.
 - [x] diff view: color the full line background by change type (add/remove/etc, next to the existing +/- gutter symbols), like a highlighter pen — keep syntax highlighting intact on top (background tint only, don't replace token colors). Split view already had this; added the same tint (plus a deepened hover state) to the unified view.
 - [x] buttons need `cursor: pointer` on hover — added a base-layer rule (`button:not(:disabled), [role="button"]:not([aria-disabled="true"])`) in `index.css`.
-- [ ] add tooltips explaining git jargon on buttons/controls that use non-everyday terminology (worktree, hunk, amend, rebase, stash, reflog, etc) for less git-savvy users.
+- [x] add tooltips explaining git jargon on buttons/controls that use non-everyday terminology (worktree, hunk, amend, rebase, stash, reflog, etc) for less git-savvy users — worktree/reflog/LFS/stash already had them from an earlier pass; added Submodules, amend, interactive rebase, and the hunk-action buttons.
 - [ ] fix error `could not read stored token for Daanieeel: No matching entry found in secure storage` surfacing in the PR tab.
 - [ ] account switcher: show the pin/remove buttons always, not only on hover, and add tooltips to them.
 - [ ] remove the "Clear pin — use …" button in the account switcher and design a more intuitive replacement.
