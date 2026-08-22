@@ -13,7 +13,7 @@ Mark as done when the feature is implemented. Commit after every TODO, do not pu
 - [x] diff view: color the full line background by change type (add/remove/etc, next to the existing +/- gutter symbols), like a highlighter pen — keep syntax highlighting intact on top (background tint only, don't replace token colors). Split view already had this; added the same tint (plus a deepened hover state) to the unified view.
 - [x] buttons need `cursor: pointer` on hover — added a base-layer rule (`button:not(:disabled), [role="button"]:not([aria-disabled="true"])`) in `index.css`.
 - [x] add tooltips explaining git jargon on buttons/controls that use non-everyday terminology (worktree, hunk, amend, rebase, stash, reflog, etc) for less git-savvy users — worktree/reflog/LFS/stash already had them from an earlier pass; added Submodules, amend, interactive rebase, and the hunk-action buttons.
-- [ ] fix error `could not read stored token for Daanieeel: No matching entry found in secure storage` surfacing in the PR tab.
+- [x] fix error `could not read stored token for Daanieeel: No matching entry found in secure storage` surfacing in the PR tab — an account can outlive its OS keychain entry; `useGitHubStore.init` now checks each stored account's token and prunes the ones missing one instead of repeatedly failing every PR load with that raw error.
 - [ ] account switcher: show the pin/remove buttons always, not only on hover, and add tooltips to them.
 - [ ] remove the "Clear pin — use …" button in the account switcher and design a more intuitive replacement.
 - [ ] move the batch-actions dropdown (currently at the top) to the bottom of the project/repo explorer, as its own side-by-side buttons instead of a dropdown.
