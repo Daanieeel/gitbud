@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { GitBranchPlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -55,6 +56,7 @@ export function CreateBranchAtDialog({ oid, onOpenChange }: CreateBranchAtDialog
         </label>
         <DialogFooter>
           <Button disabled={!name.trim() || creating} onClick={() => void submit()}>
+            <GitBranchPlusIcon className="size-3.5" />
             Create Branch
           </Button>
         </DialogFooter>

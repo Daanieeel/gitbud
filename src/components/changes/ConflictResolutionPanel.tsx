@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { openPath } from "@tauri-apps/plugin-opener";
+import { CheckIcon, PencilIcon, UserIcon, UsersIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -53,9 +54,11 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2">
         <span className="mr-2 truncate text-sm font-medium text-destructive">{path} — conflicted</span>
         <Button size="sm" variant="outline" disabled={resolving} onClick={() => void useSide("ours")}>
+          <UserIcon className="size-3.5" />
           Use Mine
         </Button>
         <Button size="sm" variant="outline" disabled={resolving} onClick={() => void useSide("theirs")}>
+          <UsersIcon className="size-3.5" />
           Use Theirs
         </Button>
         <Button
@@ -63,9 +66,11 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
           variant="outline"
           onClick={() => void openPath(`${repoPath}/${path}`)}
         >
+          <PencilIcon className="size-3.5" />
           Edit Manually
         </Button>
         <Button size="sm" disabled={resolving || hasMarkers} onClick={() => void markResolved()}>
+          <CheckIcon className="size-3.5" />
           Mark Resolved
         </Button>
         {hasMarkers && (

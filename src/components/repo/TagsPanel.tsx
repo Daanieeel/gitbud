@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { TagIcon, Trash2Icon, UploadIcon } from "lucide-react";
+import { PlusIcon, TagIcon, Trash2Icon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -112,6 +112,7 @@ export function TagsPanel() {
           <Input placeholder="Tag name (e.g. v1.0.0)" value={newName} onChange={(e) => setNewName(e.target.value)} className="h-7" />
           <Input placeholder="Message (optional — annotated tag)" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="h-7" />
           <Button size="sm" disabled={!newName.trim() || busy} onClick={() => void create()}>
+            <PlusIcon className="size-3.5" />
             Create Tag on HEAD
           </Button>
         </div>

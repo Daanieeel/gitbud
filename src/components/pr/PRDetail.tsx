@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLinkIcon } from "lucide-react";
+import { ExternalLinkIcon, GitBranchIcon, GitMergeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -83,19 +83,30 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
           title={`Fetch and check out as local branch pr-${pr.number}`}
           onClick={() => void checkout()}
         >
+          <GitBranchIcon className="size-3.5" />
           {checkingOut ? "Checking out…" : "Checkout"}
         </Button>
         {!pr.merged && pr.state === "open" && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button size="sm" disabled={merging} title="Merge this pull request">
+                <GitMergeIcon className="size-3.5" />
                 {merging ? "Merging…" : "Merge"}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onSelect={() => void merge("merge")}>Create merge commit</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void merge("squash")}>Squash and merge</DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => void merge("rebase")}>Rebase and merge</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void merge("merge")}>
+                <GitMergeIcon className="size-3.5" />
+                Create merge commit
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void merge("squash")}>
+                <GitMergeIcon className="size-3.5" />
+                Squash and merge
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void merge("rebase")}>
+                <GitMergeIcon className="size-3.5" />
+                Rebase and merge
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}

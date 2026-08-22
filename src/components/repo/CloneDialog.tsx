@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { LockIcon } from "lucide-react";
+import { DownloadIcon, FolderOpenIcon, LockIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -118,6 +118,7 @@ export function CloneDialog({ open: isOpen, onOpenChange, onClone }: CloneDialog
           />
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => void pickParentDir()}>
+              <FolderOpenIcon className="size-3.5" />
               Choose Folder
             </Button>
             <span className="truncate text-xs text-muted-foreground">
@@ -127,6 +128,7 @@ export function CloneDialog({ open: isOpen, onOpenChange, onClone }: CloneDialog
         </div>
         <DialogFooter>
           <Button disabled={disabled} onClick={() => void submit()}>
+            <DownloadIcon className="size-3.5" />
             {cloning ? "Cloning…" : "Clone"}
           </Button>
         </DialogFooter>

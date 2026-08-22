@@ -15,6 +15,11 @@ pub struct RepoEntry {
     /// `group` for display purposes. `None` means "use the auto-derived group".
     #[serde(default)]
     pub section: Option<String>,
+    /// Per-repo override of which git identity (a GitHub account or SSH identity, opaque id
+    /// interpreted by the frontend) authenticates git operations here. `None` means "use the
+    /// global default identity".
+    #[serde(default)]
+    pub identity_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -110,6 +115,7 @@ pub fn add_repo(path: &str) -> Result<Vec<RepoEntry>, String> {
         is_private: false,
         last_fetched: None,
         section: None,
+        identity_id: None,
     });
     save_repos(&repos)?;
     Ok(repos)
@@ -135,6 +141,15 @@ pub fn set_repo_section(path: &str, section: Option<String>) -> Result<Vec<RepoE
     let mut repos = load_repos()?;
     if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
         entry.section = section.filter(|s| !s.trim().is_empty());
+    }
+    save_repos(&repos)?;
+    Ok(repos)
+}
+
+pub fn set_repo_identity(path: &str, identity_id: Option<String>) -> Result<Vec<RepoEntry>, String> {
+    let mut repos = load_repos()?;
+    if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
+        entry.identity_id = identity_id.filter(|s| !s.trim().is_empty());
     }
     save_repos(&repos)?;
     Ok(repos)

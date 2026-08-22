@@ -1,5 +1,15 @@
 import { useMemo, useState } from "react";
-import { ChevronsUpDownIcon, GitBranchIcon, PlusIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  ChevronsUpDownIcon,
+  CopyIcon,
+  ExternalLinkIcon,
+  GitBranchIcon,
+  GitMergeIcon,
+  PencilIcon,
+  PlusIcon,
+  Trash2Icon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -117,6 +127,7 @@ export function BranchSwitcher() {
                 </ContextMenuTrigger>
                 <ContextMenuContent>
                   <ContextMenuItem onSelect={() => void copyToClipboard(b.name)}>
+                    <CopyIcon className="size-3.5" />
                     Copy Name
                   </ContextMenuItem>
                   <ContextMenuItem
@@ -127,22 +138,24 @@ export function BranchSwitcher() {
                       });
                     }}
                   >
+                    <ExternalLinkIcon className="size-3.5" />
                     Open Branch on GitHub
                   </ContextMenuItem>
                   <ContextMenuSeparator />
                   <ContextMenuItem
-                    disabled={b.is_head}
                     onSelect={() => {
                       setRenaming(b.name);
                       setRenameValue(b.name);
                     }}
                   >
+                    <PencilIcon className="size-3.5" />
                     Rename
                   </ContextMenuItem>
                   <ContextMenuItem
                     disabled={b.is_head}
                     onSelect={() => void mergeBranch(b.name)}
                   >
+                    <GitMergeIcon className="size-3.5" />
                     Merge into Current
                   </ContextMenuItem>
                   <ContextMenuItem
@@ -150,6 +163,7 @@ export function BranchSwitcher() {
                     disabled={b.is_head}
                     onSelect={() => void deleteBranch(b.name)}
                   >
+                    <Trash2Icon className="size-3.5" />
                     Delete
                   </ContextMenuItem>
                 </ContextMenuContent>

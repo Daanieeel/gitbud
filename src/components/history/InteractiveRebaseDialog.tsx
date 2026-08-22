@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { GripVerticalIcon } from "lucide-react";
+import { GripVerticalIcon, PlayIcon, XIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -157,9 +157,11 @@ export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRe
         {error && <p className="text-sm text-destructive">{error}</p>}
         <DialogFooter>
           <Button variant="ghost" onClick={close}>
+            <XIcon className="size-3.5" />
             Cancel
           </Button>
           <Button disabled={running || rows.length === 0} onClick={() => void start()}>
+            <PlayIcon className="size-3.5" />
             {running ? "Rebasing…" : "Start Rebase"}
           </Button>
         </DialogFooter>

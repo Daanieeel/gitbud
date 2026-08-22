@@ -58,6 +58,11 @@ pub struct Settings {
     // Advanced
     pub git_binary_path: Option<String>,
     pub fs_watch_enabled: bool,
+
+    // Identity
+    /// Opaque id of the globally-active git identity (a GitHub account or SSH identity),
+    /// interpreted by the frontend. `None` means "no identity chosen yet".
+    pub default_identity_id: Option<String>,
 }
 
 impl Default for Settings {
@@ -76,6 +81,7 @@ impl Default for Settings {
             sidebar_sort: SidebarSort::Group,
             git_binary_path: None,
             fs_watch_enabled: true,
+            default_identity_id: None,
         }
     }
 }

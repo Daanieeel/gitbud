@@ -3,53 +3,42 @@
 Ordered by priority (highest impact / biggest current gap first).
 Mark as done when the feature is implemented.
 
-## P-1 — GitHub functionality
+## P0 — Critical bugs
 
-- [x] **Interactive GitHub Login** - Device Flow (industry-standard for public/secretless desktop apps) plus one-click zero-config sign-in via detected `gh` CLI login. Note: a fully click-only OAuth flow with no client ID at all would require Anthropic/GitBud hosting a token-exchange backend, which doesn't exist for this OSS project — the `gh` CLI path covers that for anyone who has it.
-- [x] **Pull Requests tab & 1-click local checkout** — `PRTab.tsx`/`PRList.tsx`/`PRDetail.tsx`. Open/closed/all filter, search by title/author/#, labels, CI badges. "Checkout" fetches `pull/{n}/head` into a local `pr-{n}` branch (`git_shell::checkout_pull_request`).
-- [x] **Create Pull Request workflow** — `CreatePRDialog.tsx`, reachable from the PR tab. Base/compare selection, `.github/PULL_REQUEST_TEMPLATE.md` auto-load, draft toggle. (Not yet reachable from Toolbar/BranchSwitcher specifically, and no commit/diff preview before submit.)
-- [x] **CI / GitHub Actions status indicators & check details** — `CIBadge.tsx`, used in PR rows/detail and `CommitList.tsx`. Popover lists check runs with deep-links.
-- [x] **"Clone from GitHub" repository browser** — `CloneDialog.tsx` lists the signed-in user's repos (owner/collaborator/org) with search, click to fill the URL.
-- [x] **Fork sync & upstream tracking** — `UpstreamBanner.tsx` + `git_shell::sync_upstream`/`get_upstream_ahead_behind`.
-- [x] **"Open on GitHub" deep-links & permalinks** — context menus on commits (`CommitList.tsx`), branches (`BranchSwitcher.tsx`), files (`FileList.tsx`); per-line "Copy GitHub Permalink" in `DiffView.tsx` (wired in History tab).
-- [x] **Zero-config GitHub CLI (`gh`) auth detection** — `github::auth::detect_gh_cli`, offered first in `SignInDialog.tsx`.
-- [x] **Merged branch pruner & remote cleanup** — `BranchPruner.tsx` in the sidebar footer; cross-references local branches against merged/closed PRs, 1-click delete (local + prunes stale remote-tracking refs via `fetch --prune`).
-- [x] **Protected branch guard / commit warning** — inline warning in `CommitBox.tsx` + indicator icon in `BranchSwitcher.tsx` for `main`/`master`.
-- [x] **Commit signature verification (`Verified` badges)** — `VerificationBadge` in `CommitList.tsx`, via `github_get_commit_verification`.
-- [x] **GitHub Enterprise Server (GHES) support** — configurable host (`github::auth::get_host/set_host`, threaded through every API call and web link); settings UI still pending (see Settings view below).
+- [x] **Push to origin hangs indefinitely** — root cause was a credential-prompt deadlock: git was spawned with an inherited stdin and no `GIT_TERMINAL_PROMPT=0`, so any HTTPS/SSH prompt (token, passphrase) had nowhere to go and blocked forever. Fixed in `git_shell.rs`: stdin is now `Stdio::null()`, `GIT_TERMINAL_PROMPT=0` is set, SSH runs with `BatchMode=yes`, and an idle-output watchdog now kills and errors out any streamed op (fetch/pull/push/clone/submodule update) after 45s of silence. Added a real Cancel button + surfaced error banner in `SyncLogToast.tsx` backed by a new `cancel_git_operation` command.
+- [x] **"Rename Branch" incorrectly disabled on the checked-out branch** — removed the `disabled={b.is_head}` condition on the Rename item in `BranchSwitcher.tsx`; renaming the current branch now works like plain `git branch -m`.
 
-## P0 — Core gaps
+## P0 — This batch
 
-- [x] **Hunk / line-level staging** — `hunk.rs` (`stage_hunk`/`unstage_hunk`/`discard_hunk`, patch-construction + `git2::Repository::apply`), buttons in `DiffView.tsx` hunk headers when viewing the Changes tab. Verified with real conflicting-hunk tests. (Line-level, not just hunk-level, is still open — hunk is the granularity implemented.)
-- [x] **Merge conflict resolution UI** — `ConflictResolutionPanel.tsx` swaps in for conflicted files in `ChangesTab.tsx` (distinct destructive-red badge in `FileList.tsx` too): "Use Mine"/"Use Theirs" (`repo::resolve_conflict`), "Edit Manually" (opens in default editor), "Mark Resolved" (stages). Raw conflict-marker preview shown; not a rendered 3-way diff.
-- [x] **Real settings view (modal/popup)** — `SettingsDialog.tsx`, gear icon in `Toolbar.tsx`, backed by `settings.rs` (`~/.config/gitbud/settings.json`). All sections wired to real effect: theme (live class toggle), git identity (global/per-repo via `settings::set_git_identity`), default branch name (used by `init_repo`), pull strategy (`--rebase`/`--ff-only` flags on `git pull`), diff ignore-whitespace + font size, sidebar ahead/behind toggle + sort order, git binary path override (`settings::git_binary()`), fs-watch on/off gate in `start_watch`. GitHub host (GHES) also lives here.
-- [x] **Commit graph visualization** — lane-assignment algorithm in `history.rs` (`assign_lanes`), returned from `get_log`, rendered as an SVG column in `CommitGraph.tsx`/`CommitList.tsx`. Tag labels shown too (via `TagsPanel`'s data); branch labels at specific commits are not (only the current branch shows, in the toolbar).
-- [x] **Discard changes per-file/per-hunk** — `repo::discard_file` (context menu) and `hunk::discard_hunk` ("Discard Hunk" button in `DiffView.tsx`).
-- [x] files need file icons. `lib/file-icons.ts` maps extensions to a colored lucide icon (git status shown as a small corner dot instead of recoloring the whole icon). Note: this is an original lightweight mapping, not the actual vendored vscode-symbols SVG asset pack (couldn't pull ~hundreds of external SVGs into this sandboxed build) — visually similar intent, different source.
-- [x] code syntax highlighting. `lib/highlight.ts` (highlight.js core + curated language set), colors mapped from `.reference/color-pallette.json`'s tokenColors in `index.css`. Diff lines no longer tint the whole line background — only the leading +/- glyph is colored green/pink now.
-- [x] create an open-source ready short REAMDE for this project — `README.md` rewritten with a pitch intro, feature list, perf targets, getting-started, architecture, and contributing sections.
+- [x] **More icons across actions** — audited context menus (repo/branch/file/commit), tab bar, toolbar/dialog buttons across the app and added consistent lucide icons to bare text-only actions (reusing the same icon per concept — copy, delete, rename, external-link, etc).
+- [x] **Multi–git-account / multi-provider support** — `AccountBar.tsx` now shows a unified switcher over GitHub accounts *and* plain SSH-key-based identities (new `ssh_identity.rs` backend: host + key path, no hosted-provider API — stored in `~/.config/gitbud/ssh_identities.json`). Each identity can be set as the global default or pinned to just the currently-open repo (pin icon), persisted per-repo in `repos.json` (`identity_id`) and globally in `settings.json` (`default_identity_id`). Switching to an SSH identity wires its key into that repo via a local `core.sshCommand`; switching away clears it. Provider type is visually distinguished (avatar vs. key-icon badge + host). Room to add GitLab/Bitbucket OAuth providers later without changing the switcher shape.
+- [x] **Default window size doubled** — default window is now 1600x1200 (was 800x600) in `tauri.conf.json`; still freely resizable.
+- [x] **New app icon: pet + git motif** — replaced the icon set with a friendly fox/bear-cub mark (new `src-tauri/icons/source/app-icon.svg`) whose "ears" double as branch-tip commit nodes and whose chin has a tiny git merge-graph glyph; regenerated all bundle targets via `tauri icon`.
 
-## P1 — High-value quality of life
+## P1 — Redesign (main priority once the above ships)
 
-- [x] **Command palette (`Cmd+P`)** — `CommandPalette.tsx`: substring search (not fuzzy-scored) over repos, local branches, currently-changed files, and full commit history (`history::search_commits`, not limited to what's paginated in). `Cmd+K` opens the same palette scoped to just repos.
-- [x] **General keyboard shortcuts** — `Cmd+Enter` to commit (`CommitBox.tsx`), `Cmd+Shift+P` to pull, `Cmd+K` to switch repos (global listener in `App.tsx`). Arrow-key navigation through file/commit lists not implemented.
-- [x] **Right-click context menus** — repos (`RepoSidebar.tsx`): Open in Terminal/Finder, Copy Path, Remove from Sidebar. Files (`FileList.tsx`): Copy Path, Reveal in Finder, Open in Terminal, View on GitHub, Discard Changes. Commits (`CommitList.tsx`): Copy SHA, Open on GitHub, Cherry-pick, Revert, Create Branch Here. Branches (`BranchSwitcher.tsx`): Copy Name, Open on GitHub, Rename, Merge into Current, Delete.
-- [x] **Amend last commit** — checkbox in `CommitBox.tsx`, pre-fills the last commit's message.
-- [x] **Ahead/behind badges** in the sidebar (`RepoSidebar.tsx`), toggleable in Settings.
-- [x] **Cherry-pick & revert** — `repo::cherry_pick`/`repo::revert_commit`, from the commit context menu.
-- [x] **Inline blame view** — `blame::blame_file` + "Blame File" in the file context menu opens `BlameDialog.tsx` (full file + per-line author/commit gutter, click to jump to History). Not a gutter toggle inside `DiffView.tsx` itself — there's no full-file view in the diff pane to toggle within.
-- [x] **Tag management** — `TagsPanel.tsx` in the toolbar: create (lightweight or annotated), delete, push to origin; tag labels shown next to commits in `CommitList.tsx`.
-- [x] pre-filled commit message (summary, not description) for single-file commits — `CommitBox.tsx`, "Update {filename}", only when the summary field is empty.
-- [x] commit message + description inputs must stay filled out — lifted to `useRepoStore` (`commitSummary`/`commitDescription`) instead of `CommitBox` local state, so switching Changes/History/PRs tabs (which unmounts `CommitBox`) no longer loses the draft.
-- [~] tooltips on buttons — added to the highest-traffic ones (sync, tabs, commit/amend, stage-all/stage-file checkboxes, branch switcher, stash, PR checkout/merge/create). Not literally every button in the app yet.
+- [ ] **Layout redesign** — current UI works but reads as chaotic: buttons and panels feel placed ad hoc rather than grouped by purpose, making things hard to find (toolbar mixes repo actions/git actions/settings, sidebar mixes repo list/branch tools/pruner, dialogs vary in placement conventions). Needs a real information-architecture pass: group related actions, establish consistent panel regions (nav / primary content / contextual side panel / status bar), consistent spacing and hierarchy, and a clear visual system for where a given action "lives" so users build a mental map instead of hunting. Should be scoped as its own design pass (wireframe/mockup first) rather than incremental button-shuffling.
 
-## P2 — Nice to have
+## P2 — Additional feature ideas
 
-- [x] **Diff view toggles** — split (side-by-side, structural pairing not full LCS alignment) vs. unified, quick toggle button in `DiffView.tsx` plus the Settings dropdown; ignore-whitespace already in Settings → Diff. Word-wrap not implemented (diffs stay horizontally scrollable, matching most git tools' default).
-- [x] **File search/filter** in `ChangesTab.tsx`/`FileList.tsx` — already existed since the initial build (filter input above the file list).
-- [x] **Interactive rebase** — `rebase.rs` + `InteractiveRebaseDialog.tsx`. Reorder (native HTML5 drag-and-drop, no new dependency), squash, drop. Deliberately *not* real `git rebase -i`: built on the same cherry-pick primitive as the commit context menu, and any conflict does a full rollback to the original HEAD rather than pausing in a resumable half-applied state — every outcome is either "applied cleanly" or "nothing changed." No "edit" action (stop to amend a commit's content mid-sequence).
-- [x] **Custom sidebar sections** — `RepoEntry.section` (per-repo override of the auto-derived owner group), set via "Move to Section…" in the repo context menu (a `window.prompt()`, not a full drag-and-drop UI); only takes effect when sidebar sort is "group".
-- [x] **Commit message history** — `lib/commit-history.ts` (localStorage, per-machine not per-repo), history icon next to the summary field in `CommitBox.tsx`. Loading a repo's `.gitmessage` template is not implemented.
-- [x] **Drag-and-drop** a folder to add it as a repo (`RepoSidebar.tsx`, via Tauri's window-level `onDragDropEvent` — the drop target is the whole window, not hit-tested to the sidebar's DOM bounds specifically, but the sidebar highlights during drag as the visual target).
-- [x] **Submodule support** — `submodules.rs` (list via git2) + `SubmodulesPanel.tsx` (toolbar, only shown when the repo has any); init/update per-submodule or all at once, shelled out to system `git submodule update --init` (same auth reasoning as fetch/pull/push).
-- [x] **Animated status icons** — spinning refresh icon on the active repo's sidebar row while fetch/pull/push is running (`RepoSidebar.tsx`).
+Ordered low-hanging-fruit first (smallest lift → biggest lift).
+
+- [ ] **Sidebar drag-to-reorder** — manually reorder repos in the sidebar via drag, independent of the existing sort/section logic.
+- [ ] **Settings import/export** — export `settings.json` (identity, preferences, sidebar layout) to a file and re-import on another machine.
+- [ ] **Desktop notifications** — optional OS notification when a long-running fetch/pull/push finishes, or when a watched PR's CI status changes.
+- [ ] **Multi-repo batch actions** — "fetch all" / "pull all" across every sidebar repo at once, with a combined progress/status summary instead of repo-by-repo.
+- [ ] **Stash management panel** — dedicated view listing all stashes (not just create/pop inline) with diff preview per stash, partial-apply, and drop.
+- [ ] **Image / binary diff viewer** — side-by-side or overlay preview for changed image assets instead of a "binary file changed" placeholder.
+- [ ] **Repo workspaces/groups** — user-defined groups of repos (beyond the auto-derived owner grouping) that can be opened together as a saved workspace.
+- [ ] **Auto-update** — in-app update check/download for new GitBud releases instead of requiring a manual reinstall.
+- [ ] **Git LFS awareness** — detect LFS-tracked files, show LFS status/size in the file list, surface `git lfs pull`/`push` progress instead of silently stalling on large binaries.
+- [ ] **Reflog / undo UI** — a panel exposing `git reflog` with 1-click "restore to here," giving users a safety net for undoing resets, rebases, and accidental branch moves.
+- [ ] **Visual 3-way merge tool** — upgrade the conflict resolution panel from raw-marker preview to a real base/mine/theirs 3-way diff view with per-block pick controls, not just whole-file "Use Mine"/"Use Theirs."
+- [ ] **Git worktree support** — list, create, and remove worktrees for a repo; switch the active pane to a worktree without disturbing the main checkout. Make sure this worktree experience is REALLY intuitive and easily accessible to people who have never worked with worktrees before (explanative tooltips are a great help, for example).
+
+## P3 — Later / exploratory
+
+- [ ] GPG/SSH commit-signing setup wizard (generate or import a signing key, wire it into git config from within Settings).
+- [ ] Localization / i18n framework for UI strings.
+- [ ] Plugin/extension hook points for third-party panels or commands.
+- [ ] Offline-mode indicator when network-dependent actions (fetch/push/PRs) can't reach the remote.

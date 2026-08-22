@@ -1,6 +1,14 @@
 import { useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { TriangleAlertIcon } from "lucide-react";
+import {
+  CopyIcon,
+  ExternalLinkIcon,
+  FolderOpenIcon,
+  TerminalIcon,
+  Trash2Icon,
+  TriangleAlertIcon,
+  UserIcon,
+} from "lucide-react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { ChangeKind, FileEntry } from "@/lib/types";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -99,6 +107,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
               </ContextMenuTrigger>
               <ContextMenuContent>
                 <ContextMenuItem onSelect={() => void copyToClipboard(file.path)}>
+                  <CopyIcon className="size-3.5" />
                   Copy Path
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -107,6 +116,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                     void revealItemInDir(`${repoPath}/${file.path}`);
                   }}
                 >
+                  <FolderOpenIcon className="size-3.5" />
                   Reveal in Finder
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -115,6 +125,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                     void api.openInTerminal(repoPath);
                   }}
                 >
+                  <TerminalIcon className="size-3.5" />
                   Open in Terminal
                 </ContextMenuItem>
                 {branch && (
@@ -126,15 +137,20 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                       });
                     }}
                   >
+                    <ExternalLinkIcon className="size-3.5" />
                     View File on GitHub
                   </ContextMenuItem>
                 )}
-                <ContextMenuItem onSelect={() => setBlamePath(file.path)}>Blame File</ContextMenuItem>
+                <ContextMenuItem onSelect={() => setBlamePath(file.path)}>
+                  <UserIcon className="size-3.5" />
+                  Blame File
+                </ContextMenuItem>
                 <ContextMenuSeparator />
                 <ContextMenuItem
                   variant="destructive"
                   onSelect={() => void discardFile(file.path)}
                 >
+                  <Trash2Icon className="size-3.5" />
                   Discard Changes
                 </ContextMenuItem>
               </ContextMenuContent>

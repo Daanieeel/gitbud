@@ -1,7 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { formatDistanceToNow } from "date-fns";
-import { ShieldCheckIcon } from "lucide-react";
+import {
+  CherryIcon,
+  CopyIcon,
+  ExternalLinkIcon,
+  GitBranchPlusIcon,
+  ListOrderedIcon,
+  ShieldCheckIcon,
+  Undo2Icon,
+} from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { CommitEntry } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -169,6 +177,7 @@ export function CommitList({
               </ContextMenuTrigger>
               <ContextMenuContent>
                 <ContextMenuItem onSelect={() => void copyToClipboard(commit.oid)}>
+                  <CopyIcon className="size-3.5" />
                   Copy SHA
                 </ContextMenuItem>
                 <ContextMenuItem
@@ -179,15 +188,24 @@ export function CommitList({
                     });
                   }}
                 >
+                  <ExternalLinkIcon className="size-3.5" />
                   Open Commit on GitHub
                 </ContextMenuItem>
                 <ContextMenuSeparator />
-                <ContextMenuItem onSelect={() => void cherryPick(commit.oid)}>Cherry-pick</ContextMenuItem>
-                <ContextMenuItem onSelect={() => void revertCommit(commit.oid)}>Revert</ContextMenuItem>
+                <ContextMenuItem onSelect={() => void cherryPick(commit.oid)}>
+                  <CherryIcon className="size-3.5" />
+                  Cherry-pick
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => void revertCommit(commit.oid)}>
+                  <Undo2Icon className="size-3.5" />
+                  Revert
+                </ContextMenuItem>
                 <ContextMenuItem onSelect={() => onCreateBranchHere(commit.oid)}>
+                  <GitBranchPlusIcon className="size-3.5" />
                   Create Branch Here
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => onRebaseFromHere(commit.oid)}>
+                  <ListOrderedIcon className="size-3.5" />
                   Interactive Rebase from Here
                 </ContextMenuItem>
               </ContextMenuContent>

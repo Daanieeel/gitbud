@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { PlusIcon } from "lucide-react";
+import { DownloadIcon, FolderOpenIcon, FolderPlusIcon, PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -37,12 +37,15 @@ export function AddRepoMenu() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           <DropdownMenuItem onSelect={() => setCloneOpen(true)}>
+            <DownloadIcon className="size-3.5" />
             Clone Repository…
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void createNew()}>
+            <FolderPlusIcon className="size-3.5" />
             Create New Repository…
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => void addExisting()}>
+            <FolderOpenIcon className="size-3.5" />
             Add Existing Repository…
           </DropdownMenuItem>
         </DropdownMenuContent>

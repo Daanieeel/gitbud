@@ -1,4 +1,12 @@
 import { useEffect, useState } from "react";
+import {
+  ColumnsIcon,
+  GitBranchIcon,
+  PanelLeftIcon,
+  SaveIcon,
+  SettingsIcon,
+  SlidersHorizontalIcon,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -7,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { GitHubMark } from "@/components/github/GitHubMark";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -14,8 +23,15 @@ import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { DiffViewMode, PullStrategy, SidebarSort, ThemeMode } from "@/lib/types";
 
-const SECTIONS = ["General", "Git", "Diff", "Sidebar", "GitHub", "Advanced"] as const;
-type Section = (typeof SECTIONS)[number];
+const SECTIONS = [
+  { key: "General", icon: SettingsIcon },
+  { key: "Git", icon: GitBranchIcon },
+  { key: "Diff", icon: ColumnsIcon },
+  { key: "Sidebar", icon: PanelLeftIcon },
+  { key: "GitHub", icon: GitHubMark },
+  { key: "Advanced", icon: SlidersHorizontalIcon },
+] as const;
+type Section = (typeof SECTIONS)[number]["key"];
 
 interface SettingsDialogProps {
   open: boolean;
@@ -93,14 +109,15 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
           <div className="flex w-32 shrink-0 flex-col gap-0.5">
             {SECTIONS.map((s) => (
               <button
-                key={s}
-                onClick={() => setSection(s)}
+                key={s.key}
+                onClick={() => setSection(s.key)}
                 className={cn(
-                  "rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent",
-                  section === s && "bg-accent font-medium",
+                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent",
+                  section === s.key && "bg-accent font-medium",
                 )}
               >
-                {s}
+                <s.icon className="size-3.5 shrink-0" />
+                {s.key}
               </button>
             ))}
           </div>
@@ -142,6 +159,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </Row>
                 <div className="flex justify-end py-2">
                   <Button size="sm" onClick={() => void saveGitIdentity()}>
+                    <SaveIcon className="size-3.5" />
                     Save Identity
                   </Button>
                 </div>

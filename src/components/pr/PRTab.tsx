@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { PlusIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -78,6 +79,7 @@ export function PRTab() {
             ))}
           </div>
           <Button size="sm" onClick={() => setCreateOpen(true)}>
+            <PlusIcon className="size-3.5" />
             New Pull Request
           </Button>
         </div>

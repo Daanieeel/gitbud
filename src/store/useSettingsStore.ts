@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS: Settings = {
   sidebar_sort: "group",
   git_binary_path: null,
   fs_watch_enabled: true,
+  default_identity_id: null,
 };
 
 function applyTheme(theme: Settings["theme"]) {

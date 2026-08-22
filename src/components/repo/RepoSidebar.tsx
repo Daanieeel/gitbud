@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { LockIcon, RefreshCwIcon, XIcon } from "lucide-react";
+import {
+  CopyIcon,
+  FolderInputIcon,
+  FolderOpenIcon,
+  LockIcon,
+  RefreshCwIcon,
+  TerminalIcon,
+  Trash2Icon,
+  XIcon,
+} from "lucide-react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { Input } from "@/components/ui/input";
@@ -226,19 +235,24 @@ export function RepoSidebar() {
                   </ContextMenuTrigger>
                   <ContextMenuContent>
                     <ContextMenuItem onSelect={() => void api.openInTerminal(repo.path)}>
+                      <TerminalIcon className="size-3.5" />
                       Open in Terminal
                     </ContextMenuItem>
                     <ContextMenuItem onSelect={() => void revealItemInDir(repo.path)}>
+                      <FolderOpenIcon className="size-3.5" />
                       Open in Finder
                     </ContextMenuItem>
                     <ContextMenuItem onSelect={() => void copyToClipboard(repo.path)}>
+                      <CopyIcon className="size-3.5" />
                       Copy Path
                     </ContextMenuItem>
                     <ContextMenuItem onSelect={() => void moveToSection(repo)}>
+                      <FolderInputIcon className="size-3.5" />
                       Move to Section…
                     </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem variant="destructive" onSelect={() => void removeRepo(repo.path)}>
+                      <Trash2Icon className="size-3.5" />
                       Remove from Sidebar
                     </ContextMenuItem>
                   </ContextMenuContent>

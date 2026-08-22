@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { HistoryIcon, TriangleAlertIcon } from "lucide-react";
+import { GitCommitIcon, HistoryIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -132,6 +132,7 @@ export function CommitBox() {
         title={amending ? "Rewrite the last commit with this message and any staged changes" : "Cmd+Enter"}
         onClick={() => void submit()}
       >
+        <GitCommitIcon className="size-3.5" />
         {amending ? "Amend Last Commit" : `Commit to ${branch ?? "…"}`}
       </Button>
     </div>

@@ -45,6 +45,8 @@ interface RepoState {
   aheadBehind: AheadBehind;
   syncing: boolean;
   syncLog: GitOutputLine[];
+  syncError: string | null;
+  syncEventId: string | null;
 
   globalListenersReady: boolean;
 
@@ -84,6 +86,7 @@ interface RepoState {
   fetch: () => Promise<void>;
   pull: () => Promise<void>;
   push: () => Promise<void>;
+  cancelSync: () => Promise<void>;
 
   addExistingRepo: (path: string) => Promise<void>;
   cloneRepo: (url: string, dest: string) => Promise<void>;
@@ -118,6 +121,8 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   aheadBehind: { ahead: 0, behind: 0 },
   syncing: false,
   syncLog: [],
+  syncError: null,
+  syncEventId: null,
 
   globalListenersReady: false,
 
@@ -432,6 +437,11 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     await runSync(get, set, repoPath, () => api.gitPush(repoPath));
     await get().refreshAheadBehind();
   },
+  cancelSync: async () => {
+    const eventId = get().syncEventId;
+    if (!eventId) return;
+    await api.cancelGitOperation(eventId);
+  },
 
   addExistingRepo: async (path) => {
     const repos = await api.addRepo(path);
@@ -466,14 +476,16 @@ async function runSync(
   eventId: string,
   action: () => Promise<void>,
 ) {
-  set({ syncing: true, syncLog: [] });
+  set({ syncing: true, syncLog: [], syncError: null, syncEventId: eventId });
   const unlisten = await listen<GitOutputLine>(`git://${eventId}`, (event) => {
     set({ syncLog: [...get().syncLog, event.payload] });
   });
   try {
     await action();
+  } catch (e) {
+    set({ syncError: String(e) });
   } finally {
     unlisten();
-    set({ syncing: false });
+    set({ syncing: false, syncEventId: null });
   }
 }

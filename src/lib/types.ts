@@ -112,6 +112,7 @@ export interface RepoEntry {
   is_private: boolean;
   last_fetched: number | null;
   section: string | null;
+  identity_id: string | null;
 }
 
 export interface AheadBehind {
@@ -155,6 +156,7 @@ export interface Settings {
   sidebar_sort: SidebarSort;
   git_binary_path: string | null;
   fs_watch_enabled: boolean;
+  default_identity_id: string | null;
 }
 
 // --- GitHub ---
@@ -178,6 +180,15 @@ export type PollResult =
   | { status: "success"; account: GitHubAccount }
   | { status: "denied" }
   | { status: "expired" };
+
+// --- SSH identities ---
+
+export interface SshIdentity {
+  id: string;
+  label: string;
+  host: string;
+  key_path: string;
+}
 
 export interface PullRequest {
   number: number;

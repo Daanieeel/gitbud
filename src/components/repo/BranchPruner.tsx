@@ -92,6 +92,7 @@ export function BranchPruner() {
             disabled={selected.size === 0 || pruning}
             onClick={() => void pruneSelected()}
           >
+            <Trash2Icon className="size-3.5" />
             {pruning ? "Pruning…" : `Prune ${selected.size || ""} Local Branch${selected.size === 1 ? "" : "es"}`}
           </Button>
         </div>

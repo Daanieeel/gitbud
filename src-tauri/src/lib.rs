@@ -9,6 +9,7 @@ mod image_diff;
 mod rebase;
 mod repo;
 mod settings;
+mod ssh_identity;
 mod stash;
 mod submodules;
 mod system;
@@ -258,6 +259,38 @@ fn set_repo_section(path: String, section: Option<String>) -> Result<Vec<config:
 }
 
 #[tauri::command]
+fn set_repo_identity(path: String, identity_id: Option<String>) -> Result<Vec<config::RepoEntry>, String> {
+    config::set_repo_identity(&path, identity_id)
+}
+
+// --- git identities: GitHub accounts (see github/) plus plain SSH-key identities ---
+
+#[tauri::command]
+fn list_ssh_identities() -> Result<Vec<ssh_identity::SshIdentity>, String> {
+    ssh_identity::list()
+}
+
+#[tauri::command]
+fn add_ssh_identity(label: String, host: String, key_path: String) -> Result<Vec<ssh_identity::SshIdentity>, String> {
+    ssh_identity::add(&label, &host, &key_path)
+}
+
+#[tauri::command]
+fn remove_ssh_identity(id: String) -> Result<Vec<ssh_identity::SshIdentity>, String> {
+    ssh_identity::remove(&id)
+}
+
+#[tauri::command]
+fn apply_ssh_identity_to_repo(repo_path: String, key_path: String) -> Result<(), String> {
+    ssh_identity::apply_to_repo(&repo_path, &key_path)
+}
+
+#[tauri::command]
+fn clear_ssh_identity_from_repo(repo_path: String) -> Result<(), String> {
+    ssh_identity::clear_from_repo(&repo_path)
+}
+
+#[tauri::command]
 fn init_repo(path: String) -> Result<(), String> {
     let default_branch = settings::get_settings()
         .map(|s| s.default_branch_name)
@@ -295,6 +328,16 @@ fn stash_drop(repo_path: String, index: usize) -> Result<(), String> {
     stash::stash_drop(&repo_path, index)
 }
 
+#[tauri::command]
+fn get_stash_oid(repo_path: String, index: usize) -> Result<String, String> {
+    stash::stash_oid(&repo_path, index)
+}
+
+#[tauri::command]
+fn stash_apply_file(repo_path: String, index: usize, path: String) -> Result<(), String> {
+    stash::stash_apply_file(&repo_path, index, &path)
+}
+
 // --- sync: fetch/pull/push/clone via system git ---
 
 #[tauri::command]
@@ -318,6 +361,11 @@ fn git_push(app: AppHandle, repo_path: String) -> Result<(), String> {
 #[tauri::command]
 fn git_clone(app: AppHandle, url: String, dest: String) -> Result<(), String> {
     git_shell::clone(&app, &url, &dest, &dest)
+}
+
+#[tauri::command]
+fn cancel_git_operation(repo_path: String) -> Result<(), String> {
+    git_shell::cancel(&repo_path)
 }
 
 #[tauri::command]
@@ -624,6 +672,8 @@ pub fn run() {
             stash_apply,
             stash_pop,
             stash_drop,
+            get_stash_oid,
+            stash_apply_file,
             get_file_diff,
             get_commit_files,
             get_commit_file_diff,
@@ -645,10 +695,17 @@ pub fn run() {
             remove_repo,
             set_repo_private,
             set_repo_section,
+            set_repo_identity,
+            list_ssh_identities,
+            add_ssh_identity,
+            remove_ssh_identity,
+            apply_ssh_identity_to_repo,
+            clear_ssh_identity_from_repo,
             init_repo,
             git_fetch,
             git_pull,
             git_push,
+            cancel_git_operation,
             git_clone,
             get_ahead_behind,
             has_upstream_remote,

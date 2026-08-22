@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { GitPullRequestIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -86,6 +87,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
             title={`Open a PR from ${branch ?? "this branch"} into ${base}`}
             onClick={() => void submit()}
           >
+            <GitPullRequestIcon className="size-3.5" />
             {submitting ? "Creating…" : "Create Pull Request"}
           </Button>
         </DialogFooter>

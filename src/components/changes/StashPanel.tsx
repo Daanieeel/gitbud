@@ -54,6 +54,7 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
             disabled={!hasChanges || saving}
             onClick={() => void doSave()}
           >
+            <ArchiveIcon className="size-3.5" />
             Stash All Changes
           </Button>
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BoxIcon } from "lucide-react";
+import { BoxIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { api } from "@/lib/tauri";
@@ -71,6 +71,11 @@ export function SubmodulesPanel() {
                 disabled={busy}
                 onClick={() => void updateOne(sub.path)}
               >
+                {sub.initialized ? (
+                  <RefreshCwIcon className="size-3.5" />
+                ) : (
+                  <DownloadIcon className="size-3.5" />
+                )}
                 {sub.initialized ? "Update" : "Init"}
               </Button>
             </div>
@@ -78,6 +83,7 @@ export function SubmodulesPanel() {
         </div>
         <div className="border-t border-border p-2">
           <Button size="sm" className="w-full" disabled={busy} onClick={() => void updateAll()}>
+            <RefreshCwIcon className="size-3.5" />
             Update All Submodules
           </Button>
         </div>

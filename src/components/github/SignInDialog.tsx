@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLinkIcon } from "lucide-react";
+import { ExternalLinkIcon, LogInIcon, PencilIcon, PlayIcon, RotateCcwIcon, SaveIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -69,6 +69,7 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
               I don't use gh CLI
             </Button>
             <Button disabled={ghCliTrying} onClick={() => void attemptGhCli()}>
+              <LogInIcon className="size-3.5" />
               {ghCliTrying ? "Checking…" : "Use gh CLI login"}
             </Button>
           </DialogFooter>
@@ -107,6 +108,7 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
               disabled={!clientIdInput.trim()}
               onClick={() => void setClientId(clientIdInput.trim())}
             >
+              <SaveIcon className="size-3.5" />
               Save
             </Button>
           </DialogFooter>
@@ -128,9 +130,13 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setClientId("")}>
+              <PencilIcon className="size-3.5" />
               Change Client ID
             </Button>
-            <Button onClick={() => void startSignIn()}>Start</Button>
+            <Button onClick={() => void startSignIn()}>
+              <PlayIcon className="size-3.5" />
+              Start
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -170,7 +176,10 @@ export function SignInDialog({ open, onOpenChange }: SignInDialogProps) {
         )}
         {deviceFlow.status !== "waiting" && (
           <DialogFooter>
-            <Button onClick={() => void startSignIn()}>Retry</Button>
+            <Button onClick={() => void startSignIn()}>
+              <RotateCcwIcon className="size-3.5" />
+              Retry
+            </Button>
           </DialogFooter>
         )}
       </DialogContent>

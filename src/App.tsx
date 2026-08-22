@@ -10,6 +10,7 @@ import { SyncLogToast } from "@/components/sync/SyncLogToast";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
+import { useIdentityStore } from "@/store/useIdentityStore";
 
 function App() {
   const initGlobalListeners = useRepoStore((s) => s.initGlobalListeners);
@@ -19,6 +20,8 @@ function App() {
   const activeTab = useRepoStore((s) => s.activeTab);
   const repos = useRepoStore((s) => s.repos);
   const loadSettings = useSettingsStore((s) => s.load);
+  const initIdentities = useIdentityStore((s) => s.init);
+  const syncRepoIdentity = useIdentityStore((s) => s.syncRepoIdentity);
   const pull = useRepoStore((s) => s.pull);
 
   const [palette, setPalette] = useState<{ open: boolean; mode: "all" | "repos" }>({
@@ -30,7 +33,12 @@ function App() {
     void initGlobalListeners();
     void loadRepos();
     void loadSettings();
-  }, [initGlobalListeners, loadRepos, loadSettings]);
+    void initIdentities();
+  }, [initGlobalListeners, loadRepos, loadSettings, initIdentities]);
+
+  useEffect(() => {
+    if (selectedRepo) void syncRepoIdentity(selectedRepo);
+  }, [selectedRepo, syncRepoIdentity]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {

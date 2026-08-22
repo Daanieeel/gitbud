@@ -22,6 +22,7 @@ import type {
   RepoStatus,
   ReviewComment,
   Settings,
+  SshIdentity,
   StashEntry,
   SubmoduleInfo,
   TagInfo,
@@ -117,12 +118,24 @@ export const api = {
     invoke<RepoEntry[]>("set_repo_private", { path, isPrivate }),
   setRepoSection: (path: string, section: string | null) =>
     invoke<RepoEntry[]>("set_repo_section", { path, section }),
+  setRepoIdentity: (path: string, identityId: string | null) =>
+    invoke<RepoEntry[]>("set_repo_identity", { path, identityId }),
   initRepo: (path: string) => invoke<void>("init_repo", { path }),
+
+  listSshIdentities: () => invoke<SshIdentity[]>("list_ssh_identities"),
+  addSshIdentity: (label: string, host: string, keyPath: string) =>
+    invoke<SshIdentity[]>("add_ssh_identity", { label, host, keyPath }),
+  removeSshIdentity: (id: string) => invoke<SshIdentity[]>("remove_ssh_identity", { id }),
+  applySshIdentityToRepo: (repoPath: string, keyPath: string) =>
+    invoke<void>("apply_ssh_identity_to_repo", { repoPath, keyPath }),
+  clearSshIdentityFromRepo: (repoPath: string) =>
+    invoke<void>("clear_ssh_identity_from_repo", { repoPath }),
 
   gitFetch: (repoPath: string) => invoke<void>("git_fetch", { repoPath }),
   gitPull: (repoPath: string) => invoke<void>("git_pull", { repoPath }),
   gitPush: (repoPath: string) => invoke<void>("git_push", { repoPath }),
   gitClone: (url: string, dest: string) => invoke<void>("git_clone", { url, dest }),
+  cancelGitOperation: (eventId: string) => invoke<void>("cancel_git_operation", { repoPath: eventId }),
   getAheadBehind: (repoPath: string) => invoke<AheadBehind>("get_ahead_behind", { repoPath }),
   hasUpstreamRemote: (repoPath: string) => invoke<boolean>("has_upstream_remote", { repoPath }),
   getUpstreamAheadBehind: (repoPath: string, branch: string) =>
