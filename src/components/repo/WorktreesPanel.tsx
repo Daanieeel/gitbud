@@ -109,7 +109,7 @@ export function WorktreesPanel() {
           </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent>
-          Worktrees check out another branch into its own folder, side by side with this one
+          Check out another branch into its own folder
         </TooltipContent>
       </Tooltip>
       <PopoverContent className="w-96 p-0" align="start">
