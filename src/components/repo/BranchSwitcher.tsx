@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronsUpDownIcon,
   CloudUploadIcon,
@@ -44,6 +44,17 @@ export function BranchSwitcher() {
   const [renameValue, setRenameValue] = useState("");
   const [switching, setSwitching] = useState(false);
   const [renameBusy, setRenameBusy] = useState(false);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // The context menu that opens the rename Input restores focus to its own trigger on close,
+  // which races the Input's autofocus and can steal it back right away — closing the Input
+  // via onBlur before the user types anything. Focusing on the next frame lets that
+  // restoration finish first, so ours always wins.
+  useEffect(() => {
+    if (!renaming) return;
+    const raf = requestAnimationFrame(() => renameInputRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
+  }, [renaming]);
 
   const local = useMemo(
     () => branches.filter((b) => !b.is_remote && b.name.toLowerCase().includes(filter.toLowerCase())),
@@ -162,7 +173,7 @@ export function BranchSwitcher() {
             renaming === b.name ? (
               <Input
                 key={b.name}
-                autoFocus
+                ref={renameInputRef}
                 disabled={renameBusy}
                 value={renameValue}
                 onChange={(e) => setRenameValue(e.target.value)}
