@@ -12,6 +12,7 @@ import {
 import { save, open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -174,10 +175,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   />
                 </Row>
                 <Row label="Desktop notifications">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={settings.desktop_notifications}
-                    onChange={(e) => void update({ desktop_notifications: e.target.checked })}
+                    onCheckedChange={(checked) => void update({ desktop_notifications: checked === true })}
                   />
                 </Row>
               </>
@@ -239,10 +239,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   />
                 </Row>
                 <Row label="Ignore whitespace">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={settings.ignore_whitespace}
-                    onChange={(e) => void update({ ignore_whitespace: e.target.checked })}
+                    onCheckedChange={(checked) => void update({ ignore_whitespace: checked === true })}
                   />
                 </Row>
                 <Row label="Font size">
@@ -259,10 +258,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
             {section === "Sidebar" && (
               <>
                 <Row label="Show ahead/behind badges">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={settings.show_ahead_behind}
-                    onChange={(e) => void update({ show_ahead_behind: e.target.checked })}
+                    onCheckedChange={(checked) => void update({ show_ahead_behind: checked === true })}
                   />
                 </Row>
                 <Row label="Sort repos by">
@@ -312,10 +310,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   />
                 </Row>
                 <Row label="Filesystem watch">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={settings.fs_watch_enabled}
-                    onChange={(e) => void update({ fs_watch_enabled: e.target.checked })}
+                    onCheckedChange={(checked) => void update({ fs_watch_enabled: checked === true })}
                   />
                 </Row>
                 <Row label="Settings backup">

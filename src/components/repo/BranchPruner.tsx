@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
@@ -71,17 +72,14 @@ export function BranchPruner() {
         </div>
         <div className="max-h-56 overflow-auto p-1">
           {candidates.map((b) => (
-            <label
+            <div
               key={b.name}
               className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+              onClick={() => toggle(b.name)}
             >
-              <input
-                type="checkbox"
-                checked={selected.has(b.name)}
-                onChange={() => toggle(b.name)}
-              />
+              <Checkbox checked={selected.has(b.name)} onClick={(e) => e.stopPropagation()} onCheckedChange={() => toggle(b.name)} />
               <span className="truncate">{b.name}</span>
-            </label>
+            </div>
           ))}
         </div>
         <div className="border-t border-border p-2">

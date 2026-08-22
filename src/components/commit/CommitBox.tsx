@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { GitCommitIcon, HistoryIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useRepoStore } from "@/store/useRepoStore";
 import { isProtectedBranch } from "@/lib/utils";
@@ -74,11 +76,10 @@ export function CommitBox() {
         className="flex items-center gap-2 text-xs text-muted-foreground"
         title="Amend — replace the last commit with this message and any currently staged changes, instead of creating a new commit"
       >
-        <input
-          type="checkbox"
+        <Checkbox
           checked={amending}
           disabled={!lastCommit}
-          onChange={(e) => toggleAmend(e.target.checked)}
+          onCheckedChange={(checked) => toggleAmend(checked === true)}
         />
         Amend last commit
       </label>
@@ -123,12 +124,11 @@ export function CommitBox() {
           </PopoverContent>
         </Popover>
       </div>
-      <textarea
+      <Textarea
         placeholder="Description"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         rows={3}
-        className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
       />
       <Button
         disabled={disabled}

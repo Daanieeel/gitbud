@@ -4,6 +4,7 @@ import type { DiffHunk, DiffLine, FileDiff, ImageDiff, ReviewComment } from "@/l
 import { cn } from "@/lib/utils";
 import { ImageDiffView } from "./ImageDiffView";
 import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { highlightLine, languageForPath } from "@/lib/highlight";
 
@@ -78,13 +79,13 @@ function AddCommentComposer({
 
   return (
     <div className="ml-16 flex flex-col gap-2 border-l-2 border-primary bg-card px-3 py-2">
-      <textarea
+      <Textarea
         autoFocus
         rows={2}
         value={body}
         onChange={(e) => setBody(e.target.value)}
         placeholder="Leave a comment"
-        className="w-full resize-none rounded-md border border-input bg-transparent px-2 py-1 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="px-2 py-1 text-xs"
       />
       <div className="flex gap-2">
         <Button size="sm" disabled={submitting || !body.trim()} onClick={() => void submit()}>

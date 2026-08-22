@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { GitPullRequestIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -79,15 +81,14 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
             <span className="font-mono">{branch}</span>
           </div>
           <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <textarea
+          <Textarea
             placeholder="Description (loads .github/PULL_REQUEST_TEMPLATE.md if present)"
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={6}
-            className="w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            <input type="checkbox" checked={draft} onChange={(e) => setDraft(e.target.checked)} />
+            <Checkbox checked={draft} onCheckedChange={(checked) => setDraft(checked === true)} />
             Create as draft
           </label>
         </div>

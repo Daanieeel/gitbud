@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { PlusIcon, SaveIcon, Trash2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -113,17 +114,18 @@ export function WorkspaceDialog({ open, onOpenChange }: WorkspaceDialogProps) {
                 />
                 <div className="min-h-0 flex-1 overflow-auto rounded-md border border-border p-1">
                   {repos.map((repo) => (
-                    <label
+                    <div
                       key={repo.path}
                       className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1 text-sm hover:bg-accent"
+                      onClick={() => toggleRepo(repo.path)}
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={selected.has(repo.path)}
-                        onChange={() => toggleRepo(repo.path)}
+                        onClick={(e) => e.stopPropagation()}
+                        onCheckedChange={() => toggleRepo(repo.path)}
                       />
                       {repo.name}
-                    </label>
+                    </div>
                   ))}
                 </div>
                 <div className="flex justify-between">
