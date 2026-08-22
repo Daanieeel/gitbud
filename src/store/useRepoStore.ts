@@ -553,6 +553,20 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   },
 }));
 
+// Mirrors git_shell.rs's `event_channel` — Tauri event names only allow `[a-zA-Z0-9-/:_]`, but
+// `eventId` is a filesystem path that can contain spaces and other disallowed characters (e.g.
+// this repo's own ".../Open Source/gitbud"). Encoding it as base64url keeps both sides in sync
+// without ever producing a character `listen()` would reject.
+function eventChannel(eventId: string): string {
+  const bytes = new TextEncoder().encode(eventId);
+  let binary = "";
+  bytes.forEach((b) => {
+    binary += String.fromCharCode(b);
+  });
+  const b64 = btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `git://${b64}`;
+}
+
 const NOTIFY_THRESHOLD_MS = 4000;
 
 // Backend has its own 45s no-output watchdog (git_shell.rs), but that only protects against
@@ -589,12 +603,16 @@ async function runSync(
       resolveCancelled();
     },
   };
-  toast.loading(label, { id: eventId, description: undefined, cancel: cancelAction });
+  // closeButton: false — the Toaster's global close button would otherwise sit right next to
+  // our own Cancel action and looks like the obvious way to cancel, but it only dismisses the
+  // toast client-side without calling cancelAction.onClick, leaving `syncing` stuck forever.
+  toast.loading(label, { id: eventId, description: undefined, cancel: cancelAction, closeButton: false });
 
-  const unlisten = await listen<GitOutputLine>(`git://${eventId}`, (event) => {
-    toast.loading(label, { id: eventId, description: event.payload.line, cancel: cancelAction });
-  });
+  let unlisten: (() => void) | undefined;
   try {
+    unlisten = await listen<GitOutputLine>(eventChannel(eventId), (event) => {
+      toast.loading(label, { id: eventId, description: event.payload.line, cancel: cancelAction, closeButton: false });
+    });
     const settled = action().then(
       () => ({ ok: true as const }),
       (err: unknown) => ({ ok: false as const, error: String(err) }),
@@ -603,26 +621,36 @@ async function runSync(
       setTimeout(() => resolve("timeout"), SYNC_TIMEOUT_MS);
     });
     const outcome = await Promise.race([settled, timedOut, cancelled]);
+    // Stop reacting to further output lines the instant the outcome is known — a line arriving
+    // right as the process exits (e.g. git's own "branch 'x' set up to track 'origin/x'." on a
+    // first push) would otherwise re-render this toast as loading (with the Cancel button back)
+    // after we've already moved on to rendering its final state below.
+    unlisten();
+    unlisten = undefined;
+    // sonner merges options into the existing toast for this id rather than replacing them, so
+    // every final-state call below must explicitly clear `cancel`/`closeButton` — otherwise they
+    // silently inherit the Cancel action and the disabled close button from the loading state.
+    const finalState = { cancel: undefined, closeButton: true };
 
     if (outcome === "cancelled") {
-      toast(`${label.replace(/…$/, "")} cancelled`, { id: eventId });
+      toast(`${label.replace(/…$/, "")} cancelled`, { id: eventId, ...finalState });
       return;
     }
     if (outcome === "timeout") {
       void api.cancelGitOperation(eventId).catch(() => {});
       const message = `${label.replace(/…$/, "")} timed out after ${SYNC_TIMEOUT_MS / 1000}s with no response and was cancelled.`;
-      toast.error(message, { id: eventId });
+      toast.error(message, { id: eventId, ...finalState });
       useNetworkStore.getState().noteError(message);
       return;
     }
     if (!outcome.ok) {
-      toast.error(outcome.error, { id: eventId });
+      toast.error(outcome.error, { id: eventId, ...finalState });
       useNetworkStore.getState().noteError(outcome.error);
       return;
     }
     useNetworkStore.getState().noteSuccess();
     if (opts) {
-      toast.success(opts.doneMessage, { id: eventId });
+      toast.success(opts.doneMessage, { id: eventId, ...finalState });
       if (Date.now() - startedAt > NOTIFY_THRESHOLD_MS) {
         const repoName = get().repos.find((r) => r.path === eventId)?.name ?? eventId;
         void notify(opts.doneMessage, repoName);
@@ -631,7 +659,7 @@ async function runSync(
       toast.dismiss(eventId);
     }
   } finally {
-    unlisten();
+    unlisten?.();
     const elapsed = Date.now() - startedAt;
     if (elapsed < MIN_SYNCING_MS) {
       await new Promise((resolve) => setTimeout(resolve, MIN_SYNCING_MS - elapsed));

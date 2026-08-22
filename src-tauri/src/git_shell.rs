@@ -1,3 +1,4 @@
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::Read;
@@ -101,6 +102,17 @@ fn stream_reader(
     })
 }
 
+/// Tauri event names only allow `[a-zA-Z0-9-/:_]` — `event_id` is a filesystem path, which can
+/// contain spaces and other characters outside that set (e.g. this repo's own
+/// ".../Open Source/gitbud"). Using it raw in the event name makes the frontend's `listen()`
+/// call reject with an illegal-event-name error instead of registering, which — since that
+/// happens before the streaming op is even started — silently strands the UI in a permanent
+/// "loading" state with nothing registered on the backend to cancel. base64url has no such
+/// restricted characters, so it's safe to embed directly.
+fn event_channel(event_id: &str) -> String {
+    format!("git://{}", URL_SAFE_NO_PAD.encode(event_id))
+}
+
 /// Runs a system `git` subcommand, streaming each output line to the frontend as a
 /// `git://<event_id>` event so long-running fetch/pull/push/clone can show live progress.
 ///
@@ -138,8 +150,9 @@ fn run_streaming(app: &AppHandle, cwd: Option<&str>, args: &[&str], event_id: &s
         .map_err(|_| "internal lock error".to_string())?
         .insert(event_id.to_string(), RunningOp { pid: child.id(), cancelled: Arc::clone(&cancelled) });
 
-    let out_handle = stream_reader(stdout, Arc::clone(&last_activity), app.clone(), format!("git://{event_id}"), "stdout");
-    let err_handle = stream_reader(stderr, Arc::clone(&last_activity), app.clone(), format!("git://{event_id}"), "stderr");
+    let channel = event_channel(event_id);
+    let out_handle = stream_reader(stdout, Arc::clone(&last_activity), app.clone(), channel.clone(), "stdout");
+    let err_handle = stream_reader(stderr, Arc::clone(&last_activity), app.clone(), channel, "stderr");
 
     let done = Arc::new(AtomicBool::new(false));
     let watchdog_done = Arc::clone(&done);
