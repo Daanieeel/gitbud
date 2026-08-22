@@ -2,11 +2,6 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-/*
- * Palette sourced from .reference/color-pallette.json ("Vercel" VS Code theme):
- * pure black surfaces, off-white text, #0070f3 blue accent, and green/pink/purple/
- * yellow used for git + status semantics (green = added/modified, pink = deleted).
- */
 :root {
   /* Page bg is a soft neutral (same tone as --muted) so raised --card surfaces (dialogs,
      popovers, the toolbar, the sidebar) actually read as elevated instead of blending in. */

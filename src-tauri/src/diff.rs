@@ -95,7 +95,10 @@ pub(crate) fn apply_whitespace_setting(opts: &mut DiffOptions) {
 pub fn get_file_diff(repo_path: &str, path: &str, staged: bool) -> Result<FileDiff, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut opts = DiffOptions::new();
-    opts.pathspec(path).include_untracked(true).recurse_untracked_dirs(true);
+    opts.pathspec(path)
+        .include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .show_untracked_content(true);
     apply_whitespace_setting(&mut opts);
 
     let diff = if staged {

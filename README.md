@@ -11,9 +11,7 @@
 
 </div>
 
-GitBud is a desktop Git client with the workflow you already know from GitHub Desktop — repo sidebar, changes/history/PRs, stage-and-commit, one-click sync — rebuilt on Tauri instead of Electron. No bundled Chromium, no idle gigabyte of RAM, no multi-second cold start. Just your repos, fast.
-
-It's also not trying to be GitHub-branded. Distinct dark-first design, a Vercel-inspired palette, and a git core written in Rust (`git2` + shelling out to your real `git`/`gh` for anything auth-related) so it never gets in the way of your actual toolchain.
+Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. GitBud gives you the workflow you already know — sidebar, changes, history, PRs, stage-and-commit, one-click sync — without the bundled Chromium tax. It's built on Tauri, not Electron, so it opens instantly and gets out of your way.
 
 <div align="center">
 <img src="resources/screenshots.png" alt="GitBud screenshots" width="900">
@@ -34,22 +32,22 @@ It's also not trying to be GitHub-branded. Distinct dark-first design, a Vercel-
 
 ## Features
 
-- **Repo sidebar** — grouped by owner/remote, filterable, dirty-state and ahead/behind badges, right-click for terminal/Finder/copy-path actions
-- **Changes tab** — stage/unstage whole files *or individual hunks*, discard changes (file or hunk), inline diff with real syntax highlighting, virtualized file list for huge repos
-- **Merge conflicts** — dedicated resolution view: Use Mine / Use Theirs / edit manually / mark resolved
-- **Commit** — summary + description that survives tab switches, amend last commit, protected-branch warnings
-- **History** — virtualized commit log with a real `git log --graph`-style lane graph, cherry-pick, revert, create-branch-here, CI status and GPG/SSH verification badges
-- **Branches** — create/rename/delete/merge from one popover, plus a merged-branch pruner
-- **Pull Requests** — browse open/closed/all, create (with `.github/PULL_REQUEST_TEMPLATE.md` auto-load), checkout locally in one click, inline review comments, merge (merge/squash/rebase)
-- **GitHub sign-in** — zero-config via detected `gh` CLI login, or Device Flow if you'd rather not install the CLI; GitHub Enterprise Server supported via a configurable host
-- **Sync** — fetch/pull/push with live streamed output, configurable pull strategy, fork/upstream tracking with one-click fast-forward
-- **Settings** — theme, git identity (global or per-repo), diff whitespace/font-size, sidebar sort, git binary override, filesystem-watch toggle
+- **Find any repo fast** — sidebar grouped by owner/remote, filterable, with dirty-state and ahead/behind badges at a glance; right-click for terminal, Finder, or copy-path
+- **Stage exactly what you mean** — whole files *or individual hunks*, discard down to a single hunk, real syntax-highlighted inline diffs, virtualized so huge repos don't lag
+- **Resolve conflicts without leaving the app** — dedicated view: Use Mine / Use Theirs / edit manually / mark resolved
+- **Commit with confidence** — summary + description that survives tab switches, one-click amend, warnings before you commit to a protected branch
+- **See your history clearly** — virtualized log with a real `git log --graph`-style lane graph, cherry-pick, revert, create-branch-here, plus CI status and GPG/SSH verification badges right on each commit
+- **Manage branches in one place** — create/rename/delete/merge from a single popover, with a one-click pruner for branches already merged
+- **Review and ship PRs in-app** — browse open/closed/all, create with your `.github/PULL_REQUEST_TEMPLATE.md` auto-loaded, checkout locally in one click, leave inline review comments, merge/squash/rebase
+- **Sign in the way you already work** — zero-config via a detected `gh` CLI login, or Device Flow if you'd rather skip the CLI; GitHub Enterprise Server supported too
+- **Sync without surprises** — fetch/pull/push with live streamed output, your choice of pull strategy, fork/upstream tracking with one-click fast-forward
+- **Tune it to your workflow** — theme, git identity (global or per-repo), diff whitespace/font-size, sidebar sort, custom git binary, filesystem-watch toggle
 
 ## Performance, not as an afterthought
 
 These are the actual reasons this project exists:
 
-- Idle RAM target: **under 150MB** with a repo open
+- Idle RAM target: **under 50MB** with a repo open
 - Cold start to interactive: **under 1 second**
 - No polling, anywhere — repo state changes are pushed by filesystem events
 - Every list (files, commits) is virtualized
