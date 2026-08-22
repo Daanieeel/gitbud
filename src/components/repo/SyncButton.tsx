@@ -2,6 +2,7 @@ import { ArrowDownIcon, ArrowUpIcon, CloudUploadIcon, RefreshCwIcon } from "luci
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useIdentityAvailability } from "@/hooks/useIdentityAvailability";
 import { cn } from "@/lib/utils";
 
 export function SyncButton() {
@@ -11,6 +12,7 @@ export function SyncButton() {
   const fetch = useRepoStore((s) => s.fetch);
   const pull = useRepoStore((s) => s.pull);
   const push = useRepoStore((s) => s.push);
+  const { available, reason } = useIdentityAvailability();
 
   if (!selectedRepo) return null;
 
@@ -22,7 +24,7 @@ export function SyncButton() {
     label = "Publish branch";
     Icon = CloudUploadIcon;
     action = push;
-    title = "This branch has never been pushed — publish it to origin";
+    title = "This branch has never been pushed. Publish it to origin";
   } else if (aheadBehind.behind > 0) {
     label = `Pull origin (${aheadBehind.behind})`;
     Icon = ArrowDownIcon;
@@ -42,13 +44,19 @@ export function SyncButton() {
           variant="secondary"
           size="sm"
           disabled={syncing}
-          onClick={() => void action()}
+          className={cn(!available && "cursor-not-allowed opacity-50 hover:bg-accent")}
+          onClick={() => {
+            if (!available) return;
+            void action();
+          }}
         >
           <Icon className={cn("size-3.5", syncing && "animate-spin")} />
           {label}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{title}</TooltipContent>
+      <TooltipContent className={cn(!available && "border-destructive bg-destructive text-destructive-foreground")}>
+        {available ? title : reason}
+      </TooltipContent>
     </Tooltip>
   );
 }

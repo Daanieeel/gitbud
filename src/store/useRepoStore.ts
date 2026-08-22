@@ -48,6 +48,11 @@ interface RepoState {
   aheadBehind: AheadBehind;
   syncing: boolean;
 
+  // Which kind of identity can authenticate this repo's remote — resolved by checking whether
+  // the remote parses as a GitHub owner/repo. Null while unresolved (right after switching
+  // repos); callers that gate on this should treat null as "not yet known" and not block.
+  remoteProvider: "github" | "other" | null;
+
   globalListenersReady: boolean;
 
   initGlobalListeners: () => Promise<void>;
@@ -56,6 +61,7 @@ interface RepoState {
   refreshStatus: () => Promise<void>;
   refreshBranches: () => Promise<void>;
   refreshAheadBehind: () => Promise<void>;
+  refreshRemoteProvider: () => Promise<void>;
   setActiveTab: (tab: "changes" | "history" | "pulls") => void;
 
   toggleStaged: (paths: string[], staged: boolean) => Promise<void>;
@@ -121,6 +127,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
 
   aheadBehind: { ahead: 0, behind: 0, published: true },
   syncing: false,
+  remoteProvider: null,
 
   globalListenersReady: false,
 
@@ -162,6 +169,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       selectedCommitDiff: null,
       selectedCommitImageDiff: null,
       aheadBehind: { ahead: 0, behind: 0, published: true },
+      remoteProvider: null,
     });
 
     await api.startWatch(path).catch(() => {});
@@ -170,8 +178,19 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       get().refreshBranches(),
       get().loadMoreHistory(),
       get().refreshAheadBehind(),
+      get().refreshRemoteProvider(),
       useStashStore.getState().load(path),
     ]);
+  },
+
+  refreshRemoteProvider: async () => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    const provider: "github" | "other" = await api
+      .githubRemoteOwnerRepo(repoPath)
+      .then((remote) => (remote ? "github" : "other"))
+      .catch(() => "other");
+    if (get().selectedRepo === repoPath) set({ remoteProvider: provider });
   },
 
   refreshStatus: async () => {
@@ -235,21 +254,36 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   stageHunk: async (path, hunkIndex) => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    await api.stageHunk(repoPath, path, hunkIndex);
+    try {
+      await api.stageHunk(repoPath, path, hunkIndex);
+    } catch (err) {
+      toast.error(String(err));
+      return;
+    }
     await get().refreshStatus();
   },
 
   unstageHunk: async (path, hunkIndex) => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    await api.unstageHunk(repoPath, path, hunkIndex);
+    try {
+      await api.unstageHunk(repoPath, path, hunkIndex);
+    } catch (err) {
+      toast.error(String(err));
+      return;
+    }
     await get().refreshStatus();
   },
 
   discardHunk: async (path, hunkIndex) => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    await api.discardHunk(repoPath, path, hunkIndex);
+    try {
+      await api.discardHunk(repoPath, path, hunkIndex);
+    } catch (err) {
+      toast.error(String(err));
+      return;
+    }
     await get().refreshStatus();
   },
 
