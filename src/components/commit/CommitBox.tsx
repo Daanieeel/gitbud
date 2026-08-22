@@ -94,13 +94,15 @@ export function CommitBox() {
         />
         <Popover open={recentOpen} onOpenChange={setRecentOpen}>
           <PopoverTrigger asChild>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               title="Recently used commit messages"
-              className="shrink-0 text-muted-foreground hover:text-foreground"
+              className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
             >
               <HistoryIcon className="size-4" />
-            </button>
+            </Button>
           </PopoverTrigger>
           <PopoverContent className="w-72 p-1" align="end">
             {recentMessages.length === 0 ? (
