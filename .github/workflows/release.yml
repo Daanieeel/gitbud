@@ -62,3 +62,56 @@ jobs:
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+  notes:
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Build download links from release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          assets=$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name')
+
+          find_url() {
+            pattern="$1"
+            name=$(echo "$assets" | grep -Ei "$pattern" | head -n1 || true)
+            if [ -n "$name" ]; then
+              echo "https://github.com/$REPO/releases/download/$TAG/$name"
+            fi
+          }
+
+          mac_arm=$(find_url '_aarch64\.dmg$')
+          mac_intel=$(find_url '_x(64|86_64)\.dmg$')
+          win_msi=$(find_url '\.msi$')
+          win_exe=$(find_url '-setup\.exe$')
+          deb=$(find_url '\.deb$')
+          rpm=$(find_url '\.rpm$')
+          appimage=$(find_url '\.AppImage$')
+
+          {
+            echo "See the assets below to download and install for your platform."
+            echo ""
+            echo "**macOS:**"
+            [ -n "$mac_arm" ] && echo "- [Apple Silicon]($mac_arm)"
+            [ -n "$mac_intel" ] && echo "- [Intel]($mac_intel)"
+            echo ""
+            echo "> Not code-signed yet — macOS will say \`\"GitBud.app\" is damaged and can't be opened\`. Fix: \`xattr -cr /Applications/GitBud.app\`"
+            echo ""
+            echo "**Windows:**"
+            [ -n "$win_msi" ] && echo "- [Installer (.msi)]($win_msi)"
+            [ -n "$win_exe" ] && echo "- [Installer (.exe)]($win_exe)"
+            echo ""
+            echo "**Linux:**"
+            [ -n "$deb" ] && echo "- [.deb (Debian/Ubuntu)]($deb)"
+            [ -n "$rpm" ] && echo "- [.rpm (Fedora/RHEL)]($rpm)"
+            [ -n "$appimage" ] && echo "- [AppImage]($appimage)"
+          } > notes.md
+
+          gh release edit "$TAG" --repo "$REPO" --notes-file notes.md

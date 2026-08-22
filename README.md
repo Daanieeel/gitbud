@@ -59,6 +59,12 @@ These are the actual reasons this project exists:
 
 Pre-built installers for macOS, Windows, and Linux are published on the [Releases page](https://github.com/Daanieeel/gitbud/releases) whenever a new version ships. They aren't code-signed yet, so your OS will warn you before the first launch — that's expected for a project this early, not a red flag.
 
+**macOS:** you'll see `"GitBud.app" is damaged and can't be opened` — this is Gatekeeper blocking an unnotarized app, not actual corruption. Fix it by removing the quarantine flag:
+
+```bash
+xattr -cr /Applications/GitBud.app
+```
+
 ### Build from source
 
 **Prerequisites:** [Node.js](https://nodejs.org/) 18+, [Rust](https://rustup.rs/), and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.
