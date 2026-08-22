@@ -7,6 +7,18 @@ import { DiffView } from "@/components/diff/DiffView";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubFileUrl } from "@/lib/github-links";
+import { FileTypeIcon } from "@/lib/file-icons";
+
+const COMMIT_STATUS_DOT_COLOR: Record<string, string> = {
+  Added: "bg-accent-green",
+  Untracked: "bg-accent-green",
+  Copied: "bg-accent-green",
+  Modified: "bg-accent-green",
+  Deleted: "bg-accent-pink",
+  Renamed: "bg-muted-foreground",
+  Typechange: "bg-muted-foreground",
+  Conflicted: "bg-destructive",
+};
 
 export function HistoryTab() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -48,13 +60,22 @@ export function HistoryTab() {
           <div
             key={path}
             className={cn(
-              "cursor-pointer truncate px-2 py-1 text-sm hover:bg-accent",
+              "flex cursor-pointer items-center gap-1.5 truncate px-2 py-1 text-sm hover:bg-accent",
               selectedCommitFilePath === path && "bg-accent",
             )}
             title={`${path} (${status})`}
             onClick={() => void selectCommitFile(path)}
           >
-            {path}
+            <span className="relative shrink-0">
+              <FileTypeIcon path={path} className="size-3.5" />
+              <span
+                className={cn(
+                  "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
+                  COMMIT_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
+                )}
+              />
+            </span>
+            <span className="truncate">{path}</span>
           </div>
         ))}
       </div>
