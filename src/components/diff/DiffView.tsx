@@ -99,47 +99,51 @@ function AddCommentComposer({
   );
 }
 
-function HunkHeader({ hunk, hunkIdx, hunkActions }: { hunk: DiffHunk; hunkIdx: number; hunkActions?: HunkActions }) {
+function HunkHeader({ hunk }: { hunk: DiffHunk }) {
   return (
-    <div className="flex items-center justify-between bg-muted px-3 py-1 text-muted-foreground">
+    <div className="bg-muted px-3 py-1 text-muted-foreground">
       <span>{hunk.header}</span>
-      {hunkActions && (
-        <span className="flex gap-1.5 text-xs">
-          {hunkActions.staged
-            ? hunkActions.onUnstage && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 px-2 text-xs"
-                  title="A hunk is this one contiguous block of changed lines — unstage just it, leaving the rest of the file's staged changes alone"
-                  onClick={() => hunkActions.onUnstage?.(hunkIdx)}
-                >
-                  Unstage Hunk
-                </Button>
-              )
-            : hunkActions.onStage && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-6 px-2 text-xs"
-                  title="A hunk is this one contiguous block of changed lines — stage just it, leaving the rest of the file unstaged"
-                  onClick={() => hunkActions.onStage?.(hunkIdx)}
-                >
-                  Stage Hunk
-                </Button>
-              )}
-          {!hunkActions.staged && hunkActions.onDiscard && (
+    </div>
+  );
+}
+
+function HunkActionsRow({ hunkIdx, hunkActions }: { hunkIdx: number; hunkActions?: HunkActions }) {
+  if (!hunkActions) return null;
+  return (
+    <div className="flex gap-1.5 px-3 py-1.5 text-xs">
+      {hunkActions.staged
+        ? hunkActions.onUnstage && (
             <Button
               size="sm"
               variant="outline"
-              className="h-6 px-2 text-xs hover:border-destructive hover:text-destructive"
-              title="Permanently discard just this hunk's changes, leaving the rest of the file's edits intact"
-              onClick={() => hunkActions.onDiscard?.(hunkIdx)}
+              className="h-6 px-2 text-xs"
+              title="A chunk is this one contiguous block of changed lines — unstage just it, leaving the rest of the file's staged changes alone"
+              onClick={() => hunkActions.onUnstage?.(hunkIdx)}
             >
-              Discard Hunk
+              Unstage Chunk
+            </Button>
+          )
+        : hunkActions.onStage && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs"
+              title="A chunk is this one contiguous block of changed lines — stage just it, leaving the rest of the file unstaged"
+              onClick={() => hunkActions.onStage?.(hunkIdx)}
+            >
+              Stage Chunk
             </Button>
           )}
-        </span>
+      {!hunkActions.staged && hunkActions.onDiscard && (
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-6 px-2 text-xs hover:border-destructive hover:text-destructive"
+          title="Permanently discard just this chunk's changes, leaving the rest of the file's edits intact"
+          onClick={() => hunkActions.onDiscard?.(hunkIdx)}
+        >
+          Discard Chunk
+        </Button>
       )}
     </div>
   );
@@ -353,14 +357,17 @@ function DiffViewImpl({
         <div className="w-max min-w-full">
           {diff.hunks.map((hunk, hunkIdx) => (
             <div key={hunkIdx}>
-              <HunkHeader hunk={hunk} hunkIdx={hunkIdx} hunkActions={hunkActions} />
-              {toSplitRows(hunk).map((row, rowIdx) => (
-                <div key={rowIdx} className="flex">
-                  <SplitCell line={row.left} language={language} />
-                  <div className="w-px shrink-0 bg-border" />
-                  <SplitCell line={row.right} language={language} />
-                </div>
-              ))}
+              <HunkHeader hunk={hunk} />
+              <div className="bg-accent-blue/5">
+                <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} />
+                {toSplitRows(hunk).map((row, rowIdx) => (
+                  <div key={rowIdx} className="flex">
+                    <SplitCell line={row.left} language={language} />
+                    <div className="w-px shrink-0 bg-border" />
+                    <SplitCell line={row.right} language={language} />
+                  </div>
+                ))}
+              </div>
             </div>
           ))}
         </div>
@@ -377,21 +384,24 @@ function DiffViewImpl({
       <div className="w-max min-w-full">
         {diff.hunks.map((hunk, hunkIdx) => (
           <div key={hunkIdx}>
-            <HunkHeader hunk={hunk} hunkIdx={hunkIdx} hunkActions={hunkActions} />
-            {hunk.lines.map((line, lineIdx) => (
-              <UnifiedLine
-                key={lineIdx}
-                line={line}
-                hunkIdx={hunkIdx}
-                lineIdx={lineIdx}
-                language={language}
-                comments={comments}
-                onAddComment={onAddComment}
-                onCopyPermalink={onCopyPermalink}
-                composerKey={composerKey}
-                setComposerKey={setComposerKey}
-              />
-            ))}
+            <HunkHeader hunk={hunk} />
+            <div className="bg-accent-blue/5">
+              <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} />
+              {hunk.lines.map((line, lineIdx) => (
+                <UnifiedLine
+                  key={lineIdx}
+                  line={line}
+                  hunkIdx={hunkIdx}
+                  lineIdx={lineIdx}
+                  language={language}
+                  comments={comments}
+                  onAddComment={onAddComment}
+                  onCopyPermalink={onCopyPermalink}
+                  composerKey={composerKey}
+                  setComposerKey={setComposerKey}
+                />
+              ))}
+            </div>
           </div>
         ))}
       </div>
