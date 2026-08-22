@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { ImageDiffView } from "./ImageDiffView";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { highlightLine, languageForPath } from "@/lib/highlight";
@@ -119,11 +120,25 @@ function HunkHeader({ hunk, staged }: { hunk: DiffHunk; staged?: boolean }) {
   );
 }
 
-function HunkActionsRow({ hunkIdx, hunkActions }: { hunkIdx: number; hunkActions?: HunkActions }) {
+function HunkActionsRow({
+  hunkIdx,
+  hunkActions,
+  stickyTop,
+}: {
+  hunkIdx: number;
+  hunkActions?: HunkActions;
+  stickyTop: string;
+}) {
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   if (!hunkActions) return null;
   return (
     <div className="flex justify-end">
-      <div className="sticky right-3 flex gap-1.5 py-1.5 text-xs">
+      <div
+        className={cn(
+          "sticky right-3 z-[8] flex gap-1.5 py-1.5 text-xs",
+          stickyTop,
+        )}
+      >
         {hunkActions.staged
           ? hunkActions.onUnstage && (
               <Tooltip>
@@ -160,21 +175,40 @@ function HunkActionsRow({ hunkIdx, hunkActions }: { hunkIdx: number; hunkActions
               </Tooltip>
             )}
         {!hunkActions.staged && hunkActions.onDiscard && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-6 px-2 text-xs hover:border-destructive hover:text-destructive"
-                onClick={() => hunkActions.onDiscard?.(hunkIdx)}
-              >
-                Discard
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              Permanently discard just this chunk
-            </TooltipContent>
-          </Tooltip>
+          <Popover open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <PopoverTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-6 px-2 text-xs hover:border-destructive hover:text-destructive"
+                  >
+                    Discard
+                  </Button>
+                </PopoverTrigger>
+              </TooltipTrigger>
+              <TooltipContent>Permanently discard just this chunk</TooltipContent>
+            </Tooltip>
+            <PopoverContent align="end" className="w-56 space-y-2 p-3">
+              <p className="text-sm">Permanently discard this chunk?</p>
+              <div className="flex justify-end gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setConfirmDiscard(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => {
+                    setConfirmDiscard(false);
+                    hunkActions.onDiscard?.(hunkIdx);
+                  }}
+                >
+                  Discard
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         )}
       </div>
     </div>
@@ -355,6 +389,9 @@ function DiffSection({
   if (diff.hunks.length === 0) return null;
   const staged = hunkActions?.staged ?? false;
   const tint = staged ? "bg-accent-green/5" : "bg-accent-blue/5";
+  // Clears the file-path header (sticky top-0) plus the "Staged/Unstaged changes" label
+  // (sticky top-[29px]) when this section has one.
+  const actionsStickyTop = label ? "top-[50px]" : "top-[29px]";
 
   return (
     <div>
@@ -368,7 +405,7 @@ function DiffSection({
           <div key={hunkIdx}>
             <HunkHeader hunk={hunk} staged={staged} />
             <div className={tint}>
-              <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} />
+              <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} stickyTop={actionsStickyTop} />
               {toSplitRows(hunk).map((row, rowIdx) => (
                 <div key={rowIdx} className="flex">
                   <SplitCell line={row.left} language={language} />
@@ -382,7 +419,7 @@ function DiffSection({
           <div key={hunkIdx}>
             <HunkHeader hunk={hunk} staged={staged} />
             <div className={tint}>
-              <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} />
+              <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} stickyTop={actionsStickyTop} />
               {hunk.lines.map((line, lineIdx) => (
                 <UnifiedLine
                   key={lineIdx}
