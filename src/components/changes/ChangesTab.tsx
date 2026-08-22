@@ -43,46 +43,51 @@ export function ChangesTab() {
   const allStaged = filtered.length > 0 && filtered.every((f) => f.staged);
 
   return (
-    <div className="flex h-full min-w-0 flex-1">
-      <div style={{ width }} className="flex shrink-0 flex-col border-r border-border">
-        <div className="flex shrink-0 items-center justify-end border-b border-border p-2">
-          <StashPanel hasChanges={files.length > 0} />
-        </div>
-        {files.length === 0 ? (
-          <div className="flex flex-1 items-center justify-center p-4 text-center text-sm text-muted-foreground">
-            No local changes
+    <div className="flex h-full min-w-0 flex-1 gap-3">
+      <div className="flex h-full shrink-0">
+        <div
+          style={{ width }}
+          className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md"
+        >
+          <div className="flex shrink-0 items-center justify-end border-b border-border p-2">
+            <StashPanel hasChanges={files.length > 0} />
           </div>
-        ) : (
-          <>
-            <div className="flex shrink-0 items-center gap-2 border-b border-border p-2">
-              <Checkbox
-                checked={allStaged}
-                title={allStaged ? "Unstage all" : "Stage all"}
-                onCheckedChange={(checked) =>
-                  void toggleStaged(filtered.map((f) => f.path), checked === true)
-                }
-              />
-              <Input
-                placeholder="Filter files"
-                value={filter}
-                onChange={(e) => setFilter(e.target.value)}
-                className="h-7"
-              />
+          {files.length === 0 ? (
+            <div className="flex flex-1 items-center justify-center p-4 text-center text-sm text-muted-foreground">
+              No local changes
             </div>
-            <div className="min-h-0 flex-1">
-              <FileList
-                files={filtered}
-                selectedPath={selectedFilePath}
-                onSelect={(path) => void selectFile(path)}
-                onToggle={(path, staged) => void toggleStaged([path], staged)}
-              />
-            </div>
-          </>
-        )}
-        <CommitBox />
+          ) : (
+            <>
+              <div className="flex shrink-0 items-center gap-2 border-b border-border p-2">
+                <Checkbox
+                  checked={allStaged}
+                  title={allStaged ? "Unstage all" : "Stage all"}
+                  onCheckedChange={(checked) =>
+                    void toggleStaged(filtered.map((f) => f.path), checked === true)
+                  }
+                />
+                <Input
+                  placeholder="Filter files"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  className="h-7"
+                />
+              </div>
+              <div className="min-h-0 flex-1">
+                <FileList
+                  files={filtered}
+                  selectedPath={selectedFilePath}
+                  onSelect={(path) => void selectFile(path)}
+                  onToggle={(path, staged) => void toggleStaged([path], staged)}
+                />
+              </div>
+            </>
+          )}
+          <CommitBox />
+        </div>
+        <ResizeHandle onPointerDown={onPointerDown} />
       </div>
-      <ResizeHandle onPointerDown={onPointerDown} />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden rounded-xl bg-card shadow-md">
         {selectedFilePath &&
         repoPath &&
         files.find((f) => f.path === selectedFilePath)?.status === "conflicted" ? (

@@ -64,50 +64,57 @@ export function PRTab() {
   const selected = pulls.find((p) => p.number === selectedNumber);
 
   return (
-    <div className="flex h-full min-w-0 flex-1">
-      <div style={{ width }} className="flex shrink-0 flex-col border-r border-border">
-        <div className="flex shrink-0 items-center justify-between border-b border-border p-2">
-          <div className="flex gap-1">
-            {FILTERS.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={cn(
-                  "rounded-md px-2 py-1 text-xs hover:bg-accent",
-                  filter === f.key && "bg-accent font-medium",
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
+    <div className="flex h-full min-w-0 flex-1 gap-3">
+      <div className="flex h-full shrink-0">
+        <div
+          style={{ width }}
+          className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md"
+        >
+          <div className="flex shrink-0 items-center justify-between border-b border-border p-2">
+            <div className="flex gap-1">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  onClick={() => setFilter(f.key)}
+                  className={cn(
+                    "rounded-md px-2 py-1 text-xs hover:bg-accent",
+                    filter === f.key && "bg-accent font-medium",
+                  )}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
+              <PlusIcon className="size-3.5" />
+              New Pull Request
+            </Button>
           </div>
-          <Button size="sm" onClick={() => setCreateOpen(true)}>
-            <PlusIcon className="size-3.5" />
-            New Pull Request
-          </Button>
+          <div className="border-b border-border px-2 py-1 text-xs text-muted-foreground">
+            {loading ? "Loading…" : `${pulls.length} ${filter}`}
+          </div>
+          {loadError && <div className="p-2 text-xs text-destructive">{loadError}</div>}
+          <div className="min-h-0 flex-1">
+            <PRList
+              repoPath={repoPath}
+              login={currentLogin}
+              pulls={pulls}
+              selectedNumber={selectedNumber}
+              onSelect={(n) => void selectPR(repoPath, currentLogin, n)}
+            />
+          </div>
         </div>
-        <div className="border-b border-border px-2 py-1 text-xs text-muted-foreground">
-          {loading ? "Loading…" : `${pulls.length} ${filter}`}
-        </div>
-        {loadError && <div className="p-2 text-xs text-destructive">{loadError}</div>}
-        <div className="min-h-0 flex-1">
-          <PRList
-            repoPath={repoPath}
-            login={currentLogin}
-            pulls={pulls}
-            selectedNumber={selectedNumber}
-            onSelect={(n) => void selectPR(repoPath, currentLogin, n)}
-          />
-        </div>
+        <ResizeHandle onPointerDown={onPointerDown} />
       </div>
-      <ResizeHandle onPointerDown={onPointerDown} />
-      {selected ? (
-        <PRDetail repoPath={repoPath} login={currentLogin} pr={selected} />
-      ) : (
-        <div className="flex flex-1 items-center justify-center bg-dot-grid text-sm text-muted-foreground">
-          Select a pull request
-        </div>
-      )}
+      <div className="min-w-0 flex-1 overflow-hidden rounded-xl bg-card shadow-md">
+        {selected ? (
+          <PRDetail repoPath={repoPath} login={currentLogin} pr={selected} />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
+            Select a pull request
+          </div>
+        )}
+      </div>
       <CreatePRDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );

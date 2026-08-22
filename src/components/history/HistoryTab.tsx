@@ -48,44 +48,54 @@ export function HistoryTab() {
   }
 
   return (
-    <div className="flex h-full min-w-0 flex-1">
-      <div style={{ width: commitList.width }} className="shrink-0 border-r border-border">
-        <CommitList
-          commits={commits}
-          selectedOid={selectedCommitOid}
-          onSelect={(oid) => void selectCommit(oid)}
-          onNeedMore={() => void loadMoreHistory()}
-          onCreateBranchHere={setBranchAtOid}
-          onRebaseFromHere={setRebaseBaseOid}
-        />
+    <div className="flex h-full min-w-0 flex-1 gap-3">
+      <div className="flex h-full shrink-0">
+        <div
+          style={{ width: commitList.width }}
+          className="shrink-0 overflow-hidden rounded-xl bg-card shadow-md"
+        >
+          <CommitList
+            commits={commits}
+            selectedOid={selectedCommitOid}
+            onSelect={(oid) => void selectCommit(oid)}
+            onNeedMore={() => void loadMoreHistory()}
+            onCreateBranchHere={setBranchAtOid}
+            onRebaseFromHere={setRebaseBaseOid}
+          />
+        </div>
+        <ResizeHandle onPointerDown={commitList.onPointerDown} />
       </div>
-      <ResizeHandle onPointerDown={commitList.onPointerDown} />
-      <div style={{ width: fileList.width }} className="shrink-0 overflow-auto border-r border-border">
-        {selectedCommitFiles.map(([path, status]) => (
-          <div
-            key={path}
-            className={cn(
-              "flex cursor-pointer items-center gap-1.5 truncate px-2 py-1 text-sm hover:bg-accent",
-              selectedCommitFilePath === path && "bg-accent",
-            )}
-            title={`${path} (${status})`}
-            onClick={() => void selectCommitFile(path)}
-          >
-            <span className="relative shrink-0">
-              <FileTypeIcon path={path} className="size-3.5" />
-              <span
-                className={cn(
-                  "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                  COMMIT_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
-                )}
-              />
-            </span>
-            <span className="truncate">{path}</span>
-          </div>
-        ))}
+      <div className="flex h-full shrink-0">
+        <div
+          style={{ width: fileList.width }}
+          className="shrink-0 overflow-auto rounded-xl bg-card shadow-md"
+        >
+          {selectedCommitFiles.map(([path, status]) => (
+            <div
+              key={path}
+              className={cn(
+                "flex cursor-pointer items-center gap-1.5 truncate px-2 py-1 text-sm hover:bg-accent",
+                selectedCommitFilePath === path && "bg-accent",
+              )}
+              title={`${path} (${status})`}
+              onClick={() => void selectCommitFile(path)}
+            >
+              <span className="relative shrink-0">
+                <FileTypeIcon path={path} className="size-3.5" />
+                <span
+                  className={cn(
+                    "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
+                    COMMIT_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
+                  )}
+                />
+              </span>
+              <span className="truncate">{path}</span>
+            </div>
+          ))}
+        </div>
+        <ResizeHandle onPointerDown={fileList.onPointerDown} />
       </div>
-      <ResizeHandle onPointerDown={fileList.onPointerDown} />
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 overflow-hidden rounded-xl bg-card shadow-md">
         <DiffView
           path={selectedCommitFilePath}
           diff={selectedCommitDiff}
