@@ -62,12 +62,6 @@ export function CommitBox() {
 
   return (
     <div className="flex shrink-0 flex-col gap-2 border-t border-border p-2">
-      {protectedWarning && (
-        <div className="flex items-center gap-1.5 rounded-md bg-accent-yellow/10 px-2 py-1 text-xs text-accent-yellow">
-          <TriangleAlertIcon className="size-3.5 shrink-0" />
-          You're committing directly to {branch}
-        </div>
-      )}
       <label
         className="flex items-center gap-2 text-xs text-muted-foreground"
         title="Amend — replace the last commit with this message and any currently staged changes, instead of creating a new commit"
@@ -93,6 +87,12 @@ export function CommitBox() {
         onChange={(e) => setDescription(e.target.value)}
         rows={3}
       />
+      {protectedWarning && (
+        <div className="flex items-center gap-1.5 rounded-md bg-accent-yellow/10 px-2 py-1 text-xs text-accent-yellow">
+          <TriangleAlertIcon className="size-3.5 shrink-0" />
+          You're committing directly to {branch}
+        </div>
+      )}
       <Button
         disabled={disabled}
         title={amending ? "Rewrite the last commit with this message and any staged changes" : "Cmd+Enter"}
