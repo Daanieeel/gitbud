@@ -101,11 +101,11 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             {collapsed ? (
-              <Button variant="outline" size="icon" title="Add identity" className="bg-accent">
+              <Button variant="outline" size="icon" title="Add identity">
                 <LogInIcon className="size-4" />
               </Button>
             ) : (
-              <Button variant="outline" size="sm" className="min-w-0 flex-1 bg-accent">
+              <Button variant="outline" size="sm" className="h-9 min-w-0 flex-1">
                 <LogInIcon className="size-3.5" />
                 Add identity
               </Button>
@@ -133,7 +133,7 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
                 {current ? <IdentityAvatar identity={current} /> : <LogInIcon className="size-4" />}
               </button>
             ) : (
-              <Button variant="ghost" size="sm" className="min-w-0 flex-1 justify-start gap-2">
+              <Button variant="outline" size="sm" className="h-9 min-w-0 flex-1 justify-start gap-2">
                 {current && <IdentityAvatar identity={current} />}
                 <span className="truncate">{current ? identityLabel(current) : "No identity"}</span>
                 {repoOverride && (
