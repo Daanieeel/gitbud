@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRepoStore } from "@/store/useRepoStore";
 import { FileList } from "./FileList";
 import { ConflictResolutionPanel } from "./ConflictResolutionPanel";
@@ -31,6 +31,29 @@ export function ChangesTab() {
     const needle = filter.toLowerCase();
     return files.filter((f) => f.path.toLowerCase().includes(needle));
   }, [files, filter]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+      if (filtered.length === 0) return;
+
+      e.preventDefault();
+      const index = filtered.findIndex((f) => f.path === selectedFilePath);
+      const nextIndex =
+        index === -1
+          ? 0
+          : e.key === "ArrowDown"
+            ? Math.min(index + 1, filtered.length - 1)
+            : Math.max(index - 1, 0);
+      void selectFile(filtered[nextIndex].path);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [filtered, selectedFilePath, selectFile]);
 
   if (files === null) {
     return (
