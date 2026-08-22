@@ -18,7 +18,7 @@ export function TabBar() {
   const setActiveTab = useRepoStore((s) => s.setActiveTab);
 
   return (
-    <div className="flex h-9 shrink-0 items-center gap-1 border-b border-border px-2">
+    <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 pt-2 pb-1.5">
       {TABS.map((tab) => (
         <button
           key={tab.key}

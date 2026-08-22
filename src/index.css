@@ -132,6 +132,13 @@
   [role="button"]:not([aria-disabled="true"]) {
     cursor: pointer;
   }
+  button,
+  [role="button"],
+  [role="tab"],
+  .cursor-pointer {
+    -webkit-user-select: none;
+    user-select: none;
+  }
 }
 
 /* Subtle dot-grid texture for large empty-state areas, so they read as intentional

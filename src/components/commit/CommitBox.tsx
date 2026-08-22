@@ -1,13 +1,11 @@
-import { useEffect, useState } from "react";
-import { GitCommitIcon, HistoryIcon, TriangleAlertIcon } from "lucide-react";
+import { useEffect } from "react";
+import { GitCommitIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useRepoStore } from "@/store/useRepoStore";
 import { isProtectedBranch } from "@/lib/utils";
-import { getRecentCommitMessages } from "@/lib/commit-history";
 
 export function CommitBox() {
   const branch = useRepoStore((s) => s.branch);
@@ -21,8 +19,6 @@ export function CommitBox() {
   const setAmending = useRepoStore((s) => s.setAmending);
   const doCommit = useRepoStore((s) => s.doCommit);
   const doAmendCommit = useRepoStore((s) => s.doAmendCommit);
-  const [recentOpen, setRecentOpen] = useState(false);
-  const recentMessages = recentOpen ? getRecentCommitMessages() : [];
 
   const stagedFiles = status?.files.filter((f) => f.staged) ?? [];
   const hasStagedChanges = stagedFiles.length > 0;
@@ -83,49 +79,14 @@ export function CommitBox() {
         />
         Amend last commit
       </label>
-      <div className="flex items-center gap-1">
-        <Input
-          placeholder="Summary (required)"
-          value={summary}
-          onChange={(e) => setSummary(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
-          }}
-        />
-        <Popover open={recentOpen} onOpenChange={setRecentOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              title="Recently used commit messages"
-              className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <HistoryIcon className="size-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-72 p-1" align="end">
-            {recentMessages.length === 0 ? (
-              <div className="p-3 text-center text-sm text-muted-foreground">
-                No recent messages yet
-              </div>
-            ) : (
-              recentMessages.map((msg, i) => (
-                <div
-                  key={i}
-                  className="cursor-pointer truncate rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-                  onClick={() => {
-                    setSummary(msg);
-                    setRecentOpen(false);
-                  }}
-                >
-                  {msg}
-                </div>
-              ))
-            )}
-          </PopoverContent>
-        </Popover>
-      </div>
+      <Input
+        placeholder="Summary (required)"
+        value={summary}
+        onChange={(e) => setSummary(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
+        }}
+      />
       <Textarea
         placeholder="Description"
         value={description}

@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "@/lib/tauri";
-import { pushRecentCommitMessage } from "@/lib/commit-history";
 import { notify } from "@/lib/notify";
 import { useNetworkStore } from "./useNetworkStore";
 import type {
@@ -291,7 +290,6 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     const stagedCount = get().status?.files.filter((f) => f.staged).length ?? 0;
     const branch = get().branch ?? "current branch";
     await api.commit(repoPath, summary, description);
-    pushRecentCommitMessage(summary);
     set({
       selectedFilePath: null,
       selectedFileDiff: null,
@@ -309,7 +307,6 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     if (!repoPath) return;
     const branch = get().branch ?? "current branch";
     await api.amendCommit(repoPath, summary, description);
-    pushRecentCommitMessage(summary);
     set({
       selectedFilePath: null,
       selectedFileDiff: null,
