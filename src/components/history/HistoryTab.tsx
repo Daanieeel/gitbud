@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRepoStore } from "@/store/useRepoStore";
 import { CommitList } from "./CommitList";
 import { CreateBranchAtDialog } from "./CreateBranchAtDialog";
+import { InteractiveRebaseDialog } from "./InteractiveRebaseDialog";
 import { DiffView } from "@/components/diff/DiffView";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -20,6 +21,7 @@ export function HistoryTab() {
   const loadMoreHistory = useRepoStore((s) => s.loadMoreHistory);
 
   const [branchAtOid, setBranchAtOid] = useState<string | null>(null);
+  const [rebaseBaseOid, setRebaseBaseOid] = useState<string | null>(null);
 
   if (commits.length === 0) {
     return (
@@ -38,6 +40,7 @@ export function HistoryTab() {
           onSelect={(oid) => void selectCommit(oid)}
           onNeedMore={() => void loadMoreHistory()}
           onCreateBranchHere={setBranchAtOid}
+          onRebaseFromHere={setRebaseBaseOid}
         />
       </div>
       <div className="w-56 shrink-0 border-r border-border overflow-auto">
@@ -71,6 +74,10 @@ export function HistoryTab() {
         />
       </div>
       <CreateBranchAtDialog oid={branchAtOid} onOpenChange={(open) => !open && setBranchAtOid(null)} />
+      <InteractiveRebaseDialog
+        baseOid={rebaseBaseOid}
+        onOpenChange={(open) => !open && setRebaseBaseOid(null)}
+      />
     </div>
   );
 }

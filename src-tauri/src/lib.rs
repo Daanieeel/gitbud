@@ -6,6 +6,7 @@ mod github;
 mod history;
 mod hunk;
 mod image_diff;
+mod rebase;
 mod repo;
 mod settings;
 mod stash;
@@ -194,6 +195,15 @@ fn delete_tag(repo_path: String, name: String) -> Result<(), String> {
 #[tauri::command]
 fn push_tag(app: AppHandle, repo_path: String, name: String) -> Result<(), String> {
     git_shell::push_ref(&app, &repo_path, &name, &repo_path)
+}
+
+#[tauri::command]
+fn interactive_rebase(
+    repo_path: String,
+    base_oid: String,
+    todo: Vec<rebase::RebaseTodoItem>,
+) -> Result<rebase::RebaseResult, String> {
+    rebase::interactive_rebase(&repo_path, &base_oid, &todo)
 }
 
 // --- submodules ---
@@ -626,6 +636,7 @@ pub fn run() {
             delete_tag,
             push_tag,
             blame_file,
+            interactive_rebase,
             list_submodules,
             update_submodule,
             update_all_submodules,

@@ -86,6 +86,17 @@ export interface BlameLine {
   timestamp: number;
 }
 
+export interface RebaseTodoItem {
+  oid: string;
+  action: "pick" | "squash" | "drop";
+}
+
+export interface RebaseResult {
+  success: boolean;
+  conflicted_oid: string | null;
+  conflicted_summary: string | null;
+}
+
 export interface SubmoduleInfo {
   name: string;
   path: string;

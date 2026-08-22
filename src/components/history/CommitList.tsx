@@ -28,6 +28,7 @@ interface CommitListProps {
   onSelect: (oid: string) => void;
   onNeedMore: () => void;
   onCreateBranchHere: (oid: string) => void;
+  onRebaseFromHere: (oid: string) => void;
 }
 
 function VerificationBadge({ repoPath, login, sha }: { repoPath: string; login: string; sha: string }) {
@@ -52,7 +53,14 @@ function VerificationBadge({ repoPath, login, sha }: { repoPath: string; login: 
   );
 }
 
-export function CommitList({ commits, selectedOid, onSelect, onNeedMore, onCreateBranchHere }: CommitListProps) {
+export function CommitList({
+  commits,
+  selectedOid,
+  onSelect,
+  onNeedMore,
+  onCreateBranchHere,
+  onRebaseFromHere,
+}: CommitListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const cherryPick = useRepoStore((s) => s.cherryPick);
@@ -178,6 +186,9 @@ export function CommitList({ commits, selectedOid, onSelect, onNeedMore, onCreat
                 <ContextMenuItem onSelect={() => void revertCommit(commit.oid)}>Revert</ContextMenuItem>
                 <ContextMenuItem onSelect={() => onCreateBranchHere(commit.oid)}>
                   Create Branch Here
+                </ContextMenuItem>
+                <ContextMenuItem onSelect={() => onRebaseFromHere(commit.oid)}>
+                  Interactive Rebase from Here
                 </ContextMenuItem>
               </ContextMenuContent>
             </ContextMenu>

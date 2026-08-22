@@ -16,6 +16,8 @@ import type {
   PollResult,
   PullRequest,
   PullRequestFile,
+  RebaseResult,
+  RebaseTodoItem,
   RepoEntry,
   RepoStatus,
   ReviewComment,
@@ -98,6 +100,9 @@ export const api = {
 
   blameFile: (repoPath: string, path: string) =>
     invoke<BlameLine[]>("blame_file", { repoPath, path }),
+
+  interactiveRebase: (repoPath: string, baseOid: string, todo: RebaseTodoItem[]) =>
+    invoke<RebaseResult>("interactive_rebase", { repoPath, baseOid, todo }),
 
   listSubmodules: (repoPath: string) => invoke<SubmoduleInfo[]>("list_submodules", { repoPath }),
   updateSubmodule: (repoPath: string, submodulePath: string) =>

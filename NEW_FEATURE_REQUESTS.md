@@ -48,7 +48,7 @@ Mark as done when the feature is implemented.
 - [x] **Diff view toggles** — split (side-by-side, structural pairing not full LCS alignment) vs. unified, quick toggle button in `DiffView.tsx` plus the Settings dropdown; ignore-whitespace already in Settings → Diff. Word-wrap not implemented (diffs stay horizontally scrollable, matching most git tools' default).
 - [x] **File search/filter** in `ChangesTab.tsx`/`FileList.tsx` — already existed since the initial build (filter input above the file list).
 - [ ] **Interactive rebase** — reorder/squash/edit/drop commits via a drag-orderable list before running `git rebase -i`.
-- [ ] **Custom sidebar sections** (Favorites, Work, Personal, etc.) to organize repositories instead of one flat list.
+- [x] **Custom sidebar sections** — `RepoEntry.section` (per-repo override of the auto-derived owner group), set via "Move to Section…" in the repo context menu (a `window.prompt()`, not a full drag-and-drop UI); only takes effect when sidebar sort is "group".
 - [x] **Commit message history** — `lib/commit-history.ts` (localStorage, per-machine not per-repo), history icon next to the summary field in `CommitBox.tsx`. Loading a repo's `.gitmessage` template is not implemented.
 - [x] **Drag-and-drop** a folder to add it as a repo (`RepoSidebar.tsx`, via Tauri's window-level `onDragDropEvent` — the drop target is the whole window, not hit-tested to the sidebar's DOM bounds specifically, but the sidebar highlights during drag as the visual target).
 - [x] **Submodule support** — `submodules.rs` (list via git2) + `SubmodulesPanel.tsx` (toolbar, only shown when the repo has any); init/update per-submodule or all at once, shelled out to system `git submodule update --init` (same auth reasoning as fetch/pull/push).
