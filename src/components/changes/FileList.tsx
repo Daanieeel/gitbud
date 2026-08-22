@@ -89,6 +89,13 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
     overscan: 12,
   });
 
+  useEffect(() => {
+    if (!selectedPath) return;
+    const index = files.findIndex((f) => f.path === selectedPath);
+    if (index === -1) return;
+    virtualizer.scrollToIndex(index, { align: "auto" });
+  }, [selectedPath, files, virtualizer]);
+
   return (
     <div ref={parentRef} className="h-full overflow-auto">
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
