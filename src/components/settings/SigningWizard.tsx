@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { copyToClipboard } from "@/lib/clipboard";
+import { cn } from "@/lib/utils";
 import type { SigningStatus } from "@/lib/types";
 
 interface SigningWizardProps {
@@ -26,8 +27,21 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
   const [selectedGpgKey, setSelectedGpgKey] = useState("");
   const [sshKeyPath, setSshKeyPath] = useState("");
   const [pubkey, setPubkey] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [busyKey, setBusyKey] = useState<string | null>(null);
+  const busy = busyKey !== null;
   const [error, setError] = useState<string | null>(null);
+
+  const runBusy = async (key: string, fn: () => Promise<void>) => {
+    const startedAt = Date.now();
+    setBusyKey(key);
+    try {
+      await fn();
+    } finally {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
+      setBusyKey(null);
+    }
+  };
 
   useEffect(() => {
     if (!repoPath) return;
@@ -40,72 +54,64 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
 
   if (!repoPath) return null;
 
-  const generateSsh = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const defaultDir = await homeDir();
-      const path = sshKeyPath.trim() || `${defaultDir}/.ssh/gitbud_signing_ed25519`;
-      const pub = await api.generateSshSigningKey(path, email);
-      setSshKeyPath(path);
-      setPubkey(pub.trim());
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const generateSsh = () =>
+    runBusy("generateSsh", async () => {
+      setError(null);
+      try {
+        const defaultDir = await homeDir();
+        const path = sshKeyPath.trim() || `${defaultDir}/.ssh/gitbud_signing_ed25519`;
+        const pub = await api.generateSshSigningKey(path, email);
+        setSshKeyPath(path);
+        setPubkey(pub.trim());
+      } catch (e) {
+        setError(String(e));
+      }
+    });
 
   const pickExistingSshKey = async () => {
     const file = await open({ title: "Choose an SSH public key (.pub)" });
     if (typeof file === "string") setSshKeyPath(file);
   };
 
-  const generateGpg = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const keyId = await api.generateGpgKey(name, email);
-      setSelectedGpgKey(keyId);
-      const keys = await api.listGpgKeys();
-      setGpgKeys(keys);
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const enable = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const signingKey = format === "ssh" ? sshKeyPath.trim() : selectedGpgKey;
-      if (!signingKey) {
-        setError(format === "ssh" ? "Generate or choose a key first" : "Choose a GPG key first");
-        return;
+  const generateGpg = () =>
+    runBusy("generateGpg", async () => {
+      setError(null);
+      try {
+        const keyId = await api.generateGpgKey(name, email);
+        setSelectedGpgKey(keyId);
+        const keys = await api.listGpgKeys();
+        setGpgKeys(keys);
+      } catch (e) {
+        setError(String(e));
       }
-      await api.configureSigning(repoPath, format, signingKey, global);
-      setStatus(await api.getSigningStatus(repoPath));
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
-  const disable = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      await api.disableSigning(repoPath, global);
-      setStatus(await api.getSigningStatus(repoPath));
-    } catch (e) {
-      setError(String(e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const enable = () =>
+    runBusy("enable", async () => {
+      setError(null);
+      try {
+        const signingKey = format === "ssh" ? sshKeyPath.trim() : selectedGpgKey;
+        if (!signingKey) {
+          setError(format === "ssh" ? "Generate or choose a key first" : "Choose a GPG key first");
+          return;
+        }
+        await api.configureSigning(repoPath, format, signingKey, global);
+        setStatus(await api.getSigningStatus(repoPath));
+      } catch (e) {
+        setError(String(e));
+      }
+    });
+
+  const disable = () =>
+    runBusy("disable", async () => {
+      setError(null);
+      try {
+        await api.disableSigning(repoPath, global);
+        setStatus(await api.getSigningStatus(repoPath));
+      } catch (e) {
+        setError(String(e));
+      }
+    });
 
   return (
     <div className="flex flex-col gap-2 rounded-md border border-border p-2">
@@ -156,8 +162,8 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
                   Use Existing
                 </Button>
                 <Button size="sm" variant="secondary" disabled={busy} onClick={() => void generateSsh()}>
-                  <PlusIcon className="size-3.5" />
-                  Generate New
+                  <PlusIcon className={cn("size-3.5", busyKey === "generateSsh" && "animate-spin")} />
+                  {busyKey === "generateSsh" ? "Generating…" : "Generate New"}
                 </Button>
               </div>
               {pubkey && (
@@ -198,8 +204,8 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
                   ))}
                 </select>
                 <Button size="sm" variant="secondary" disabled={busy} onClick={() => void generateGpg()}>
-                  <PlusIcon className="size-3.5" />
-                  Generate New
+                  <PlusIcon className={cn("size-3.5", busyKey === "generateGpg" && "animate-spin")} />
+                  {busyKey === "generateGpg" ? "Generating…" : "Generate New"}
                 </Button>
               </div>
             </div>
@@ -207,7 +213,7 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
 
           <div className="flex justify-end">
             <Button size="sm" disabled={busy} onClick={() => void enable()}>
-              Enable Signing
+              {busyKey === "enable" ? "Enabling…" : "Enable Signing"}
             </Button>
           </div>
         </>
@@ -215,7 +221,7 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
       {status?.enabled && (
         <div className="flex justify-end">
           <Button size="sm" variant="secondary" disabled={busy} onClick={() => void disable()}>
-            Disable Signing
+            {busyKey === "disable" ? "Disabling…" : "Disable Signing"}
           </Button>
         </div>
       )}
