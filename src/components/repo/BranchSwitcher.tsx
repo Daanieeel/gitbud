@@ -107,7 +107,7 @@ export function BranchSwitcher() {
             className="h-7"
           />
         </div>
-        <div className="max-h-64 overflow-auto p-1">
+        <div className="flex max-h-64 flex-col gap-1 overflow-auto p-1">
           {local.map((b) =>
             renaming === b.name ? (
               <Input
