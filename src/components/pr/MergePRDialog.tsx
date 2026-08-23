@@ -1,12 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  CheckCircle2Icon,
-  CircleDashedIcon,
-  ExternalLinkIcon,
-  GitMergeIcon,
-  TriangleAlertIcon,
-  XCircleIcon,
-} from "lucide-react";
+import { ExternalLinkIcon, GitMergeIcon, TriangleAlertIcon } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { usePRStore } from "@/store/usePRStore";
+import { runIcon, runStatusLabel } from "./CIBadge";
 import { api } from "@/lib/tauri";
 import { takePrefetchedMergeSettings } from "@/lib/mergeSettingsPrefetch";
 import { cn } from "@/lib/utils";
@@ -60,37 +54,6 @@ const METHODS: {
     allowed: "allow_rebase_merge",
   },
 ];
-
-function runIcon(run: CheckRun) {
-  if (run.status !== "completed") return <CircleDashedIcon className="size-3.5 shrink-0 text-accent-yellow" />;
-  if (run.conclusion && ["success", "neutral", "skipped"].includes(run.conclusion)) {
-    return <CheckCircle2Icon className="size-3.5 shrink-0 text-accent-green" />;
-  }
-  return <XCircleIcon className="size-3.5 shrink-0 text-accent-pink" />;
-}
-
-// GitHub's raw check-run status/conclusion enum values, mapped to human-readable labels.
-const RUN_STATUS_LABEL: Record<string, string> = {
-  queued: "Queued",
-  in_progress: "In progress",
-  waiting: "Waiting",
-  requested: "Requested",
-  pending: "Pending",
-  success: "Success",
-  failure: "Failed",
-  cancelled: "Cancelled",
-  skipped: "Skipped",
-  timed_out: "Timed out",
-  action_required: "Action required",
-  neutral: "Neutral",
-  stale: "Stale",
-  startup_failure: "Startup failure",
-};
-
-function runStatusLabel(run: CheckRun): string {
-  const raw = run.status === "completed" ? (run.conclusion ?? run.status) : run.status;
-  return RUN_STATUS_LABEL[raw] ?? raw.replace(/_/g, " ");
-}
 
 export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: MergePRDialogProps) {
   const mergePR = usePRStore((s) => s.mergePR);

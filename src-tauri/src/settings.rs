@@ -71,6 +71,9 @@ pub struct Settings {
     // Notifications
     pub desktop_notifications: bool,
 
+    // Pull requests
+    pub open_pr_on_provider_after_creation: bool,
+
     // Editor
     /// Id of the chosen "Open in <editor>" target (see `system::EDITORS`), or `"custom"` for
     /// `custom_editor_command`. `None` means no favorite editor has been chosen yet.
@@ -101,6 +104,7 @@ impl Default for Settings {
             desktop_notifications: true,
             favorite_editor: None,
             custom_editor_command: None,
+            open_pr_on_provider_after_creation: true,
         }
     }
 }

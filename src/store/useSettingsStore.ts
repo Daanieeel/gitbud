@@ -21,6 +21,7 @@ const DEFAULT_SETTINGS: Settings = {
   desktop_notifications: true,
   favorite_editor: null,
   custom_editor_command: null,
+  open_pr_on_provider_after_creation: true,
 };
 
 function applyTheme(theme: Settings["theme"]) {

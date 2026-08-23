@@ -214,6 +214,7 @@ export interface Settings {
   desktop_notifications: boolean;
   favorite_editor: string | null;
   custom_editor_command: string | null;
+  open_pr_on_provider_after_creation: boolean;
 }
 
 // --- GitHub ---

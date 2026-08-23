@@ -221,6 +221,14 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     </Button>
                   </EditorPicker>
                 </Row>
+                <Row label="Open PR on provider after creation">
+                  <Checkbox
+                    checked={settings.open_pr_on_provider_after_creation}
+                    onCheckedChange={(checked) =>
+                      void update({ open_pr_on_provider_after_creation: checked === true })
+                    }
+                  />
+                </Row>
               </>
             )}
 

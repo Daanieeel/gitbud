@@ -40,9 +40,11 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [X] Delete branch on remote feature
 - [ ] Pop-out merge conflict resolution editor
 - [ ] Settings redesign
-- [ ] Open File in Editor
+- [X] Open File in Editor
 - [ ] Better PR viewer (comments, files, commits) like on GitHub
 - [ ] Move to TanStack Query
+- [ ] Live-syncing with git provider (PRs, commits etc)
+- [ ] Improve git blame view
 - [ ] ...and more to come
 
 ## Features
