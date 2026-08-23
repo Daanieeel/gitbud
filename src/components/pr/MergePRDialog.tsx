@@ -160,6 +160,12 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     };
   }, [open, repoPath, login, pr.base_ref]);
 
+  // Vacuously true for no checks at all (nothing to block on) and false while still loading —
+  // we don't want to flash the confident "default" color before we actually know.
+  const allChecksPassing =
+    runs !== null &&
+    runs.every((r) => r.status === "completed" && r.conclusion && ["success", "neutral", "skipped"].includes(r.conclusion));
+
   const submit = async () => {
     setMerging(true);
     try {
@@ -295,10 +301,22 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
           >
             Delete branch after merge
           </CheckboxGroup>
-          <Button disabled={merging || !commitTitle.trim()} onClick={() => void submit()}>
-            <GitMergeIcon className="size-3.5" />
-            {merging ? "Merging…" : METHODS.find((m) => m.key === method)?.label}
-          </Button>
+          {allChecksPassing ? (
+            <Button disabled={merging || !commitTitle.trim()} onClick={() => void submit()}>
+              <GitMergeIcon className="size-3.5" />
+              {merging ? "Merging…" : METHODS.find((m) => m.key === method)?.label}
+            </Button>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="secondary" disabled={merging || !commitTitle.trim()} onClick={() => void submit()}>
+                  <GitMergeIcon className="size-3.5" />
+                  {merging ? "Merging…" : METHODS.find((m) => m.key === method)?.label}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Not all checks have passed yet</TooltipContent>
+            </Tooltip>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
