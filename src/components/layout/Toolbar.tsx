@@ -1,9 +1,12 @@
 import { useState, useEffect } from "react";
 import { GitPullRequestCreateArrow, GitPullRequestArrowIcon } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
+import { githubRepoUrl } from "@/lib/github-links";
+import { GitHubMark } from "@/components/github/GitHubMark";
 import { BranchSwitcher } from "@/components/repo/BranchSwitcher";
 import { BranchPruner } from "@/components/repo/BranchPruner";
 import { TagsPanel } from "@/components/repo/TagsPanel";
@@ -25,6 +28,19 @@ export function Toolbar() {
   const selectPR = usePRStore((s) => s.selectPR);
   const [previewPrOpen, setPreviewPrOpen] = useState(false);
   const [existingPrNumber, setExistingPrNumber] = useState<number | null>(null);
+  const [repoUrl, setRepoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    setRepoUrl(null);
+    if (!repoPath) return;
+    let cancelled = false;
+    void githubRepoUrl(repoPath).then((url) => {
+      if (!cancelled) setRepoUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath]);
 
   useEffect(() => {
     const handleOpenCreatePr = () => setPreviewPrOpen(true);
@@ -55,6 +71,16 @@ export function Toolbar() {
       <WorktreesPanel />
       <ReflogPanel />
       <LfsPanel />
+      {repoUrl && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="icon" onClick={() => void openUrl(repoUrl)}>
+              <GitHubMark className="size-3.5" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>View repo on GitHub</TooltipContent>
+        </Tooltip>
+      )}
       <div className="flex-1" />
       <OfflineIndicator />
       {currentLogin && existingPrNumber != null && (
