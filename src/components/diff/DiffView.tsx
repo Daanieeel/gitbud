@@ -297,73 +297,82 @@ function UnifiedLine({
         <span
           dangerouslySetInnerHTML={{ __html: renderLineHtml(line, language) }}
         />
-        {onCopyPermalink && line.new_lineno != null && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
-                onClick={() => onCopyPermalink(line.new_lineno as number)}
-              >
-                <LinkIcon className="size-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Copy GitHub permalink to this line</TooltipContent>
-          </Tooltip>
-        )}
-        {canComment && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                className="ml-2 shrink-0 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
-                onClick={() => setComposerKey(composerKey === key ? null : key)}
-              >
-                <MessageSquarePlusIcon className="size-3.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent>Add comment</TooltipContent>
-          </Tooltip>
-        )}
-        {line.kind !== "context" && hunkActions && (
-          <div className="ml-auto flex shrink-0 items-center gap-1.5 pl-2 opacity-0 group-hover:opacity-100">
-            {hunkActions.staged
-              ? hunkActions.onUnstageLines && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        className="text-muted-foreground hover:text-foreground"
-                        onClick={() => hunkActions.onUnstageLines?.(hunkIdx, [lineIdx])}
-                      >
-                        <MinusIcon className="size-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>Unstage this line</TooltipContent>
-                  </Tooltip>
-                )
-              : hunkActions.onStageLines && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        className="text-muted-foreground hover:text-foreground"
-                        onClick={() => hunkActions.onStageLines?.(hunkIdx, [lineIdx])}
-                      >
-                        <PlusIcon className="size-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>Stage this line</TooltipContent>
-                  </Tooltip>
-                )}
-            {!hunkActions.staged && hunkActions.onDiscardLines && (
+        {(onCopyPermalink || canComment || (line.kind !== "context" && hunkActions)) && (
+          // One sticky group for every trailing action, pinned to the right edge of the
+          // scrollport — a whitespace-pre line can be far wider than the viewport, so without
+          // this these buttons would sit off past the true end of the line, invisible unless
+          // scrolled all the way over. A solid background keeps scrolling code text from
+          // showing through underneath it.
+          <div className="sticky right-3 z-[7] ml-auto flex shrink-0 items-center gap-1.5 rounded bg-card px-1.5 py-0.5 opacity-0 shadow-sm group-hover:opacity-100">
+            {onCopyPermalink && line.new_lineno != null && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={() => hunkActions.onDiscardLines?.(hunkIdx, [lineIdx])}
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => onCopyPermalink(line.new_lineno as number)}
                   >
-                    <Trash2Icon className="size-3.5" />
+                    <LinkIcon className="size-3.5" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent>Discard this line</TooltipContent>
+                <TooltipContent>Copy GitHub permalink to this line</TooltipContent>
               </Tooltip>
+            )}
+            {canComment && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => setComposerKey(composerKey === key ? null : key)}
+                  >
+                    <MessageSquarePlusIcon className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Add comment</TooltipContent>
+              </Tooltip>
+            )}
+            {line.kind !== "context" && hunkActions && (
+              <>
+                {hunkActions.staged
+                  ? hunkActions.onUnstageLines && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={() => hunkActions.onUnstageLines?.(hunkIdx, [lineIdx])}
+                          >
+                            <MinusIcon className="size-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Unstage this line</TooltipContent>
+                      </Tooltip>
+                    )
+                  : hunkActions.onStageLines && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className="text-muted-foreground hover:text-foreground"
+                            onClick={() => hunkActions.onStageLines?.(hunkIdx, [lineIdx])}
+                          >
+                            <PlusIcon className="size-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>Stage this line</TooltipContent>
+                      </Tooltip>
+                    )}
+                {!hunkActions.staged && hunkActions.onDiscardLines && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => hunkActions.onDiscardLines?.(hunkIdx, [lineIdx])}
+                      >
+                        <Trash2Icon className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Discard this line</TooltipContent>
+                  </Tooltip>
+                )}
+              </>
             )}
           </div>
         )}

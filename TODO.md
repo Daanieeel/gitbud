@@ -25,3 +25,10 @@ Complete in chronological order.
 - [x] Fixup commit + autosquash: quick "commit --fixup" action from commit context menu, plus rebase -i --autosquash support
 - [x] add line by line staging support (keep chunk staging as well though)
 - [x] add tooltips to the icons next to the changed files in the file explorer to explain what they mean (created, updated, deleted, moved etc)
+
+
+ad
+as
+dsa
+as
+d
