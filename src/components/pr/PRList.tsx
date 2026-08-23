@@ -1,6 +1,14 @@
 import { useMemo, useState, useEffect, useRef } from "react";
-import { BellIcon, BellRingIcon, GitPullRequestIcon, GitPullRequestDraftIcon } from "lucide-react";
+import {
+  BellIcon,
+  BellRingIcon,
+  GitPullRequestIcon,
+  GitPullRequestDraftIcon,
+  GitPullRequestClosedIcon,
+  GitPullRequestArrowIcon,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { PullRequest } from "@/lib/types";
 import { usePRStore } from "@/store/usePRStore";
@@ -80,7 +88,14 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
           <div className="p-4 text-center text-sm text-muted-foreground">No pull requests found</div>
         ) : (
           filtered.map((pr) => {
-            const Icon = pr.draft ? GitPullRequestDraftIcon : GitPullRequestIcon;
+            const closed = pr.state === "closed" && !pr.merged;
+            const Icon = pr.merged
+              ? GitPullRequestIcon
+              : pr.draft
+                ? GitPullRequestDraftIcon
+                : closed
+                  ? GitPullRequestClosedIcon
+                  : GitPullRequestArrowIcon;
             return (
               <div
                 key={pr.number}
@@ -93,12 +108,19 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
                 <Icon
                   className={cn(
                     "mt-0.5 size-3.5 shrink-0",
-                    pr.draft ? "text-muted-foreground" : "text-accent-green",
+                    pr.merged
+                      ? "text-accent-purple"
+                      : pr.draft
+                        ? "text-muted-foreground"
+                        : closed
+                          ? "text-destructive"
+                          : "text-accent-green",
                   )}
                 />
                 <div className="min-w-0 flex-1">
                   <div className="truncate">{pr.title}</div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Avatar src={pr.author_avatar_url} alt={pr.author_login} className="size-3.5" />
                     <span>
                       #{pr.number} by {pr.author_login}
                     </span>

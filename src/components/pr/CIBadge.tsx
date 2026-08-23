@@ -26,6 +26,37 @@ export function overallFrom(runs: CheckRun[]): Overall {
   return "passing";
 }
 
+export function runIcon(run: CheckRun) {
+  if (run.status !== "completed") return <CircleDashedIcon className="size-3.5 shrink-0 text-accent-yellow" />;
+  if (run.conclusion && ["success", "neutral", "skipped"].includes(run.conclusion)) {
+    return <CheckCircle2Icon className="size-3.5 shrink-0 text-accent-green" />;
+  }
+  return <XCircleIcon className="size-3.5 shrink-0 text-accent-pink" />;
+}
+
+// GitHub's raw check-run status/conclusion enum values, mapped to human-readable labels.
+const RUN_STATUS_LABEL: Record<string, string> = {
+  queued: "Queued",
+  in_progress: "In progress",
+  waiting: "Waiting",
+  requested: "Requested",
+  pending: "Pending",
+  success: "Success",
+  failure: "Failed",
+  cancelled: "Cancelled",
+  skipped: "Skipped",
+  timed_out: "Timed out",
+  action_required: "Action required",
+  neutral: "Neutral",
+  stale: "Stale",
+  startup_failure: "Startup failure",
+};
+
+export function runStatusLabel(run: CheckRun): string {
+  const raw = run.status === "completed" ? (run.conclusion ?? run.status) : run.status;
+  return RUN_STATUS_LABEL[raw] ?? raw.replace(/_/g, " ");
+}
+
 export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
   const [runs, setRuns] = useState<CheckRun[] | null>(null);
   const [open, setOpen] = useState(false);
@@ -65,12 +96,11 @@ export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
               href={run.html_url}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+              className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
             >
-              <span className="truncate">{run.name}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {run.status === "completed" ? run.conclusion : run.status}
-              </span>
+              {runIcon(run)}
+              <span className="min-w-0 flex-1 truncate">{run.name}</span>
+              <span className="shrink-0 text-xs text-muted-foreground">{runStatusLabel(run)}</span>
             </a>
           ))}
         </PopoverContent>

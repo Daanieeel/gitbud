@@ -34,6 +34,10 @@ export interface DiffLine {
   content: string;
   old_lineno: number | null;
   new_lineno: number | null;
+  /** [start, end) character ranges into `content` that changed at the character level vs. this
+   * line's paired counterpart on the other side of the edit. Empty for context lines and for
+   * add/delete lines with no counterpart to compare against. */
+  highlight_ranges: [number, number][];
 }
 
 export interface DiffHunk {
@@ -208,6 +212,9 @@ export interface Settings {
   fs_watch_enabled: boolean;
   default_identity_id: string | null;
   desktop_notifications: boolean;
+  favorite_editor: string | null;
+  custom_editor_command: string | null;
+  open_pr_on_provider_after_creation: boolean;
 }
 
 // --- GitHub ---
@@ -250,6 +257,7 @@ export interface PullRequest {
   draft: boolean;
   html_url: string;
   author_login: string;
+  author_avatar_url: string;
   head_ref: string;
   head_sha: string;
   base_ref: string;
@@ -266,6 +274,7 @@ export interface ReviewComment {
   side: "LEFT" | "RIGHT" | null;
   body: string;
   user_login: string;
+  user_avatar_url: string;
   created_at: string;
   in_reply_to_id: number | null;
 }
@@ -294,6 +303,13 @@ export interface PullRequestFile {
   filename: string;
   status: string;
   diff: FileDiff;
+}
+
+export interface RepoMergeSettings {
+  allow_merge_commit: boolean;
+  allow_squash_merge: boolean;
+  allow_rebase_merge: boolean;
+  delete_branch_on_merge: boolean;
 }
 
 export interface CheckRun {

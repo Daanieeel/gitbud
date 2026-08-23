@@ -16,6 +16,7 @@ function Toaster(props: ToasterProps) {
           "--normal-border": "var(--border)",
         } as React.CSSProperties
       }
+      toastOptions={{ classNames: { title: "whitespace-pre-line" } }}
       {...props}
     />
   );

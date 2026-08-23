@@ -24,10 +24,12 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Avatar } from "@/components/ui/avatar";
 import { CIBadge } from "@/components/pr/CIBadge";
 import { CommitGraph } from "./CommitGraph";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
+import { useAuthorAvatar } from "@/hooks/useAuthorAvatar";
 
 const ROW_HEIGHT = 52;
 
@@ -64,6 +66,28 @@ function VerificationBadge({ repoPath, login, sha }: { repoPath: string; login: 
       </TooltipTrigger>
       <TooltipContent>Verified signature</TooltipContent>
     </Tooltip>
+  );
+}
+
+function CommitAuthorAvatar({
+  repoPath,
+  login,
+  email,
+  initial,
+}: {
+  repoPath: string | null;
+  login: string | null;
+  email: string;
+  initial: string;
+}) {
+  const avatarUrl = useAuthorAvatar(repoPath, login, email);
+  if (avatarUrl) {
+    return <Avatar src={avatarUrl} alt={initial} className="size-6" />;
+  }
+  return (
+    <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-medium">
+      {initial}
+    </div>
   );
 }
 
@@ -149,9 +173,12 @@ export function CommitList({
                     laneCount={laneCount}
                     rowHeight={row.size}
                   />
-                  <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-[10px] font-medium">
-                    {initial}
-                  </div>
+                  <CommitAuthorAvatar
+                    repoPath={repoPath}
+                    login={currentLogin}
+                    email={commit.author_email}
+                    initial={initial}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1 truncate text-sm">
                       {(tagsByOid.get(commit.oid) ?? []).map((tag) => (

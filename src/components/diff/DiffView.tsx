@@ -6,9 +6,10 @@ import { ImageDiffView } from "./ImageDiffView";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Avatar } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSettingsStore } from "@/store/useSettingsStore";
-import { highlightLine, languageForPath } from "@/lib/highlight";
+import { applyHighlightRanges, highlightLine, languageForPath } from "@/lib/highlight";
 
 interface HunkActions {
   /** Whether the diff being shown is the staged (HEAD->index) or unstaged (index->workdir) side. */
@@ -34,6 +35,15 @@ interface DiffViewProps {
   secondaryHunkActions?: HunkActions;
 }
 
+/** Syntax-highlights a line, then overlays its intraline diff ranges (if any) on top so both
+ * render together. */
+function renderLineHtml(line: DiffLine, language: string | undefined): string {
+  const html = highlightLine(line.content, language);
+  if (line.highlight_ranges.length === 0) return html;
+  const className = line.kind === "addition" ? "diff-intraline-add" : "diff-intraline-del";
+  return applyHighlightRanges(html, line.highlight_ranges, className);
+}
+
 function commentsForLine(
   comments: ReviewComment[] | undefined,
   oldLineno: number | null,
@@ -51,12 +61,15 @@ function CommentThread({ comments }: { comments: ReviewComment[] }) {
   return (
     <div className="ml-16 flex flex-col gap-1 border-l-2 border-primary bg-card px-3 py-2">
       {comments.map((c) => (
-        <div key={c.id} className="text-xs">
-          <span className="font-medium">{c.user_login}</span>{" "}
-          <span className="text-muted-foreground">
-            {new Date(c.created_at).toLocaleDateString()}
-          </span>
-          <p className="whitespace-pre-wrap">{c.body}</p>
+        <div key={c.id} className="flex items-start gap-1.5 text-xs">
+          <Avatar src={c.user_avatar_url} alt={c.user_login} className="mt-0.5 size-4" />
+          <div>
+            <span className="font-medium">{c.user_login}</span>{" "}
+            <span className="text-muted-foreground">
+              {new Date(c.created_at).toLocaleDateString()}
+            </span>
+            <p className="whitespace-pre-wrap">{c.body}</p>
+          </div>
         </div>
       ))}
     </div>
@@ -267,7 +280,7 @@ function UnifiedLine({
           {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
         </span>
         <span
-          dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }}
+          dangerouslySetInnerHTML={{ __html: renderLineHtml(line, language) }}
         />
         {onCopyPermalink && line.new_lineno != null && (
           <Tooltip>
@@ -352,7 +365,7 @@ function SplitCell({ line, language }: { line: DiffLine | null; language: string
       >
         {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
       </span>
-      <span dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }} />
+      <span dangerouslySetInnerHTML={{ __html: renderLineHtml(line, language) }} />
     </div>
   );
 }

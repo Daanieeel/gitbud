@@ -22,6 +22,7 @@ import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { usePRStore } from "@/store/usePRStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { FileDiff, ImageDiff, Label, AssignableUser, Milestone, Project, CommitSearchResult } from "@/lib/types";
@@ -56,6 +57,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const branches = useRepoStore((s) => s.branches);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const createPR = usePRStore((s) => s.createPR);
+  const openPrAfterCreation = useSettingsStore((s) => s.settings.open_pr_on_provider_after_creation);
 
   const localBranches = useMemo(
     () => branches.filter((b) => !b.is_remote && b.name !== branch),
@@ -192,7 +194,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
         ),
       ]);
       onOpenChange(false);
-      void openUrl(pr.html_url);
+      if (openPrAfterCreation) void openUrl(pr.html_url);
       setTitle("");
       setBody("");
       setSelectedLabels([]);

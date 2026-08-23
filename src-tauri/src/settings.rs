@@ -70,6 +70,17 @@ pub struct Settings {
 
     // Notifications
     pub desktop_notifications: bool,
+
+    // Pull requests
+    pub open_pr_on_provider_after_creation: bool,
+
+    // Editor
+    /// Id of the chosen "Open in <editor>" target (see `system::EDITORS`), or `"custom"` for
+    /// `custom_editor_command`. `None` means no favorite editor has been chosen yet.
+    pub favorite_editor: Option<String>,
+    /// Shell command template used when `favorite_editor` is `"custom"` — `{path}` is replaced
+    /// with the file's absolute path.
+    pub custom_editor_command: Option<String>,
 }
 
 impl Default for Settings {
@@ -91,6 +102,9 @@ impl Default for Settings {
             fs_watch_enabled: true,
             default_identity_id: None,
             desktop_notifications: true,
+            favorite_editor: None,
+            custom_editor_command: None,
+            open_pr_on_provider_after_creation: true,
         }
     }
 }

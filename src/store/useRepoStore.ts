@@ -24,6 +24,14 @@ const LOG_PAGE_SIZE = 100;
  * path once it drops out of `status.files` (committed/discarded), so a later, genuinely new
  * change to that same path is auto-staged again. */
 const autoStagedPaths = new Map<string, Set<string>>();
+/** Guards against out-of-order `refreshStatus` calls: staging/unstaging triggers it both
+ * directly and via the `repo-changed` filesystem watcher, and those two calls can resolve out
+ * of order. Without this, a slower call that started first can land after a faster one that
+ * started later and overwrite fresh status with stale data — visible as the commit button
+ * flashing enabled/disabled right after a stage/unstage. */
+let statusRequestId = 0;
+/** Same out-of-order guard as `statusRequestId`, for `resetHistory`. */
+let historyRequestId = 0;
 /** Restores the last-open repo across app restarts, so launching GitBud doesn't always land
  * back on whatever repo happens to be first in the sidebar. */
 const LAST_REPO_KEY = "last-selected-repo";
@@ -76,19 +84,21 @@ interface RepoState {
 
   toggleStaged: (paths: string[], staged: boolean) => Promise<void>;
   discardFile: (path: string) => Promise<void>;
+  discardFiles: (paths: string[]) => Promise<void>;
   stageHunk: (path: string, hunkIndex: number) => Promise<void>;
   unstageHunk: (path: string, hunkIndex: number) => Promise<void>;
   discardHunk: (path: string, hunkIndex: number) => Promise<void>;
   selectFile: (path: string | null) => Promise<void>;
   doCommit: (summary: string, description: string) => Promise<void>;
   doAmendCommit: (summary: string, description: string) => Promise<void>;
+  undoLastCommit: () => Promise<void>;
   setCommitSummary: (value: string) => void;
   setCommitDescription: (value: string) => void;
   setAmending: (value: boolean) => void;
 
   checkoutBranch: (branch: string) => Promise<void>;
   createBranch: (name: string, checkout: boolean) => Promise<void>;
-  deleteBranch: (name: string) => Promise<void>;
+  deleteBranch: (name: string, opts?: { deleteRemote?: boolean }) => Promise<void>;
   renameBranch: (oldName: string, newName: string, alsoRenameRemote?: boolean) => Promise<void>;
   mergeBranch: (name: string) => Promise<CherryPickResult>;
   cherryPick: (oid: string) => Promise<CherryPickResult>;
@@ -102,6 +112,7 @@ interface RepoState {
   fetch: () => Promise<void>;
   pull: () => Promise<void>;
   push: () => Promise<void>;
+  syncBranch: () => Promise<void>;
   pullLfs: () => Promise<void>;
   pushLfs: () => Promise<void>;
 
@@ -214,6 +225,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   refreshStatus: async () => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
+    const requestId = ++statusRequestId;
     let status = await api.getStatus(repoPath);
 
     if (useSettingsStore.getState().settings.auto_stage_new_changes) {
@@ -236,6 +248,9 @@ export const useRepoStore = create<RepoState>((set, get) => ({
         status = await api.getStatus(repoPath);
       }
     }
+    // A newer refreshStatus call already landed while this one was in flight — applying this
+    // one now would overwrite fresh status with stale data.
+    if (requestId !== statusRequestId) return;
     set({ status });
 
     const selected = get().selectedFilePath;
@@ -285,6 +300,16 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     if (!repoPath) return;
     await api.discardFile(repoPath, path);
     if (get().selectedFilePath === path) {
+      set({ selectedFilePath: null, selectedStagedDiff: null, selectedUnstagedDiff: null, selectedFileImageDiff: null });
+    }
+    await get().refreshStatus();
+  },
+
+  discardFiles: async (paths) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    await Promise.all(paths.map((path) => api.discardFile(repoPath, path)));
+    if (get().selectedFilePath && paths.includes(get().selectedFilePath as string)) {
       set({ selectedFilePath: null, selectedStagedDiff: null, selectedUnstagedDiff: null, selectedFileImageDiff: null });
     }
     await get().refreshStatus();
@@ -393,6 +418,20 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     void notify(`Amended commit on ${branch}`, summary);
   },
 
+  undoLastCommit: async () => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    let summary: string, description: string;
+    try {
+      [summary, description] = await api.undoLastCommit(repoPath);
+    } catch (err) {
+      toast.error(String(err));
+      return;
+    }
+    set({ commitSummary: summary, commitDescription: description, amending: false });
+    await Promise.all([get().refreshStatus(), get().resetHistory()]);
+  },
+
   checkoutBranch: async (branch) => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
@@ -410,10 +449,27 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     }
   },
 
-  deleteBranch: async (name) => {
+  deleteBranch: async (name, opts) => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
+    // Deleting the checked-out branch: git refuses outright, so move off it first. The caller
+    // is expected to have already confirmed there's somewhere else to go (disabling delete
+    // entirely when this is the only local branch).
+    if (get().branch === name) {
+      const fallback =
+        get().branches.find((b) => !b.is_remote && b.name !== name && (b.name === "main" || b.name === "master")) ??
+        get().branches.find((b) => !b.is_remote && b.name !== name);
+      if (!fallback) return;
+      await get().checkoutBranch(fallback.name);
+    }
     await api.deleteBranch(repoPath, name);
+    if (opts?.deleteRemote) {
+      toast.success(`Deleted ${name} locally`);
+      await runSync(get, set, repoPath, () => api.deleteBranchRemote(repoPath, name), {
+        description: `Deleting ${name} on origin…`,
+        doneMessage: `Deleted ${name} on origin`,
+      });
+    }
     await get().refreshBranches();
   },
 
@@ -469,8 +525,16 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   },
 
   resetHistory: async () => {
-    set({ commits: [], historyExhausted: false });
-    await get().loadMoreHistory();
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    const requestId = ++historyRequestId;
+    const page = await api.getLog(repoPath, LOG_PAGE_SIZE, 0);
+    // Fetch first, then swap — clearing `commits` up front (the old behavior) briefly hides
+    // anything derived from the last commit (e.g. the commit box's unpushed-commit/Undo row)
+    // on every call, including the frequent ones triggered by the repo-changed file watcher
+    // on a plain stage/unstage.
+    if (requestId !== historyRequestId) return;
+    set({ commits: page, historyExhausted: page.length < LOG_PAGE_SIZE });
   },
 
   loadMoreHistory: async () => {
@@ -551,6 +615,40 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       doneMessage: publish ? `Published ${branch} to origin` : `Pushed ${branch} to origin`,
     });
     await get().refreshAheadBehind();
+  },
+  // For a diverged branch (both ahead and behind origin): pull, then push, in one action. If
+  // the pull conflicts with a local commit, aborts the merge/rebase immediately (restoring the
+  // pre-pull state exactly) and never pushes — a real merge conflict here would mix unreviewed
+  // remote history into a commit the user hasn't looked at, so this bails out to a suggested
+  // manual recovery instead of dropping them straight into the conflict-resolution UI.
+  syncBranch: async () => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    const branch = get().branch ?? "current branch";
+    await runSync(
+      get,
+      set,
+      repoPath,
+      async () => {
+        try {
+          await api.gitPull(repoPath);
+        } catch (err) {
+          const status = await api.getStatus(repoPath);
+          if (!status.files.some((f) => f.status === "conflicted")) throw err;
+          await api.gitAbortPull(repoPath);
+          throw (
+            "Pulling origin conflicts with your local commit(s) — aborted, nothing changed.\n" +
+            "Safer path: undo the last commit, stash the remaining changes, pull from origin, then unstash and recommit."
+          );
+        }
+        await api.gitPush(repoPath);
+      },
+      {
+        description: `Syncing ${branch} with origin…`,
+        doneMessage: `Synced ${branch} with origin`,
+      },
+    );
+    await Promise.all([get().refreshStatus(), get().resetHistory(), get().refreshAheadBehind()]);
   },
   pullLfs: async () => {
     const repoPath = get().selectedRepo;

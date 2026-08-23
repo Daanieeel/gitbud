@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::auth::{api_base, graphql_base};
+use super::auth::{api_base, graphql_base, web_base};
 use crate::diff::{DiffHunk, DiffLine, FileDiff, LineKind};
 use crate::image_diff::{is_image_path, mime_for, ImageDiff};
 
@@ -49,6 +49,10 @@ impl GhClient {
 
     fn patch(&self, path: &str) -> reqwest::RequestBuilder {
         self.http.patch(self.url(path))
+    }
+
+    fn delete(&self, path: &str) -> reqwest::RequestBuilder {
+        self.http.delete(self.url(path))
     }
 
     /// GitHub Projects (v2) has no REST surface — `query`/`variables` go straight to the
@@ -112,6 +116,7 @@ pub struct PullRequest {
     pub draft: bool,
     pub html_url: String,
     pub author_login: String,
+    pub author_avatar_url: String,
     pub head_ref: String,
     pub head_sha: String,
     pub base_ref: String,
@@ -124,6 +129,47 @@ pub struct PullRequest {
 #[derive(Deserialize)]
 struct RawUser {
     login: String,
+    avatar_url: String,
+}
+
+#[derive(Deserialize)]
+struct SearchUsersResponse {
+    items: Vec<RawUser>,
+}
+
+/// Looks up a GitHub avatar for a plain git commit author by email — used for commit history,
+/// where (unlike a PR/review author) all we start with is whatever the commit itself recorded.
+/// Only finds a match if that email is public/verified on the account's GitHub profile, so
+/// this is "if available", not a hard guarantee. One request per unique email (callers should
+/// cache), not per commit.
+/// GitHub's own auto-generated commit email (`{username}@users.noreply.{host}`, or
+/// `{id}+{username}@users.noreply.{host}` when "keep my email private" is on) already encodes
+/// the username — the overwhelming majority of commit authors we'll actually see, and unlike a
+/// real address it's never searchable by `find_user_avatar_by_email`'s `/search/users` fallback
+/// (GitHub excludes noreply addresses from that index entirely, so it would always return zero
+/// results). Extracting the username directly turns this into a no-API-call, always-correct
+/// lookup instead of a search that's guaranteed to come up empty.
+fn github_noreply_username<'a>(email: &'a str, host: &str) -> Option<&'a str> {
+    let local = email.strip_suffix(&format!("@users.noreply.{host}"))?;
+    Some(local.rsplit('+').next().unwrap_or(local))
+}
+
+pub async fn find_user_avatar_by_email(host: &str, token: &str, email: &str) -> Result<Option<String>, String> {
+    if let Some(username) = github_noreply_username(email, host) {
+        return Ok(Some(format!("{}/{username}.png", web_base(host))));
+    }
+    let gh = GhClient::new(host, token)?;
+    let query = format!("{email} in:email");
+    let res = check(
+        gh.get("/search/users")
+            .query(&[("q", query.as_str()), ("per_page", "1")])
+            .send()
+            .await
+            .map_err(|e| e.to_string())?,
+    )
+    .await?;
+    let parsed: SearchUsersResponse = res.json().await.map_err(|e| e.to_string())?;
+    Ok(parsed.items.into_iter().next().map(|u| u.avatar_url))
 }
 
 #[derive(Deserialize)]
@@ -149,8 +195,11 @@ struct RawPullRequest {
     user: RawUser,
     head: RawRef,
     base: RawRef,
+    // GitHub's list-pull-requests endpoint (unlike get-a-single-pull-request) doesn't include a
+    // `merged` boolean at all — only `merged_at`, null for an unmerged PR. Deriving `merged`
+    // from that instead of trusting a `merged` field means both endpoints report it correctly.
     #[serde(default)]
-    merged: bool,
+    merged_at: Option<String>,
     #[serde(default)]
     mergeable: Option<bool>,
     #[serde(default)]
@@ -167,11 +216,12 @@ impl From<RawPullRequest> for PullRequest {
             draft: raw.draft,
             html_url: raw.html_url,
             author_login: raw.user.login,
+            author_avatar_url: raw.user.avatar_url,
             head_ref: raw.head.ref_name,
             head_sha: raw.head.sha,
             base_ref: raw.base.ref_name,
             base_sha: raw.base.sha,
-            merged: raw.merged,
+            merged: raw.merged_at.is_some(),
             mergeable: raw.mergeable,
             labels: raw.labels.into_iter().map(|l| l.name).collect(),
         }
@@ -207,6 +257,145 @@ pub async fn get_pull_request(
     let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
     let raw: RawPullRequest = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoMergeSettings {
+    pub allow_merge_commit: bool,
+    pub allow_squash_merge: bool,
+    pub allow_rebase_merge: bool,
+    /// Repo-level default for the merge dialog's "Delete branch after merge" checkbox.
+    pub delete_branch_on_merge: bool,
+}
+
+#[derive(Deserialize)]
+struct RawRepo {
+    #[serde(default = "default_true")]
+    allow_merge_commit: bool,
+    #[serde(default = "default_true")]
+    allow_squash_merge: bool,
+    #[serde(default = "default_true")]
+    allow_rebase_merge: bool,
+    #[serde(default)]
+    delete_branch_on_merge: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Deserialize, Default)]
+struct RawLinearHistorySetting {
+    #[serde(default)]
+    enabled: bool,
+}
+
+#[derive(Deserialize, Default)]
+struct RawBranchProtection {
+    #[serde(default)]
+    required_linear_history: RawLinearHistorySetting,
+}
+
+/// Whether `branch`'s protection rules require a linear history — the one branch-protection
+/// setting that overrides a repo-level merge-method toggle (it forbids merge commits even if
+/// the repo itself allows them, since a merge commit isn't linear). Best-effort: an unprotected
+/// branch (404) or a token without permission to view protection settings (403) both just mean
+/// "no additional restriction visible to us", not an error worth surfacing.
+async fn requires_linear_history(host: &str, token: &str, owner: &str, repo: &str, branch: &str) -> bool {
+    let Ok(gh) = GhClient::new(host, token) else { return false };
+    let path = format!("/repos/{owner}/{repo}/branches/{branch}/protection");
+    let Ok(res) = gh.get(&path).send().await else { return false };
+    if !res.status().is_success() {
+        return false;
+    }
+    res.json::<RawBranchProtection>().await.map(|p| p.required_linear_history.enabled).unwrap_or(false)
+}
+
+#[derive(Deserialize)]
+struct RawEffectiveRule {
+    #[serde(rename = "type")]
+    rule_type: String,
+    #[serde(default)]
+    parameters: Option<serde_json::Value>,
+}
+
+/// Repository rulesets (the newer replacement for classic branch protection) can restrict a
+/// branch's PRs to a subset of merge methods via a `pull_request` rule's `allowed_merge_methods`
+/// parameter — a setting that lives entirely outside both the repo-level merge-method toggles
+/// and classic branch protection, so neither of those alone can catch it. The "effective rules
+/// for a branch" endpoint used here does GitHub's own ruleset-matching for us (by branch name
+/// pattern, across every ruleset that applies) rather than requiring us to fetch and evaluate
+/// rulesets ourselves. Returns `None` when no ruleset restricts merge methods (not the same as
+/// an empty list, which would mean "nothing allowed").
+async fn ruleset_allowed_merge_methods(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+) -> Option<Vec<String>> {
+    let gh = GhClient::new(host, token).ok()?;
+    // A `/` in the branch name is a path separator to an HTTP server, not part of the branch
+    // name, unless escaped — GitHub's docs call for encoding it as %2F specifically here.
+    let encoded_branch = branch.replace('/', "%2F");
+    let path = format!("/repos/{owner}/{repo}/rules/branches/{encoded_branch}");
+    let res = gh.get(&path).send().await.ok()?;
+    if !res.status().is_success() {
+        return None;
+    }
+    let rules: Vec<RawEffectiveRule> = res.json().await.ok()?;
+
+    let mut result: Option<Vec<String>> = None;
+    for rule in rules {
+        if rule.rule_type != "pull_request" {
+            continue;
+        }
+        let Some(methods) = rule
+            .parameters
+            .as_ref()
+            .and_then(|p| p.get("allowed_merge_methods"))
+            .and_then(|m| m.as_array())
+        else {
+            continue;
+        };
+        let methods: Vec<String> =
+            methods.iter().filter_map(|v| v.as_str().map(str::to_string)).collect();
+        result = Some(match result {
+            // Multiple applicable rulesets each restricting methods: only what every one of
+            // them allows is actually allowed.
+            Some(existing) => existing.into_iter().filter(|m| methods.contains(m)).collect(),
+            None => methods,
+        });
+    }
+    result
+}
+
+/// Which merge methods this repo allows, and whether it defaults to deleting the head branch
+/// on merge — powers the merge dialog so it doesn't offer a method GitHub would reject with a
+/// 405, and so its "Delete branch after merge" checkbox starts at the repo's own convention.
+/// `base_ref` is the PR's target branch, checked for a "required linear history" protection
+/// rule and a ruleset-level allowed-merge-methods restriction, either of which can additionally
+/// rule out a method beyond what the repo-level settings say.
+pub async fn get_repo_merge_settings(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    base_ref: &str,
+) -> Result<RepoMergeSettings, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}");
+    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let raw: RawRepo = res.json().await.map_err(|e| e.to_string())?;
+    let linear_history = requires_linear_history(host, token, owner, repo, base_ref).await;
+    let ruleset_methods = ruleset_allowed_merge_methods(host, token, owner, repo, base_ref).await;
+    let ruleset_allows = |method: &str| ruleset_methods.as_ref().is_none_or(|m| m.iter().any(|s| s == method));
+    Ok(RepoMergeSettings {
+        allow_merge_commit: raw.allow_merge_commit && !linear_history && ruleset_allows("merge"),
+        allow_squash_merge: raw.allow_squash_merge && ruleset_allows("squash"),
+        allow_rebase_merge: raw.allow_rebase_merge && ruleset_allows("rebase"),
+        delete_branch_on_merge: raw.delete_branch_on_merge,
+    })
 }
 
 #[derive(Debug, Serialize)]
@@ -498,6 +687,15 @@ pub async fn add_pull_request_to_project(
 #[derive(Debug, Serialize)]
 struct MergeBody<'a> {
     merge_method: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    commit_title: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    commit_message: Option<&'a str>,
+    // Pins the merge to the PR's head commit at the time the user opened the merge dialog —
+    // GitHub rejects the request with a 409 if the branch moved since, rather than silently
+    // merging commits the user never saw/reviewed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sha: Option<&'a str>,
 }
 
 pub async fn merge_pull_request(
@@ -507,17 +705,34 @@ pub async fn merge_pull_request(
     repo: &str,
     number: u64,
     merge_method: &str,
+    commit_title: Option<&str>,
+    commit_message: Option<&str>,
+    sha: Option<&str>,
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/merge");
     check(
         gh.put(&path)
-            .json(&MergeBody { merge_method })
+            .json(&MergeBody { merge_method, commit_title, commit_message, sha })
             .send()
             .await
             .map_err(|e| e.to_string())?,
     )
     .await?;
+    Ok(())
+}
+
+/// Deletes `branch` on the remote — used for the merge dialog's "Delete branch after merge".
+/// A no-op-shaped 422 (branch already gone, e.g. GitHub's own auto-delete-branch repo setting
+/// beat us to it) is swallowed rather than surfaced as a merge failure.
+pub async fn delete_branch(host: &str, token: &str, owner: &str, repo: &str, branch: &str) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/git/refs/heads/{branch}");
+    let res = gh.delete(&path).send().await.map_err(|e| e.to_string())?;
+    if res.status() == reqwest::StatusCode::UNPROCESSABLE_ENTITY {
+        return Ok(());
+    }
+    check(res).await?;
     Ok(())
 }
 
@@ -631,6 +846,7 @@ fn parse_patch(patch: &str) -> Vec<DiffHunk> {
                 content: content.to_string(),
                 old_lineno: None,
                 new_lineno: Some(new_line),
+                highlight_ranges: Vec::new(),
             });
             new_line += 1;
         } else if let Some(content) = raw_line.strip_prefix('-') {
@@ -639,6 +855,7 @@ fn parse_patch(patch: &str) -> Vec<DiffHunk> {
                 content: content.to_string(),
                 old_lineno: Some(old_line),
                 new_lineno: None,
+                highlight_ranges: Vec::new(),
             });
             old_line += 1;
         } else {
@@ -648,11 +865,13 @@ fn parse_patch(patch: &str) -> Vec<DiffHunk> {
                 content: content.to_string(),
                 old_lineno: Some(old_line),
                 new_lineno: Some(new_line),
+                highlight_ranges: Vec::new(),
             });
             old_line += 1;
             new_line += 1;
         }
     }
+    crate::diff::add_intraline_highlights(&mut hunks);
     hunks
 }
 
@@ -680,6 +899,7 @@ pub struct ReviewComment {
     pub side: Option<String>,
     pub body: String,
     pub user_login: String,
+    pub user_avatar_url: String,
     pub created_at: String,
     pub in_reply_to_id: Option<u64>,
 }
@@ -706,6 +926,7 @@ impl From<RawReviewComment> for ReviewComment {
             side: raw.side,
             body: raw.body,
             user_login: raw.user.login,
+            user_avatar_url: raw.user.avatar_url,
             created_at: raw.created_at,
             in_reply_to_id: raw.in_reply_to_id,
         }

@@ -155,6 +155,13 @@ async fn amend_commit(repo_path: String, summary: String, description: String) -
 }
 
 #[tauri::command]
+async fn undo_last_commit(repo_path: String) -> Result<(String, String), String> {
+    tauri::async_runtime::spawn_blocking(move || repo::undo_last_commit(&repo_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn cherry_pick(repo_path: String, oid: String) -> Result<repo::CherryPickResult, String> {
     tauri::async_runtime::spawn_blocking(move || repo::cherry_pick(&repo_path, &oid))
         .await
@@ -171,6 +178,22 @@ async fn revert_commit(repo_path: String, oid: String) -> Result<repo::CherryPic
 #[tauri::command]
 async fn delete_branch(repo_path: String, name: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || repo::delete_branch(&repo_path, &name))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn delete_branch_remote(app: AppHandle, repo_path: String, name: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_shell::delete_branch_remote(&app, &repo_path, &name, &repo_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn is_branch_merged(repo_path: String, branch: String, target: String) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || repo::is_branch_merged(&repo_path, &branch, &target))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -727,6 +750,13 @@ async fn git_pull(app: AppHandle, repo_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn git_abort_pull(app: AppHandle, repo_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || git_shell::abort_pull(&app, &repo_path, &repo_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn git_push(app: AppHandle, repo_path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || git_shell::push(&app, &repo_path, &repo_path))
         .await
@@ -1040,9 +1070,49 @@ async fn github_merge_pull_request(
     login: String,
     number: u64,
     merge_method: String,
+    commit_title: Option<String>,
+    commit_message: Option<String>,
+    sha: Option<String>,
 ) -> Result<(), String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::merge_pull_request(&host, &token, &owner, &repo, number, &merge_method).await
+    github::api::merge_pull_request(
+        &host,
+        &token,
+        &owner,
+        &repo,
+        number,
+        &merge_method,
+        commit_title.as_deref(),
+        commit_message.as_deref(),
+        sha.as_deref(),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn github_delete_remote_branch(repo_path: String, login: String, branch: String) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::delete_branch(&host, &token, &owner, &repo, &branch).await
+}
+
+#[tauri::command]
+async fn github_find_user_avatar_by_email(
+    repo_path: String,
+    login: String,
+    email: String,
+) -> Result<Option<String>, String> {
+    let (host, token, _owner, _repo) = github_resolve(&repo_path, &login)?;
+    github::api::find_user_avatar_by_email(&host, &token, &email).await
+}
+
+#[tauri::command]
+async fn github_get_repo_merge_settings(
+    repo_path: String,
+    login: String,
+    base_ref: String,
+) -> Result<github::api::RepoMergeSettings, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_repo_merge_settings(&host, &token, &owner, &repo, &base_ref).await
 }
 
 #[tauri::command]
@@ -1099,6 +1169,13 @@ async fn github_create_review_comment(
 #[tauri::command]
 async fn open_in_terminal(path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || system::open_in_terminal(&path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn open_in_editor(path: String, editor: String, custom_command: Option<String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || system::open_in_editor(&path, &editor, custom_command.as_deref()))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -1313,9 +1390,12 @@ pub fn run() {
             discard_hunk,
             commit,
             amend_commit,
+            undo_last_commit,
             cherry_pick,
             revert_commit,
             delete_branch,
+            delete_branch_remote,
+            is_branch_merged,
             rename_branch,
             rename_branch_remote,
             merge_branch,
@@ -1385,6 +1465,7 @@ pub fn run() {
             init_repo,
             git_fetch,
             git_pull,
+            git_abort_pull,
             git_push,
             cancel_git_operation,
             git_clone,
@@ -1394,6 +1475,7 @@ pub fn run() {
             sync_upstream,
             checkout_pull_request,
             open_in_terminal,
+            open_in_editor,
             get_settings,
             save_settings,
             export_settings,
@@ -1426,6 +1508,9 @@ pub fn run() {
             github_list_projects,
             github_add_pull_request_to_project,
             github_merge_pull_request,
+            github_delete_remote_branch,
+            github_get_repo_merge_settings,
+            github_find_user_avatar_by_email,
             github_list_pull_request_files,
             github_get_pull_request_image_diff,
             github_list_review_comments,

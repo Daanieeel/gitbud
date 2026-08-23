@@ -25,6 +25,7 @@ import type {
   RebaseResult,
   RebaseTodoItem,
   RepoEntry,
+  RepoMergeSettings,
   ReflogEntry,
   RepoStatus,
   SigningStatus,
@@ -82,12 +83,17 @@ export const api = {
     invoke<string>("commit", { repoPath, summary, description }),
   amendCommit: (repoPath: string, summary: string, description: string) =>
     invoke<string>("amend_commit", { repoPath, summary, description }),
+  undoLastCommit: (repoPath: string) => invoke<[string, string]>("undo_last_commit", { repoPath }),
   cherryPick: (repoPath: string, oid: string) =>
     invoke<CherryPickResult>("cherry_pick", { repoPath, oid }),
   revertCommit: (repoPath: string, oid: string) =>
     invoke<CherryPickResult>("revert_commit", { repoPath, oid }),
   deleteBranch: (repoPath: string, name: string) =>
     invoke<void>("delete_branch", { repoPath, name }),
+  deleteBranchRemote: (repoPath: string, name: string) =>
+    invoke<void>("delete_branch_remote", { repoPath, name }),
+  isBranchMerged: (repoPath: string, branch: string, target: string) =>
+    invoke<boolean>("is_branch_merged", { repoPath, branch, target }),
   renameBranch: (repoPath: string, oldName: string, newName: string) =>
     invoke<void>("rename_branch", { repoPath, oldName, newName }),
   renameBranchRemote: (repoPath: string, oldName: string, newName: string) =>
@@ -197,6 +203,7 @@ export const api = {
 
   gitFetch: (repoPath: string) => invoke<void>("git_fetch", { repoPath }),
   gitPull: (repoPath: string) => invoke<void>("git_pull", { repoPath }),
+  gitAbortPull: (repoPath: string) => invoke<void>("git_abort_pull", { repoPath }),
   gitPush: (repoPath: string) => invoke<void>("git_push", { repoPath }),
   gitClone: (url: string, dest: string) => invoke<void>("git_clone", { url, dest }),
   cancelGitOperation: (eventId: string) => invoke<void>("cancel_git_operation", { repoPath: eventId }),
@@ -210,6 +217,8 @@ export const api = {
     invoke<string>("checkout_pull_request", { repoPath, number }),
 
   openInTerminal: (path: string) => invoke<void>("open_in_terminal", { path }),
+  openInEditor: (path: string, editor: string, customCommand: string | null) =>
+    invoke<void>("open_in_editor", { path, editor, customCommand }),
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
   exportSettings: (destPath: string) => invoke<void>("export_settings", { destPath }),
@@ -278,8 +287,30 @@ export const api = {
     invoke<Project[]>("github_list_projects", { repoPath, login }),
   githubAddPullRequestToProject: (repoPath: string, login: string, number: number, projectId: string) =>
     invoke<void>("github_add_pull_request_to_project", { repoPath, login, number, projectId }),
-  githubMergePullRequest: (repoPath: string, login: string, number: number, mergeMethod: string) =>
-    invoke<void>("github_merge_pull_request", { repoPath, login, number, mergeMethod }),
+  githubMergePullRequest: (
+    repoPath: string,
+    login: string,
+    number: number,
+    mergeMethod: string,
+    commitTitle: string | null,
+    commitMessage: string | null,
+    sha: string | null,
+  ) =>
+    invoke<void>("github_merge_pull_request", {
+      repoPath,
+      login,
+      number,
+      mergeMethod,
+      commitTitle,
+      commitMessage,
+      sha,
+    }),
+  githubDeleteRemoteBranch: (repoPath: string, login: string, branch: string) =>
+    invoke<void>("github_delete_remote_branch", { repoPath, login, branch }),
+  githubGetRepoMergeSettings: (repoPath: string, login: string, baseRef: string) =>
+    invoke<RepoMergeSettings>("github_get_repo_merge_settings", { repoPath, login, baseRef }),
+  githubFindUserAvatarByEmail: (repoPath: string, login: string, email: string) =>
+    invoke<string | null>("github_find_user_avatar_by_email", { repoPath, login, email }),
   githubListPullRequestFiles: (repoPath: string, login: string, number: number) =>
     invoke<[string, string, FileDiff][]>("github_list_pull_request_files", {
       repoPath,

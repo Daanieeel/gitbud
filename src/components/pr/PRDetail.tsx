@@ -2,15 +2,11 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { ExternalLinkIcon, GitBranchIcon, GitMergeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Avatar } from "@/components/ui/avatar";
 import { DiffView } from "@/components/diff/DiffView";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CIBadge } from "./CIBadge";
+import { MergePRDialog } from "./MergePRDialog";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
 import type { ImageDiff, PullRequest } from "@/lib/types";
@@ -41,10 +37,9 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
   const comments = usePRStore((s) => s.comments);
   const selectFile = usePRStore((s) => s.selectFile);
   const addComment = usePRStore((s) => s.addComment);
-  const mergePR = usePRStore((s) => s.mergePR);
 
   const [checkingOut, setCheckingOut] = useState(false);
-  const [merging, setMerging] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [selectedImageDiff, setSelectedImageDiff] = useState<ImageDiff | null>(null);
 
   const checkout = async () => {
@@ -53,15 +48,6 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
       await api.checkoutPullRequest(repoPath, pr.number);
     } finally {
       setCheckingOut(false);
-    }
-  };
-
-  const merge = async (method: string) => {
-    setMerging(true);
-    try {
-      await mergePR(repoPath, login, pr.number, method);
-    } finally {
-      setMerging(false);
     }
   };
 
@@ -91,6 +77,7 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+        <Avatar src={pr.author_avatar_url} alt={pr.author_login} className="size-6" />
         <div className="min-w-0 flex-1">
           <div className="truncate text-sm font-medium">
             {pr.title} <span className="text-muted-foreground">#{pr.number}</span>
@@ -131,30 +118,12 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
         </Tooltip>
         {!pr.merged && pr.state === "open" && (
           <Tooltip>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <TooltipTrigger asChild>
-                  <Button size="sm" disabled={merging}>
-                    <GitMergeIcon className="size-3.5" />
-                    {merging ? "Merging…" : "Merge"}
-                  </Button>
-                </TooltipTrigger>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => void merge("merge")}>
-                  <GitMergeIcon className="size-3.5" />
-                  Create merge commit
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void merge("squash")}>
-                  <GitMergeIcon className="size-3.5" />
-                  Squash and merge
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => void merge("rebase")}>
-                  <GitMergeIcon className="size-3.5" />
-                  Rebase and merge
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <TooltipTrigger asChild>
+              <Button size="sm" onClick={() => setMergeOpen(true)}>
+                <GitMergeIcon className="size-3.5" />
+                Merge…
+              </Button>
+            </TooltipTrigger>
             <TooltipContent>Merge this pull request</TooltipContent>
           </Tooltip>
         )}
@@ -197,6 +166,7 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
           />
         </div>
       </div>
+      <MergePRDialog open={mergeOpen} onOpenChange={setMergeOpen} repoPath={repoPath} login={login} pr={pr} />
     </div>
   );
 }
