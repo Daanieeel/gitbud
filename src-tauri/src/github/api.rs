@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::auth::{api_base, graphql_base};
+use super::auth::{api_base, graphql_base, web_base};
 use crate::diff::{DiffHunk, DiffLine, FileDiff, LineKind};
 use crate::image_diff::{is_image_path, mime_for, ImageDiff};
 
@@ -142,7 +142,22 @@ struct SearchUsersResponse {
 /// Only finds a match if that email is public/verified on the account's GitHub profile, so
 /// this is "if available", not a hard guarantee. One request per unique email (callers should
 /// cache), not per commit.
+/// GitHub's own auto-generated commit email (`{username}@users.noreply.{host}`, or
+/// `{id}+{username}@users.noreply.{host}` when "keep my email private" is on) already encodes
+/// the username — the overwhelming majority of commit authors we'll actually see, and unlike a
+/// real address it's never searchable by `find_user_avatar_by_email`'s `/search/users` fallback
+/// (GitHub excludes noreply addresses from that index entirely, so it would always return zero
+/// results). Extracting the username directly turns this into a no-API-call, always-correct
+/// lookup instead of a search that's guaranteed to come up empty.
+fn github_noreply_username<'a>(email: &'a str, host: &str) -> Option<&'a str> {
+    let local = email.strip_suffix(&format!("@users.noreply.{host}"))?;
+    Some(local.rsplit('+').next().unwrap_or(local))
+}
+
 pub async fn find_user_avatar_by_email(host: &str, token: &str, email: &str) -> Result<Option<String>, String> {
+    if let Some(username) = github_noreply_username(email, host) {
+        return Ok(Some(format!("{}/{username}.png", web_base(host))));
+    }
     let gh = GhClient::new(host, token)?;
     let query = format!("{email} in:email");
     let res = check(
