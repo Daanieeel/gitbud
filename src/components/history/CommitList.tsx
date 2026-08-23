@@ -24,10 +24,12 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Avatar } from "@/components/ui/avatar";
 import { CIBadge } from "@/components/pr/CIBadge";
 import { CommitGraph } from "./CommitGraph";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
+import { useAuthorAvatar } from "@/hooks/useAuthorAvatar";
 
 const ROW_HEIGHT = 52;
 
