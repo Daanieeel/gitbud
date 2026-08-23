@@ -155,7 +155,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
 
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">Checks</span>
-            <div className="flex flex-col gap-1 rounded-md border border-border p-2 text-xs">
+            <div className="flex flex-col gap-1 rounded-md border border-border p-1 text-xs">
               {runs === null ? (
                 <div className="flex flex-col gap-1.5 py-0.5">
                   {Array.from({ length: 3 }).map((_, i) => (
