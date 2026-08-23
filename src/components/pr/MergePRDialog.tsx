@@ -107,7 +107,6 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     if (open && !wasOpenRef.current) {
       setCommitTitle(`${pr.title} (#${pr.number})`);
       setCommitMessage("");
-      setRepoSettings(null);
     }
     wasOpenRef.current = open;
   }, [open, pr.title, pr.number]);
@@ -130,16 +129,25 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
   // than always off.
   useEffect(() => {
     if (!open) return;
+    // Re-fetched fresh on every open (not cached across dialog opens) since these settings —
+    // especially branch protection rules — can change between one merge and the next.
+    setRepoSettings(null);
     let cancelled = false;
-    void api.githubGetRepoMergeSettings(repoPath, login, pr.base_ref).then((settings) => {
-      if (cancelled) return;
-      setRepoSettings(settings);
-      setDeleteBranch(settings.delete_branch_on_merge);
-      setMethod((prev) => {
-        const isAllowed = (key: typeof prev) => settings[METHODS.find((m) => m.key === key)!.allowed];
-        return isAllowed(prev) ? prev : (METHODS.find((m) => settings[m.allowed])?.key ?? prev);
-      });
-    });
+    api.githubGetRepoMergeSettings(repoPath, login, pr.base_ref).then(
+      (settings) => {
+        if (cancelled) return;
+        setRepoSettings(settings);
+        setDeleteBranch(settings.delete_branch_on_merge);
+        setMethod((prev) => {
+          const isAllowed = (key: typeof prev) => settings[METHODS.find((m) => m.key === key)!.allowed];
+          return isAllowed(prev) ? prev : (METHODS.find((m) => settings[m.allowed])?.key ?? prev);
+        });
+      },
+      (err) => {
+        if (cancelled) return;
+        console.error("Failed to load repo merge settings:", err);
+      },
+    );
     return () => {
       cancelled = true;
     };
