@@ -280,7 +280,7 @@ export function BranchSwitcher() {
             autoComplete="off"
             placeholder="Find or create branch"
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => setFilter(e.target.value.replace(/\s/g, "-"))}
             onKeyDown={(e) => {
               if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                 e.preventDefault();
