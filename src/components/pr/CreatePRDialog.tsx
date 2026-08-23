@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { DiffView } from "@/components/diff/DiffView";
 import { FileTypeIcon } from "@/lib/file-icons";
+import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
 import { MultiSelectField } from "./MultiSelectField";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
@@ -38,19 +39,6 @@ function branchNameToPrTitle(name: string): string {
   const withColon = slashIdx === -1 ? name : `${name.slice(0, slashIdx)}: ${name.slice(slashIdx + 1)}`;
   return withColon.replace(/-/g, " ");
 }
-
-// Matches git2's `Delta` Debug-formatted variants, which is what get_branch_diff_files reports
-// (a local tree-to-tree diff, not the GitHub API) — distinct casing from the GitHub-backed
-// PRDetail's lowercase file statuses.
-const BRANCH_DIFF_STATUS_COLOR: Record<string, string> = {
-  Added: "bg-accent-green",
-  Modified: "bg-accent-green",
-  Typechange: "bg-accent-green",
-  Deleted: "bg-accent-pink",
-  Conflicted: "bg-accent-pink",
-  Renamed: "bg-muted-foreground",
-  Copied: "bg-muted-foreground",
-};
 
 export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -295,16 +283,9 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
                             )}
                             onClick={() => setSelectedFilePath(path)}
                           >
-                            <span className="relative shrink-0">
-                              <FileTypeIcon path={path} className="size-3.5" />
-                              <span
-                                className={cn(
-                                  "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                                  BRANCH_DIFF_STATUS_COLOR[status] || "bg-muted-foreground",
-                                )}
-                              />
-                            </span>
+                            <FileTypeIcon path={path} className="size-3.5 shrink-0" />
                             <FilePathLabel path={path} />
+                            <FileStatusIcon status={status} className="size-3.5" />
                           </div>
                         </TooltipTrigger>
                         <TooltipContent>{`${path} (${status})`}</TooltipContent>

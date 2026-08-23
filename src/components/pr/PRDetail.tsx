@@ -17,17 +17,8 @@ import type { ImageDiff, PullRequest } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { FileTypeIcon } from "@/lib/file-icons";
+import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
-
-const PR_STATUS_COLOR: Record<string, string> = {
-  added: "bg-accent-green",
-  modified: "bg-accent-green",
-  changed: "bg-accent-green",
-  removed: "bg-accent-pink",
-  renamed: "bg-muted-foreground",
-  copied: "bg-muted-foreground",
-  unchanged: "bg-transparent",
-};
 
 interface PRDetailProps {
   repoPath: string;
@@ -158,16 +149,9 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
                   )}
                   onClick={() => selectFile(f.filename)}
                 >
-                  <span className="relative shrink-0">
-                    <FileTypeIcon path={f.filename} className="size-3.5" />
-                    <span
-                      className={cn(
-                        "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                        PR_STATUS_COLOR[f.status] || "bg-muted-foreground",
-                      )}
-                    />
-                  </span>
+                  <FileTypeIcon path={f.filename} className="size-3.5 shrink-0" />
                   <FilePathLabel path={f.filename} />
+                  <FileStatusIcon status={f.status} className="size-3.5" />
                 </div>
               </TooltipTrigger>
               <TooltipContent>{`${f.filename} (${f.status})`}</TooltipContent>

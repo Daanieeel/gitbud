@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
-import type { ChangeKind, FileEntry } from "@/lib/types";
+import type { FileEntry } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubFileUrl } from "@/lib/github-links";
 import { FileTypeIcon } from "@/lib/file-icons";
+import { FileStatusIcon } from "@/lib/file-status";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
@@ -59,16 +60,6 @@ function formatBytes(bytes: number): string {
   }
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
 }
-
-const STATUS_DOT_COLOR: Record<ChangeKind, string> = {
-  added: "bg-accent-green",
-  untracked: "bg-accent-green",
-  modified: "bg-accent-green",
-  deleted: "bg-accent-pink",
-  renamed: "bg-muted-foreground",
-  type_change: "bg-muted-foreground",
-  conflicted: "bg-destructive",
-};
 
 interface FileListProps {
   files: FileEntry[];
@@ -219,19 +210,11 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                           : "Stage"}
                     </TooltipContent>
                   </Tooltip>
-                  <span className="relative shrink-0">
-                    {file.status === "conflicted" ? (
-                      <TriangleAlertIcon className="size-3.5 text-destructive" />
-                    ) : (
-                      <FileTypeIcon path={file.path} className="size-3.5" />
-                    )}
-                    <span
-                      className={cn(
-                        "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                        STATUS_DOT_COLOR[file.status],
-                      )}
-                    />
-                  </span>
+                  {file.status === "conflicted" ? (
+                    <TriangleAlertIcon className="size-3.5 shrink-0 text-destructive" />
+                  ) : (
+                    <FileTypeIcon path={file.path} className="size-3.5 shrink-0" />
+                  )}
                   <FilePathLabel path={file.path} />
                   {lfsInfo[file.path] && (
                     <Tooltip>
@@ -243,6 +226,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                       <TooltipContent>Tracked by Git LFS</TooltipContent>
                     </Tooltip>
                   )}
+                  {file.status !== "conflicted" && <FileStatusIcon status={file.status} className="size-3.5" />}
                 </div>
               </ContextMenuTrigger>
               </PopoverAnchor>

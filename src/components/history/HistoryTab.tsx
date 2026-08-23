@@ -13,21 +13,11 @@ import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubFileUrl } from "@/lib/github-links";
 import { FileTypeIcon } from "@/lib/file-icons";
+import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
-const COMMIT_STATUS_DOT_COLOR: Record<string, string> = {
-  Added: "bg-accent-green",
-  Untracked: "bg-accent-green",
-  Copied: "bg-accent-green",
-  Modified: "bg-accent-green",
-  Deleted: "bg-accent-pink",
-  Renamed: "bg-muted-foreground",
-  Typechange: "bg-muted-foreground",
-  Conflicted: "bg-destructive",
-};
 
 export function HistoryTab() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -98,16 +88,9 @@ export function HistoryTab() {
                     )}
                     onClick={() => selectCommitFile(path)}
                   >
-                    <span className="relative shrink-0">
-                      <FileTypeIcon path={path} className="size-3.5" />
-                      <span
-                        className={cn(
-                          "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                          COMMIT_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
-                        )}
-                      />
-                    </span>
+                    <FileTypeIcon path={path} className="size-3.5 shrink-0" />
                     <FilePathLabel path={path} />
+                    <FileStatusIcon status={status} className="size-3.5" />
                   </div>
                 </TooltipTrigger>
                 <TooltipContent>{`${path} (${status})`}</TooltipContent>
