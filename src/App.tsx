@@ -8,6 +8,7 @@ import { HistoryTab } from "@/components/history/HistoryTab";
 import { PRTab } from "@/components/pr/PRTab";
 import { UpstreamBanner } from "@/components/pr/UpstreamBanner";
 import { CommandPalette } from "@/components/palette/CommandPalette";
+import { ResolveDivergedPullDialog } from "@/components/repo/ResolveDivergedPullDialog";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -164,6 +165,7 @@ function App() {
         mode={palette.mode}
         onOpenChange={(open) => setPalette((p) => ({ ...p, open }))}
       />
+      <ResolveDivergedPullDialog />
     </div>
     </TooltipProvider>
   );

@@ -207,6 +207,8 @@ export const api = {
 
   gitFetch: (repoPath: string) => invoke<void>("git_fetch", { repoPath }),
   gitPull: (repoPath: string) => invoke<void>("git_pull", { repoPath }),
+  gitPullWithStrategy: (repoPath: string, strategy: "merge" | "rebase") =>
+    invoke<void>("git_pull_with_strategy", { repoPath, strategy }),
   gitAbortPull: (repoPath: string) => invoke<void>("git_abort_pull", { repoPath }),
   gitPush: (repoPath: string) => invoke<void>("git_push", { repoPath }),
   gitClone: (url: string, dest: string) => invoke<void>("git_clone", { url, dest }),

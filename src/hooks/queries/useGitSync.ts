@@ -3,6 +3,7 @@ import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 import { runGitSync } from "@/lib/gitSync";
 import { useRepoStore } from "@/store/useRepoStore";
+import { isDivergedPullError, useDivergedPullStore } from "@/store/useDivergedPullStore";
 
 // A button's disabled/spinning state tied directly to an async action can finish and flip back
 // off faster than a human eye (or even a browser paint) reliably registers, which reads as "the
@@ -70,6 +71,11 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
         await runGitSync(repoPath, () => api.gitPull(repoPath), {
           description: `Pulling origin/${branch ?? "current branch"}…`,
           doneMessage: `Pulled origin/${branch ?? "current branch"}`,
+          onError: (message) => {
+            if (!isDivergedPullError(message)) return false;
+            useDivergedPullStore.getState().open(repoPath);
+            return true;
+          },
         });
         invalidate([queryKeys.status(repoPath), queryKeys.log(repoPath), queryKeys.aheadBehind(repoPath)]);
       }),
@@ -119,6 +125,11 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
           {
             description: `Syncing ${branch ?? "current branch"} with origin…`,
             doneMessage: `Synced ${branch ?? "current branch"} with origin`,
+            onError: (message) => {
+              if (!isDivergedPullError(message)) return false;
+              useDivergedPullStore.getState().open(repoPath);
+              return true;
+            },
           },
         );
         invalidate([queryKeys.status(repoPath), queryKeys.log(repoPath), queryKeys.aheadBehind(repoPath)]);
@@ -158,4 +169,24 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
     pullLfs: () => pullLfsMutation.mutateAsync(),
     pushLfs: () => pushLfsMutation.mutateAsync(),
   };
+}
+
+/** Retries a `--ff-only` pull that failed on diverged branches with an explicit strategy the
+ * user picked in ResolveDivergedPullDialog, instead of the configured default. */
+export function useResolveDivergedPull(repoPath: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: repoPath ? syncMutationKey(repoPath) : undefined,
+    mutationFn: (strategy: "merge" | "rebase") =>
+      guarded(async () => {
+        if (!repoPath) return;
+        await runGitSync(repoPath, () => api.gitPullWithStrategy(repoPath, strategy), {
+          description: strategy === "merge" ? "Merging origin…" : "Rebasing onto origin…",
+          doneMessage: strategy === "merge" ? "Merged origin" : "Rebased onto origin",
+        });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.log(repoPath) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(repoPath) });
+      }),
+  });
 }

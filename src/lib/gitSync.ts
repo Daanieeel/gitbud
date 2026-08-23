@@ -34,7 +34,15 @@ const NOTIFY_THRESHOLD_MS = 4000;
 export async function runGitSync(
   eventId: string,
   action: () => Promise<void>,
-  opts?: { description: string; doneMessage: string; repoName?: string },
+  opts?: {
+    description: string;
+    doneMessage: string;
+    repoName?: string;
+    /** Called with the error message when `action` throws. Returning true means the caller
+     * already presented its own recovery UI for it — skip the generic error toast (the loading
+     * toast is still dismissed either way). */
+    onError?: (message: string) => boolean;
+  },
 ) {
   const startedAt = Date.now();
   const label = opts?.description ?? "Working…";
@@ -95,8 +103,12 @@ export async function runGitSync(
       return;
     }
     if (!outcome.ok) {
-      toast.error(outcome.error, { id: eventId, ...finalState });
       useNetworkStore.getState().noteError(outcome.error);
+      if (opts?.onError?.(outcome.error)) {
+        toast.dismiss(eventId);
+        return;
+      }
+      toast.error(outcome.error, { id: eventId, ...finalState });
       return;
     }
     useNetworkStore.getState().noteSuccess();
