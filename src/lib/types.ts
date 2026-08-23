@@ -203,6 +203,7 @@ export interface Settings {
   diff_font_size: number;
   show_ahead_behind: boolean;
   sidebar_sort: SidebarSort;
+  auto_stage_new_changes: boolean;
   git_binary_path: string | null;
   fs_watch_enabled: boolean;
   default_identity_id: string | null;

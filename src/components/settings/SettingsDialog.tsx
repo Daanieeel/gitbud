@@ -189,6 +189,12 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     onCheckedChange={(checked) => void update({ desktop_notifications: checked === true })}
                   />
                 </Row>
+                <Row label="Auto-stage new changes">
+                  <Checkbox
+                    checked={settings.auto_stage_new_changes}
+                    onCheckedChange={(checked) => void update({ auto_stage_new_changes: checked === true })}
+                  />
+                </Row>
               </>
             )}
 
