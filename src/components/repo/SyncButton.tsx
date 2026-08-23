@@ -20,6 +20,7 @@ export function SyncButton() {
   let Icon = RefreshCwIcon;
   let action = fetch;
   let title = `${label} (Cmd+Shift+P to pull)`;
+  let variant: "secondary" | "default" = "secondary";
   if (!aheadBehind.published) {
     label = "Publish branch";
     Icon = CloudUploadIcon;
@@ -35,13 +36,14 @@ export function SyncButton() {
     Icon = ArrowUpIcon;
     action = push;
     title = `${label} (Cmd+Shift+P to pull)`;
+    variant = "default";
   }
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <Button
-          variant="secondary"
+          variant={variant}
           size="sm"
           disabled={syncing}
           className={cn(!available && "cursor-not-allowed opacity-50 hover:bg-accent")}

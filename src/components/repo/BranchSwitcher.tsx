@@ -12,6 +12,9 @@ import {
   TriangleAlertIcon,
 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { toast } from "sonner";
+import { api } from "@/lib/tauri";
+import { useStashStore } from "@/store/useStashStore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
@@ -33,7 +36,9 @@ import { githubBranchUrl } from "@/lib/github-links";
 export function BranchSwitcher() {
   const branch = useRepoStore((s) => s.branch);
   const branches = useRepoStore((s) => s.branches);
+  const status = useRepoStore((s) => s.status);
   const checkoutBranch = useRepoStore((s) => s.checkoutBranch);
+  const refreshStatus = useRepoStore((s) => s.refreshStatus);
   const createBranch = useRepoStore((s) => s.createBranch);
   const deleteBranch = useRepoStore((s) => s.deleteBranch);
   const renameBranch = useRepoStore((s) => s.renameBranch);
@@ -47,6 +52,8 @@ export function BranchSwitcher() {
   const [renameRemote, setRenameRemote] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [renameBusy, setRenameBusy] = useState(false);
+  const [pendingSwitch, setPendingSwitch] = useState<string | null>(null);
+  const [switchChoice, setSwitchChoice] = useState<"leave" | "bring">("leave");
 
   useEffect(() => {
     const handleOpenBranchSwitcher = () => setOpen(true);
@@ -93,16 +100,53 @@ export function BranchSwitcher() {
     }
   };
 
-  const doCheckout = async (name: string) => {
+  const runCheckout = async (name: string) => {
     setOpen(false);
     setSwitching(true);
     const startedAt = Date.now();
     try {
       await checkoutBranch(name);
+    } catch (err) {
+      toast.error(String(err));
     } finally {
       const elapsed = Date.now() - startedAt;
       if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
       setSwitching(false);
+    }
+  };
+
+  const doCheckout = (name: string) => {
+    if (name === branch) {
+      setOpen(false);
+      return;
+    }
+    if ((status?.files.length ?? 0) > 0) {
+      setOpen(false);
+      setSwitchChoice("leave");
+      setPendingSwitch(name);
+      return;
+    }
+    void runCheckout(name);
+  };
+
+  const confirmSwitch = async () => {
+    if (!pendingSwitch || !selectedRepo || !branch) return;
+    const target = pendingSwitch;
+    const bringChanges = switchChoice === "bring";
+    setSwitching(true);
+    const startedAt = Date.now();
+    try {
+      await api.stashSave(selectedRepo, `WIP on ${branch} before switching to ${target}`, true);
+      await checkoutBranch(target);
+      if (bringChanges) await api.stashPop(selectedRepo, 0);
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      await Promise.all([refreshStatus(), useStashStore.getState().load(selectedRepo)]);
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
+      setSwitching(false);
+      setPendingSwitch(null);
     }
   };
 
@@ -165,6 +209,13 @@ export function BranchSwitcher() {
             placeholder="Find or create branch"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              const name = filter.trim();
+              if (!name) return;
+              if (exactMatch) void doCheckout(name);
+              else void doCreate(name);
+            }}
             className="h-7"
           />
         </div>
@@ -239,7 +290,7 @@ export function BranchSwitcher() {
           ))}
           {canCreate && (
             <div
-              className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-primary hover:bg-accent"
+              className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
               onClick={() => void doCreate(filter.trim())}
             >
               <PlusIcon className="size-3.5" />
@@ -287,6 +338,71 @@ export function BranchSwitcher() {
             </Button>
             <Button disabled={renameBusy || !renameValue.trim()} onClick={() => void commitRename()}>
               Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={pendingSwitch !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setPendingSwitch(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Switch Branch</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            You have changes on this branch. What would you like to do with them?
+          </p>
+          <div className="flex flex-col gap-2">
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-2 rounded-md border border-border p-3 text-sm",
+                switchChoice === "leave" && "border-primary bg-accent",
+              )}
+            >
+              <input
+                type="radio"
+                className="mt-0.5"
+                checked={switchChoice === "leave"}
+                onChange={() => setSwitchChoice("leave")}
+              />
+              <span>
+                <span className="font-medium">Leave my changes on {branch}</span>
+                <br />
+                <span className="text-muted-foreground">
+                  Your in-progress work will be stashed on this branch for you to return to later
+                </span>
+              </span>
+            </label>
+            <label
+              className={cn(
+                "flex cursor-pointer items-start gap-2 rounded-md border border-border p-3 text-sm",
+                switchChoice === "bring" && "border-primary bg-accent",
+              )}
+            >
+              <input
+                type="radio"
+                className="mt-0.5"
+                checked={switchChoice === "bring"}
+                onChange={() => setSwitchChoice("bring")}
+              />
+              <span>
+                <span className="font-medium">Bring my changes to {pendingSwitch}</span>
+                <br />
+                <span className="text-muted-foreground">
+                  Your in-progress work will follow you to the new branch
+                </span>
+              </span>
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPendingSwitch(null)}>
+              Cancel
+            </Button>
+            <Button disabled={switching} onClick={() => void confirmSwitch()}>
+              Switch Branch
             </Button>
           </DialogFooter>
         </DialogContent>

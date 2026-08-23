@@ -56,6 +56,9 @@ pub struct Settings {
     pub show_ahead_behind: bool,
     pub sidebar_sort: SidebarSort,
 
+    // Changes
+    pub auto_stage_new_changes: bool,
+
     // Advanced
     pub git_binary_path: Option<String>,
     pub fs_watch_enabled: bool,
@@ -83,6 +86,7 @@ impl Default for Settings {
             diff_font_size: 12,
             show_ahead_behind: true,
             sidebar_sort: SidebarSort::Group,
+            auto_stage_new_changes: true,
             git_binary_path: None,
             fs_watch_enabled: true,
             default_identity_id: None,
