@@ -2,17 +2,17 @@ import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, CloudUploadIcon, RefreshCw
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useBranches } from "@/hooks/queries/useBranches";
+import { useAheadBehind } from "@/hooks/queries/useAheadBehind";
+import { useGitSync } from "@/hooks/queries/useGitSync";
 import { useIdentityAvailability } from "@/hooks/useIdentityAvailability";
 import { cn } from "@/lib/utils";
 
 export function SyncButton() {
   const selectedRepo = useRepoStore((s) => s.selectedRepo);
-  const aheadBehind = useRepoStore((s) => s.aheadBehind);
-  const syncing = useRepoStore((s) => s.syncing);
-  const fetch = useRepoStore((s) => s.fetch);
-  const pull = useRepoStore((s) => s.pull);
-  const push = useRepoStore((s) => s.push);
-  const syncBranch = useRepoStore((s) => s.syncBranch);
+  const { data: branchData } = useBranches(selectedRepo);
+  const { data: aheadBehind } = useAheadBehind(selectedRepo);
+  const { syncing, fetch, pull, push, syncBranch } = useGitSync(selectedRepo, branchData?.branch ?? null);
   const { available, reason } = useIdentityAvailability();
 
   if (!selectedRepo) return null;

@@ -1,26 +1,18 @@
-import { useEffect, useState } from "react";
 import { DatabaseIcon, DownloadIcon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useHasLfs } from "@/hooks/queries/useLfs";
+import { useBranches } from "@/hooks/queries/useBranches";
+import { useGitSync } from "@/hooks/queries/useGitSync";
 import { cn } from "@/lib/utils";
 
 export function LfsPanel() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const syncing = useRepoStore((s) => s.syncing);
-  const pullLfs = useRepoStore((s) => s.pullLfs);
-  const pushLfs = useRepoStore((s) => s.pushLfs);
-  const [hasLfs, setHasLfs] = useState(false);
-
-  useEffect(() => {
-    if (!repoPath) {
-      setHasLfs(false);
-      return;
-    }
-    void api.hasLfs(repoPath).then(setHasLfs);
-  }, [repoPath]);
+  const { data: branchData } = useBranches(repoPath);
+  const { syncing, pullLfs, pushLfs } = useGitSync(repoPath, branchData?.branch ?? null);
+  const { data: hasLfs } = useHasLfs(repoPath);
 
   if (!repoPath || !hasLfs) return null;
 

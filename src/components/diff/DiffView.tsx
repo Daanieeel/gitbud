@@ -1,6 +1,6 @@
 import { memo, useMemo, useState } from "react";
 import { ColumnsIcon, LinkIcon, MessageSquarePlusIcon, RowsIcon } from "lucide-react";
-import type { DiffHunk, DiffLine, FileDiff, ImageDiff, ReviewComment } from "@/lib/types";
+import type { DiffHunk, DiffLine, FileDiff, ImageDiff, LineKind, ReviewComment } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ImageDiffView } from "./ImageDiffView";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,12 @@ interface DiffViewProps {
   secondaryDiff?: FileDiff | null;
   secondaryHunkActions?: HunkActions;
 }
+
+const LINE_PREFIX: Record<LineKind, string> = {
+  addition: "+",
+  deletion: "-",
+  context: " ",
+};
 
 /** Syntax-highlights a line, then overlays its intraline diff ranges (if any) on top so both
  * render together. */
@@ -277,7 +283,7 @@ function UnifiedLine({
             line.kind === "deletion" && "text-accent-pink",
           )}
         >
-          {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
+          {LINE_PREFIX[line.kind]}
         </span>
         <span
           dangerouslySetInnerHTML={{ __html: renderLineHtml(line, language) }}
@@ -363,7 +369,7 @@ function SplitCell({ line, language }: { line: DiffLine | null; language: string
           line.kind === "deletion" && "text-accent-pink",
         )}
       >
-        {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
+        {LINE_PREFIX[line.kind]}
       </span>
       <span dangerouslySetInnerHTML={{ __html: renderLineHtml(line, language) }} />
     </div>

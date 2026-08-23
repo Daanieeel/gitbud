@@ -11,7 +11,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { api } from "@/lib/tauri";
+import { useQueryClient } from "@tanstack/react-query";
 import { useRepoStore } from "@/store/useRepoStore";
+import { queryKeys } from "@/lib/queryKeys";
 
 interface CreateBranchAtDialogProps {
   oid: string | null;
@@ -20,7 +22,7 @@ interface CreateBranchAtDialogProps {
 
 export function CreateBranchAtDialog({ oid, onOpenChange }: CreateBranchAtDialogProps) {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const refreshBranches = useRepoStore((s) => s.refreshBranches);
+  const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [checkout, setCheckout] = useState(true);
   const [creating, setCreating] = useState(false);
@@ -30,7 +32,7 @@ export function CreateBranchAtDialog({ oid, onOpenChange }: CreateBranchAtDialog
     setCreating(true);
     try {
       await api.createBranchAt(repoPath, name.trim(), oid, checkout);
-      await refreshBranches();
+      await queryClient.invalidateQueries({ queryKey: queryKeys.branches(repoPath) });
       setName("");
       onOpenChange(false);
     } finally {

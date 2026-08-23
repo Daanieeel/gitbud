@@ -1,5 +1,6 @@
 import { FileDiffIcon, GitPullRequestIcon, HistoryIcon } from "lucide-react";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useStatus } from "@/hooks/queries/useRepoStatus";
 import { StashPanel } from "@/components/changes/StashPanel";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +13,9 @@ const TABS = [
 export function TabBar() {
   const activeTab = useRepoStore((s) => s.activeTab);
   const setActiveTab = useRepoStore((s) => s.setActiveTab);
-  const hasChanges = useRepoStore((s) => (s.status?.files.length ?? 0) > 0);
+  const repoPath = useRepoStore((s) => s.selectedRepo);
+  const { data: status } = useStatus(repoPath);
+  const hasChanges = (status?.files.length ?? 0) > 0;
 
   return (
     <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 pt-2 pb-1.5">

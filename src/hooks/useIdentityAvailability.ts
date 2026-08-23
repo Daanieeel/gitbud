@@ -1,4 +1,5 @@
 import { useRepoStore } from "@/store/useRepoStore";
+import { useRemoteProvider } from "@/hooks/queries/useAheadBehind";
 import { useIdentityStore, githubIdentityId, sshIdentityId } from "@/store/useIdentityStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
@@ -11,7 +12,7 @@ import { useGitHubStore } from "@/store/useGitHubStore";
  */
 export function useIdentityAvailability(): { available: boolean; reason: string | null } {
   const selectedRepo = useRepoStore((s) => s.selectedRepo);
-  const remoteProvider = useRepoStore((s) => s.remoteProvider);
+  const { data: remoteProvider } = useRemoteProvider(selectedRepo);
   const repoOverride = useRepoStore(
     (s) => s.repos.find((r) => r.path === s.selectedRepo)?.identity_id ?? null,
   );

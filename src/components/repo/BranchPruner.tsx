@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useBranches, useDeleteBranch } from "@/hooks/queries/useBranches";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { api } from "@/lib/tauri";
 import { isProtectedBranch } from "@/lib/utils";
@@ -12,8 +13,9 @@ import type { PullRequest } from "@/lib/types";
 
 export function BranchPruner() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const branches = useRepoStore((s) => s.branches);
-  const deleteBranch = useRepoStore((s) => s.deleteBranch);
+  const { data: branchData } = useBranches(repoPath);
+  const branches = branchData?.branches ?? [];
+  const deleteBranchMutation = useDeleteBranch(repoPath);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
 
   const [open, setOpen] = useState(false);
@@ -50,7 +52,7 @@ export function BranchPruner() {
     setPruning(true);
     try {
       for (const name of selected) {
-        await deleteBranch(name);
+        await deleteBranchMutation.mutateAsync({ name });
       }
       setSelected(new Set());
       setOpen(false);

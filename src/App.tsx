@@ -17,20 +17,30 @@ import { useGitHubStore } from "@/store/useGitHubStore";
 import { usePRStore } from "@/store/usePRStore";
 import { useNetworkStore } from "@/store/useNetworkStore";
 import { useUpdateStore } from "@/store/useUpdateStore";
+import { useBranches } from "@/hooks/queries/useBranches";
+import { useGitSync } from "@/hooks/queries/useGitSync";
+import { usePullRequestList } from "@/hooks/queries/usePullRequests";
+import { useProviderSync } from "@/hooks/useProviderSync";
 
 function App() {
   const initGlobalListeners = useRepoStore((s) => s.initGlobalListeners);
   const loadRepos = useRepoStore((s) => s.loadRepos);
   const selectedRepo = useRepoStore((s) => s.selectedRepo);
-  const branch = useRepoStore((s) => s.branch);
+  const { data: branchData } = useBranches(selectedRepo);
+  const branch = branchData?.branch ?? null;
   const activeTab = useRepoStore((s) => s.activeTab);
   const repos = useRepoStore((s) => s.repos);
   const loadSettings = useSettingsStore((s) => s.load);
   const initIdentities = useIdentityStore((s) => s.init);
   const syncRepoIdentity = useIdentityStore((s) => s.syncRepoIdentity);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
-  const pollWatchedChecks = usePRStore((s) => s.pollWatchedChecks);
-  const pull = useRepoStore((s) => s.pull);
+  const watched = usePRStore((s) => s.watched);
+  // Watched PRs are open by construction (there's no UI to watch a closed one), so this is the
+  // one list that needs to exist for CI-notification polling regardless of which filter the PR
+  // tab itself currently has selected — see useProviderSync.
+  const { pulls: openPulls } = usePullRequestList(selectedRepo, currentLogin, "open");
+  useProviderSync(selectedRepo, currentLogin, watched, openPulls);
+  const { pull, fetch, push } = useGitSync(selectedRepo, branch);
   const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
 
   const [palette, setPalette] = useState<{ open: boolean; mode: "all" | "repos" }>({
@@ -56,16 +66,6 @@ function App() {
     const interval = setInterval(() => void checkForUpdates(), 6 * 60 * 60_000);
     return () => clearInterval(interval);
   }, [checkForUpdates]);
-
-  // Deliberate exception to "no polling": GitHub gives a pure desktop client no event/webhook
-  // mechanism for check-run status, so watched-PR CI notifications have no event-driven option.
-  useEffect(() => {
-    if (!selectedRepo || !currentLogin) return;
-    const interval = setInterval(() => {
-      void pollWatchedChecks(selectedRepo, currentLogin);
-    }, 60_000);
-    return () => clearInterval(interval);
-  }, [selectedRepo, currentLogin, pollWatchedChecks]);
 
   useEffect(() => {
     const goOnline = () => useNetworkStore.getState().setOffline(false);
@@ -109,13 +109,13 @@ function App() {
           setPalette({ open: true, mode: "repos" });
           break;
         case "fetch":
-          useRepoStore.getState().fetch();
+          void fetch();
           break;
         case "pull":
-          useRepoStore.getState().pull();
+          void pull();
           break;
         case "push":
-          useRepoStore.getState().push();
+          void push();
           break;
         case "branch_switcher":
           window.dispatchEvent(new CustomEvent("open-branch-switcher"));
@@ -128,7 +128,7 @@ function App() {
     return () => {
       unlisten.then((f) => f());
     };
-  }, []);
+  }, [fetch, pull, push]);
 
   return (
     <TooltipProvider delayDuration={300}>

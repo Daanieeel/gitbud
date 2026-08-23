@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CheckCircle2Icon, CircleDashedIcon, XCircleIcon } from "lucide-react";
-import { api } from "@/lib/tauri";
+import { useCheckRuns } from "@/hooks/queries/useCheckRuns";
+import { CheckRunsRefresh } from "./CheckRunsRefresh";
 import type { CheckRun } from "@/lib/types";
 import {
   Popover,
@@ -13,6 +14,9 @@ interface CIBadgeProps {
   repoPath: string;
   login: string;
   sha: string;
+  /** From prPollIntervalMs — null (the default) means don't auto-poll this badge at all, just
+   * show whatever's cached and let the manual refresh button do the rest. */
+  pollIntervalMs?: number | null;
 }
 
 export type Overall = "passing" | "failing" | "pending" | "none";
@@ -57,27 +61,34 @@ export function runStatusLabel(run: CheckRun): string {
   return RUN_STATUS_LABEL[raw] ?? raw.replace(/_/g, " ");
 }
 
-export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
-  const [runs, setRuns] = useState<CheckRun[] | null>(null);
-  const [open, setOpen] = useState(false);
+const OVERALL_ICON: Record<Overall, typeof CheckCircle2Icon> = {
+  passing: CheckCircle2Icon,
+  failing: XCircleIcon,
+  pending: CircleDashedIcon,
+  none: CircleDashedIcon,
+};
 
-  useEffect(() => {
-    let cancelled = false;
-    void api.githubListCheckRuns(repoPath, login, sha).then(
-      (result) => !cancelled && setRuns(result),
-      () => !cancelled && setRuns([]),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [repoPath, login, sha]);
+const OVERALL_COLOR: Record<Overall, string> = {
+  passing: "text-accent-green",
+  failing: "text-accent-pink",
+  pending: "text-accent-yellow",
+  none: "text-accent-yellow",
+};
+
+export function CIBadge({ repoPath, login, sha, pollIntervalMs = null }: CIBadgeProps) {
+  const {
+    data: runs = null,
+    refetch,
+    isFetching,
+    dataUpdatedAt,
+  } = useCheckRuns(repoPath, login, sha, pollIntervalMs);
+  const [open, setOpen] = useState(false);
 
   if (runs === null || runs.length === 0) return null;
   const overall = overallFrom(runs);
 
-  const Icon = overall === "passing" ? CheckCircle2Icon : overall === "failing" ? XCircleIcon : CircleDashedIcon;
-  const color =
-    overall === "passing" ? "text-accent-green" : overall === "failing" ? "text-accent-pink" : "text-accent-yellow";
+  const Icon = OVERALL_ICON[overall];
+  const color = OVERALL_COLOR[overall];
 
   return (
     <Tooltip>
@@ -90,6 +101,15 @@ export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
           </TooltipTrigger>
         </PopoverTrigger>
         <PopoverContent className="w-72 p-1" align="start">
+          <div className="flex items-center justify-between gap-2 px-2 py-1">
+            <span className="text-xs font-medium text-muted-foreground">Checks</span>
+            <CheckRunsRefresh
+              dataUpdatedAt={dataUpdatedAt}
+              isFetching={isFetching}
+              onRefresh={() => void refetch()}
+              pollIntervalMs={pollIntervalMs}
+            />
+          </div>
           {runs.map((run) => (
             <a
               key={run.name}

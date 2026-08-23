@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ExternalLinkIcon, GitMergeIcon, TriangleAlertIcon } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,12 +15,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { usePRStore } from "@/store/usePRStore";
+import { useMergePullRequest } from "@/hooks/queries/usePullRequests";
+import { prPollIntervalMs, useCheckRuns, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
+import { CheckRunsRefresh } from "./CheckRunsRefresh";
 import { runIcon, runStatusLabel } from "./CIBadge";
 import { api } from "@/lib/tauri";
+import { queryKeys } from "@/lib/queryKeys";
 import { takePrefetchedMergeSettings } from "@/lib/mergeSettingsPrefetch";
 import { cn } from "@/lib/utils";
-import type { CheckRun, PullRequest, RepoMergeSettings } from "@/lib/types";
+import type { PullRequest, RepoMergeSettings } from "@/lib/types";
 
 interface MergePRDialogProps {
   open: boolean;
@@ -56,15 +60,33 @@ const METHODS: {
 ];
 
 export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: MergePRDialogProps) {
-  const mergePR = usePRStore((s) => s.mergePR);
+  const mergePRMutation = useMergePullRequest(repoPath, login);
+  const queryClient = useQueryClient();
 
   const [method, setMethod] = useState<"merge" | "squash" | "rebase">("squash");
   const [commitTitle, setCommitTitle] = useState("");
   const [commitMessage, setCommitMessage] = useState("");
   const [deleteBranch, setDeleteBranch] = useState(false);
   const [merging, setMerging] = useState(false);
-  const [runs, setRuns] = useState<CheckRun[] | null>(null);
+  const isPrTabActive = useIsPrTabActive();
+  const {
+    data: runs = null,
+    refetch: refetchRuns,
+    isFetching: runsFetching,
+    dataUpdatedAt: runsUpdatedAt,
+  } = useCheckRuns(
+    open ? repoPath : null,
+    open ? login : null,
+    open ? pr.head_sha : null,
+    open ? prPollIntervalMs(pr, isPrTabActive, true) : null,
+  );
   const [repoSettings, setRepoSettings] = useState<RepoMergeSettings | null>(null);
+
+  // Force a fresh check-runs fetch every time this dialog opens — you're about to merge, so a
+  // 20s-stale CI result (the shared staleTime CIBadge also uses) isn't good enough here.
+  useEffect(() => {
+    if (open) void queryClient.invalidateQueries({ queryKey: queryKeys.checkRuns(repoPath, login, pr.head_sha) });
+  }, [open, repoPath, login, pr.head_sha, queryClient]);
 
   // Reset per-open state right at the moment the dialog opens, mirroring CreatePRDialog.
   const wasOpenRef = useRef(false);
@@ -75,18 +97,6 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     }
     wasOpenRef.current = open;
   }, [open, pr.title, pr.number]);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    void api.githubListCheckRuns(repoPath, login, pr.head_sha).then(
-      (result) => !cancelled && setRuns(result),
-      () => !cancelled && setRuns([]),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [open, repoPath, login, pr.head_sha]);
 
   // Only offer merge methods this repo (and this base branch's protection rules, e.g. "require
   // linear history" ruling out merge commits) actually allow — GitHub 405s on a disallowed one
@@ -132,7 +142,15 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
   const submit = async () => {
     setMerging(true);
     try {
-      await mergePR(repoPath, login, pr.number, method, commitTitle, commitMessage, pr.head_sha, deleteBranch, pr.head_ref);
+      await mergePRMutation.mutateAsync({
+        number: pr.number,
+        method,
+        commitTitle,
+        commitMessage,
+        sha: pr.head_sha,
+        deleteBranch,
+        headRef: pr.head_ref,
+      });
       onOpenChange(false);
     } finally {
       setMerging(false);
@@ -163,7 +181,15 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
           )}
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Checks</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Checks</span>
+              <CheckRunsRefresh
+                dataUpdatedAt={runsUpdatedAt}
+                isFetching={runsFetching}
+                onRefresh={() => void refetchRuns()}
+                pollIntervalMs={open ? prPollIntervalMs(pr, isPrTabActive, true) : null}
+              />
+            </div>
             <div className="flex flex-col gap-1 rounded-md border border-border p-1 text-xs">
               {runs === null ? (
                 <div className="flex flex-col gap-1.5 py-0.5">
@@ -248,7 +274,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
             autoComplete="off"
           />
           <Textarea
-            placeholder="Extra description (optional — leave blank for GitHub's default)"
+            placeholder="Description"
             value={commitMessage}
             onChange={(e) => setCommitMessage(e.target.value)}
             rows={3}

@@ -40,7 +40,9 @@ import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
-import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { useWorkspaces } from "@/hooks/queries/useWorkspaces";
+import { useWorkspaceFilterStore } from "@/store/useWorkspaceFilterStore";
+import { useRepoSyncing } from "@/hooks/queries/useGitSync";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -266,12 +268,12 @@ export function RepoSidebar() {
   const removeRepo = useRepoStore((s) => s.removeRepo);
   const addExistingRepo = useRepoStore((s) => s.addExistingRepo);
   const setReposLocal = useRepoStore.setState;
-  const syncing = useRepoStore((s) => s.syncing);
+  const syncing = useRepoSyncing(selectedRepo);
   const [dragOver, setDragOver] = useState(false);
   const sidebarSort = useSettingsStore((s) => s.settings.sidebar_sort);
   const showAheadBehind = useSettingsStore((s) => s.settings.show_ahead_behind);
-  const workspaces = useWorkspaceStore((s) => s.workspaces);
-  const activeWorkspaceId = useWorkspaceStore((s) => s.activeId);
+  const { data: workspaces } = useWorkspaces();
+  const activeWorkspaceId = useWorkspaceFilterStore((s) => s.activeId);
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
 
   const { width, onPointerDown } = useResizableWidth("sidebar-width:repos", 256, 200, 480);

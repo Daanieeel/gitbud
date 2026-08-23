@@ -8,6 +8,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { CIBadge } from "./CIBadge";
 import { MergePRDialog } from "./MergePRDialog";
 import { usePRStore } from "@/store/usePRStore";
+import { useAddReviewComment, usePullRequestDetail } from "@/hooks/queries/usePullRequests";
+import { prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
 import { api } from "@/lib/tauri";
 import type { ImageDiff, PullRequest } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -32,11 +34,13 @@ interface PRDetailProps {
 }
 
 export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
-  const files = usePRStore((s) => s.files);
   const selectedFilePath = usePRStore((s) => s.selectedFilePath);
-  const comments = usePRStore((s) => s.comments);
   const selectFile = usePRStore((s) => s.selectFile);
-  const addComment = usePRStore((s) => s.addComment);
+  const { data } = usePullRequestDetail(repoPath, login, pr.number);
+  const files = data?.files ?? [];
+  const comments = data?.comments ?? [];
+  const addCommentMutation = useAddReviewComment(repoPath, login, pr.number);
+  const isPrTabActive = useIsPrTabActive();
 
   const [checkingOut, setCheckingOut] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
@@ -86,7 +90,12 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
             {pr.head_ref} → {pr.base_ref}
           </div>
         </div>
-        <CIBadge repoPath={repoPath} login={login} sha={pr.head_sha} />
+        <CIBadge
+          repoPath={repoPath}
+          login={login}
+          sha={pr.head_sha}
+          pollIntervalMs={prPollIntervalMs(pr, isPrTabActive, true)}
+        />
         <Tooltip>
           <TooltipTrigger asChild>
             <a
@@ -162,7 +171,10 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
             diff={selectedFile?.diff ?? null}
             imageDiff={selectedImageDiff}
             comments={fileComments}
-            onAddComment={(line, side, body) => addComment(repoPath, login, line, side, body)}
+            onAddComment={(line, side, body) => {
+              if (!selectedFilePath) return;
+              addCommentMutation.mutate({ commitId: pr.head_sha, path: selectedFilePath, line, side, body });
+            }}
           />
         </div>
       </div>

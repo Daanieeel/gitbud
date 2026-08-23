@@ -10,8 +10,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useCommitLog, useInteractiveRebase } from "@/hooks/queries/useCommitLog";
 import type { CommitEntry } from "@/lib/types";
 
 type Action = "pick" | "squash" | "drop";
@@ -31,9 +31,8 @@ interface InteractiveRebaseDialogProps {
 
 export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRebaseDialogProps) {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const commits = useRepoStore((s) => s.commits);
-  const refreshStatus = useRepoStore((s) => s.refreshStatus);
-  const resetHistory = useRepoStore((s) => s.resetHistory);
+  const { commits } = useCommitLog(repoPath);
+  const rebaseMutation = useInteractiveRebase(repoPath);
 
   const initialRows = useMemo<Row[]>(() => {
     if (!baseOid) return [];
@@ -88,13 +87,11 @@ export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRe
     setRunning(true);
     setError(null);
     try {
-      const result = await api.interactiveRebase(
-        repoPath,
+      const result = await rebaseMutation.mutateAsync({
         baseOid,
-        rows.map((r) => ({ oid: r.commit.oid, action: r.action })),
-      );
+        todo: rows.map((r) => ({ oid: r.commit.oid, action: r.action })),
+      });
       if (result.success) {
-        await Promise.all([refreshStatus(), resetHistory()]);
         close();
       } else {
         setError(

@@ -12,9 +12,33 @@ import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { PullRequest } from "@/lib/types";
 import { usePRStore } from "@/store/usePRStore";
+import { prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
 import { CIBadge } from "./CIBadge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
+
+type PRStatus = "merged" | "draft" | "closed" | "open";
+
+function prStatus(pr: PullRequest): PRStatus {
+  if (pr.merged) return "merged";
+  if (pr.draft) return "draft";
+  if (pr.state === "closed") return "closed";
+  return "open";
+}
+
+const PR_STATUS_ICON: Record<PRStatus, typeof GitPullRequestIcon> = {
+  merged: GitPullRequestIcon,
+  draft: GitPullRequestDraftIcon,
+  closed: GitPullRequestClosedIcon,
+  open: GitPullRequestArrowIcon,
+};
+
+const PR_STATUS_COLOR: Record<PRStatus, string> = {
+  merged: "text-accent-purple",
+  draft: "text-muted-foreground",
+  closed: "text-destructive",
+  open: "text-accent-green",
+};
 
 interface PRListProps {
   loading: boolean;
@@ -32,6 +56,7 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
   const [filter, setFilter] = useState("");
   const watched = usePRStore((s) => s.watched);
   const toggleWatch = usePRStore((s) => s.toggleWatch);
+  const isPrTabActive = useIsPrTabActive();
 
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -88,14 +113,8 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
           <div className="p-4 text-center text-sm text-muted-foreground">No pull requests found</div>
         ) : (
           filtered.map((pr) => {
-            const closed = pr.state === "closed" && !pr.merged;
-            const Icon = pr.merged
-              ? GitPullRequestIcon
-              : pr.draft
-                ? GitPullRequestDraftIcon
-                : closed
-                  ? GitPullRequestClosedIcon
-                  : GitPullRequestArrowIcon;
+            const status = prStatus(pr);
+            const Icon = PR_STATUS_ICON[status];
             return (
               <div
                 key={pr.number}
@@ -105,18 +124,7 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
                 )}
                 onClick={() => onSelect(pr.number)}
               >
-                <Icon
-                  className={cn(
-                    "mt-0.5 size-3.5 shrink-0",
-                    pr.merged
-                      ? "text-accent-purple"
-                      : pr.draft
-                        ? "text-muted-foreground"
-                        : closed
-                          ? "text-destructive"
-                          : "text-accent-green",
-                  )}
-                />
+                <Icon className={cn("mt-0.5 size-3.5 shrink-0", PR_STATUS_COLOR[status])} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate">{pr.title}</div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -124,7 +132,12 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
                     <span>
                       #{pr.number} by {pr.author_login}
                     </span>
-                    <CIBadge repoPath={repoPath} login={login} sha={pr.head_sha} />
+                    <CIBadge
+                      repoPath={repoPath}
+                      login={login}
+                      sha={pr.head_sha}
+                      pollIntervalMs={prPollIntervalMs(pr, isPrTabActive, pr.number === selectedNumber)}
+                    />
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button

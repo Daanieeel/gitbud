@@ -1,27 +1,25 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { BoxIcon, DownloadIcon, RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import {
+  useSubmodules,
+  useUpdateAllSubmodules,
+  useUpdateSubmodule,
+} from "@/hooks/queries/useSubmodules";
 import { cn } from "@/lib/utils";
-import type { SubmoduleInfo } from "@/lib/types";
 
 export function SubmodulesPanel() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const [submodules, setSubmodules] = useState<SubmoduleInfo[]>([]);
+  const { data: submodules } = useSubmodules(repoPath);
+  const updateSubmodule = useUpdateSubmodule(repoPath);
+  const updateAllSubmodules = useUpdateAllSubmodules(repoPath);
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const busy = busyKey !== null;
 
-  useEffect(() => {
-    if (!repoPath) return;
-    void api.listSubmodules(repoPath).then(setSubmodules);
-  }, [repoPath]);
-
   if (!repoPath || submodules.length === 0) return null;
-
-  const refresh = () => void api.listSubmodules(repoPath).then(setSubmodules);
 
   const runBusy = async (key: string, fn: () => Promise<void>) => {
     const startedAt = Date.now();
@@ -35,17 +33,9 @@ export function SubmodulesPanel() {
     }
   };
 
-  const updateOne = (path: string) =>
-    runBusy(path, async () => {
-      await api.updateSubmodule(repoPath, path);
-      refresh();
-    });
+  const updateOne = (path: string) => runBusy(path, () => updateSubmodule.mutateAsync(path));
 
-  const updateAll = () =>
-    runBusy("__all__", async () => {
-      await api.updateAllSubmodules(repoPath);
-      refresh();
-    });
+  const updateAll = () => runBusy("__all__", () => updateAllSubmodules.mutateAsync());
 
   const uninitialized = submodules.filter((s) => !s.initialized).length;
 
