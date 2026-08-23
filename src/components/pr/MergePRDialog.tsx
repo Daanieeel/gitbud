@@ -150,6 +150,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
         sha: pr.head_sha,
         deleteBranch,
         headRef: pr.head_ref,
+        baseRef: pr.base_ref,
       });
       onOpenChange(false);
     } finally {

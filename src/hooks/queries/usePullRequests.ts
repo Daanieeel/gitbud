@@ -6,7 +6,7 @@ import { useNetworkStore } from "@/store/useNetworkStore";
 import { isBrokenTokenError, useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import type { PRFilter } from "@/store/usePRStore";
-import type { PullRequest, PullRequestFile, ReviewComment } from "@/lib/types";
+import type { BranchInfo, PullRequest, PullRequestFile, ReviewComment } from "@/lib/types";
 
 const PR_PAGE_SIZE = 50;
 
@@ -107,6 +107,7 @@ export function useMergePullRequest(repoPath: string | null, login: string | nul
       sha,
       deleteBranch,
       headRef,
+      baseRef,
     }: {
       number: number;
       method: string;
@@ -115,6 +116,7 @@ export function useMergePullRequest(repoPath: string | null, login: string | nul
       sha: string;
       deleteBranch: boolean;
       headRef: string;
+      baseRef: string;
     }) => {
       const path = repoPath as string;
       await api.githubMergePullRequest(
@@ -132,11 +134,23 @@ export function useMergePullRequest(repoPath: string | null, login: string | nul
         } catch (err) {
           toast.error(String(err));
         }
-        // Best-effort: the merged branch is very often not even checked out locally, and git2
-        // errors on deleting whichever branch IS currently checked out — neither case should
-        // block on or surface an error for what's just opportunistic local cleanup.
+        // Best-effort: the merged branch is very often not even checked out locally. But when it
+        // IS the currently checked-out branch, git2 refuses to delete it outright — dodge that by
+        // switching to the PR's base branch first (falling back to any other local branch if the
+        // base isn't checked out locally either), mirroring useDeleteBranch's fallback logic.
+        const cached = queryClient.getQueryData<{ branch: string | null; branches: BranchInfo[] }>(
+          queryKeys.branches(path),
+        );
+        if (cached?.branch === headRef) {
+          const fallback =
+            cached.branches.find((b) => !b.is_remote && b.name === baseRef) ??
+            cached.branches.find((b) => !b.is_remote && b.name !== headRef);
+          if (fallback) await api.checkoutBranch(path, fallback.name).catch(() => {});
+        }
         await api.deleteBranch(path, headRef).catch(() => {});
         void queryClient.invalidateQueries({ queryKey: queryKeys.branches(path) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.status(path) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.log(path) });
         void useRepoStore.getState().loadRepos();
       }
     },
