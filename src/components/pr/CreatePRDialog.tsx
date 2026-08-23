@@ -31,6 +31,12 @@ interface CreatePRDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+function branchNameToPrTitle(name: string): string {
+  const slashIdx = name.indexOf("/");
+  const withColon = slashIdx === -1 ? name : `${name.slice(0, slashIdx)}: ${name.slice(slashIdx + 1)}`;
+  return withColon.replace(/-/g, " ");
+}
+
 // Matches git2's `Delta` Debug-formatted variants, which is what get_branch_diff_files reports
 // (a local tree-to-tree diff, not the GitHub API) — distinct casing from the GitHub-backed
 // PRDetail's lowercase file statuses.
@@ -95,7 +101,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const wasOpenRef = useRef(false);
   useEffect(() => {
     if (open && !wasOpenRef.current && branch) {
-      setTitle((prev) => prev || branch);
+      setTitle((prev) => prev || branchNameToPrTitle(branch));
     }
     wasOpenRef.current = open;
   }, [open, branch]);
