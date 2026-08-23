@@ -113,20 +113,20 @@ Pull requests, checks, and review comments need a signed-in GitHub account. GitB
 
 ## Architecture
 
-- **Rust (`src-tauri/`)** — all git truth lives here: `git2` for status/diff/staging/commit/branch/history/hunks, system `git`/`gh` shelled out for anything touching auth (fetch/pull/push/clone), `notify` for debounced filesystem watching, OS keychain for GitHub tokens.
-- **React + TypeScript (`src/`)** — a thin rendering layer over Tauri commands/events. Zustand stores per concern (repo state, GitHub, PRs, settings). No git logic on the frontend, by design — it should be replaceable without touching a single Rust file.
+- **Rust (`src-tauri/`)** holds all git truth: `git2` for status/diff/staging/commit/branch/history/hunks, system `git`/`gh` shelled out for anything touching auth (fetch/pull/push/clone), `notify` for debounced filesystem watching, OS keychain for GitHub tokens.
+- **React + TypeScript (`src/`)** is a thin rendering layer over Tauri commands/events. Zustand stores per concern (repo state, GitHub, PRs, settings). No git logic on the frontend, by design: it should be replaceable without touching a single Rust file.
 
 ## Contributing
 
-Issues and PRs welcome — this is early enough that a well-argued PR can genuinely shape the roadmap. Please also read the [Code of Conduct](CODE_OF_CONDUCT.md). A few ground rules to keep this project on-mission:
+Issues and PRs welcome. This is early enough that a well-argued PR can genuinely shape the roadmap. Please also read the [Code of Conduct](CODE_OF_CONDUCT.md). A few ground rules to keep this project on-mission:
 
 1. **RAM and cold-start numbers are acceptance criteria, not vibes.** If a change adds meaningful idle memory or startup time, it needs a reason.
-2. **No polling.** State changes should be event-driven (filesystem watcher, Tauri events), not timers.
+2. **Local state stays event-driven.** Anything backed by the local `.git` (status, log, branches) should update from the filesystem watcher or Tauri events, not a timer. Remote-facing data (PRs, CI checks, background fetch) already polls on a backoff schedule since GitHub gives us no push channel for it; reuse that schedule instead of adding another timer.
 3. **Auth stays out of Rust.** Anything that needs a user's GitHub credentials for git operations (fetch/pull/push/clone) shells out to system `git`; only the GitHub *API* (PRs, checks, comments) talks HTTP directly, using tokens from Device Flow or `gh`.
 4. **Keep the frontend dumb.** Git logic belongs in `src-tauri/`, not in a Zustand store.
 
-Every push and PR runs through [CI](.github/workflows/ci.yml) — `cargo check` + `cargo test` on macOS, Windows, and Linux, plus a frontend typecheck and build. Keep it green.
+Every push and PR runs through [CI](.github/workflows/ci.yml): `cargo check` + `cargo test` on macOS, Windows, and Linux, plus a frontend typecheck and build. Keep it green.
 
 ## License
 
-[GNU Affero General Public License v3.0 or later](LICENSE) — free to use, modify, and redistribute (commercially or not), but any distributed or network-served version, including a modified or hosted one, must keep its source available under the same terms. It can never be relicensed as closed-source/proprietary.
+[GNU Affero General Public License v3.0 or later](LICENSE): free to use, modify, and redistribute (commercially or not), but any distributed or network-served version, including a modified or hosted one, must keep its source available under the same terms. It can never be relicensed as closed-source/proprietary.
