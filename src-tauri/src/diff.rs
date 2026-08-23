@@ -132,6 +132,16 @@ fn intraline_diff(old: &str, new: &str) -> (Vec<(u32, u32)>, Vec<(u32, u32)>) {
     (old_ranges, new_ranges)
 }
 
+/// Above this many changed characters on either side of a paired line, intraline highlighting
+/// is skipped in favor of showing the whole line removed/added: past this point there's enough
+/// coincidental single-character overlap between the old and new text that highlighting just
+/// the "changed" ranges tends to look noisy and arbitrary rather than clarifying anything.
+const MAX_HIGHLIGHTED_CHANGE_LEN: u32 = 15;
+
+fn ranges_total_len(ranges: &[(u32, u32)]) -> u32 {
+    ranges.iter().map(|(start, end)| end - start).sum()
+}
+
 /// Finds each hunk's "replace" blocks — a run of deletion lines immediately followed by a run
 /// of addition lines, git's usual shape for "this line changed" — and fills in `highlight_ranges`
 /// for the lines that pair up 1:1 across the two runs (extra lines on the longer side are left
@@ -159,6 +169,11 @@ pub fn add_intraline_highlights(hunks: &mut [DiffHunk]) {
             for offset in 0..pair_count {
                 let (old_ranges, new_ranges) =
                     intraline_diff(&hunk.lines[del_start + offset].content, &hunk.lines[add_start + offset].content);
+                if ranges_total_len(&old_ranges) > MAX_HIGHLIGHTED_CHANGE_LEN
+                    || ranges_total_len(&new_ranges) > MAX_HIGHLIGHTED_CHANGE_LEN
+                {
+                    continue;
+                }
                 hunk.lines[del_start + offset].highlight_ranges = old_ranges;
                 hunk.lines[add_start + offset].highlight_ranges = new_ranges;
             }
@@ -331,6 +346,24 @@ mod tests {
         assert!(!hunks[0].lines[0].highlight_ranges.is_empty());
         assert!(hunks[0].lines[1].highlight_ranges.is_empty());
         assert!(!hunks[0].lines[2].highlight_ranges.is_empty());
+    }
+
+    #[test]
+    fn intraline_skips_highlighting_past_the_length_threshold() {
+        // The whole first half of the line differs — well past MAX_HIGHLIGHTED_CHANGE_LEN —
+        // so both sides should fall back to a plain whole-line change instead of a highlight
+        // that would otherwise land on almost the entire line.
+        let mut hunks = vec![DiffHunk {
+            header: String::new(),
+            lines: vec![
+                line(LineKind::Deletion, "this whole first section is completely different, end"),
+                line(LineKind::Addition, "a totally rewritten opening passage right here, end"),
+            ],
+        }];
+        add_intraline_highlights(&mut hunks);
+
+        assert!(hunks[0].lines[0].highlight_ranges.is_empty());
+        assert!(hunks[0].lines[1].highlight_ranges.is_empty());
     }
 }
 
