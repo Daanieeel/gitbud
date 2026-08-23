@@ -12,11 +12,13 @@ import type { PullRequest } from "@/lib/types";
 // The open-PR list and watched-PR CI checks are cheap REST GETs — poll them fast right after
 // opening the app or switching repos (when "did anything change" is most likely to matter and
 // most worth answering quickly), then back off in two steps as that stops being freshly true.
-const BURST_DURATION_MS = 3 * 60_000;
-const BURST_INTERVAL_MS = 5_000;
-const STEADY_DURATION_MS = 30 * 60_000;
-const STEADY_INTERVAL_MS = 30_000;
-const LONG_INTERVAL_MS = 60_000;
+// Tiers checked in order — the first one whose `maxElapsedMs` the elapsed time is still under
+// wins. The last tier's `maxElapsedMs` is Infinity so there's always a match.
+const POLL_TIERS: { maxElapsedMs: number; intervalMs: number }[] = [
+  { maxElapsedMs: 3 * 60_000, intervalMs: 5_000 },
+  { maxElapsedMs: 30 * 60_000, intervalMs: 30_000 },
+  { maxElapsedMs: Infinity, intervalMs: 60_000 },
+];
 // git fetch is a real network git operation (ref advertisement + object transfer), materially
 // pricier than a small REST GET — kept on its own slower, constant cadence rather than riding
 // the burst/steady schedule above.
@@ -126,12 +128,7 @@ export function useProviderSync(
     let cheapTimer: ReturnType<typeof setTimeout>;
     const scheduleCheapCheck = () => {
       const elapsed = Date.now() - burstStartedAt;
-      const delay =
-        elapsed < BURST_DURATION_MS
-          ? BURST_INTERVAL_MS
-          : elapsed < STEADY_DURATION_MS
-            ? STEADY_INTERVAL_MS
-            : LONG_INTERVAL_MS;
+      const delay = POLL_TIERS.find((tier) => elapsed < tier.maxElapsedMs)!.intervalMs;
       cheapTimer = setTimeout(() => {
         void runCheapCheck().finally(() => {
           if (!cancelled) scheduleCheapCheck();

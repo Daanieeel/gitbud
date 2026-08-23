@@ -57,6 +57,20 @@ export function runStatusLabel(run: CheckRun): string {
   return RUN_STATUS_LABEL[raw] ?? raw.replace(/_/g, " ");
 }
 
+const OVERALL_ICON: Record<Overall, typeof CheckCircle2Icon> = {
+  passing: CheckCircle2Icon,
+  failing: XCircleIcon,
+  pending: CircleDashedIcon,
+  none: CircleDashedIcon,
+};
+
+const OVERALL_COLOR: Record<Overall, string> = {
+  passing: "text-accent-green",
+  failing: "text-accent-pink",
+  pending: "text-accent-yellow",
+  none: "text-accent-yellow",
+};
+
 export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
   const { data: runs = null } = useCheckRuns(repoPath, login, sha);
   const [open, setOpen] = useState(false);
@@ -64,9 +78,8 @@ export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
   if (runs === null || runs.length === 0) return null;
   const overall = overallFrom(runs);
 
-  const Icon = overall === "passing" ? CheckCircle2Icon : overall === "failing" ? XCircleIcon : CircleDashedIcon;
-  const color =
-    overall === "passing" ? "text-accent-green" : overall === "failing" ? "text-accent-pink" : "text-accent-yellow";
+  const Icon = OVERALL_ICON[overall];
+  const color = OVERALL_COLOR[overall];
 
   return (
     <Tooltip>
