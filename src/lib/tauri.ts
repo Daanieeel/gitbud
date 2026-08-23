@@ -77,10 +77,16 @@ export const api = {
     invoke<string>("read_working_file", { repoPath, path }),
   stageHunk: (repoPath: string, path: string, hunkIndex: number) =>
     invoke<void>("stage_hunk", { repoPath, path, hunkIndex }),
+  stageHunkLines: (repoPath: string, path: string, hunkIndex: number, lineIndices: number[]) =>
+    invoke<void>("stage_hunk_lines", { repoPath, path, hunkIndex, lineIndices }),
   unstageHunk: (repoPath: string, path: string, hunkIndex: number) =>
     invoke<void>("unstage_hunk", { repoPath, path, hunkIndex }),
+  unstageHunkLines: (repoPath: string, path: string, hunkIndex: number, lineIndices: number[]) =>
+    invoke<void>("unstage_hunk_lines", { repoPath, path, hunkIndex, lineIndices }),
   discardHunk: (repoPath: string, path: string, hunkIndex: number) =>
     invoke<void>("discard_hunk", { repoPath, path, hunkIndex }),
+  discardHunkLines: (repoPath: string, path: string, hunkIndex: number, lineIndices: number[]) =>
+    invoke<void>("discard_hunk_lines", { repoPath, path, hunkIndex, lineIndices }),
   commit: (repoPath: string, summary: string, description: string) =>
     invoke<string>("commit", { repoPath, summary, description }),
   createFixupCommit: (repoPath: string, targetOid: string) =>

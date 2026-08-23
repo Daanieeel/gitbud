@@ -92,8 +92,10 @@ export function useAddToGitignore(repoPath: string | null) {
 export function useStageHunk(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ path, hunkIndex }: { path: string; hunkIndex: number }) =>
-      api.stageHunk(repoPath as string, path, hunkIndex),
+    mutationFn: ({ path, hunkIndex, lineIndices }: { path: string; hunkIndex: number; lineIndices?: number[] }) =>
+      lineIndices
+        ? api.stageHunkLines(repoPath as string, path, hunkIndex, lineIndices)
+        : api.stageHunk(repoPath as string, path, hunkIndex),
     onSuccess: (_, { path }) => {
       if (!repoPath) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
@@ -105,8 +107,10 @@ export function useStageHunk(repoPath: string | null) {
 export function useUnstageHunk(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ path, hunkIndex }: { path: string; hunkIndex: number }) =>
-      api.unstageHunk(repoPath as string, path, hunkIndex),
+    mutationFn: ({ path, hunkIndex, lineIndices }: { path: string; hunkIndex: number; lineIndices?: number[] }) =>
+      lineIndices
+        ? api.unstageHunkLines(repoPath as string, path, hunkIndex, lineIndices)
+        : api.unstageHunk(repoPath as string, path, hunkIndex),
     onSuccess: (_, { path }) => {
       if (!repoPath) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
@@ -118,8 +122,10 @@ export function useUnstageHunk(repoPath: string | null) {
 export function useDiscardHunk(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ path, hunkIndex }: { path: string; hunkIndex: number }) =>
-      api.discardHunk(repoPath as string, path, hunkIndex),
+    mutationFn: ({ path, hunkIndex, lineIndices }: { path: string; hunkIndex: number; lineIndices?: number[] }) =>
+      lineIndices
+        ? api.discardHunkLines(repoPath as string, path, hunkIndex, lineIndices)
+        : api.discardHunk(repoPath as string, path, hunkIndex),
     onSuccess: (_, { path }) => {
       if (!repoPath) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });

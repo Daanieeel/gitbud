@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { ColumnsIcon, LinkIcon, MessageSquarePlusIcon, RowsIcon } from "lucide-react";
+import { ColumnsIcon, LinkIcon, MessageSquarePlusIcon, MinusIcon, PlusIcon, RowsIcon, Trash2Icon } from "lucide-react";
 import type { DiffHunk, DiffLine, FileDiff, ImageDiff, LineKind, ReviewComment } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { ImageDiffView } from "./ImageDiffView";
@@ -17,6 +17,13 @@ interface HunkActions {
   onStage?: (hunkIndex: number) => void;
   onUnstage?: (hunkIndex: number) => void;
   onDiscard?: (hunkIndex: number) => void;
+  /** Line-level counterparts — each takes the indices (into that hunk's `lines[]`) of the
+   * +/- line(s) to act on alone, leaving the rest of the hunk untouched. A modified line is a
+   * delete+add pair under the hood, so staging "the whole line" means both indices; these are
+   * plumbed through per-line so callers decide (e.g. one line at a time, from a hover button). */
+  onStageLines?: (hunkIndex: number, lineIndices: number[]) => void;
+  onUnstageLines?: (hunkIndex: number, lineIndices: number[]) => void;
+  onDiscardLines?: (hunkIndex: number, lineIndices: number[]) => void;
 }
 
 interface DiffViewProps {
@@ -242,6 +249,7 @@ function UnifiedLine({
   comments,
   onAddComment,
   onCopyPermalink,
+  hunkActions,
   composerKey,
   setComposerKey,
 }: {
@@ -252,6 +260,7 @@ function UnifiedLine({
   comments: ReviewComment[] | undefined;
   onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
   onCopyPermalink?: (line: number) => void;
+  hunkActions?: HunkActions;
   composerKey: string | null;
   setComposerKey: (key: string | null) => void;
 }) {
@@ -313,6 +322,50 @@ function UnifiedLine({
             </TooltipTrigger>
             <TooltipContent>Add comment</TooltipContent>
           </Tooltip>
+        )}
+        {line.kind !== "context" && hunkActions && (
+          <div className="ml-auto flex shrink-0 items-center gap-1.5 pl-2 opacity-0 group-hover:opacity-100">
+            {hunkActions.staged
+              ? hunkActions.onUnstageLines && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => hunkActions.onUnstageLines?.(hunkIdx, [lineIdx])}
+                      >
+                        <MinusIcon className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Unstage this line</TooltipContent>
+                  </Tooltip>
+                )
+              : hunkActions.onStageLines && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="text-muted-foreground hover:text-foreground"
+                        onClick={() => hunkActions.onStageLines?.(hunkIdx, [lineIdx])}
+                      >
+                        <PlusIcon className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Stage this line</TooltipContent>
+                  </Tooltip>
+                )}
+            {!hunkActions.staged && hunkActions.onDiscardLines && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    className="text-muted-foreground hover:text-destructive"
+                    onClick={() => hunkActions.onDiscardLines?.(hunkIdx, [lineIdx])}
+                  >
+                    <Trash2Icon className="size-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Discard this line</TooltipContent>
+              </Tooltip>
+            )}
+          </div>
         )}
       </div>
       <CommentThread comments={lineComments} />
@@ -449,6 +502,7 @@ function DiffSection({
                   comments={comments}
                   onAddComment={onAddComment}
                   onCopyPermalink={onCopyPermalink}
+                  hunkActions={hunkActions}
                   composerKey={composerKey}
                   setComposerKey={setComposerKey}
                 />

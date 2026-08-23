@@ -134,6 +134,18 @@ async fn stage_hunk(repo_path: String, path: String, hunk_index: usize) -> Resul
 }
 
 #[tauri::command]
+async fn stage_hunk_lines(
+    repo_path: String,
+    path: String,
+    hunk_index: usize,
+    line_indices: Vec<usize>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || hunk::stage_hunk_lines(&repo_path, &path, hunk_index, &line_indices))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn unstage_hunk(repo_path: String, path: String, hunk_index: usize) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || hunk::unstage_hunk(&repo_path, &path, hunk_index))
         .await
@@ -141,8 +153,32 @@ async fn unstage_hunk(repo_path: String, path: String, hunk_index: usize) -> Res
 }
 
 #[tauri::command]
+async fn unstage_hunk_lines(
+    repo_path: String,
+    path: String,
+    hunk_index: usize,
+    line_indices: Vec<usize>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || hunk::unstage_hunk_lines(&repo_path, &path, hunk_index, &line_indices))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn discard_hunk(repo_path: String, path: String, hunk_index: usize) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || hunk::discard_hunk(&repo_path, &path, hunk_index))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn discard_hunk_lines(
+    repo_path: String,
+    path: String,
+    hunk_index: usize,
+    line_indices: Vec<usize>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || hunk::discard_hunk_lines(&repo_path, &path, hunk_index, &line_indices))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -1441,8 +1477,11 @@ pub fn run() {
             resolve_conflict,
             read_working_file,
             stage_hunk,
+            stage_hunk_lines,
             unstage_hunk,
+            unstage_hunk_lines,
             discard_hunk,
+            discard_hunk_lines,
             commit,
             create_fixup_commit,
             amend_commit,
