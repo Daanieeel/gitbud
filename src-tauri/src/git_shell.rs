@@ -72,15 +72,25 @@ fn stream_reader(
     app: AppHandle,
     event: String,
     stream_name: &'static str,
+    capture: Option<Arc<Mutex<Vec<String>>>>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut pending = Vec::new();
         let mut buf = [0u8; 4096];
         let emit = |app: &AppHandle, segment: &[u8]| {
             let line = String::from_utf8_lossy(segment).trim().to_string();
-            if !line.is_empty() {
-                let _ = app.emit(&event, GitOutputLine { stream: stream_name.into(), line });
+            if line.is_empty() {
+                return;
             }
+            // Progress-meter lines (git's own "Counting objects: 45% (.../...)") always carry a
+            // percentage — excluding them keeps a failure message focused on the actual error
+            // (e.g. a server-side rejection reason) instead of the transfer noise leading up to it.
+            if let Some(capture) = &capture {
+                if !line.contains('%') {
+                    capture.lock().unwrap().push(line.clone());
+                }
+            }
+            let _ = app.emit(&event, GitOutputLine { stream: stream_name.into(), line });
         };
         loop {
             match reader.read(&mut buf) {
@@ -150,9 +160,19 @@ fn run_streaming(app: &AppHandle, cwd: Option<&str>, args: &[&str], event_id: &s
         .map_err(|_| "internal lock error".to_string())?
         .insert(event_id.to_string(), RunningOp { pid: child.id(), cancelled: Arc::clone(&cancelled) });
 
+    let captured_stderr: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+
     let channel = event_channel(event_id);
-    let out_handle = stream_reader(stdout, Arc::clone(&last_activity), app.clone(), channel.clone(), "stdout");
-    let err_handle = stream_reader(stderr, Arc::clone(&last_activity), app.clone(), channel, "stderr");
+    let out_handle =
+        stream_reader(stdout, Arc::clone(&last_activity), app.clone(), channel.clone(), "stdout", None);
+    let err_handle = stream_reader(
+        stderr,
+        Arc::clone(&last_activity),
+        app.clone(),
+        channel,
+        "stderr",
+        Some(Arc::clone(&captured_stderr)),
+    );
 
     let done = Arc::new(AtomicBool::new(false));
     let watchdog_done = Arc::clone(&done);
@@ -191,7 +211,20 @@ fn run_streaming(app: &AppHandle, cwd: Option<&str>, args: &[&str], event_id: &s
             IDLE_TIMEOUT.as_secs()
         ))
     } else {
-        Err(format!("git {} exited with {status}", args.join(" ")))
+        // Strip git's own "remote: " passthrough prefix so a server-side message (e.g. a
+        // GitHub branch protection rejection) reads like a normal sentence instead of looking
+        // like raw transport plumbing.
+        let stderr_lines = captured_stderr.lock().unwrap();
+        let detail: Vec<&str> = stderr_lines
+            .iter()
+            .map(|line| line.strip_prefix("remote:").map(str::trim).unwrap_or(line.as_str()))
+            .filter(|line| !line.is_empty())
+            .collect();
+        if detail.is_empty() {
+            Err(format!("git {} exited with {status}", args.join(" ")))
+        } else {
+            Err(detail.join("\n"))
+        }
     }
 }
 
