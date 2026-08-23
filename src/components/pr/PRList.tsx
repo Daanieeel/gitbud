@@ -1,8 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from "react";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import {
-  BellIcon,
-  BellRingIcon,
   GitPullRequestIcon,
   GitPullRequestDraftIcon,
   GitPullRequestClosedIcon,
@@ -12,10 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { PullRequest } from "@/lib/types";
-import { usePRStore } from "@/store/usePRStore";
 import { prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
 import { CIBadge } from "./CIBadge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type PRStatus = "merged" | "draft" | "closed" | "open";
@@ -55,8 +51,6 @@ interface PRListProps {
 
 export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMore, loadingMore, onLoadMore, onSelect }: PRListProps) {
   const [filter, setFilter] = useState("");
-  const watched = usePRStore((s) => s.watched);
-  const toggleWatch = usePRStore((s) => s.toggleWatch);
   const isPrTabActive = useIsPrTabActive();
 
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -166,31 +160,6 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
                       sha={pr.head_sha}
                       pollIntervalMs={prPollIntervalMs(pr, isPrTabActive, pr.number === selectedNumber)}
                     />
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleWatch(pr.number);
-                          }}
-                          className={cn(
-                            "text-muted-foreground hover:text-foreground",
-                            watched.includes(pr.number) && "text-accent-yellow",
-                          )}
-                        >
-                          {watched.includes(pr.number) ? (
-                            <BellRingIcon className="size-3" />
-                          ) : (
-                            <BellIcon className="size-3" />
-                          )}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {watched.includes(pr.number)
-                          ? "Stop notifying me when CI status changes"
-                          : "Notify me when CI status changes"}
-                      </TooltipContent>
-                    </Tooltip>
                     {pr.merged && (
                       <span className="rounded bg-accent-purple/20 px-1 text-accent-purple">merged</span>
                     )}

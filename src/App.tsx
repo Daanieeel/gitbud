@@ -15,12 +15,10 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useIdentityStore } from "@/store/useIdentityStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
-import { usePRStore } from "@/store/usePRStore";
 import { useNetworkStore } from "@/store/useNetworkStore";
 import { useUpdateStore } from "@/store/useUpdateStore";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { useGitSync } from "@/hooks/queries/useGitSync";
-import { usePullRequestList } from "@/hooks/queries/usePullRequests";
 import { useProviderSync } from "@/hooks/useProviderSync";
 
 function App() {
@@ -35,12 +33,7 @@ function App() {
   const initIdentities = useIdentityStore((s) => s.init);
   const syncRepoIdentity = useIdentityStore((s) => s.syncRepoIdentity);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
-  const watched = usePRStore((s) => s.watched);
-  // Watched PRs are open by construction (there's no UI to watch a closed one), so this is the
-  // one list that needs to exist for CI-notification polling regardless of which filter the PR
-  // tab itself currently has selected — see useProviderSync.
-  const { pulls: openPulls } = usePullRequestList(selectedRepo, currentLogin, "open");
-  useProviderSync(selectedRepo, currentLogin, watched, openPulls);
+  useProviderSync(selectedRepo, currentLogin);
   const { pull, fetch, push } = useGitSync(selectedRepo, branch);
   const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
 
