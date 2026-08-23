@@ -51,6 +51,10 @@ impl GhClient {
         self.http.patch(self.url(path))
     }
 
+    fn delete(&self, path: &str) -> reqwest::RequestBuilder {
+        self.http.delete(self.url(path))
+    }
+
     /// GitHub Projects (v2) has no REST surface — `query`/`variables` go straight to the
     /// GraphQL endpoint. Unlike REST, GraphQL returns 200 even on a semantic failure, with the
     /// problem described in an `errors` array instead, so that has to be checked explicitly.
@@ -112,6 +116,7 @@ pub struct PullRequest {
     pub draft: bool,
     pub html_url: String,
     pub author_login: String,
+    pub author_avatar_url: String,
     pub head_ref: String,
     pub head_sha: String,
     pub base_ref: String,
@@ -124,6 +129,7 @@ pub struct PullRequest {
 #[derive(Deserialize)]
 struct RawUser {
     login: String,
+    avatar_url: String,
 }
 
 #[derive(Deserialize)]
@@ -170,6 +176,7 @@ impl From<RawPullRequest> for PullRequest {
             draft: raw.draft,
             html_url: raw.html_url,
             author_login: raw.user.login,
+            author_avatar_url: raw.user.avatar_url,
             head_ref: raw.head.ref_name,
             head_sha: raw.head.sha,
             base_ref: raw.base.ref_name,
@@ -210,6 +217,52 @@ pub async fn get_pull_request(
     let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
     let raw: RawPullRequest = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RepoMergeSettings {
+    pub allow_merge_commit: bool,
+    pub allow_squash_merge: bool,
+    pub allow_rebase_merge: bool,
+    /// Repo-level default for the merge dialog's "Delete branch after merge" checkbox.
+    pub delete_branch_on_merge: bool,
+}
+
+#[derive(Deserialize)]
+struct RawRepo {
+    #[serde(default = "default_true")]
+    allow_merge_commit: bool,
+    #[serde(default = "default_true")]
+    allow_squash_merge: bool,
+    #[serde(default = "default_true")]
+    allow_rebase_merge: bool,
+    #[serde(default)]
+    delete_branch_on_merge: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// Which merge methods this repo allows, and whether it defaults to deleting the head branch
+/// on merge — powers the merge dialog so it doesn't offer a method GitHub would reject with a
+/// 405, and so its "Delete branch after merge" checkbox starts at the repo's own convention.
+pub async fn get_repo_merge_settings(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<RepoMergeSettings, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}");
+    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let raw: RawRepo = res.json().await.map_err(|e| e.to_string())?;
+    Ok(RepoMergeSettings {
+        allow_merge_commit: raw.allow_merge_commit,
+        allow_squash_merge: raw.allow_squash_merge,
+        allow_rebase_merge: raw.allow_rebase_merge,
+        delete_branch_on_merge: raw.delete_branch_on_merge,
+    })
 }
 
 #[derive(Debug, Serialize)]
@@ -501,6 +554,15 @@ pub async fn add_pull_request_to_project(
 #[derive(Debug, Serialize)]
 struct MergeBody<'a> {
     merge_method: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    commit_title: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    commit_message: Option<&'a str>,
+    // Pins the merge to the PR's head commit at the time the user opened the merge dialog —
+    // GitHub rejects the request with a 409 if the branch moved since, rather than silently
+    // merging commits the user never saw/reviewed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sha: Option<&'a str>,
 }
 
 pub async fn merge_pull_request(
@@ -510,17 +572,34 @@ pub async fn merge_pull_request(
     repo: &str,
     number: u64,
     merge_method: &str,
+    commit_title: Option<&str>,
+    commit_message: Option<&str>,
+    sha: Option<&str>,
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/merge");
     check(
         gh.put(&path)
-            .json(&MergeBody { merge_method })
+            .json(&MergeBody { merge_method, commit_title, commit_message, sha })
             .send()
             .await
             .map_err(|e| e.to_string())?,
     )
     .await?;
+    Ok(())
+}
+
+/// Deletes `branch` on the remote — used for the merge dialog's "Delete branch after merge".
+/// A no-op-shaped 422 (branch already gone, e.g. GitHub's own auto-delete-branch repo setting
+/// beat us to it) is swallowed rather than surfaced as a merge failure.
+pub async fn delete_branch(host: &str, token: &str, owner: &str, repo: &str, branch: &str) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/git/refs/heads/{branch}");
+    let res = gh.delete(&path).send().await.map_err(|e| e.to_string())?;
+    if res.status() == reqwest::StatusCode::UNPROCESSABLE_ENTITY {
+        return Ok(());
+    }
+    check(res).await?;
     Ok(())
 }
 
@@ -683,6 +762,7 @@ pub struct ReviewComment {
     pub side: Option<String>,
     pub body: String,
     pub user_login: String,
+    pub user_avatar_url: String,
     pub created_at: String,
     pub in_reply_to_id: Option<u64>,
 }
@@ -709,6 +789,7 @@ impl From<RawReviewComment> for ReviewComment {
             side: raw.side,
             body: raw.body,
             user_login: raw.user.login,
+            user_avatar_url: raw.user.avatar_url,
             created_at: raw.created_at,
             in_reply_to_id: raw.in_reply_to_id,
         }

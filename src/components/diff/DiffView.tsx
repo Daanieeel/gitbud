@@ -6,6 +6,7 @@ import { ImageDiffView } from "./ImageDiffView";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Avatar } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { highlightLine, languageForPath } from "@/lib/highlight";
@@ -51,12 +52,15 @@ function CommentThread({ comments }: { comments: ReviewComment[] }) {
   return (
     <div className="ml-16 flex flex-col gap-1 border-l-2 border-primary bg-card px-3 py-2">
       {comments.map((c) => (
-        <div key={c.id} className="text-xs">
-          <span className="font-medium">{c.user_login}</span>{" "}
-          <span className="text-muted-foreground">
-            {new Date(c.created_at).toLocaleDateString()}
-          </span>
-          <p className="whitespace-pre-wrap">{c.body}</p>
+        <div key={c.id} className="flex items-start gap-1.5 text-xs">
+          <Avatar src={c.user_avatar_url} alt={c.user_login} className="mt-0.5 size-4" />
+          <div>
+            <span className="font-medium">{c.user_login}</span>{" "}
+            <span className="text-muted-foreground">
+              {new Date(c.created_at).toLocaleDateString()}
+            </span>
+            <p className="whitespace-pre-wrap">{c.body}</p>
+          </div>
         </div>
       ))}
     </div>

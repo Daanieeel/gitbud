@@ -8,6 +8,7 @@ import {
   GitPullRequestArrowIcon,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { PullRequest } from "@/lib/types";
 import { usePRStore } from "@/store/usePRStore";
@@ -119,6 +120,7 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
                 <div className="min-w-0 flex-1">
                   <div className="truncate">{pr.title}</div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <Avatar src={pr.author_avatar_url} alt={pr.author_login} className="size-3.5" />
                     <span>
                       #{pr.number} by {pr.author_login}
                     </span>

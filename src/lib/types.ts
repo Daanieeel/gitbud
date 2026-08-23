@@ -250,6 +250,7 @@ export interface PullRequest {
   draft: boolean;
   html_url: string;
   author_login: string;
+  author_avatar_url: string;
   head_ref: string;
   head_sha: string;
   base_ref: string;
@@ -266,6 +267,7 @@ export interface ReviewComment {
   side: "LEFT" | "RIGHT" | null;
   body: string;
   user_login: string;
+  user_avatar_url: string;
   created_at: string;
   in_reply_to_id: number | null;
 }
@@ -294,6 +296,13 @@ export interface PullRequestFile {
   filename: string;
   status: string;
   diff: FileDiff;
+}
+
+export interface RepoMergeSettings {
+  allow_merge_commit: boolean;
+  allow_squash_merge: boolean;
+  allow_rebase_merge: boolean;
+  delete_branch_on_merge: boolean;
 }
 
 export interface CheckRun {

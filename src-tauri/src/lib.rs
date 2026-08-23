@@ -1047,9 +1047,38 @@ async fn github_merge_pull_request(
     login: String,
     number: u64,
     merge_method: String,
+    commit_title: Option<String>,
+    commit_message: Option<String>,
+    sha: Option<String>,
 ) -> Result<(), String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::merge_pull_request(&host, &token, &owner, &repo, number, &merge_method).await
+    github::api::merge_pull_request(
+        &host,
+        &token,
+        &owner,
+        &repo,
+        number,
+        &merge_method,
+        commit_title.as_deref(),
+        commit_message.as_deref(),
+        sha.as_deref(),
+    )
+    .await
+}
+
+#[tauri::command]
+async fn github_delete_remote_branch(repo_path: String, login: String, branch: String) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::delete_branch(&host, &token, &owner, &repo, &branch).await
+}
+
+#[tauri::command]
+async fn github_get_repo_merge_settings(
+    repo_path: String,
+    login: String,
+) -> Result<github::api::RepoMergeSettings, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_repo_merge_settings(&host, &token, &owner, &repo).await
 }
 
 #[tauri::command]
@@ -1434,6 +1463,8 @@ pub fn run() {
             github_list_projects,
             github_add_pull_request_to_project,
             github_merge_pull_request,
+            github_delete_remote_branch,
+            github_get_repo_merge_settings,
             github_list_pull_request_files,
             github_get_pull_request_image_diff,
             github_list_review_comments,

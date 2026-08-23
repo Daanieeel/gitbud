@@ -25,6 +25,7 @@ import type {
   RebaseResult,
   RebaseTodoItem,
   RepoEntry,
+  RepoMergeSettings,
   ReflogEntry,
   RepoStatus,
   SigningStatus,
@@ -279,8 +280,28 @@ export const api = {
     invoke<Project[]>("github_list_projects", { repoPath, login }),
   githubAddPullRequestToProject: (repoPath: string, login: string, number: number, projectId: string) =>
     invoke<void>("github_add_pull_request_to_project", { repoPath, login, number, projectId }),
-  githubMergePullRequest: (repoPath: string, login: string, number: number, mergeMethod: string) =>
-    invoke<void>("github_merge_pull_request", { repoPath, login, number, mergeMethod }),
+  githubMergePullRequest: (
+    repoPath: string,
+    login: string,
+    number: number,
+    mergeMethod: string,
+    commitTitle: string | null,
+    commitMessage: string | null,
+    sha: string | null,
+  ) =>
+    invoke<void>("github_merge_pull_request", {
+      repoPath,
+      login,
+      number,
+      mergeMethod,
+      commitTitle,
+      commitMessage,
+      sha,
+    }),
+  githubDeleteRemoteBranch: (repoPath: string, login: string, branch: string) =>
+    invoke<void>("github_delete_remote_branch", { repoPath, login, branch }),
+  githubGetRepoMergeSettings: (repoPath: string, login: string) =>
+    invoke<RepoMergeSettings>("github_get_repo_merge_settings", { repoPath, login }),
   githubListPullRequestFiles: (repoPath: string, login: string, number: number) =>
     invoke<[string, string, FileDiff][]>("github_list_pull_request_files", {
       repoPath,
