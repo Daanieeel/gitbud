@@ -291,3 +291,34 @@ pub async fn poll_device_flow(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn api_base_uses_dotcom_api_host() {
+        assert_eq!(api_base("github.com"), "https://api.github.com");
+    }
+
+    #[test]
+    fn api_base_uses_enterprise_v3_path() {
+        assert_eq!(api_base("git.company.com"), "https://git.company.com/api/v3");
+    }
+
+    #[test]
+    fn web_base_just_adds_scheme() {
+        assert_eq!(web_base("github.com"), "https://github.com");
+        assert_eq!(web_base("git.company.com"), "https://git.company.com");
+    }
+
+    #[test]
+    fn graphql_base_uses_dotcom_graphql_host() {
+        assert_eq!(graphql_base("github.com"), "https://api.github.com/graphql");
+    }
+
+    #[test]
+    fn graphql_base_uses_enterprise_path() {
+        assert_eq!(graphql_base("git.company.com"), "https://git.company.com/api/graphql");
+    }
+}
+

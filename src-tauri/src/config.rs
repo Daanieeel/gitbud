@@ -79,12 +79,9 @@ fn save_repos(repos: &[RepoEntry]) -> Result<(), String> {
     fs::write(&file, contents).map_err(|e| e.to_string())
 }
 
-/// Parses "owner/repo" out of an `origin` remote URL, handling both
+/// Parses "owner/repo" out of an `origin`-style remote URL, handling both
 /// "git@host:owner/repo.git" and "https://host/owner/repo.git" forms.
-pub fn remote_owner_repo(repo_path: &str) -> Option<(String, String)> {
-    let repo = Repository::open(repo_path).ok()?;
-    let url = repo.find_remote("origin").ok()?.url()?.to_string();
-
+fn parse_owner_repo(url: &str) -> Option<(String, String)> {
     let trimmed = url.trim_end_matches(".git").trim_end_matches('/');
     let path_part = if let Some(idx) = trimmed.find("://") {
         let after_scheme = &trimmed[idx + 3..];
@@ -95,7 +92,7 @@ pub fn remote_owner_repo(repo_path: &str) -> Option<(String, String)> {
     } else {
         trimmed
     };
-    
+
     let mut segments = path_part.rsplitn(2, '/');
     let repo_name = segments.next()?.to_string();
     let owner = segments.next()?.to_string();
@@ -103,6 +100,13 @@ pub fn remote_owner_repo(repo_path: &str) -> Option<(String, String)> {
         return None;
     }
     Some((owner, repo_name))
+}
+
+/// Parses "owner/repo" out of a repo's `origin` remote URL.
+pub fn remote_owner_repo(repo_path: &str) -> Option<(String, String)> {
+    let repo = Repository::open(repo_path).ok()?;
+    let url = repo.find_remote("origin").ok()?.url()?.to_string();
+    parse_owner_repo(&url)
 }
 
 /// Derives an owner/group key from a remote URL, e.g. "git@github.com:owner/repo.git" -> "owner".
@@ -236,4 +240,89 @@ pub fn touch_last_fetched(path: &str, timestamp: i64) -> Result<Vec<RepoEntry>, 
     }
     save_repos(&repos)?;
     Ok(repos)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_owner_repo_ssh_form() {
+        assert_eq!(
+            parse_owner_repo("git@github.com:owner/repo.git"),
+            Some(("owner".to_string(), "repo".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_owner_repo_https_form() {
+        assert_eq!(
+            parse_owner_repo("https://github.com/owner/repo.git"),
+            Some(("owner".to_string(), "repo".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_owner_repo_https_no_dot_git_suffix() {
+        assert_eq!(
+            parse_owner_repo("https://github.com/owner/repo"),
+            Some(("owner".to_string(), "repo".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_owner_repo_trailing_slash() {
+        assert_eq!(
+            parse_owner_repo("https://github.com/owner/repo/"),
+            Some(("owner".to_string(), "repo".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_owner_repo_enterprise_host() {
+        assert_eq!(
+            parse_owner_repo("https://git.company.com/owner/repo.git"),
+            Some(("owner".to_string(), "repo".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_owner_repo_rejects_host_only_url() {
+        assert_eq!(parse_owner_repo("https://github.com/"), None);
+        assert_eq!(parse_owner_repo("https://github.com"), None);
+    }
+
+    #[test]
+    fn parse_owner_repo_rejects_garbage() {
+        assert_eq!(parse_owner_repo(""), None);
+        assert_eq!(parse_owner_repo("not-a-url"), None);
+    }
+
+    #[test]
+    fn migrate_legacy_section_converts_singular_to_plural() {
+        let input = serde_json::json!({
+            "repos": [{"path": "/a", "name": "a", "group": "g", "section": "Work"}]
+        });
+        let migrated = migrate_legacy_section(input);
+        let sections = migrated["repos"][0]["sections"].as_array().unwrap();
+        assert_eq!(sections, &vec![serde_json::json!("Work")]);
+    }
+
+    #[test]
+    fn migrate_legacy_section_leaves_existing_sections_alone() {
+        let input = serde_json::json!({
+            "repos": [{"path": "/a", "name": "a", "group": "g", "sections": ["Personal"]}]
+        });
+        let migrated = migrate_legacy_section(input.clone());
+        assert_eq!(migrated, input);
+    }
+
+    #[test]
+    fn migrate_legacy_section_handles_missing_section_field() {
+        let input = serde_json::json!({
+            "repos": [{"path": "/a", "name": "a", "group": "g"}]
+        });
+        let migrated = migrate_legacy_section(input.clone());
+        assert_eq!(migrated, input);
+    }
 }
