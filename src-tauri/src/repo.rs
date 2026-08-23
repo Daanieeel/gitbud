@@ -227,10 +227,75 @@ pub fn create_branch_at(
     Ok(())
 }
 
+/// Finds unstaged-rename pairs (a workdir path git2 would pair with a different index path)
+/// via `renames_index_to_workdir` detection, so callers can stage/unstage both halves of a
+/// move together — staging only one half would leave the other tracked unchanged in the
+/// index, splitting what should be a single rename back into a separate add + delete on the
+/// next status read.
+fn find_index_to_workdir_rename_pairs(repo: &Repository) -> Result<Vec<(String, String)>, String> {
+    let mut opts = StatusOptions::new();
+    opts.include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .renames_index_to_workdir(true);
+    let statuses = repo.statuses(Some(&mut opts)).map_err(|e| e.message().to_string())?;
+
+    let mut pairs = Vec::new();
+    for entry in statuses.iter() {
+        let Some(diff) = entry.index_to_workdir() else { continue };
+        let (Some(new_p), Some(old_p)) = (diff.new_file().path(), diff.old_file().path()) else {
+            continue;
+        };
+        let new_p = new_p.to_string_lossy().to_string();
+        let old_p = old_p.to_string_lossy().to_string();
+        if new_p != old_p {
+            pairs.push((new_p, old_p));
+        }
+    }
+    Ok(pairs)
+}
+
+/// Same as above but for the staged (HEAD-vs-index) side, via `renames_head_to_index`.
+fn find_head_to_index_rename_pairs(repo: &Repository) -> Result<Vec<(String, String)>, String> {
+    let mut opts = StatusOptions::new();
+    opts.renames_head_to_index(true);
+    let statuses = repo.statuses(Some(&mut opts)).map_err(|e| e.message().to_string())?;
+
+    let mut pairs = Vec::new();
+    for entry in statuses.iter() {
+        let Some(diff) = entry.head_to_index() else { continue };
+        let (Some(new_p), Some(old_p)) = (diff.new_file().path(), diff.old_file().path()) else {
+            continue;
+        };
+        let new_p = new_p.to_string_lossy().to_string();
+        let old_p = old_p.to_string_lossy().to_string();
+        if new_p != old_p {
+            pairs.push((new_p, old_p));
+        }
+    }
+    Ok(pairs)
+}
+
+/// Expands `paths` to include the other half of any rename pair either path belongs to.
+fn with_rename_partners(paths: &[String], pairs: &[(String, String)]) -> Vec<String> {
+    let mut expanded: Vec<String> = paths.to_vec();
+    for path in paths {
+        if let Some((new_p, old_p)) = pairs.iter().find(|(n, o)| n == path || o == path) {
+            expanded.push(new_p.clone());
+            expanded.push(old_p.clone());
+        }
+    }
+    expanded.sort();
+    expanded.dedup();
+    expanded
+}
+
 pub fn stage_paths(repo_path: &str, paths: &[String]) -> Result<(), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let rename_pairs = find_index_to_workdir_rename_pairs(&repo)?;
+    let paths = with_rename_partners(paths, &rename_pairs);
+
     let mut index = repo.index().map_err(|e| e.message().to_string())?;
-    for path in paths {
+    for path in &paths {
         let full = std::path::Path::new(repo_path).join(path);
         if full.exists() {
             index.add_path(std::path::Path::new(path)).map_err(|e| e.message().to_string())?;
@@ -247,7 +312,9 @@ pub fn unstage_paths(repo_path: &str, paths: &[String]) -> Result<(), String> {
     match head {
         Some(commit) => {
             let obj = commit.as_object();
-            for path in paths {
+            let rename_pairs = find_head_to_index_rename_pairs(&repo)?;
+            let paths = with_rename_partners(paths, &rename_pairs);
+            for path in &paths {
                 repo.reset_default(Some(obj), [std::path::Path::new(path)])
                     .map_err(|e| e.message().to_string())?;
             }
@@ -395,6 +462,36 @@ mod tests {
         for f in &status.files {
             assert!(!f.path.is_empty());
         }
+    }
+
+    #[test]
+    fn staging_one_half_of_an_unstaged_rename_stages_both_halves() {
+        let scratch = ScratchRepo::new("rename-stage");
+        let repo_path = scratch.path_str();
+        scratch.write_and_commit(
+            "old_name.txt",
+            "hello world\nthis is a decently long file\nwith several lines\nso similarity detection works\n",
+            "base",
+        );
+        std::fs::rename(scratch.path.join("old_name.txt"), scratch.path.join("new_name.txt")).unwrap();
+
+        // Staging only the new (added) half shouldn't leave the old half fully tracked and
+        // unchanged in the index — that would split the rename back into an add + delete pair.
+        stage_paths(&repo_path, &["new_name.txt".to_string()]).unwrap();
+        let status = get_status(&repo_path).unwrap();
+        assert_eq!(status.files.len(), 1, "rename should stay a single entry: {status:?}");
+        assert_eq!(status.files[0].path, "new_name.txt");
+        assert_eq!(status.files[0].old_path.as_deref(), Some("old_name.txt"));
+        assert_eq!(status.files[0].status, ChangeKind::Renamed);
+        assert!(status.files[0].staged);
+
+        // Unstaging it back should restore the single unstaged rename, not orphan either half.
+        unstage_paths(&repo_path, &["new_name.txt".to_string()]).unwrap();
+        let status = get_status(&repo_path).unwrap();
+        assert_eq!(status.files.len(), 1, "unstage should stay a single entry: {status:?}");
+        assert_eq!(status.files[0].path, "new_name.txt");
+        assert_eq!(status.files[0].old_path.as_deref(), Some("old_name.txt"));
+        assert!(!status.files[0].staged);
     }
 
     #[test]
