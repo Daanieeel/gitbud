@@ -209,6 +209,7 @@ export const api = {
   cancelGitOperation: (eventId: string) => invoke<void>("cancel_git_operation", { repoPath: eventId }),
   getAheadBehind: (repoPath: string) => invoke<AheadBehind>("get_ahead_behind", { repoPath }),
   hasUpstreamRemote: (repoPath: string) => invoke<boolean>("has_upstream_remote", { repoPath }),
+  remoteWebInfo: (repoPath: string) => invoke<[string, string] | null>("remote_web_info", { repoPath }),
   getUpstreamAheadBehind: (repoPath: string, branch: string) =>
     invoke<AheadBehind | null>("get_upstream_ahead_behind", { repoPath, branch }),
   syncUpstream: (repoPath: string, branch: string) =>

@@ -79,27 +79,40 @@ fn save_repos(repos: &[RepoEntry]) -> Result<(), String> {
     fs::write(&file, contents).map_err(|e| e.to_string())
 }
 
-/// Parses "owner/repo" out of an `origin`-style remote URL, handling both
+/// Strips a leading "user@" and trailing ":port" from a host token, e.g.
+/// "git@example.com:2222" -> "example.com".
+fn clean_host(raw: &str) -> String {
+    let after_at = raw.rsplit('@').next().unwrap_or(raw);
+    after_at.split(':').next().unwrap_or(after_at).to_string()
+}
+
+/// Parses a git remote URL into (host, owner, repo), handling both
 /// "git@host:owner/repo.git" and "https://host/owner/repo.git" forms.
-fn parse_owner_repo(url: &str) -> Option<(String, String)> {
+fn parse_remote(url: &str) -> Option<(String, String, String)> {
     let trimmed = url.trim_end_matches(".git").trim_end_matches('/');
-    let path_part = if let Some(idx) = trimmed.find("://") {
+    let (host_raw, path_part) = if let Some(idx) = trimmed.find("://") {
         let after_scheme = &trimmed[idx + 3..];
-        // Drop the host segment
-        after_scheme.splitn(2, '/').nth(1)?
+        let mut parts = after_scheme.splitn(2, '/');
+        (parts.next()?, parts.next()?)
     } else if let Some(idx) = trimmed.find(':') {
-        &trimmed[idx + 1..]
+        (&trimmed[..idx], &trimmed[idx + 1..])
     } else {
-        trimmed
+        return None;
     };
+    let host = clean_host(host_raw);
 
     let mut segments = path_part.rsplitn(2, '/');
     let repo_name = segments.next()?.to_string();
     let owner = segments.next()?.to_string();
-    if owner.is_empty() || repo_name.is_empty() {
+    if host.is_empty() || owner.is_empty() || repo_name.is_empty() {
         return None;
     }
-    Some((owner, repo_name))
+    Some((host, owner, repo_name))
+}
+
+/// Parses "owner/repo" out of an `origin`-style remote URL.
+fn parse_owner_repo(url: &str) -> Option<(String, String)> {
+    parse_remote(url).map(|(_, owner, repo)| (owner, repo))
 }
 
 /// Parses "owner/repo" out of a repo's `origin` remote URL.
@@ -107,6 +120,17 @@ pub fn remote_owner_repo(repo_path: &str) -> Option<(String, String)> {
     let repo = Repository::open(repo_path).ok()?;
     let url = repo.find_remote("origin").ok()?.url()?.to_string();
     parse_owner_repo(&url)
+}
+
+/// The host and best-effort web URL for a repo's `origin` remote, regardless of forge —
+/// works for any host that serves its web UI at the same `host/owner/repo` path as its git
+/// remote (GitHub, GitLab, Bitbucket, self-hosted Gitea/Forgejo, etc).
+pub fn remote_web_info(repo_path: &str) -> Option<(String, String)> {
+    let repo = Repository::open(repo_path).ok()?;
+    let url = repo.find_remote("origin").ok()?.url()?.to_string();
+    let (host, owner, repo_name) = parse_remote(&url)?;
+    let web_url = format!("https://{host}/{owner}/{repo_name}");
+    Some((host, web_url))
 }
 
 /// Derives an owner/group key from a remote URL, e.g. "git@github.com:owner/repo.git" -> "owner".
@@ -245,6 +269,30 @@ pub fn touch_last_fetched(path: &str, timestamp: i64) -> Result<Vec<RepoEntry>, 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_remote_ssh_form_captures_host() {
+        assert_eq!(
+            parse_remote("git@github.com:owner/repo.git"),
+            Some(("github.com".to_string(), "owner".to_string(), "repo".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_remote_https_form_captures_host() {
+        assert_eq!(
+            parse_remote("https://gitlab.com/owner/repo.git"),
+            Some(("gitlab.com".to_string(), "owner".to_string(), "repo".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_remote_ssh_scheme_with_port_strips_user_and_port() {
+        assert_eq!(
+            parse_remote("ssh://git@example.com:2222/owner/repo.git"),
+            Some(("example.com".to_string(), "owner".to_string(), "repo".to_string()))
+        );
+    }
 
     #[test]
     fn parse_owner_repo_ssh_form() {
