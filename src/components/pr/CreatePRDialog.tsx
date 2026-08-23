@@ -22,7 +22,7 @@ import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { useGitHubStore } from "@/store/useGitHubStore";
-import { usePRStore } from "@/store/usePRStore";
+import { useCreatePullRequest } from "@/hooks/queries/usePullRequests";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
@@ -58,7 +58,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const branch = branchData?.branch ?? null;
   const branches = branchData?.branches ?? [];
   const currentLogin = useGitHubStore((s) => s.currentLogin);
-  const createPR = usePRStore((s) => s.createPR);
+  const createPRMutation = useCreatePullRequest(repoPath, currentLogin);
   const openPrAfterCreation = useSettingsStore((s) => s.settings.open_pr_on_provider_after_creation);
 
   const localBranches = useMemo(
@@ -172,18 +172,16 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
     if (!repoPath || !currentLogin || !branch || !title.trim()) return;
     setSubmitting(true);
     try {
-      const pr = await createPR(
-        repoPath,
-        currentLogin,
-        title.trim(),
-        branch,
+      const pr = await createPRMutation.mutateAsync({
+        title: title.trim(),
+        head: branch,
         base,
         body,
         draft,
-        selectedLabels,
-        selectedAssignees,
-        selectedReviewers,
-      );
+        labels: selectedLabels,
+        assignees: selectedAssignees,
+        reviewers: selectedReviewers,
+      });
       // Milestone and projects go through separate endpoints from labels/assignees/reviewers
       // (a single-value issue field, and a GraphQL-only surface, respectively), so they're
       // applied here rather than folded into createPR.

@@ -101,7 +101,7 @@ export function Toolbar() {
               onClick={() => {
                 if (!repoPath) return;
                 setActiveTab("pulls");
-                void selectPR(repoPath, currentLogin, existingPrNumber);
+                selectPR(existingPrNumber);
               }}
             >
               <GitPullRequestArrowIcon className="size-3.5" />

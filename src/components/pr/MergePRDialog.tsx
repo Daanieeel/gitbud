@@ -14,12 +14,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { usePRStore } from "@/store/usePRStore";
+import { useMergePullRequest } from "@/hooks/queries/usePullRequests";
+import { useCheckRuns } from "@/hooks/queries/useCheckRuns";
 import { runIcon, runStatusLabel } from "./CIBadge";
 import { api } from "@/lib/tauri";
 import { takePrefetchedMergeSettings } from "@/lib/mergeSettingsPrefetch";
 import { cn } from "@/lib/utils";
-import type { CheckRun, PullRequest, RepoMergeSettings } from "@/lib/types";
+import type { PullRequest, RepoMergeSettings } from "@/lib/types";
 
 interface MergePRDialogProps {
   open: boolean;
@@ -56,14 +57,14 @@ const METHODS: {
 ];
 
 export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: MergePRDialogProps) {
-  const mergePR = usePRStore((s) => s.mergePR);
+  const mergePRMutation = useMergePullRequest(repoPath, login);
 
   const [method, setMethod] = useState<"merge" | "squash" | "rebase">("squash");
   const [commitTitle, setCommitTitle] = useState("");
   const [commitMessage, setCommitMessage] = useState("");
   const [deleteBranch, setDeleteBranch] = useState(false);
   const [merging, setMerging] = useState(false);
-  const [runs, setRuns] = useState<CheckRun[] | null>(null);
+  const { data: runs = null } = useCheckRuns(open ? repoPath : null, open ? login : null, open ? pr.head_sha : null);
   const [repoSettings, setRepoSettings] = useState<RepoMergeSettings | null>(null);
 
   // Reset per-open state right at the moment the dialog opens, mirroring CreatePRDialog.
@@ -75,18 +76,6 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     }
     wasOpenRef.current = open;
   }, [open, pr.title, pr.number]);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    void api.githubListCheckRuns(repoPath, login, pr.head_sha).then(
-      (result) => !cancelled && setRuns(result),
-      () => !cancelled && setRuns([]),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [open, repoPath, login, pr.head_sha]);
 
   // Only offer merge methods this repo (and this base branch's protection rules, e.g. "require
   // linear history" ruling out merge commits) actually allow — GitHub 405s on a disallowed one
@@ -132,7 +121,15 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
   const submit = async () => {
     setMerging(true);
     try {
-      await mergePR(repoPath, login, pr.number, method, commitTitle, commitMessage, pr.head_sha, deleteBranch, pr.head_ref);
+      await mergePRMutation.mutateAsync({
+        number: pr.number,
+        method,
+        commitTitle,
+        commitMessage,
+        sha: pr.head_sha,
+        deleteBranch,
+        headRef: pr.head_ref,
+      });
       onOpenChange(false);
     } finally {
       setMerging(false);

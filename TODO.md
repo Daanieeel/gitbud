@@ -11,3 +11,4 @@ Complete in chronological order.
 - [ ] Toolbar > Preview PR button: disable the button if no commit exists on the current branch or if no other branch exists. in both cases, disable the button and add a toolbar explaining why the button is disabled (in a VERY short and clear way. no long sentence.)
 - [ ] Changes > File Explorer > Right Click > Open in Editor option: Zed logo needs to be a little larger (inspired by the VS Code logo)
 - [ ] History Tab: show unpushed commits in a different way than pushed commits
+- [ ] Hostory Tab: add a compact mode. compact mode only shows the current branch's graph and hides all other branches. it should only show when something was merged into the current branch or out of it. but dont show all branches parallel to each other, just the branching out and in from the current branch

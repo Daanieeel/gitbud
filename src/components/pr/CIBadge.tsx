@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { CheckCircle2Icon, CircleDashedIcon, XCircleIcon } from "lucide-react";
-import { api } from "@/lib/tauri";
+import { useCheckRuns } from "@/hooks/queries/useCheckRuns";
 import type { CheckRun } from "@/lib/types";
 import {
   Popover,
@@ -58,19 +58,8 @@ export function runStatusLabel(run: CheckRun): string {
 }
 
 export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
-  const [runs, setRuns] = useState<CheckRun[] | null>(null);
+  const { data: runs = null } = useCheckRuns(repoPath, login, sha);
   const [open, setOpen] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void api.githubListCheckRuns(repoPath, login, sha).then(
-      (result) => !cancelled && setRuns(result),
-      () => !cancelled && setRuns([]),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [repoPath, login, sha]);
 
   if (runs === null || runs.length === 0) return null;
   const overall = overallFrom(runs);

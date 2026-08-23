@@ -19,6 +19,8 @@ import { useNetworkStore } from "@/store/useNetworkStore";
 import { useUpdateStore } from "@/store/useUpdateStore";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { useGitSync } from "@/hooks/queries/useGitSync";
+import { usePullRequestList } from "@/hooks/queries/usePullRequests";
+import { useProviderSync } from "@/hooks/useProviderSync";
 
 function App() {
   const initGlobalListeners = useRepoStore((s) => s.initGlobalListeners);
@@ -32,7 +34,12 @@ function App() {
   const initIdentities = useIdentityStore((s) => s.init);
   const syncRepoIdentity = useIdentityStore((s) => s.syncRepoIdentity);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
-  const pollWatchedChecks = usePRStore((s) => s.pollWatchedChecks);
+  const watched = usePRStore((s) => s.watched);
+  // Watched PRs are open by construction (there's no UI to watch a closed one), so this is the
+  // one list that needs to exist for CI-notification polling regardless of which filter the PR
+  // tab itself currently has selected — see useProviderSync.
+  const { pulls: openPulls } = usePullRequestList(selectedRepo, currentLogin, "open");
+  useProviderSync(selectedRepo, currentLogin, watched, openPulls);
   const { pull, fetch, push } = useGitSync(selectedRepo, branch);
   const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
 
@@ -59,16 +66,6 @@ function App() {
     const interval = setInterval(() => void checkForUpdates(), 6 * 60 * 60_000);
     return () => clearInterval(interval);
   }, [checkForUpdates]);
-
-  // Deliberate exception to "no polling": GitHub gives a pure desktop client no event/webhook
-  // mechanism for check-run status, so watched-PR CI notifications have no event-driven option.
-  useEffect(() => {
-    if (!selectedRepo || !currentLogin) return;
-    const interval = setInterval(() => {
-      void pollWatchedChecks(selectedRepo, currentLogin);
-    }, 60_000);
-    return () => clearInterval(interval);
-  }, [selectedRepo, currentLogin, pollWatchedChecks]);
 
   useEffect(() => {
     const goOnline = () => useNetworkStore.getState().setOffline(false);

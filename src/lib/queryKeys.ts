@@ -25,4 +25,10 @@ export const queryKeys = {
   worktrees: (repoPath: string) => ["repo", repoPath, "worktrees"] as const,
   submodules: (repoPath: string) => ["repo", repoPath, "submodules"] as const,
   hasLfs: (repoPath: string) => ["repo", repoPath, "has-lfs"] as const,
+
+  // GitHub/PR domain — keyed by (repoPath, login) rather than nested under "repo" since login
+  // also varies independently (switching accounts on the same repo).
+  prList: (repoPath: string, login: string, filter: string) => ["pr-list", repoPath, login, filter] as const,
+  prDetail: (repoPath: string, login: string, number: number) => ["pr-detail", repoPath, login, number] as const,
+  checkRuns: (repoPath: string, login: string, sha: string) => ["check-runs", repoPath, login, sha] as const,
 };
