@@ -75,7 +75,20 @@ export function CommitGraph({ commit, prevActiveLanes, laneCount, rowHeight }: C
         />
       ))}
 
-      <circle cx={x(commit.lane)} cy={midY} r={DOT_RADIUS} fill={laneColor(commit.lane)} />
+      {/* Unpushed commits render as a hollow dot rather than the usual solid fill — the same
+       * convention other git clients use to distinguish local-only commits at a glance. */}
+      {commit.unpushed ? (
+        <circle
+          cx={x(commit.lane)}
+          cy={midY}
+          r={DOT_RADIUS - 0.75}
+          fill="var(--background)"
+          stroke={laneColor(commit.lane)}
+          strokeWidth={1.5}
+        />
+      ) : (
+        <circle cx={x(commit.lane)} cy={midY} r={DOT_RADIUS} fill={laneColor(commit.lane)} />
+      )}
     </svg>
   );
 }

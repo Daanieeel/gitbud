@@ -66,6 +66,7 @@ export interface CommitEntry {
   author_email: string;
   timestamp: number;
   parent_ids: string[];
+  unpushed: boolean;
   lane: number;
   parent_lanes: number[];
   active_lanes: number[];

@@ -10,6 +10,10 @@ pub struct CommitEntry {
     pub author_email: String,
     pub timestamp: i64,
     pub parent_ids: Vec<String>,
+    /// True if this commit hasn't reached the branch's `origin` upstream yet — reachable from
+    /// HEAD but not from `origin/<branch>` (or, if the branch has no upstream at all, simply
+    /// every commit reachable from HEAD, since none of them are on any remote).
+    pub unpushed: bool,
     /// This commit's lane in the graph column (0-indexed, stable left-to-right).
     pub lane: usize,
     /// Lanes this commit's edges connect down to (one per parent, same order as `parent_ids`).
@@ -249,8 +253,32 @@ pub fn get_commit_detail(repo_path: &str, oid: &str) -> Result<CommitDetail, Str
     })
 }
 
+/// Commits reachable from HEAD but not from its `origin` upstream (or, with no upstream at
+/// all, every commit reachable from HEAD) — the same "unpushed" set `get_ahead_behind` counts,
+/// computed here as an actual oid set instead of just a count.
+fn unpushed_oids(repo: &Repository) -> std::collections::HashSet<git2::Oid> {
+    (|| -> Result<_, git2::Error> {
+        let head = repo.head()?;
+        let head_oid = head.target().ok_or_else(|| git2::Error::from_str("HEAD has no target"))?;
+        let branch_name = head
+            .shorthand()
+            .ok_or_else(|| git2::Error::from_str("HEAD has no shorthand"))?;
+        let upstream_ref = format!("refs/remotes/origin/{branch_name}");
+
+        let mut walk = repo.revwalk()?;
+        walk.push(head_oid)?;
+        if let Ok(upstream_oid) = repo.refname_to_id(&upstream_ref) {
+            walk.hide(upstream_oid)?;
+        }
+        walk.collect::<Result<std::collections::HashSet<_>, _>>()
+    })()
+    .unwrap_or_default()
+}
+
 pub fn get_log(repo_path: &str, limit: usize, skip: usize) -> Result<Vec<CommitEntry>, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let unpushed = unpushed_oids(&repo);
+
     let mut revwalk = repo.revwalk().map_err(|e| e.message().to_string())?;
     revwalk.push_head().map_err(|e| e.message().to_string())?;
     revwalk
@@ -270,6 +298,7 @@ pub fn get_log(repo_path: &str, limit: usize, skip: usize) -> Result<Vec<CommitE
             author_email: author.email().unwrap_or("").to_string(),
             timestamp: commit.time().seconds(),
             parent_ids: commit.parent_ids().map(|id| id.to_string()).collect(),
+            unpushed: unpushed.contains(&oid),
             lane: 0,
             parent_lanes: Vec::new(),
             active_lanes: Vec::new(),
@@ -297,6 +326,38 @@ mod tests {
         let entries = get_log(&repo_root, 5, 0).expect("log should succeed");
         assert!(!entries.is_empty());
         assert!(entries[0].short_oid.len() == 7);
+    }
+
+    #[test]
+    fn flags_commits_ahead_of_the_pushed_upstream_as_unpushed() {
+        let scratch = ScratchRepo::new("unpushed");
+        let repo_path = scratch.path_str();
+
+        std::fs::write(scratch.path.join("a.txt"), "a\n").unwrap();
+        crate::repo::stage_paths(&repo_path, &["a.txt".to_string()]).unwrap();
+        let pushed_oid = crate::repo::commit(&repo_path, "pushed", "").unwrap();
+
+        // Simulate this commit already being on origin without any actual network access —
+        // just point a remote-tracking ref at it directly.
+        let repo = Repository::open(&repo_path).unwrap();
+        let branch_name = repo.head().unwrap().shorthand().unwrap().to_string();
+        repo.reference(
+            &format!("refs/remotes/origin/{branch_name}"),
+            git2::Oid::from_str(&pushed_oid).unwrap(),
+            true,
+            "test setup",
+        )
+        .unwrap();
+
+        std::fs::write(scratch.path.join("b.txt"), "b\n").unwrap();
+        crate::repo::stage_paths(&repo_path, &["b.txt".to_string()]).unwrap();
+        let unpushed_oid = crate::repo::commit(&repo_path, "not yet pushed", "").unwrap();
+
+        let entries = get_log(&repo_path, 10, 0).unwrap();
+        let pushed_entry = entries.iter().find(|e| e.oid == pushed_oid).unwrap();
+        let unpushed_entry = entries.iter().find(|e| e.oid == unpushed_oid).unwrap();
+        assert!(!pushed_entry.unpushed);
+        assert!(unpushed_entry.unpushed);
     }
 
     struct ScratchRepo {
