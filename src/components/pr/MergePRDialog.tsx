@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
+import { takePrefetchedMergeSettings } from "@/lib/mergeSettingsPrefetch";
 import { cn } from "@/lib/utils";
 import type { CheckRun, PullRequest, RepoMergeSettings } from "@/lib/types";
 
@@ -133,7 +135,12 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     // especially branch protection rules — can change between one merge and the next.
     setRepoSettings(null);
     let cancelled = false;
-    api.githubGetRepoMergeSettings(repoPath, login, pr.base_ref).then(
+    // Reuse a prefetch already in flight from the PR tab (see mergeSettingsPrefetch) if there is
+    // one, instead of firing a redundant duplicate request — but this always consumes it rather
+    // than caching by result, so the *next* open still fires a genuinely fresh request.
+    (takePrefetchedMergeSettings(repoPath, login, pr.base_ref) ??
+      api.githubGetRepoMergeSettings(repoPath, login, pr.base_ref)
+    ).then(
       (settings) => {
         if (cancelled) return;
         setRepoSettings(settings);
@@ -231,24 +238,35 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
             <div className="flex gap-2">
               {METHODS.map((m) => {
                 const allowed = repoSettings ? repoSettings[m.allowed] : true;
-                return (
+                const card = (
                   <button
                     key={m.key}
                     type="button"
-                    disabled={!allowed}
-                    title={allowed ? undefined : "Disabled by this repository's merge settings or branch protection rules"}
+                    // Not a real `disabled` attribute: a disabled element receives no pointer
+                    // events in most browsers, which would silently prevent the tooltip below
+                    // from ever showing on hover.
+                    aria-disabled={!allowed}
                     className={cn(
                       "flex-1 rounded-md border border-border p-2 text-left",
                       !allowed && "cursor-not-allowed opacity-40",
                       method === m.key && "border-2 border-primary bg-primary/10 p-[7px]",
                     )}
-                    onClick={() => setMethod(m.key)}
+                    onClick={() => allowed && setMethod(m.key)}
                   >
                     <div className="flex flex-col gap-1">
                       <div className="text-sm font-medium">{m.label}</div>
                       <div className="text-xs text-muted-foreground">{m.description}</div>
                     </div>
                   </button>
+                );
+                if (allowed) return card;
+                return (
+                  <Tooltip key={m.key}>
+                    <TooltipTrigger asChild>{card}</TooltipTrigger>
+                    <TooltipContent>
+                      Disabled by this repository's merge settings or branch protection rules
+                    </TooltipContent>
+                  </Tooltip>
                 );
               })}
             </div>

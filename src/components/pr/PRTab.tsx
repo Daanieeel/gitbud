@@ -10,6 +10,7 @@ import { PRDetail } from "./PRDetail";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { api } from "@/lib/tauri";
+import { prefetchMergeSettings } from "@/lib/mergeSettingsPrefetch";
 
 const FILTERS: { key: PRFilter; label: string }[] = [
   { key: "open", label: "Open" },
@@ -45,6 +46,15 @@ export function PRTab() {
   useEffect(() => {
     if (repoPath && currentLogin && hasRemote) void load(repoPath, currentLogin);
   }, [repoPath, currentLogin, hasRemote, filter, load]);
+
+  // Warm the merge dialog's allowed-methods check as soon as this tab has PRs to show, so it's
+  // (very likely) already resolved by the time the user actually opens a merge dialog — most
+  // PRs in a repo target the same one or two base branches.
+  useEffect(() => {
+    if (!repoPath || !currentLogin) return;
+    const baseRefs = new Set(pulls.map((p) => p.base_ref));
+    for (const baseRef of baseRefs) prefetchMergeSettings(repoPath, currentLogin, baseRef);
+  }, [repoPath, currentLogin, pulls]);
 
   if (!repoPath) return null;
 
