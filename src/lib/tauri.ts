@@ -302,6 +302,8 @@ export const api = {
     invoke<void>("github_delete_remote_branch", { repoPath, login, branch }),
   githubGetRepoMergeSettings: (repoPath: string, login: string) =>
     invoke<RepoMergeSettings>("github_get_repo_merge_settings", { repoPath, login }),
+  githubFindUserAvatarByEmail: (repoPath: string, login: string, email: string) =>
+    invoke<string | null>("github_find_user_avatar_by_email", { repoPath, login, email }),
   githubListPullRequestFiles: (repoPath: string, login: string, number: number) =>
     invoke<[string, string, FileDiff][]>("github_list_pull_request_files", {
       repoPath,

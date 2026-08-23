@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2Icon, CircleDashedIcon, GitMergeIcon, TriangleAlertIcon, XCircleIcon } from "lucide-react";
+import {
+  CheckCircle2Icon,
+  CircleDashedIcon,
+  ExternalLinkIcon,
+  GitMergeIcon,
+  TriangleAlertIcon,
+  XCircleIcon,
+} from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,40 +153,44 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
             </div>
           )}
 
-          <div className="flex flex-col gap-1 rounded-md border border-border p-2 text-xs">
-            {runs === null ? (
-              <div className="flex flex-col gap-1.5 py-0.5">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={i} className="flex items-center gap-1.5">
-                    <Skeleton className="size-3.5 shrink-0 rounded-full" />
-                    <Skeleton className="h-3 w-32" />
-                    <Skeleton className="ml-auto h-3 w-14" />
-                  </div>
-                ))}
-              </div>
-            ) : runs.length === 0 ? (
-              <span className="text-muted-foreground">No checks reported</span>
-            ) : (
-              <div className="flex max-h-32 flex-col gap-1 overflow-auto">
-                {runs.map((r) => (
-                  <a
-                    key={r.name}
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      void openUrl(r.html_url);
-                    }}
-                    className="flex items-center gap-1.5 rounded-sm px-1 py-0.5 hover:bg-accent"
-                  >
-                    {runIcon(r)}
-                    <span className="min-w-0 flex-1 truncate">{r.name}</span>
-                    <span className="shrink-0 text-muted-foreground">
-                      {r.status === "completed" ? r.conclusion : r.status}
-                    </span>
-                  </a>
-                ))}
-              </div>
-            )}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Checks</span>
+            <div className="flex flex-col gap-1 rounded-md border border-border p-3 text-xs">
+              {runs === null ? (
+                <div className="flex flex-col gap-1.5 py-0.5">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <Skeleton className="size-3.5 shrink-0 rounded-full" />
+                      <Skeleton className="h-3 w-32" />
+                      <Skeleton className="ml-auto h-3 w-14" />
+                    </div>
+                  ))}
+                </div>
+              ) : runs.length === 0 ? (
+                <span className="text-muted-foreground">No checks reported</span>
+              ) : (
+                <div className="flex max-h-40 flex-col gap-1.5 overflow-auto">
+                  {runs.map((r) => (
+                    <a
+                      key={r.name}
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        void openUrl(r.html_url);
+                      }}
+                      className="flex items-center gap-2 rounded-sm px-2 py-1.5 hover:bg-accent"
+                    >
+                      {runIcon(r)}
+                      <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                      <span className="shrink-0 text-muted-foreground">
+                        {r.status === "completed" ? r.conclusion : r.status}
+                      </span>
+                      <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground" />
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
