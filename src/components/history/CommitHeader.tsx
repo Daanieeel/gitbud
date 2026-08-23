@@ -32,7 +32,7 @@ export function CommitHeader({ repoPath, oid }: CommitHeaderProps) {
   const matchingTags = tags.filter((t) => t.oid === oid);
 
   return (
-    <div className="flex max-h-[300px] shrink-0 flex-col gap-1.5 overflow-auto border-b border-border px-3 py-2.5">
+    <div className="flex shrink-0 flex-col gap-1.5 border-b border-border px-3 py-2.5">
       <div className="flex items-center gap-1.5">
         {matchingTags.map((t) => (
           <span
@@ -45,7 +45,9 @@ export function CommitHeader({ repoPath, oid }: CommitHeaderProps) {
         <span className="truncate text-sm font-medium">{detail.summary}</span>
       </div>
       {detail.description && (
-        <p className="whitespace-pre-wrap text-xs text-muted-foreground">{detail.description}</p>
+        <p className="max-h-[300px] overflow-auto whitespace-pre-wrap text-xs text-muted-foreground">
+          {detail.description}
+        </p>
       )}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
         <div className="flex items-center -space-x-1.5">
