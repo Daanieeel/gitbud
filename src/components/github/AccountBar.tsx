@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { KeyRoundIcon, LogInIcon, MapPinIcon, PlusIcon, SettingsIcon, TriangleAlertIcon, XIcon } from "lucide-react";
+import { DownloadIcon, KeyRoundIcon, LogInIcon, MapPinIcon, PlusIcon, SettingsIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { EditorPicker } from "@/components/settings/EditorPicker";
 import { CUSTOM_EDITOR_ID } from "@/lib/editors";
@@ -21,6 +21,7 @@ import { useGitHubStore } from "@/store/useGitHubStore";
 import { useIdentityStore, githubIdentityId, sshIdentityId, type UnifiedIdentity } from "@/store/useIdentityStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useUpdateStore } from "@/store/useUpdateStore";
 import { AddSshIdentityDialog } from "./AddSshIdentityDialog";
 import { DeviceFlowDialog } from "./DeviceFlowDialog";
 import { cn } from "@/lib/utils";
@@ -77,6 +78,9 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
     (s) => s.repos.find((r) => r.path === s.selectedRepo)?.identity_id ?? null,
   );
   const clearRepoOverride = useIdentityStore((s) => s.clearRepoOverride);
+  const updateStatus = useUpdateStore((s) => s.status);
+  const availableUpdate = useUpdateStore((s) => s.update);
+  const installUpdate = useUpdateStore((s) => s.install);
 
   const [sshDialogOpen, setSshDialogOpen] = useState(false);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -122,6 +126,22 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
 
   return (
     <div className="flex shrink-0 flex-col gap-2 border-t border-border p-2">
+      {!collapsed && (updateStatus === "available" || updateStatus === "installing") && availableUpdate && (
+        <button
+          type="button"
+          disabled={updateStatus === "installing"}
+          onClick={() => void installUpdate()}
+          className="flex flex-col gap-1 rounded-md border border-accent-yellow/30 bg-accent-yellow/10 p-2.5 text-left text-xs text-accent-yellow transition-colors hover:bg-accent-yellow/15 disabled:cursor-default disabled:opacity-80"
+        >
+          <span className="flex items-center gap-1.5 font-medium">
+            <DownloadIcon className={`size-3.5 shrink-0 ${updateStatus === "installing" ? "animate-bounce" : ""}`} />
+            {updateStatus === "installing" ? "Installing update…" : `Update available: v${availableUpdate.version}`}
+          </span>
+          <span className="text-accent-yellow/80">
+            {updateStatus === "installing" ? "Downloading and installing, app will relaunch." : "Click to download and install now."}
+          </span>
+        </button>
+      )}
       {!collapsed && brokenIdentity && (
         <div className="flex flex-col gap-1.5 rounded-md bg-destructive/10 p-2 text-xs text-destructive">
           <span className="flex items-center gap-1.5 font-medium">
