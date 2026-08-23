@@ -16,6 +16,7 @@ import { useIdentityStore } from "@/store/useIdentityStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { usePRStore } from "@/store/usePRStore";
 import { useNetworkStore } from "@/store/useNetworkStore";
+import { useUpdateStore } from "@/store/useUpdateStore";
 
 function App() {
   const initGlobalListeners = useRepoStore((s) => s.initGlobalListeners);
@@ -30,6 +31,7 @@ function App() {
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const pollWatchedChecks = usePRStore((s) => s.pollWatchedChecks);
   const pull = useRepoStore((s) => s.pull);
+  const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
 
   const [palette, setPalette] = useState<{ open: boolean; mode: "all" | "repos" }>({
     open: false,
@@ -46,6 +48,14 @@ function App() {
   useEffect(() => {
     if (selectedRepo) void syncRepoIdentity(selectedRepo);
   }, [selectedRepo, syncRepoIdentity]);
+
+  // Deliberate exception to "no polling": there's no push channel for release publication, so
+  // catching a new version requires asking the update endpoint periodically.
+  useEffect(() => {
+    void checkForUpdates();
+    const interval = setInterval(() => void checkForUpdates(), 6 * 60 * 60_000);
+    return () => clearInterval(interval);
+  }, [checkForUpdates]);
 
   // Deliberate exception to "no polling": GitHub gives a pure desktop client no event/webhook
   // mechanism for check-run status, so watched-PR CI notifications have no event-driven option.
