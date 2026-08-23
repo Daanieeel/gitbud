@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
-import { GitPullRequestCreateArrow, GitPullRequestArrowIcon } from "lucide-react";
+import { GitPullRequestCreateArrow, GitPullRequestArrowIcon, ExternalLinkIcon } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
-import { githubRepoUrl } from "@/lib/github-links";
+import { detectRemoteProvider } from "@/lib/remote-provider";
 import { GitHubMark } from "@/components/github/GitHubMark";
+import { GitLabMark } from "@/components/github/GitLabMark";
+import { BitbucketMark } from "@/components/github/BitbucketMark";
 import { BranchSwitcher } from "@/components/repo/BranchSwitcher";
 import { BranchPruner } from "@/components/repo/BranchPruner";
 import { TagsPanel } from "@/components/repo/TagsPanel";
@@ -28,14 +30,16 @@ export function Toolbar() {
   const selectPR = usePRStore((s) => s.selectPR);
   const [previewPrOpen, setPreviewPrOpen] = useState(false);
   const [existingPrNumber, setExistingPrNumber] = useState<number | null>(null);
-  const [repoUrl, setRepoUrl] = useState<string | null>(null);
+  const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: ReturnType<typeof detectRemoteProvider> } | null>(null);
 
   useEffect(() => {
-    setRepoUrl(null);
+    setRemoteInfo(null);
     if (!repoPath) return;
     let cancelled = false;
-    void githubRepoUrl(repoPath).then((url) => {
-      if (!cancelled) setRepoUrl(url);
+    void api.remoteWebInfo(repoPath).then((info) => {
+      if (cancelled || !info) return;
+      const [host, url] = info;
+      setRemoteInfo({ url, provider: detectRemoteProvider(host) });
     });
     return () => {
       cancelled = true;
@@ -71,14 +75,17 @@ export function Toolbar() {
       <WorktreesPanel />
       <ReflogPanel />
       <LfsPanel />
-      {repoUrl && (
+      {remoteInfo && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" onClick={() => void openUrl(repoUrl)}>
-              <GitHubMark className="size-3.5" />
+            <Button variant="ghost" size="icon" onClick={() => void openUrl(remoteInfo.url)}>
+              {remoteInfo.provider === "github" && <GitHubMark className="size-3.5" />}
+              {remoteInfo.provider === "gitlab" && <GitLabMark className="size-3.5" />}
+              {remoteInfo.provider === "bitbucket" && <BitbucketMark className="size-3.5" />}
+              {remoteInfo.provider === "unknown" && <ExternalLinkIcon className="size-3.5" />}
             </Button>
           </TooltipTrigger>
-          <TooltipContent>View repo on GitHub</TooltipContent>
+          <TooltipContent>View repo on remote</TooltipContent>
         </Tooltip>
       )}
       <div className="flex-1" />
