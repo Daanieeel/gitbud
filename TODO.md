@@ -12,3 +12,4 @@ Complete in chronological order.
 - [ ] Changes > File Explorer > Right Click > Open in Editor option: Zed logo needs to be a little larger (inspired by the VS Code logo)
 - [ ] History Tab: show unpushed commits in a different way than pushed commits
 - [ ] Hostory Tab: add a compact mode. compact mode only shows the current branch's graph and hides all other branches. it should only show when something was merged into the current branch or out of it. but dont show all branches parallel to each other, just the branching out and in from the current branch
+- [ ] (BUG) Settings > General > Favorite Editor: The selector isnt scrollable

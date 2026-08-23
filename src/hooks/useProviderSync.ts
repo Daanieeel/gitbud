@@ -9,13 +9,17 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useRepoSyncing } from "@/hooks/queries/useGitSync";
 import type { PullRequest } from "@/lib/types";
 
-// One shared tick for everything below — a single timer/visibility-listener pair instead of
-// three, since they all want the same "only while visible" gating anyway.
-const TICK_MS = 60_000;
-// git fetch is a real network git operation (can transfer objects), materially pricier than a
-// small REST GET — only run it every other tick so it's on its own, coarser cadence while
-// check-runs/PR-list still refresh every tick.
-const FETCH_EVERY_N_TICKS = 2;
+// The open-PR list and watched-PR CI checks are cheap REST GETs — poll them fast right after
+// opening the app or switching repos (when "did anything change" is most likely to matter and
+// most worth answering quickly), then back off to a steady-state cadence once that initial
+// window has passed and nothing's actively being waited on.
+const BURST_DURATION_MS = 5 * 60_000;
+const BURST_INTERVAL_MS = 5_000;
+const STEADY_INTERVAL_MS = 30_000;
+// git fetch is a real network git operation (ref advertisement + object transfer), materially
+// pricier than a small REST GET — kept on its own slower, constant cadence rather than riding
+// the burst/steady schedule above.
+const FETCH_INTERVAL_MS = 90_000;
 
 function isWindowVisible() {
   return typeof document === "undefined" || document.visibilityState === "visible";
@@ -27,15 +31,20 @@ function isWindowVisible() {
  * reads straight off the local .git). This is the one place that reaches out on a timer to catch
  * what local-first can't see: what a teammate pushed.
  *
- * Three things, one shared interval, all gated the same way (paused while the window isn't
- * visible, with an immediate catch-up run on refocus — minimized/backgrounded costs nothing):
+ * Three things, all paused while the window isn't visible (minimized/backgrounded/another tab
+ * costs nothing) and refreshed once immediately on becoming visible again:
  *  - a silent `git fetch` for the selected repo, updating remote-tracking refs so ahead/behind
  *    counts and the remote branch list reflect what's actually on origin — never touches the
- *    working tree or local branches, so it's safe to run without the user asking
+ *    working tree or local branches, so it's safe to run without the user asking. Runs on its
+ *    own constant, slow interval — see FETCH_INTERVAL_MS above for why.
  *  - a refresh of the (already-cached) open-PR list, so a new PR or a new commit pushed to an
  *    existing one shows up without needing to leave and reopen the PR tab
  *  - CI status for watched (starred) PRs, unchanged from before — the desktop-notification
  *    trigger for "a PR I'm watching just went green/red"
+ * The latter two share a burst-then-steady-state schedule (see constants above), reset whenever
+ * this repo/login is (re)selected — not on every window refocus, so alt-tabbing back and forth
+ * doesn't perpetually re-arm the fast interval. A plain refocus still gets one immediate refresh
+ * of all three (via the visibilitychange listener below), just not a sustained fast window.
  *
  * Skips its own fetch step entirely while a manual sync (the toolbar's fetch/pull/push/sync
  * button) is already running for this repo, so it never races or duplicates that work.
@@ -51,7 +60,7 @@ export function useProviderSync(
   const manualSyncInFlight = useRepoSyncing(repoPath);
   // Interval/visibility setup only needs to happen once per (repoPath, login) — reading
   // everything else through refs means a PR list refetch, the user starring another PR, or a
-  // manual sync starting/finishing doesn't tear down and recreate the timer.
+  // manual sync starting/finishing doesn't tear down and recreate the timers.
   const watchedRef = useRef(watched);
   watchedRef.current = watched;
   const pullsRef = useRef(pulls);
@@ -62,7 +71,7 @@ export function useProviderSync(
   useEffect(() => {
     if (!repoPath) return;
     let cancelled = false;
-    let tick = 0;
+    const burstStartedAt = Date.now();
 
     const fetchRemote = async () => {
       if (manualSyncRef.current) return;
@@ -100,26 +109,45 @@ export function useProviderSync(
       }
     };
 
-    const runTick = async (isCatchUp: boolean) => {
+    const runCheapCheck = async () => {
       if (cancelled || !isWindowVisible()) return;
-      // A refocus catch-up always includes a fetch — the whole point is "what changed while I
-      // was away" — regardless of where the every-Nth-tick counter happened to land.
-      if (isCatchUp || tick % FETCH_EVERY_N_TICKS === 0) void fetchRemote();
       refreshOpenPulls();
       await pollWatchedChecks();
-      tick++;
     };
 
-    void runTick(true);
-    const interval = setInterval(() => void runTick(false), TICK_MS);
+    // Self-rescheduling rather than setInterval, since the delay itself changes (fast → steady)
+    // partway through — a fixed setInterval can't do that without being torn down and recreated.
+    // The burst clock runs in real wall-time from when this repo/login was selected, regardless
+    // of visibility — the simplification being that a repo left backgrounded for the whole burst
+    // window and only looked at afterward gets the steady (slower) cadence from then on rather
+    // than a fresh burst, on the logic that the one immediate refresh below already caught it up.
+    let cheapTimer: ReturnType<typeof setTimeout>;
+    const scheduleCheapCheck = () => {
+      const elapsed = Date.now() - burstStartedAt;
+      const delay = elapsed < BURST_DURATION_MS ? BURST_INTERVAL_MS : STEADY_INTERVAL_MS;
+      cheapTimer = setTimeout(() => {
+        void runCheapCheck().finally(() => {
+          if (!cancelled) scheduleCheapCheck();
+        });
+      }, delay);
+    };
+
+    void runCheapCheck();
+    scheduleCheapCheck();
+    void fetchRemote();
+    const fetchTimer = setInterval(() => void fetchRemote(), FETCH_INTERVAL_MS);
+
     const onVisibilityChange = () => {
-      if (isWindowVisible()) void runTick(true);
+      if (!isWindowVisible()) return;
+      void fetchRemote();
+      void runCheapCheck();
     };
     document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      clearTimeout(cheapTimer);
+      clearInterval(fetchTimer);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [repoPath, login, queryClient]);
