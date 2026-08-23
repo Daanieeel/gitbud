@@ -64,7 +64,18 @@ export function EditorPicker({ onSelect, children }: EditorPickerProps) {
               className="h-7"
             />
           </div>
-          <div className="max-h-72 overflow-auto p-1">
+          <div
+            className="max-h-72 overflow-auto p-1"
+            // The settings dialog this trigger normally lives in is a modal Dialog, whose
+            // scroll lock only recognizes scrollable elements it can find nested inside its own
+            // content — this popover is portalled straight to `body`, a DOM sibling of it
+            // rather than a descendant, so the lock swallows wheel events over it and native
+            // scrolling silently does nothing. Scroll it manually instead of relying on that.
+            onWheel={(e) => {
+              e.currentTarget.scrollTop += e.deltaY;
+              e.stopPropagation();
+            }}
+          >
             {groups.length === 0 && (
               <div className="p-3 text-center text-xs text-muted-foreground">No matches</div>
             )}
