@@ -1,5 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
+import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { ExternalLinkIcon, GitBranchIcon, GitMergeIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/avatar";
@@ -73,6 +75,7 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
   const filePaths = useMemo(() => files.map((f) => f.filename), [files]);
   const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, (path) => selectFile(path));
   const fileListRef = useRef<HTMLDivElement>(null);
+  const { width, onPointerDown } = useResizableWidth("panel-width:pr-files", 224, 160, 560);
 
   useEffect(() => {
     fileListRef.current?.focus();
@@ -138,7 +141,13 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
         )}
       </div>
       <div className="flex min-h-0 flex-1">
-        <div ref={fileListRef} tabIndex={0} onKeyDown={handleArrowNav} className="w-56 shrink-0 overflow-auto border-r border-border outline-none">
+        <div
+          ref={fileListRef}
+          tabIndex={0}
+          onKeyDown={handleArrowNav}
+          style={{ width }}
+          className="shrink-0 overflow-auto border-r border-border outline-none"
+        >
           {files.map((f) => (
             <Tooltip key={f.filename}>
               <TooltipTrigger asChild>
@@ -165,6 +174,7 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
             </Tooltip>
           ))}
         </div>
+        <ResizeHandle onPointerDown={onPointerDown} />
         <div className="min-w-0 flex-1">
           <DiffView
             path={selectedFilePath}
