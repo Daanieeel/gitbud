@@ -82,6 +82,7 @@ export const api = {
     invoke<string>("commit", { repoPath, summary, description }),
   amendCommit: (repoPath: string, summary: string, description: string) =>
     invoke<string>("amend_commit", { repoPath, summary, description }),
+  undoLastCommit: (repoPath: string) => invoke<[string, string]>("undo_last_commit", { repoPath }),
   cherryPick: (repoPath: string, oid: string) =>
     invoke<CherryPickResult>("cherry_pick", { repoPath, oid }),
   revertCommit: (repoPath: string, oid: string) =>

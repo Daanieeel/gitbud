@@ -155,6 +155,13 @@ async fn amend_commit(repo_path: String, summary: String, description: String) -
 }
 
 #[tauri::command]
+async fn undo_last_commit(repo_path: String) -> Result<(String, String), String> {
+    tauri::async_runtime::spawn_blocking(move || repo::undo_last_commit(&repo_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn cherry_pick(repo_path: String, oid: String) -> Result<repo::CherryPickResult, String> {
     tauri::async_runtime::spawn_blocking(move || repo::cherry_pick(&repo_path, &oid))
         .await
@@ -1313,6 +1320,7 @@ pub fn run() {
             discard_hunk,
             commit,
             amend_commit,
+            undo_last_commit,
             cherry_pick,
             revert_commit,
             delete_branch,

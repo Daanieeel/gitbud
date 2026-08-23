@@ -1,4 +1,4 @@
-use git2::{Repository, StatusOptions};
+use git2::{Repository, ResetType, StatusOptions};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -592,6 +592,30 @@ pub fn amend_commit(repo_path: &str, summary: &str, description: &str) -> Result
         .amend(Some("HEAD"), None, None, None, Some(&message), Some(&tree))
         .map_err(|e| e.message().to_string())?;
     Ok(oid.to_string())
+}
+
+/// Un-commits HEAD: moves the branch pointer back to its parent with a soft reset, so the
+/// undone commit's changes reappear staged exactly as they were, ready to be re-committed or
+/// edited. Callers are expected to only allow this on commits that are still unpushed — a soft
+/// reset here doesn't touch the remote, so undoing a commit that's already on origin would just
+/// leave the local branch behind it.
+///
+/// Returns the undone commit's (summary, description) — split the same way `commit`/
+/// `amend_commit` join them — so the caller can pre-fill the commit form with it.
+pub fn undo_last_commit(repo_path: &str) -> Result<(String, String), String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let head_commit = repo.head().and_then(|h| h.peel_to_commit()).map_err(|e| e.message().to_string())?;
+    let parent = head_commit
+        .parent(0)
+        .map_err(|_| "Can't undo the repository's initial commit".to_string())?;
+    let message = head_commit.message().unwrap_or("").to_string();
+
+    repo.reset(parent.as_object(), ResetType::Soft, None).map_err(|e| e.message().to_string())?;
+
+    Ok(match message.split_once("\n\n") {
+        Some((summary, description)) => (summary.trim().to_string(), description.trim().to_string()),
+        None => (message.trim().to_string(), String::new()),
+    })
 }
 
 /// Applies `oid`'s changes on top of the current HEAD as a new commit. If the cherry-pick

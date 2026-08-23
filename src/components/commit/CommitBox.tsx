@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { GitCommitIcon, TriangleAlertIcon } from "lucide-react";
+import { GitCommitIcon, TriangleAlertIcon, Undo2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,6 +13,7 @@ export function CommitBox() {
   const branch = useRepoStore((s) => s.branch);
   const status = useRepoStore((s) => s.status);
   const commits = useRepoStore((s) => s.commits);
+  const aheadBehind = useRepoStore((s) => s.aheadBehind);
   const summary = useRepoStore((s) => s.commitSummary);
   const description = useRepoStore((s) => s.commitDescription);
   const amending = useRepoStore((s) => s.amending);
@@ -21,11 +22,17 @@ export function CommitBox() {
   const setAmending = useRepoStore((s) => s.setAmending);
   const doCommit = useRepoStore((s) => s.doCommit);
   const doAmendCommit = useRepoStore((s) => s.doAmendCommit);
+  const undoLastCommit = useRepoStore((s) => s.undoLastCommit);
 
   const [committing, runCommit] = useBusyAction();
+  const [undoing, runUndo] = useBusyAction();
   const stagedFiles = status?.files.filter((f) => f.staged) ?? [];
   const hasStagedChanges = stagedFiles.length > 0;
   const lastCommit = commits[0];
+  // A commit is unpushed either because the branch has local commits ahead of its upstream,
+  // or because the branch has never been pushed at all (no upstream to compare against, so
+  // `ahead` reads 0 even though every commit on it is unpushed).
+  const hasUnpushedCommit = !!lastCommit && (!aheadBehind.published || aheadBehind.ahead > 0);
 
   // Pre-fill a sensible summary for the common single-file-change case, without
   // clobbering anything the user has already typed.
@@ -123,6 +130,24 @@ export function CommitBox() {
           {amending ? "Rewrite the last commit with this message and any staged changes" : "Cmd+Enter"}
         </TooltipContent>
       </Tooltip>
+      {hasUnpushedCommit && (
+        <div className="flex items-center gap-1.5 px-2 text-xs text-muted-foreground">
+          <GitCommitIcon className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate" title={lastCommit.summary}>
+            {lastCommit.summary}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 shrink-0 px-1.5"
+            disabled={undoing}
+            onClick={() => void runUndo(undoLastCommit)}
+          >
+            <Undo2Icon className={cn("size-3.5", undoing && "animate-spin")} />
+            Undo
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

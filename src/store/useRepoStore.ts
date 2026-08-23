@@ -82,6 +82,7 @@ interface RepoState {
   selectFile: (path: string | null) => Promise<void>;
   doCommit: (summary: string, description: string) => Promise<void>;
   doAmendCommit: (summary: string, description: string) => Promise<void>;
+  undoLastCommit: () => Promise<void>;
   setCommitSummary: (value: string) => void;
   setCommitDescription: (value: string) => void;
   setAmending: (value: boolean) => void;
@@ -391,6 +392,20 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     });
     await Promise.all([get().refreshStatus(), get().resetHistory()]);
     void notify(`Amended commit on ${branch}`, summary);
+  },
+
+  undoLastCommit: async () => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    let summary: string, description: string;
+    try {
+      [summary, description] = await api.undoLastCommit(repoPath);
+    } catch (err) {
+      toast.error(String(err));
+      return;
+    }
+    set({ commitSummary: summary, commitDescription: description, amending: false });
+    await Promise.all([get().refreshStatus(), get().resetHistory()]);
   },
 
   checkoutBranch: async (branch) => {

@@ -211,21 +211,43 @@ fn run_streaming(app: &AppHandle, cwd: Option<&str>, args: &[&str], event_id: &s
             IDLE_TIMEOUT.as_secs()
         ))
     } else {
-        // Strip git's own "remote: " passthrough prefix so a server-side message (e.g. a
-        // GitHub branch protection rejection) reads like a normal sentence instead of looking
-        // like raw transport plumbing.
         let stderr_lines = captured_stderr.lock().unwrap();
-        let detail: Vec<&str> = stderr_lines
-            .iter()
-            .map(|line| line.strip_prefix("remote:").map(str::trim).unwrap_or(line.as_str()))
-            .filter(|line| !line.is_empty())
-            .collect();
+        let detail = summarize_git_error(&stderr_lines);
         if detail.is_empty() {
             Err(format!("git {} exited with {status}", args.join(" ")))
         } else {
             Err(detail.join("\n"))
         }
     }
+}
+
+/// Reduces raw git stderr down to the lines a user actually needs to understand and act on a
+/// failure, dropping transport bookkeeping (object counts, delta compression stats, the "To
+/// <url>" line) and git's own "remote: " passthrough prefix, plus the generic "error: failed to
+/// push some refs..." line that git always prints alongside a more specific reason and adds
+/// nothing beyond what the caller already knows (a push failed).
+fn summarize_git_error(lines: &[String]) -> Vec<String> {
+    const NOISE_PREFIXES: &[&str] = &[
+        "Enumerating objects",
+        "Counting objects",
+        "Compressing objects",
+        "Writing objects",
+        "Total ",
+        "Delta compression",
+        "To http",
+        "To git@",
+        "To ssh://",
+    ];
+    let mut seen = std::collections::HashSet::new();
+    lines
+        .iter()
+        .map(|line| line.strip_prefix("remote:").map(str::trim).unwrap_or(line.as_str()))
+        .filter(|line| !line.is_empty())
+        .filter(|line| !NOISE_PREFIXES.iter().any(|prefix| line.starts_with(prefix)))
+        .filter(|line| !line.starts_with("error: failed to push some refs"))
+        .filter(|line| seen.insert(line.to_string()))
+        .map(str::to_string)
+        .collect()
 }
 
 pub fn fetch(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
