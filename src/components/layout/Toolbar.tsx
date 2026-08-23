@@ -3,6 +3,7 @@ import { GitPullRequestCreateArrow, GitPullRequestArrowIcon, ExternalLinkIcon } 
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useBranches } from "@/hooks/queries/useBranches";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
 import { detectRemoteProvider } from "@/lib/remote-provider";
@@ -25,7 +26,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 export function Toolbar() {
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const branch = useRepoStore((s) => s.branch);
+  const { data: branchData } = useBranches(repoPath);
+  const branch = branchData?.branch ?? null;
   const setActiveTab = useRepoStore((s) => s.setActiveTab);
   const selectPR = usePRStore((s) => s.selectPR);
   const [previewPrOpen, setPreviewPrOpen] = useState(false);

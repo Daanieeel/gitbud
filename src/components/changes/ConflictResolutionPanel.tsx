@@ -3,7 +3,7 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { CheckIcon, PencilIcon, UserIcon, UsersIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/tauri";
-import { useRepoStore } from "@/store/useRepoStore";
+import { useResolveConflict, useResolveConflictWithContent, useToggleStaged } from "@/hooks/queries/useRepoStatus";
 import { buildMergeBlocks, reconstructFile, type Pick } from "@/lib/merge3";
 import type { ConflictSides } from "@/lib/types";
 import { MergeBlockView } from "./MergeBlockView";
@@ -21,8 +21,9 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
   const [view, setView] = useState<"merge" | "raw">("merge");
   const [resolving, setResolving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const toggleStaged = useRepoStore((s) => s.toggleStaged);
-  const refreshStatus = useRepoStore((s) => s.refreshStatus);
+  const toggleStagedMutation = useToggleStaged(repoPath);
+  const resolveConflictMutation = useResolveConflict(repoPath);
+  const resolveConflictWithContentMutation = useResolveConflictWithContent(repoPath);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,8 +51,7 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
   const useSide = async (side: "ours" | "theirs") => {
     setResolving(true);
     try {
-      await api.resolveConflict(repoPath, path, side);
-      await refreshStatus();
+      await resolveConflictMutation.mutateAsync({ path, side });
     } finally {
       setResolving(false);
     }
@@ -63,8 +63,7 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
     setError(null);
     try {
       const merged = reconstructFile(sides, blocks, picks);
-      await api.resolveConflictWithContent(repoPath, path, merged);
-      await refreshStatus();
+      await resolveConflictWithContentMutation.mutateAsync({ path, content: merged });
     } catch (e) {
       setError(String(e));
     } finally {
@@ -75,7 +74,7 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
   const markResolved = async () => {
     setResolving(true);
     try {
-      await toggleStaged([path], true);
+      await toggleStagedMutation.mutateAsync({ paths: [path], staged: true });
     } finally {
       setResolving(false);
     }

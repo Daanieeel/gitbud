@@ -5,7 +5,8 @@ import { notify } from "@/lib/notify";
 import { overallFrom, type Overall } from "@/components/pr/CIBadge";
 import { useNetworkStore } from "./useNetworkStore";
 import { isBrokenTokenError, useGitHubStore } from "./useGitHubStore";
-import { useRepoStore } from "./useRepoStore";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import type { PullRequest, PullRequestFile, ReviewComment } from "@/lib/types";
 
 export type PRFilter = "open" | "closed" | "all";
@@ -208,7 +209,7 @@ export const usePRStore = create<PRState>((set, get) => ({
       // git2 errors on deleting whichever branch IS currently checked out — neither case
       // should block on or surface an error for what's just opportunistic local cleanup.
       await api.deleteBranch(repoPath, headRef).catch(() => {});
-      void useRepoStore.getState().refreshBranches();
+      void queryClient.invalidateQueries({ queryKey: queryKeys.branches(repoPath) });
     }
     await get().load(repoPath, login);
   },

@@ -14,7 +14,7 @@ import {
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import { api } from "@/lib/tauri";
-import { useStashStore } from "@/store/useStashStore";
+import { useStashSave, useStashPop } from "@/hooks/queries/useStashes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
@@ -29,21 +29,35 @@ import {
 } from "@/components/ui/context-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
+import {
+  useBranches,
+  useCheckoutBranch,
+  useCreateBranch,
+  useDeleteBranch,
+  useMergeBranch,
+  useRenameBranch,
+} from "@/hooks/queries/useBranches";
+import { useStatus } from "@/hooks/queries/useRepoStatus";
+import { useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/queryKeys";
 import { cn, isProtectedBranch } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubBranchUrl } from "@/lib/github-links";
 
 export function BranchSwitcher() {
-  const branch = useRepoStore((s) => s.branch);
-  const branches = useRepoStore((s) => s.branches);
-  const status = useRepoStore((s) => s.status);
-  const checkoutBranch = useRepoStore((s) => s.checkoutBranch);
-  const refreshStatus = useRepoStore((s) => s.refreshStatus);
-  const createBranch = useRepoStore((s) => s.createBranch);
-  const deleteBranch = useRepoStore((s) => s.deleteBranch);
-  const renameBranch = useRepoStore((s) => s.renameBranch);
-  const mergeBranch = useRepoStore((s) => s.mergeBranch);
   const selectedRepo = useRepoStore((s) => s.selectedRepo);
+  const queryClient = useQueryClient();
+  const { data: branchData } = useBranches(selectedRepo);
+  const branch = branchData?.branch ?? null;
+  const branches = branchData?.branches ?? [];
+  const { data: status } = useStatus(selectedRepo);
+  const checkoutBranchMutation = useCheckoutBranch(selectedRepo);
+  const createBranchMutation = useCreateBranch(selectedRepo);
+  const deleteBranchMutation = useDeleteBranch(selectedRepo);
+  const renameBranchMutation = useRenameBranch(selectedRepo);
+  const mergeBranchMutation = useMergeBranch(selectedRepo);
+  const stashSaveMutation = useStashSave(selectedRepo);
+  const stashPopMutation = useStashPop(selectedRepo);
 
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
@@ -104,7 +118,7 @@ export function BranchSwitcher() {
     }
     setRenameBusy(true);
     try {
-      await renameBranch(renaming, renameValue.trim(), renameRemote);
+      await renameBranchMutation.mutateAsync({ oldName: renaming, newName: renameValue.trim(), alsoRenameRemote: renameRemote });
     } finally {
       setRenameBusy(false);
       setRenaming(null);
@@ -116,7 +130,7 @@ export function BranchSwitcher() {
     setSwitching(true);
     const startedAt = Date.now();
     try {
-      await checkoutBranch(name);
+      await checkoutBranchMutation.mutateAsync(name);
     } catch (err) {
       toast.error(String(err));
     } finally {
@@ -147,13 +161,16 @@ export function BranchSwitcher() {
     setSwitching(true);
     const startedAt = Date.now();
     try {
-      await api.stashSave(selectedRepo, `WIP on ${branch} before switching to ${target}`, true);
-      await checkoutBranch(target);
-      if (bringChanges) await api.stashPop(selectedRepo, 0);
+      await stashSaveMutation.mutateAsync({ message: `WIP on ${branch} before switching to ${target}`, includeUntracked: true });
+      await checkoutBranchMutation.mutateAsync(target);
+      if (bringChanges) await stashPopMutation.mutateAsync(0);
     } catch (err) {
       toast.error(String(err));
     } finally {
-      await Promise.all([refreshStatus(), useStashStore.getState().load(selectedRepo)]);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: queryKeys.status(selectedRepo) }),
+        queryClient.invalidateQueries({ queryKey: queryKeys.stashes(selectedRepo) }),
+      ]);
       const elapsed = Date.now() - startedAt;
       if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
       setSwitching(false);
@@ -174,7 +191,7 @@ export function BranchSwitcher() {
     const unmerged = !target || !(selectedRepo && (await api.isBranchMerged(selectedRepo, name, target).catch(() => false)));
 
     if (!published && !uncommitted && !unmerged) {
-      void deleteBranch(name);
+      deleteBranchMutation.mutate({ name });
       return;
     }
     setDeleteOnRemote(false);
@@ -185,7 +202,10 @@ export function BranchSwitcher() {
     if (!pendingDelete) return;
     setDeleting(true);
     try {
-      await deleteBranch(pendingDelete.name, { deleteRemote: pendingDelete.published && deleteOnRemote });
+      await deleteBranchMutation.mutateAsync({
+        name: pendingDelete.name,
+        opts: { deleteRemote: pendingDelete.published && deleteOnRemote },
+      });
     } finally {
       setDeleting(false);
       setPendingDelete(null);
@@ -198,7 +218,7 @@ export function BranchSwitcher() {
     setSwitching(true);
     const startedAt = Date.now();
     try {
-      await createBranch(name, true);
+      await createBranchMutation.mutateAsync({ name, checkout: true });
     } finally {
       const elapsed = Date.now() - startedAt;
       if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
@@ -314,7 +334,7 @@ export function BranchSwitcher() {
                   </ContextMenuItem>
                   <ContextMenuItem
                     disabled={b.is_head}
-                    onSelect={() => void mergeBranch(b.name)}
+                    onSelect={() => mergeBranchMutation.mutate(b.name)}
                   >
                     <GitMergeIcon className="size-3.5" />
                     Merge into Current

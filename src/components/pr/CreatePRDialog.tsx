@@ -20,6 +20,7 @@ import { FilePathLabel } from "@/components/changes/FilePathLabel";
 import { MultiSelectField } from "./MultiSelectField";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useBranches } from "@/hooks/queries/useBranches";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { usePRStore } from "@/store/usePRStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
@@ -53,8 +54,9 @@ const BRANCH_DIFF_STATUS_COLOR: Record<string, string> = {
 
 export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const branch = useRepoStore((s) => s.branch);
-  const branches = useRepoStore((s) => s.branches);
+  const { data: branchData } = useBranches(repoPath);
+  const branch = branchData?.branch ?? null;
+  const branches = branchData?.branches ?? [];
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const createPR = usePRStore((s) => s.createPR);
   const openPrAfterCreation = useSettingsStore((s) => s.settings.open_pr_on_provider_after_creation);

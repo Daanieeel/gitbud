@@ -28,6 +28,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { CIBadge } from "@/components/pr/CIBadge";
 import { CommitGraph } from "./CommitGraph";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useCherryPick, useRevertCommit } from "@/hooks/queries/useCommitLog";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useAuthorAvatar } from "@/hooks/useAuthorAvatar";
 
@@ -101,8 +102,8 @@ export function CommitList({
 }: CommitListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const cherryPick = useRepoStore((s) => s.cherryPick);
-  const revertCommit = useRepoStore((s) => s.revertCommit);
+  const cherryPickMutation = useCherryPick(repoPath);
+  const revertCommitMutation = useRevertCommit(repoPath);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const [tagsByOid, setTagsByOid] = useState<Map<string, string[]>>(new Map());
 
@@ -225,11 +226,11 @@ export function CommitList({
                   Open Commit on GitHub
                 </ContextMenuItem>
                 <ContextMenuSeparator />
-                <ContextMenuItem onSelect={() => void cherryPick(commit.oid)}>
+                <ContextMenuItem onSelect={() => cherryPickMutation.mutate(commit.oid)}>
                   <CherryIcon className="size-3.5" />
                   Cherry-pick
                 </ContextMenuItem>
-                <ContextMenuItem onSelect={() => void revertCommit(commit.oid)}>
+                <ContextMenuItem onSelect={() => revertCommitMutation.mutate(commit.oid)}>
                   <Undo2Icon className="size-3.5" />
                   Revert
                 </ContextMenuItem>

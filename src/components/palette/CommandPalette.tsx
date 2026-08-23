@@ -4,6 +4,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useBranches, useCheckoutBranch } from "@/hooks/queries/useBranches";
+import { useStatus } from "@/hooks/queries/useRepoStatus";
 import type { CommitSearchResult } from "@/lib/types";
 
 interface CommandPaletteProps {
@@ -21,11 +23,12 @@ type Entry =
 
 export function CommandPalette({ open, onOpenChange, mode }: CommandPaletteProps) {
   const repos = useRepoStore((s) => s.repos);
-  const branches = useRepoStore((s) => s.branches);
-  const status = useRepoStore((s) => s.status);
   const selectedRepo = useRepoStore((s) => s.selectedRepo);
+  const { data: branchData } = useBranches(selectedRepo);
+  const branches = branchData?.branches ?? [];
+  const { data: status } = useStatus(selectedRepo);
   const selectRepo = useRepoStore((s) => s.selectRepo);
-  const checkoutBranch = useRepoStore((s) => s.checkoutBranch);
+  const checkoutBranchMutation = useCheckoutBranch(selectedRepo);
   const selectFile = useRepoStore((s) => s.selectFile);
   const selectCommit = useRepoStore((s) => s.selectCommit);
   const setActiveTab = useRepoStore((s) => s.setActiveTab);
@@ -87,15 +90,15 @@ export function CommandPalette({ open, onOpenChange, mode }: CommandPaletteProps
         void selectRepo(entry.path);
         break;
       case "branch":
-        void checkoutBranch(entry.name);
+        checkoutBranchMutation.mutate(entry.name);
         break;
       case "file":
         setActiveTab("changes");
-        void selectFile(entry.path);
+        selectFile(entry.path);
         break;
       case "commit":
         setActiveTab("history");
-        void selectCommit(entry.oid);
+        selectCommit(entry.oid);
         break;
     }
     onOpenChange(false);

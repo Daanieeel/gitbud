@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useBranches } from "@/hooks/queries/useBranches";
 import { useAddWorktree, useRemoveWorktree, useWorktrees } from "@/hooks/queries/useWorktrees";
 import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
@@ -14,7 +15,8 @@ import type { WorktreeInfo } from "@/lib/types";
 
 export function WorktreesPanel() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const branches = useRepoStore((s) => s.branches);
+  const { data: branchData } = useBranches(repoPath);
+  const branches = branchData?.branches ?? [];
   const addExistingRepo = useRepoStore((s) => s.addExistingRepo);
   const queryClient = useQueryClient();
   const { data: worktrees } = useWorktrees(repoPath);

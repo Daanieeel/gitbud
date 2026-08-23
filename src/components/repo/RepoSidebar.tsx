@@ -42,6 +42,7 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useWorkspaces } from "@/hooks/queries/useWorkspaces";
 import { useWorkspaceFilterStore } from "@/store/useWorkspaceFilterStore";
+import { useRepoSyncing } from "@/hooks/queries/useGitSync";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -267,7 +268,7 @@ export function RepoSidebar() {
   const removeRepo = useRepoStore((s) => s.removeRepo);
   const addExistingRepo = useRepoStore((s) => s.addExistingRepo);
   const setReposLocal = useRepoStore.setState;
-  const syncing = useRepoStore((s) => s.syncing);
+  const syncing = useRepoSyncing(selectedRepo);
   const [dragOver, setDragOver] = useState(false);
   const sidebarSort = useSettingsStore((s) => s.settings.sidebar_sort);
   const showAheadBehind = useSettingsStore((s) => s.settings.show_ahead_behind);

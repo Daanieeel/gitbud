@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useStatus, useDiscardFiles, useStageHunk, useToggleStaged, useUnstageHunk, useDiscardHunk } from "@/hooks/queries/useRepoStatus";
+import { useFileDiff } from "@/hooks/queries/useFileDiff";
 import { FileList } from "./FileList";
 import { ConflictResolutionPanel } from "./ConflictResolutionPanel";
 import { DiffView } from "@/components/diff/DiffView";
@@ -13,20 +15,30 @@ import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 
 export function ChangesTab() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const files = useRepoStore((s) => s.status?.files ?? null);
   const selectedFilePath = useRepoStore((s) => s.selectedFilePath);
-  const selectedStagedDiff = useRepoStore((s) => s.selectedStagedDiff);
-  const selectedUnstagedDiff = useRepoStore((s) => s.selectedUnstagedDiff);
-  const selectedFileImageDiff = useRepoStore((s) => s.selectedFileImageDiff);
   const selectFile = useRepoStore((s) => s.selectFile);
-  const toggleStaged = useRepoStore((s) => s.toggleStaged);
-  const discardFiles = useRepoStore((s) => s.discardFiles);
-  const stageHunk = useRepoStore((s) => s.stageHunk);
-  const unstageHunk = useRepoStore((s) => s.unstageHunk);
-  const discardHunk = useRepoStore((s) => s.discardHunk);
+
+  const { data: status } = useStatus(repoPath);
+  const files = status?.files ?? null;
+  const entryStaged = files?.find((f) => f.path === selectedFilePath)?.staged ?? false;
+  const { data: fileDiff } = useFileDiff(repoPath, selectedFilePath, entryStaged);
+
+  const toggleStagedMutation = useToggleStaged(repoPath);
+  const discardFilesMutation = useDiscardFiles(repoPath);
+  const stageHunkMutation = useStageHunk(repoPath);
+  const unstageHunkMutation = useUnstageHunk(repoPath);
+  const discardHunkMutation = useDiscardHunk(repoPath);
 
   const [filter, setFilter] = useState("");
   const { width, onPointerDown } = useResizableWidth("panel-width:changes-files", 288, 200, 560);
+
+  // A file the user has selected can disappear out from under them — committed, discarded, or
+  // fully unstaged into nothing left to show — in which case there's nothing left to display.
+  useEffect(() => {
+    if (files && selectedFilePath && !files.some((f) => f.path === selectedFilePath)) {
+      selectFile(null);
+    }
+  }, [files, selectedFilePath, selectFile]);
 
   const filtered = useMemo(() => {
     if (!files) return [];
@@ -36,7 +48,7 @@ export function ChangesTab() {
   }, [files, filter]);
 
   const filePaths = useMemo(() => filtered.map((f) => f.path), [filtered]);
-  const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, (path) => void selectFile(path));
+  const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, selectFile);
   const fileListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,7 +80,7 @@ export function ChangesTab() {
                   <Checkbox
                     checked={allStaged}
                     onCheckedChange={(checked) =>
-                      void toggleStaged(filtered.map((f) => f.path), checked === true)
+                      toggleStagedMutation.mutate({ paths: filtered.map((f) => f.path), staged: checked === true })
                     }
                   />
                 </TooltipTrigger>
@@ -85,10 +97,10 @@ export function ChangesTab() {
               <FileList
                 files={filtered}
                 selectedPath={selectedFilePath}
-                onSelect={(path) => void selectFile(path)}
-                onToggle={(path, staged) => void toggleStaged([path], staged)}
-                onToggleMany={(paths, staged) => void toggleStaged(paths, staged)}
-                onDiscardMany={(paths) => void discardFiles(paths)}
+                onSelect={selectFile}
+                onToggle={(path, staged) => toggleStagedMutation.mutate({ paths: [path], staged })}
+                onToggleMany={(paths, staged) => toggleStagedMutation.mutate({ paths, staged })}
+                onDiscardMany={(paths) => discardFilesMutation.mutate(paths)}
               />
             </div>
           </>
@@ -104,15 +116,15 @@ export function ChangesTab() {
         ) : (
           <DiffView
             path={selectedFilePath}
-            diff={selectedUnstagedDiff}
-            secondaryDiff={selectedStagedDiff}
-            imageDiff={selectedFileImageDiff}
+            diff={fileDiff?.unstaged ?? null}
+            secondaryDiff={fileDiff?.staged ?? null}
+            imageDiff={fileDiff?.imageDiff ?? null}
             hunkActions={
               selectedFilePath
                 ? {
                     staged: false,
-                    onStage: (i) => void stageHunk(selectedFilePath, i),
-                    onDiscard: (i) => void discardHunk(selectedFilePath, i),
+                    onStage: (i) => stageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
+                    onDiscard: (i) => discardHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
                   }
                 : undefined
             }
@@ -120,7 +132,7 @@ export function ChangesTab() {
               selectedFilePath
                 ? {
                     staged: true,
-                    onUnstage: (i) => void unstageHunk(selectedFilePath, i),
+                    onUnstage: (i) => unstageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
                   }
                 : undefined
             }

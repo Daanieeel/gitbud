@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useCommitLog } from "@/hooks/queries/useCommitLog";
+import { useCommitFileDiff, useCommitFiles } from "@/hooks/queries/useCommitDetail";
 import { CommitList } from "./CommitList";
 import { CreateBranchAtDialog } from "./CreateBranchAtDialog";
 import { InteractiveRebaseDialog } from "./InteractiveRebaseDialog";
@@ -26,15 +28,23 @@ const COMMIT_STATUS_DOT_COLOR: Record<string, string> = {
 
 export function HistoryTab() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const commits = useRepoStore((s) => s.commits);
   const selectedCommitOid = useRepoStore((s) => s.selectedCommitOid);
-  const selectedCommitFiles = useRepoStore((s) => s.selectedCommitFiles);
   const selectedCommitFilePath = useRepoStore((s) => s.selectedCommitFilePath);
-  const selectedCommitDiff = useRepoStore((s) => s.selectedCommitDiff);
-  const selectedCommitImageDiff = useRepoStore((s) => s.selectedCommitImageDiff);
   const selectCommit = useRepoStore((s) => s.selectCommit);
   const selectCommitFile = useRepoStore((s) => s.selectCommitFile);
-  const loadMoreHistory = useRepoStore((s) => s.loadMoreHistory);
+
+  const { commits, fetchNextPage, hasNextPage, isFetchingNextPage } = useCommitLog(repoPath);
+  const { data: selectedCommitFiles = [] } = useCommitFiles(repoPath, selectedCommitOid);
+  const { data: selectedCommitFileDiff } = useCommitFileDiff(repoPath, selectedCommitOid, selectedCommitFilePath);
+
+  // Default to the first changed file whenever a different commit is selected (or its file list
+  // just loaded), mirroring the old eager auto-select — but only while nothing's picked yet, so
+  // it doesn't fight the user's own file selection.
+  useEffect(() => {
+    if (selectedCommitOid && selectedCommitFilePath === null && selectedCommitFiles.length > 0) {
+      selectCommitFile(selectedCommitFiles[0][0]);
+    }
+  }, [selectedCommitOid, selectedCommitFilePath, selectedCommitFiles, selectCommitFile]);
 
   const [branchAtOid, setBranchAtOid] = useState<string | null>(null);
   const [rebaseBaseOid, setRebaseBaseOid] = useState<string | null>(null);
@@ -55,8 +65,8 @@ export function HistoryTab() {
         <CommitList
           commits={commits}
           selectedOid={selectedCommitOid}
-          onSelect={(oid) => void selectCommit(oid)}
-          onNeedMore={() => void loadMoreHistory()}
+          onSelect={selectCommit}
+          onNeedMore={() => hasNextPage && !isFetchingNextPage && void fetchNextPage()}
           onCreateBranchHere={setBranchAtOid}
           onRebaseFromHere={setRebaseBaseOid}
         />
@@ -71,7 +81,7 @@ export function HistoryTab() {
                   "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
                   selectedCommitFilePath === path && "bg-accent",
                 )}
-                onClick={() => void selectCommitFile(path)}
+                onClick={() => selectCommitFile(path)}
               >
                 <span className="relative shrink-0">
                   <FileTypeIcon path={path} className="size-3.5" />
@@ -93,8 +103,8 @@ export function HistoryTab() {
       <div className="min-w-0 flex-1">
         <DiffView
           path={selectedCommitFilePath}
-          diff={selectedCommitDiff}
-          imageDiff={selectedCommitImageDiff}
+          diff={selectedCommitFileDiff?.diff ?? null}
+          imageDiff={selectedCommitFileDiff?.imageDiff ?? null}
           onCopyPermalink={(line) => {
             if (!repoPath || !selectedCommitOid || !selectedCommitFilePath) return;
             void githubFileUrl(repoPath, selectedCommitOid, selectedCommitFilePath, line).then(

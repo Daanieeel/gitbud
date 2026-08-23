@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { HistoryIcon, RotateCcwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,25 +9,18 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
-import type { ReflogEntry } from "@/lib/types";
+import { useReflogEntries, useReflogRestore } from "@/hooks/queries/useReflog";
 
 export function ReflogPanel() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const refreshStatus = useRepoStore((s) => s.refreshStatus);
-  const refreshBranches = useRepoStore((s) => s.refreshBranches);
-  const resetHistory = useRepoStore((s) => s.resetHistory);
 
   const [open, setOpen] = useState(false);
-  const [entries, setEntries] = useState<ReflogEntry[]>([]);
+  const { data: entries } = useReflogEntries(repoPath, open);
+  const restoreMutation = useReflogRestore(repoPath);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOid, setConfirmOid] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open && repoPath) void api.getReflog(repoPath).then(setEntries);
-  }, [open, repoPath]);
 
   if (!repoPath) return null;
 
@@ -35,10 +28,9 @@ export function ReflogPanel() {
     setBusy(true);
     setError(null);
     try {
-      await api.reflogRestore(repoPath, oid);
+      await restoreMutation.mutateAsync(oid);
       setConfirmOid(null);
       setOpen(false);
-      await Promise.all([refreshStatus(), refreshBranches(), resetHistory()]);
     } catch (e) {
       setError(String(e));
     } finally {

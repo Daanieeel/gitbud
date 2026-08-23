@@ -39,6 +39,8 @@ import { githubFileUrl } from "@/lib/github-links";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useBranches } from "@/hooks/queries/useBranches";
+import { useDiscardFile } from "@/hooks/queries/useRepoStatus";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
 import { BlameDialog } from "./BlameDialog";
@@ -79,8 +81,9 @@ interface FileListProps {
 export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany, onDiscardMany }: FileListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const branch = useRepoStore((s) => s.branch);
-  const discardFile = useRepoStore((s) => s.discardFile);
+  const { data: branchData } = useBranches(repoPath);
+  const branch = branchData?.branch ?? null;
+  const discardFileMutation = useDiscardFile(repoPath);
   const favoriteEditorId = useSettingsStore((s) => s.settings.favorite_editor);
   const customEditorCommand = useSettingsStore((s) => s.settings.custom_editor_command);
   const favoriteEditorOption = findEditor(favoriteEditorId);
@@ -342,7 +345,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                     variant="destructive"
                     onClick={() => {
                       setConfirmDiscardPath(null);
-                      void discardFile(file.path);
+                      discardFileMutation.mutate(file.path);
                     }}
                   >
                     Discard

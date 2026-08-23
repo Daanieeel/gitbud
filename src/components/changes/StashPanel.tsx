@@ -5,16 +5,23 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { DiffView } from "@/components/diff/DiffView";
-import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
-import { useStashStore } from "@/store/useStashStore";
+import {
+  useStashApply,
+  useStashApplyFile,
+  useStashDrop,
+  useStashFileDiff,
+  useStashFiles,
+  useStashPop,
+  useStashSave,
+  useStashes,
+} from "@/hooks/queries/useStashes";
 import { cn } from "@/lib/utils";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FilePathLabel } from "./FilePathLabel";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
-import type { FileDiff } from "@/lib/types";
 
 interface StashPanelProps {
   hasChanges: boolean;
@@ -47,45 +54,28 @@ const STASH_STATUS_DOT_COLOR: Record<string, string> = {
 };
 
 function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
-  const refreshStatus = useRepoStore((s) => s.refreshStatus);
-  const [files, setFiles] = useState<[string, string][]>([]);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
-  const [diff, setDiff] = useState<FileDiff | null>(null);
   const [applyingPath, setApplyingPath] = useState<string | null>(null);
   const { width, onPointerDown } = useResizableWidth("panel-width:stash-files", 224, 160, 480);
+  const { data: files = [] } = useStashFiles(repoPath, index);
+  const { data: diff = null } = useStashFileDiff(repoPath, index, selectedPath);
+  const applyFileMutation = useStashApplyFile(repoPath);
   const filePaths = useMemo(() => files.map(([path]) => path), [files]);
   const handleArrowNav = useArrowKeyFileNav(filePaths, selectedPath, setSelectedPath);
   const fileListRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setSelectedPath(null);
-    setDiff(null);
-    void api
-      .getStashOid(repoPath, index)
-      .then((oid) => api.getCommitFiles(repoPath, oid))
-      .then(setFiles);
   }, [repoPath, index]);
 
   useEffect(() => {
     fileListRef.current?.focus();
   }, [repoPath, index]);
 
-  useEffect(() => {
-    if (!selectedPath) {
-      setDiff(null);
-      return;
-    }
-    void api
-      .getStashOid(repoPath, index)
-      .then((oid) => api.getCommitFileDiff(repoPath, oid, selectedPath))
-      .then(setDiff);
-  }, [repoPath, index, selectedPath]);
-
   const applyFile = async (path: string) => {
     setApplyingPath(path);
     try {
-      await api.stashApplyFile(repoPath, index, path);
-      await refreshStatus();
+      await applyFileMutation.mutateAsync({ index, path });
     } finally {
       setApplyingPath(null);
     }
@@ -159,13 +149,11 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
 
 export function StashPanel({ hasChanges }: StashPanelProps) {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const refreshStatus = useRepoStore((s) => s.refreshStatus);
-  const stashes = useStashStore((s) => s.stashes);
-  const load = useStashStore((s) => s.load);
-  const save = useStashStore((s) => s.save);
-  const apply = useStashStore((s) => s.apply);
-  const pop = useStashStore((s) => s.pop);
-  const drop = useStashStore((s) => s.drop);
+  const { data: stashes } = useStashes(repoPath);
+  const saveMutation = useStashSave(repoPath);
+  const applyMutation = useStashApply(repoPath);
+  const popMutation = useStashPop(repoPath);
+  const dropMutation = useStashDrop(repoPath);
 
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -173,17 +161,12 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
   const [detailIndex, setDetailIndex] = useState<number | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (open && repoPath) void load(repoPath);
-  }, [open, repoPath, load]);
-
   if (!repoPath) return null;
 
   const doSave = async () => {
     setSaving(true);
     try {
-      await save(repoPath, "", true);
-      await refreshStatus();
+      await saveMutation.mutateAsync({ message: "", includeUntracked: true });
     } finally {
       setSaving(false);
     }
@@ -280,10 +263,7 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
                       disabled={busyKey !== null}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void runRowAction(`${s.index}:apply`, async () => {
-                          await apply(repoPath, s.index);
-                          await refreshStatus();
-                        });
+                        void runRowAction(`${s.index}:apply`, () => applyMutation.mutateAsync(s.index));
                       }}
                     >
                       <Undo2Icon className={cn("size-3.5", busyKey === `${s.index}:apply` && "animate-spin")} />
@@ -301,10 +281,7 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
                       disabled={busyKey !== null}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void runRowAction(`${s.index}:pop`, async () => {
-                          await pop(repoPath, s.index);
-                          await refreshStatus();
-                        });
+                        void runRowAction(`${s.index}:pop`, () => popMutation.mutateAsync(s.index));
                       }}
                     >
                       <ArchiveIcon className={cn("size-3.5", busyKey === `${s.index}:pop` && "animate-spin")} />
@@ -322,7 +299,7 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
                       disabled={busyKey !== null}
                       onClick={(e) => {
                         e.stopPropagation();
-                        void runRowAction(`${s.index}:drop`, () => drop(repoPath, s.index));
+                        void runRowAction(`${s.index}:drop`, () => dropMutation.mutateAsync(s.index));
                       }}
                     >
                       <Trash2Icon className={cn("size-3.5", busyKey === `${s.index}:drop` && "animate-spin")} />

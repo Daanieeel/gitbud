@@ -4,13 +4,14 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useHasLfs } from "@/hooks/queries/useLfs";
+import { useBranches } from "@/hooks/queries/useBranches";
+import { useGitSync } from "@/hooks/queries/useGitSync";
 import { cn } from "@/lib/utils";
 
 export function LfsPanel() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
-  const syncing = useRepoStore((s) => s.syncing);
-  const pullLfs = useRepoStore((s) => s.pullLfs);
-  const pushLfs = useRepoStore((s) => s.pushLfs);
+  const { data: branchData } = useBranches(repoPath);
+  const { syncing, pullLfs, pushLfs } = useGitSync(repoPath, branchData?.branch ?? null);
   const { data: hasLfs } = useHasLfs(repoPath);
 
   if (!repoPath || !hasLfs) return null;

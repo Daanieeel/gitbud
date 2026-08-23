@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { toast } from "sonner";
 import { GitCommitIcon, TriangleAlertIcon, Undo2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,23 +7,31 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useBranches } from "@/hooks/queries/useBranches";
+import { useStatus } from "@/hooks/queries/useRepoStatus";
+import { useCommitLog } from "@/hooks/queries/useCommitLog";
+import { useAheadBehind } from "@/hooks/queries/useAheadBehind";
+import { useCommit, useAmendCommit, useUndoLastCommit } from "@/hooks/queries/useCommitActions";
 import { cn, isProtectedBranch } from "@/lib/utils";
+import { notify } from "@/lib/notify";
 import { useBusyAction } from "@/hooks/useBusyAction";
 
 export function CommitBox() {
-  const branch = useRepoStore((s) => s.branch);
-  const status = useRepoStore((s) => s.status);
-  const commits = useRepoStore((s) => s.commits);
-  const aheadBehind = useRepoStore((s) => s.aheadBehind);
+  const repoPath = useRepoStore((s) => s.selectedRepo);
+  const { data: branchData } = useBranches(repoPath);
+  const branch = branchData?.branch ?? null;
+  const { data: status } = useStatus(repoPath);
+  const { commits } = useCommitLog(repoPath);
+  const { data: aheadBehind } = useAheadBehind(repoPath);
   const summary = useRepoStore((s) => s.commitSummary);
   const description = useRepoStore((s) => s.commitDescription);
   const amending = useRepoStore((s) => s.amending);
   const setSummary = useRepoStore((s) => s.setCommitSummary);
   const setDescription = useRepoStore((s) => s.setCommitDescription);
   const setAmending = useRepoStore((s) => s.setAmending);
-  const doCommit = useRepoStore((s) => s.doCommit);
-  const doAmendCommit = useRepoStore((s) => s.doAmendCommit);
-  const undoLastCommit = useRepoStore((s) => s.undoLastCommit);
+  const commitMutation = useCommit(repoPath);
+  const amendCommitMutation = useAmendCommit(repoPath);
+  const undoLastCommitMutation = useUndoLastCommit(repoPath);
 
   const [committing, runCommit] = useBusyAction();
   const [undoing, runUndo] = useBusyAction();
@@ -62,10 +71,20 @@ export function CommitBox() {
   const submit = async () => {
     if (disabled || committing) return;
     await runCommit(async () => {
+      const trimmedSummary = summary.trim();
+      const trimmedDescription = description.trim();
       if (amending) {
-        await doAmendCommit(summary.trim(), description.trim());
+        await amendCommitMutation.mutateAsync({ summary: trimmedSummary, description: trimmedDescription });
+        setSummary("");
+        setDescription("");
+        setAmending(false);
+        void notify(`Amended commit on ${branch ?? "current branch"}`, trimmedSummary);
       } else {
-        await doCommit(summary.trim(), description.trim());
+        await commitMutation.mutateAsync({ summary: trimmedSummary, description: trimmedDescription });
+        const fileWord = stagedFiles.length === 1 ? "file" : "files";
+        setSummary("");
+        setDescription("");
+        void notify(`Committed ${stagedFiles.length} ${fileWord} to ${branch ?? "current branch"}`, trimmedSummary);
       }
     });
   };
@@ -141,7 +160,20 @@ export function CommitBox() {
             size="sm"
             className="h-6 shrink-0 px-1.5"
             disabled={undoing}
-            onClick={() => void runUndo(undoLastCommit)}
+            onClick={() =>
+              void runUndo(async () => {
+                let restoredSummary: string, restoredDescription: string;
+                try {
+                  [restoredSummary, restoredDescription] = await undoLastCommitMutation.mutateAsync();
+                } catch (err) {
+                  toast.error(String(err));
+                  return;
+                }
+                setSummary(restoredSummary);
+                setDescription(restoredDescription);
+                setAmending(false);
+              })
+            }
           >
             <Undo2Icon className={cn("size-3.5", undoing && "animate-spin")} />
             Undo
