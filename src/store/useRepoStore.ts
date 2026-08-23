@@ -84,6 +84,7 @@ interface RepoState {
 
   toggleStaged: (paths: string[], staged: boolean) => Promise<void>;
   discardFile: (path: string) => Promise<void>;
+  discardFiles: (paths: string[]) => Promise<void>;
   stageHunk: (path: string, hunkIndex: number) => Promise<void>;
   unstageHunk: (path: string, hunkIndex: number) => Promise<void>;
   discardHunk: (path: string, hunkIndex: number) => Promise<void>;
@@ -298,6 +299,16 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     if (!repoPath) return;
     await api.discardFile(repoPath, path);
     if (get().selectedFilePath === path) {
+      set({ selectedFilePath: null, selectedStagedDiff: null, selectedUnstagedDiff: null, selectedFileImageDiff: null });
+    }
+    await get().refreshStatus();
+  },
+
+  discardFiles: async (paths) => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    await Promise.all(paths.map((path) => api.discardFile(repoPath, path)));
+    if (get().selectedFilePath && paths.includes(get().selectedFilePath as string)) {
       set({ selectedFilePath: null, selectedStagedDiff: null, selectedUnstagedDiff: null, selectedFileImageDiff: null });
     }
     await get().refreshStatus();

@@ -143,7 +143,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     return () => {
       cancelled = true;
     };
-  }, [open, repoPath, login]);
+  }, [open, repoPath, login, pr.base_ref]);
 
   const submit = async () => {
     setMerging(true);
@@ -228,7 +228,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
                     key={m.key}
                     type="button"
                     disabled={!allowed}
-                    title={allowed ? undefined : "Disabled by this repository's merge settings"}
+                    title={allowed ? undefined : "Disabled by this repository's merge settings or branch protection rules"}
                     className={cn(
                       "flex-1 rounded-md border border-border p-2 text-left",
                       !allowed && "cursor-not-allowed opacity-40",
@@ -263,6 +263,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
         <DialogFooter className="sm:items-center sm:gap-4">
           <CheckboxGroup
             className="text-sm text-muted-foreground"
+            variant="destructive"
             checked={deleteBranch}
             onCheckedChange={(checked) => setDeleteBranch(checked === true)}
           >

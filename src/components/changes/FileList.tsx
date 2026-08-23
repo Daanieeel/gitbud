@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
+  CheckIcon,
   CopyIcon,
   ExternalLinkIcon,
   FolderOpenIcon,
@@ -8,6 +9,7 @@ import {
   Trash2Icon,
   TriangleAlertIcon,
   UserIcon,
+  XIcon,
 } from "lucide-react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import type { ChangeKind, FileEntry } from "@/lib/types";
@@ -20,6 +22,13 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -59,16 +68,35 @@ interface FileListProps {
   selectedPath: string | null;
   onSelect: (path: string) => void;
   onToggle: (path: string, staged: boolean) => void;
+  onToggleMany: (paths: string[], staged: boolean) => void;
+  onDiscardMany: (paths: string[]) => void;
 }
 
-export function FileList({ files, selectedPath, onSelect, onToggle }: FileListProps) {
+export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany, onDiscardMany }: FileListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const branch = useRepoStore((s) => s.branch);
   const discardFile = useRepoStore((s) => s.discardFile);
   const [blamePath, setBlamePath] = useState<string | null>(null);
   const [confirmDiscardPath, setConfirmDiscardPath] = useState<string | null>(null);
+  const [confirmDiscardBatch, setConfirmDiscardBatch] = useState(false);
   const [lfsInfo, setLfsInfo] = useState<Record<string, LfsFileInfo>>({});
+
+  // Multi-select: shift-click extends a range from `anchorIndex`, cmd/ctrl-click toggles one
+  // file in/out. A plain click always collapses back to a single selection, matching standard
+  // file-explorer behavior.
+  const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
+  const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
+
+  // Drop any selected paths that no longer exist (staged/discarded out from under the list)
+  // rather than silently batch-acting on stale entries next time.
+  useEffect(() => {
+    const paths = new Set(files.map((f) => f.path));
+    setSelectedPaths((prev) => {
+      const next = new Set([...prev].filter((p) => paths.has(p)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [files]);
 
   useEffect(() => {
     if (!repoPath || files.length === 0) {
@@ -99,13 +127,47 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
     virtualizer.scrollToIndex(index, { align: "auto" });
   }, [selectedPath, files, virtualizer]);
 
+  const handleRowClick = (e: React.MouseEvent, path: string, index: number) => {
+    if (e.shiftKey && anchorIndex != null) {
+      const [start, end] = anchorIndex < index ? [anchorIndex, index] : [index, anchorIndex];
+      setSelectedPaths(new Set(files.slice(start, end + 1).map((f) => f.path)));
+    } else if (e.metaKey || e.ctrlKey) {
+      setSelectedPaths((prev) => {
+        const next = new Set(prev);
+        if (next.has(path)) next.delete(path);
+        else next.add(path);
+        return next;
+      });
+      setAnchorIndex(index);
+    } else {
+      setSelectedPaths(new Set([path]));
+      setAnchorIndex(index);
+    }
+    onSelect(path);
+  };
+
+  // Right-clicking a file outside the current selection collapses the selection to just that
+  // file first, mirroring Finder/Explorer — otherwise the batch menu would apply to files the
+  // user never meant to include.
+  const handleContextMenu = (path: string, index: number) => {
+    if (!selectedPaths.has(path)) {
+      setSelectedPaths(new Set([path]));
+      setAnchorIndex(index);
+    }
+  };
+
+  const isBatch = selectedPaths.size > 1;
+  const selectedList = [...selectedPaths];
+
   return (
     <div ref={parentRef} className="h-full overflow-auto">
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {virtualizer.getVirtualItems().map((row) => {
           const file = files[row.index];
+          const rowSelected = selectedPaths.has(file.path);
+          const showBatchMenu = isBatch && rowSelected;
           return (
-            <ContextMenu key={file.path}>
+            <ContextMenu key={file.path} onOpenChange={(open) => open && handleContextMenu(file.path, row.index)}>
             <Popover
               open={confirmDiscardPath === file.path}
               onOpenChange={(o) => !o && setConfirmDiscardPath(null)}
@@ -123,10 +185,10 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
                   }}
                   className={cn(
                     "flex items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
-                    selectedPath === file.path && "bg-accent",
+                    (selectedPath === file.path || rowSelected) && "bg-accent",
                     file.status === "conflicted" && "text-destructive",
                   )}
-                  onClick={() => onSelect(file.path)}
+                  onClick={(e) => handleRowClick(e, file.path, row.index)}
                 >
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -172,53 +234,77 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
               </ContextMenuTrigger>
               </PopoverAnchor>
               <ContextMenuContent>
-                <ContextMenuItem onSelect={() => void copyToClipboard(file.path)}>
-                  <CopyIcon className="size-3.5" />
-                  Copy Path
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onSelect={() => {
-                    if (!repoPath) return;
-                    void revealItemInDir(`${repoPath}/${file.path}`);
-                  }}
-                >
-                  <FolderOpenIcon className="size-3.5" />
-                  Reveal in Finder
-                </ContextMenuItem>
-                <ContextMenuItem
-                  onSelect={() => {
-                    if (!repoPath) return;
-                    void api.openInTerminal(repoPath);
-                  }}
-                >
-                  <TerminalIcon className="size-3.5" />
-                  Open in Terminal
-                </ContextMenuItem>
-                {branch && (
-                  <ContextMenuItem
-                    onSelect={() => {
-                      if (!repoPath) return;
-                      void githubFileUrl(repoPath, branch, file.path).then((url) => {
-                        if (url) void openUrl(url);
-                      });
-                    }}
-                  >
-                    <ExternalLinkIcon className="size-3.5" />
-                    View File on GitHub
-                  </ContextMenuItem>
+                {showBatchMenu ? (
+                  <>
+                    <ContextMenuItem onSelect={() => onToggleMany(selectedList, true)}>
+                      <CheckIcon className="size-3.5" />
+                      Stage {selectedList.length} Files
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => onToggleMany(selectedList, false)}>
+                      <XIcon className="size-3.5" />
+                      Unstage {selectedList.length} Files
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => void copyToClipboard(selectedList.join("\n"))}>
+                      <CopyIcon className="size-3.5" />
+                      Copy Paths
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem variant="destructive" onSelect={() => setConfirmDiscardBatch(true)}>
+                      <Trash2Icon className="size-3.5" />
+                      Discard {selectedList.length} Files
+                    </ContextMenuItem>
+                  </>
+                ) : (
+                  <>
+                    <ContextMenuItem onSelect={() => void copyToClipboard(file.path)}>
+                      <CopyIcon className="size-3.5" />
+                      Copy Path
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      onSelect={() => {
+                        if (!repoPath) return;
+                        void revealItemInDir(`${repoPath}/${file.path}`);
+                      }}
+                    >
+                      <FolderOpenIcon className="size-3.5" />
+                      Reveal in Finder
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      onSelect={() => {
+                        if (!repoPath) return;
+                        void api.openInTerminal(repoPath);
+                      }}
+                    >
+                      <TerminalIcon className="size-3.5" />
+                      Open in Terminal
+                    </ContextMenuItem>
+                    {branch && (
+                      <ContextMenuItem
+                        onSelect={() => {
+                          if (!repoPath) return;
+                          void githubFileUrl(repoPath, branch, file.path).then((url) => {
+                            if (url) void openUrl(url);
+                          });
+                        }}
+                      >
+                        <ExternalLinkIcon className="size-3.5" />
+                        View File on GitHub
+                      </ContextMenuItem>
+                    )}
+                    <ContextMenuItem onSelect={() => setBlamePath(file.path)}>
+                      <UserIcon className="size-3.5" />
+                      Blame File
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      variant="destructive"
+                      onSelect={() => setConfirmDiscardPath(file.path)}
+                    >
+                      <Trash2Icon className="size-3.5" />
+                      Discard Changes
+                    </ContextMenuItem>
+                  </>
                 )}
-                <ContextMenuItem onSelect={() => setBlamePath(file.path)}>
-                  <UserIcon className="size-3.5" />
-                  Blame File
-                </ContextMenuItem>
-                <ContextMenuSeparator />
-                <ContextMenuItem
-                  variant="destructive"
-                  onSelect={() => setConfirmDiscardPath(file.path)}
-                >
-                  <Trash2Icon className="size-3.5" />
-                  Discard Changes
-                </ContextMenuItem>
               </ContextMenuContent>
               <PopoverContent align="start" className="w-56 space-y-2 p-3">
                 <p className="text-sm">Permanently discard changes to "{file.path}"?</p>
@@ -250,6 +336,30 @@ export function FileList({ files, selectedPath, onSelect, onToggle }: FileListPr
           onOpenChange={(open) => !open && setBlamePath(null)}
         />
       )}
+      <Dialog open={confirmDiscardBatch} onOpenChange={setConfirmDiscardBatch}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Discard {selectedList.length} files?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This permanently discards changes to the selected files. This can't be undone.
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDiscardBatch(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setConfirmDiscardBatch(false);
+                onDiscardMany(selectedList);
+              }}
+            >
+              Discard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
