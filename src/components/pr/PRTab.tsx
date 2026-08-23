@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { TriangleAlertIcon } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { usePRStore, type PRFilter } from "@/store/usePRStore";
 import { isBrokenTokenError, usePullRequestList } from "@/hooks/queries/usePullRequests";
+import { queryKeys } from "@/lib/queryKeys";
 import { PRList } from "./PRList";
 import { PRDetail } from "./PRDetail";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
@@ -32,11 +34,22 @@ export function PRTab() {
   const [hasRemote, setHasRemote] = useState<boolean | null>(null);
   const [reauthing, setReauthing] = useState(false);
   const { width, onPointerDown } = useResizableWidth("panel-width:pr-list", 260, 240, 640);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!repoPath) return;
     void api.githubRemoteOwnerRepo(repoPath).then((r) => setHasRemote(r != null));
   }, [repoPath]);
+
+  // Force a fresh fetch whenever this tab is (re)entered or the filter changes, rather than
+  // trusting whatever's still "fresh" by staleTime — a teammate's PR activity doesn't wait for a
+  // staleTime window to expire, and the background sync (useProviderSync) only ever keeps the
+  // "open" filter warm.
+  useEffect(() => {
+    if (repoPath && currentLogin) {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.prList(repoPath, currentLogin, filter) });
+    }
+  }, [repoPath, currentLogin, filter, queryClient]);
 
   const {
     pulls,

@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { HistoryIcon, RotateCcwIcon } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -11,13 +12,21 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useReflogEntries, useReflogRestore } from "@/hooks/queries/useReflog";
+import { queryKeys } from "@/lib/queryKeys";
 
 export function ReflogPanel() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
+  const queryClient = useQueryClient();
 
   const [open, setOpen] = useState(false);
   const { data: entries } = useReflogEntries(repoPath, open);
   const restoreMutation = useReflogRestore(repoPath);
+
+  // Force a fresh fetch every time this dialog opens — HEAD can have moved (commit, checkout,
+  // another sync) since the last time it was open, well within staleTime's window.
+  useEffect(() => {
+    if (open && repoPath) void queryClient.invalidateQueries({ queryKey: queryKeys.reflog(repoPath) });
+  }, [open, repoPath, queryClient]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmOid, setConfirmOid] = useState<string | null>(null);

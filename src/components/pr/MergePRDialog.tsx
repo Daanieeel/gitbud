@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ExternalLinkIcon, GitMergeIcon, TriangleAlertIcon } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +19,7 @@ import { useMergePullRequest } from "@/hooks/queries/usePullRequests";
 import { useCheckRuns } from "@/hooks/queries/useCheckRuns";
 import { runIcon, runStatusLabel } from "./CIBadge";
 import { api } from "@/lib/tauri";
+import { queryKeys } from "@/lib/queryKeys";
 import { takePrefetchedMergeSettings } from "@/lib/mergeSettingsPrefetch";
 import { cn } from "@/lib/utils";
 import type { PullRequest, RepoMergeSettings } from "@/lib/types";
@@ -58,6 +60,7 @@ const METHODS: {
 
 export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: MergePRDialogProps) {
   const mergePRMutation = useMergePullRequest(repoPath, login);
+  const queryClient = useQueryClient();
 
   const [method, setMethod] = useState<"merge" | "squash" | "rebase">("squash");
   const [commitTitle, setCommitTitle] = useState("");
@@ -66,6 +69,12 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
   const [merging, setMerging] = useState(false);
   const { data: runs = null } = useCheckRuns(open ? repoPath : null, open ? login : null, open ? pr.head_sha : null);
   const [repoSettings, setRepoSettings] = useState<RepoMergeSettings | null>(null);
+
+  // Force a fresh check-runs fetch every time this dialog opens — you're about to merge, so a
+  // 20s-stale CI result (the shared staleTime CIBadge also uses) isn't good enough here.
+  useEffect(() => {
+    if (open) void queryClient.invalidateQueries({ queryKey: queryKeys.checkRuns(repoPath, login, pr.head_sha) });
+  }, [open, repoPath, login, pr.head_sha, queryClient]);
 
   // Reset per-open state right at the moment the dialog opens, mirroring CreatePRDialog.
   const wasOpenRef = useRef(false);

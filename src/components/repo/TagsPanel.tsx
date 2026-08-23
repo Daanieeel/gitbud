@@ -1,12 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { PlusIcon, TagIcon, Trash2Icon, UploadIcon } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useCreateTag, useDeleteTag, usePushTag, useTags } from "@/hooks/queries/useTags";
+import { queryKeys } from "@/lib/queryKeys";
 import { githubRepoUrl } from "@/lib/github-links";
 import { cn } from "@/lib/utils";
 
@@ -14,6 +16,14 @@ export function TagsPanel() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const [open, setOpen] = useState(false);
   const { data: tags } = useTags(repoPath, open);
+  const queryClient = useQueryClient();
+
+  // Force a fresh fetch every time this popover opens, rather than trusting whatever's still
+  // "fresh" by staleTime — tags can be created/pushed/deleted from outside the app (another
+  // clone, the CLI), and re-opening within the staleTime window shouldn't ever show stale data.
+  useEffect(() => {
+    if (open && repoPath) void queryClient.invalidateQueries({ queryKey: queryKeys.tags(repoPath) });
+  }, [open, repoPath, queryClient]);
   const createTag = useCreateTag(repoPath);
   const deleteTag = useDeleteTag(repoPath);
   const pushTag = usePushTag(repoPath);
