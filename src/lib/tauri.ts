@@ -274,6 +274,8 @@ export const api = {
       draft,
     }),
   readPrTemplate: (repoPath: string) => invoke<string | null>("read_pr_template", { repoPath }),
+  githubUpdatePullRequestBase: (repoPath: string, login: string, number: number, base: string) =>
+    invoke<void>("github_update_pull_request_base", { repoPath, login, number, base }),
   githubListLabels: (repoPath: string, login: string) =>
     invoke<Label[]>("github_list_labels", { repoPath, login }),
   githubListAssignableUsers: (repoPath: string, login: string) =>

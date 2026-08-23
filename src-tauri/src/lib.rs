@@ -971,6 +971,17 @@ async fn github_create_pull_request(
 }
 
 #[tauri::command]
+async fn github_update_pull_request_base(
+    repo_path: String,
+    login: String,
+    number: u64,
+    base: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::update_pull_request_base(&host, &token, &owner, &repo, number, &base).await
+}
+
+#[tauri::command]
 async fn github_list_labels(repo_path: String, login: String) -> Result<Vec<github::api::Label>, String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
     github::api::list_labels(&host, &token, &owner, &repo).await
@@ -1524,6 +1535,7 @@ pub fn run() {
             github_list_pull_requests,
             github_get_pull_request,
             github_create_pull_request,
+            github_update_pull_request_base,
             github_list_labels,
             github_list_assignable_users,
             github_add_labels,

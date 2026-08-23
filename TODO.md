@@ -16,7 +16,7 @@ Complete in chronological order.
 - [x] History Tab: show unpushed commits in a different way than pushed commits
 - [x] Hostory Tab: add a compact mode. compact mode only shows the current branch's graph and hides all other branches. it should only show when something was merged into the current branch or out of it. but dont show all branches parallel to each other, just the branching out and in from the current branch
 - [x] (BUG) Settings > General > Favorite Editor: The selector isnt scrollable
-- [ ] Pull Request Tab > Single PR > "Merge..." button > Dialog: add an option to change the target branch
+- [x] Pull Request Tab > Single PR > "Merge..." button > Dialog: add an option to change the target branch
 - [ ] Any diff viewer: a feature we want is inline diff viewing. if only a small portion of a line is changed, we currently show the whole line removed and added again but we highlight the changed portion. this is good and should stay. however, when there was a lot of change in a line, the porbablity for it matching with the old version on some singular letters is high. this can get really messy. so if the changed portion of a line is above 10-20 characters, we should show the whole line removed and added again instead of highlighting the changed portion
 - [ ] Command palette: switch from substring match to fuzzy scored match (goto anything style)
 - [ ] add an interface for resolving this error when pushing and pulling at the same time: "Diverging branches can't be fast-forwarded"

@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useMergePullRequest } from "@/hooks/queries/usePullRequests";
+import { useBranches } from "@/hooks/queries/useBranches";
 import { prPollIntervalMs, useCheckRuns, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
 import { CheckRunsRefresh } from "./CheckRunsRefresh";
 import { runIcon, runStatusLabel } from "./CIBadge";
@@ -68,6 +69,16 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
   const [commitMessage, setCommitMessage] = useState("");
   const [deleteBranch, setDeleteBranch] = useState(false);
   const [merging, setMerging] = useState(false);
+  const [targetBase, setTargetBase] = useState(pr.base_ref);
+  const { data: branchData } = useBranches(repoPath);
+  const localBranchNames = (branchData?.branches ?? [])
+    .filter((b) => !b.is_remote && b.name !== pr.head_ref)
+    .map((b) => b.name);
+  // The PR's current base might not be checked out locally (e.g. reviewing someone else's PR
+  // against a branch you've never fetched) — keep it selectable regardless.
+  const baseOptions = localBranchNames.includes(pr.base_ref)
+    ? localBranchNames
+    : [pr.base_ref, ...localBranchNames];
   const isPrTabActive = useIsPrTabActive();
   const {
     data: runs = null,
@@ -94,9 +105,10 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     if (open && !wasOpenRef.current) {
       setCommitTitle(`${pr.title} (#${pr.number})`);
       setCommitMessage("");
+      setTargetBase(pr.base_ref);
     }
     wasOpenRef.current = open;
-  }, [open, pr.title, pr.number]);
+  }, [open, pr.title, pr.number, pr.base_ref]);
 
   // Only offer merge methods this repo (and this base branch's protection rules, e.g. "require
   // linear history" ruling out merge commits) actually allow — GitHub 405s on a disallowed one
@@ -111,8 +123,8 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     // Reuse a prefetch already in flight from the PR tab (see mergeSettingsPrefetch) if there is
     // one, instead of firing a redundant duplicate request — but this always consumes it rather
     // than caching by result, so the *next* open still fires a genuinely fresh request.
-    (takePrefetchedMergeSettings(repoPath, login, pr.base_ref) ??
-      api.githubGetRepoMergeSettings(repoPath, login, pr.base_ref)
+    ((targetBase === pr.base_ref ? takePrefetchedMergeSettings(repoPath, login, targetBase) : null) ??
+      api.githubGetRepoMergeSettings(repoPath, login, targetBase)
     ).then(
       (settings) => {
         if (cancelled) return;
@@ -131,7 +143,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     return () => {
       cancelled = true;
     };
-  }, [open, repoPath, login, pr.base_ref]);
+  }, [open, repoPath, login, targetBase, pr.base_ref]);
 
   // Vacuously true for no checks at all (nothing to block on) and false while still loading —
   // we don't want to flash the confident "default" color before we actually know.
@@ -142,6 +154,11 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
   const submit = async () => {
     setMerging(true);
     try {
+      // The merge endpoint always merges into whatever base is currently set on the PR, so a
+      // changed target has to be pushed as its own update first.
+      if (targetBase !== pr.base_ref) {
+        await api.githubUpdatePullRequestBase(repoPath, login, pr.number, targetBase);
+      }
       await mergePRMutation.mutateAsync({
         number: pr.number,
         method,
@@ -150,7 +167,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
         sha: pr.head_sha,
         deleteBranch,
         headRef: pr.head_ref,
-        baseRef: pr.base_ref,
+        baseRef: targetBase,
       });
       onOpenChange(false);
     } finally {
@@ -170,11 +187,30 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
           </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
-          <div className="text-sm text-muted-foreground">
-            {pr.head_ref} → {pr.base_ref}
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+            <span className="font-mono">{pr.head_ref}</span>
+            <span>→</span>
+            <select
+              value={targetBase}
+              onChange={(e) => setTargetBase(e.target.value)}
+              className="h-6 rounded-md border border-input bg-transparent px-1.5 font-mono text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {baseOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
           </div>
 
-          {pr.mergeable === false && (
+          {targetBase !== pr.base_ref && (
+            <div className="flex items-center gap-1.5 rounded-md bg-accent-yellow/10 px-2 py-1.5 text-xs text-accent-yellow">
+              <TriangleAlertIcon className="size-3.5 shrink-0" />
+              This PR will be retargeted from {pr.base_ref} to {targetBase} before merging.
+            </div>
+          )}
+
+          {pr.mergeable === false && targetBase === pr.base_ref && (
             <div className="flex items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
               <TriangleAlertIcon className="size-3.5 shrink-0" />
               This branch has conflicts with {pr.base_ref} and may not be mergeable.
