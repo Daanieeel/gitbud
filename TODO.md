@@ -4,7 +4,7 @@ Not ordered by priority. Tick off items as you complete them. Commit after each 
 Complete in chronological order.
 
 - [x] Toolbar > Tags > Tags List Popover > Single Tag Item: has three actions on hover. leftmost action is open on github. it currently has a "Tag" icon, transform into an external link icon.
-- [ ] Preview Pull Request Dialog > Milestone selector: if not milestone is selected, the placeholder text should be a lower opacity grey (just like for the other three selectors above). currently is full white
+- [x] Preview Pull Request Dialog > Milestone selector: if not milestone is selected, the placeholder text should be a lower opacity grey (just like for the other three selectors above). currently is full white
 - [ ] fix branch deletion after PR merge if it was enabled. currently only deletes on remote, leaves the local branch as local-only. should delete the local branch after merge and move user to default branch as dodge
 - [ ] Pull Request Tab > Single PR > File Explorer: needs to be horizontally resizable
 - [ ] "Add to .gitignore" action in right click menu on files (as single file action or multiple file action)

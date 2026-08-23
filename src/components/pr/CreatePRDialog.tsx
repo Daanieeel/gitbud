@@ -379,7 +379,10 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
               <select
                 value={selectedMilestone}
                 onChange={(e) => setSelectedMilestone(e.target.value)}
-                className="h-7 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={cn(
+                  "h-7 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  !selectedMilestone && "text-muted-foreground",
+                )}
               >
                 <option value="">No milestone</option>
                 {milestones.map((m) => (
