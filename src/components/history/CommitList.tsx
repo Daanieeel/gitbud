@@ -31,6 +31,7 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useCherryPick, useRevertCommit } from "@/hooks/queries/useCommitLog";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useAuthorAvatar } from "@/hooks/useAuthorAvatar";
+import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 
 const ROW_HEIGHT = 52;
 
@@ -143,8 +144,22 @@ export function CommitList({
     if (lastIndex >= commits.length - 5) onNeedMore();
   }, [lastIndex, commits.length, onNeedMore]);
 
+  const oids = useMemo(() => commits.map((c) => c.oid), [commits]);
+  const handleArrowNav = useArrowKeyFileNav(oids, selectedOid, onSelect);
+
+  useEffect(() => {
+    parentRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedOid) return;
+    const index = commits.findIndex((c) => c.oid === selectedOid);
+    if (index === -1) return;
+    virtualizer.scrollToIndex(index, { align: "auto" });
+  }, [selectedOid, commits, virtualizer]);
+
   return (
-    <div ref={parentRef} className="h-full overflow-auto">
+    <div ref={parentRef} tabIndex={0} onKeyDown={handleArrowNav} className="h-full overflow-auto outline-none">
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {items.map((row) => {
           const commit = commits[row.index];

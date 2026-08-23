@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
+import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import {
   BellIcon,
   BellRingIcon,
@@ -86,6 +87,24 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
     );
   }, [pulls, filter]);
 
+  const listRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const numberKeys = useMemo(() => filtered.map((p) => String(p.number)), [filtered]);
+  const handleArrowNav = useArrowKeyFileNav(
+    numberKeys,
+    selectedNumber !== null ? String(selectedNumber) : null,
+    (key) => onSelect(Number(key)),
+  );
+
+  useEffect(() => {
+    if (selectedNumber === null) return;
+    rowRefs.current.get(selectedNumber)?.scrollIntoView({ block: "nearest" });
+  }, [selectedNumber]);
+
+  useEffect(() => {
+    listRef.current?.focus();
+  }, []);
+
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0 border-b border-border p-2">
@@ -96,7 +115,12 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
           className="h-7"
         />
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div
+        ref={listRef}
+        tabIndex={0}
+        onKeyDown={handleArrowNav}
+        className="min-h-0 flex-1 overflow-auto outline-none"
+      >
         {loading && pulls.length === 0 ? (
           <div className="flex flex-col">
             {Array.from({ length: 10 }).map((_, i) => (
@@ -118,6 +142,10 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
             return (
               <div
                 key={pr.number}
+                ref={(el) => {
+                  if (el) rowRefs.current.set(pr.number, el);
+                  else rowRefs.current.delete(pr.number);
+                }}
                 className={cn(
                   "flex cursor-pointer items-start gap-2 border-b border-border/50 px-2 py-2 text-sm hover:bg-accent",
                   selectedNumber === pr.number && "bg-accent",

@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useCommitLog } from "@/hooks/queries/useCommitLog";
 import { useCommitFileDiff, useCommitFiles } from "@/hooks/queries/useCommitDetail";
+import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { queryKeys } from "@/lib/queryKeys";
 import { toMainlineCommits } from "@/lib/compact-graph";
 import { CheckboxGroup } from "@/components/ui/checkbox-group";
@@ -59,6 +60,9 @@ export function HistoryTab() {
     localStorage.setItem("history:compact", String(compact));
   }, [compact]);
   const displayedCommits = compact ? toMainlineCommits(commits) : commits;
+  const commitFilePaths = useMemo(() => selectedCommitFiles.map(([path]) => path), [selectedCommitFiles]);
+  const handleFileArrowNav = useArrowKeyFileNav(commitFilePaths, selectedCommitFilePath, selectCommitFile);
+  const fileListRef = useRef<HTMLDivElement>(null);
 
   if (commits.length === 0) {
     return (
@@ -104,7 +108,13 @@ export function HistoryTab() {
       <div className="flex min-w-0 flex-1 flex-col">
         {selectedCommitOid && <CommitHeader repoPath={repoPath} oid={selectedCommitOid} />}
         <div className="flex min-h-0 flex-1">
-          <div style={{ width: fileList.width }} className="shrink-0 overflow-auto border-r border-border">
+          <div
+            ref={fileListRef}
+            tabIndex={0}
+            onKeyDown={handleFileArrowNav}
+            style={{ width: fileList.width }}
+            className="shrink-0 overflow-auto border-r border-border outline-none"
+          >
             {selectedCommitFiles.map(([path, status]) => (
               <Tooltip key={path}>
                 <TooltipTrigger asChild>
