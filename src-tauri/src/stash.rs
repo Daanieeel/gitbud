@@ -107,6 +107,7 @@ mod tests {
             let mut config = repo.config().unwrap();
             config.set_str("user.name", "Test").unwrap();
             config.set_str("user.email", "test@example.com").unwrap();
+            config.set_bool("core.autocrlf", false).unwrap();
             std::fs::write(path.join("a.txt"), "a\n").unwrap();
             repo::stage_paths(&path.to_string_lossy(), &["a.txt".to_string()]).unwrap();
             repo::commit(&path.to_string_lossy(), "init", "").unwrap();
