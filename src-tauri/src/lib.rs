@@ -734,6 +734,13 @@ async fn git_pull(app: AppHandle, repo_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn git_abort_pull(app: AppHandle, repo_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || git_shell::abort_pull(&app, &repo_path, &repo_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn git_push(app: AppHandle, repo_path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || git_shell::push(&app, &repo_path, &repo_path))
         .await
@@ -1433,6 +1440,7 @@ pub fn run() {
             init_repo,
             git_fetch,
             git_pull,
+            git_abort_pull,
             git_push,
             cancel_git_operation,
             git_clone,

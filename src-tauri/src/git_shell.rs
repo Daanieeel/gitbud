@@ -265,6 +265,21 @@ pub fn pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), Stri
     run_streaming(app, Some(repo_path), args, event_id)
 }
 
+/// Aborts a pull that resulted in a conflict, restoring the working tree to exactly how it was
+/// beforehand — used when a caller wants a clean slate instead of working through the conflict
+/// resolution UI (e.g. the "sync" button's fallback: undo the local commit, stash, pull,
+/// unstash, then recommit). `--ff-only` pulls never leave a conflicted state to abort (they just
+/// fail outright without touching anything), so only merge/rebase are handled here.
+pub fn abort_pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
+    use crate::settings::PullStrategy;
+    let strategy = crate::settings::get_settings().map(|s| s.pull_strategy).unwrap_or(PullStrategy::Merge);
+    let args: &[&str] = match strategy {
+        PullStrategy::Rebase => &["rebase", "--abort"],
+        _ => &["merge", "--abort"],
+    };
+    run_streaming(app, Some(repo_path), args, event_id)
+}
+
 /// Always passes `-u origin HEAD` rather than a bare `git push` — harmless once a branch is
 /// already tracking `origin`, but means a never-before-pushed ("unpublished") branch gets a
 /// tracking branch set up on its very first push instead of failing with "no upstream branch".

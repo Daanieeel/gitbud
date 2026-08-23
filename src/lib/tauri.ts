@@ -199,6 +199,7 @@ export const api = {
 
   gitFetch: (repoPath: string) => invoke<void>("git_fetch", { repoPath }),
   gitPull: (repoPath: string) => invoke<void>("git_pull", { repoPath }),
+  gitAbortPull: (repoPath: string) => invoke<void>("git_abort_pull", { repoPath }),
   gitPush: (repoPath: string) => invoke<void>("git_push", { repoPath }),
   gitClone: (url: string, dest: string) => invoke<void>("git_clone", { url, dest }),
   cancelGitOperation: (eventId: string) => invoke<void>("cancel_git_operation", { repoPath: eventId }),

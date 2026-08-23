@@ -112,6 +112,7 @@ interface RepoState {
   fetch: () => Promise<void>;
   pull: () => Promise<void>;
   push: () => Promise<void>;
+  syncBranch: () => Promise<void>;
   pullLfs: () => Promise<void>;
   pushLfs: () => Promise<void>;
 
@@ -597,6 +598,40 @@ export const useRepoStore = create<RepoState>((set, get) => ({
       doneMessage: publish ? `Published ${branch} to origin` : `Pushed ${branch} to origin`,
     });
     await get().refreshAheadBehind();
+  },
+  // For a diverged branch (both ahead and behind origin): pull, then push, in one action. If
+  // the pull conflicts with a local commit, aborts the merge/rebase immediately (restoring the
+  // pre-pull state exactly) and never pushes — a real merge conflict here would mix unreviewed
+  // remote history into a commit the user hasn't looked at, so this bails out to a suggested
+  // manual recovery instead of dropping them straight into the conflict-resolution UI.
+  syncBranch: async () => {
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    const branch = get().branch ?? "current branch";
+    await runSync(
+      get,
+      set,
+      repoPath,
+      async () => {
+        try {
+          await api.gitPull(repoPath);
+        } catch (err) {
+          const status = await api.getStatus(repoPath);
+          if (!status.files.some((f) => f.status === "conflicted")) throw err;
+          await api.gitAbortPull(repoPath);
+          throw (
+            "Pulling origin conflicts with your local commit(s) — aborted, nothing changed.\n" +
+            "Safer path: undo the last commit, stash the remaining changes, pull from origin, then unstash and recommit."
+          );
+        }
+        await api.gitPush(repoPath);
+      },
+      {
+        description: `Syncing ${branch} with origin…`,
+        doneMessage: `Synced ${branch} with origin`,
+      },
+    );
+    await Promise.all([get().refreshStatus(), get().resetHistory(), get().refreshAheadBehind()]);
   },
   pullLfs: async () => {
     const repoPath = get().selectedRepo;

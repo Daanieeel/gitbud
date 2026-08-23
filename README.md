@@ -42,6 +42,7 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [ ] Settings redesign
 - [ ] Open File in Editor
 - [ ] Better PR viewer (comments, files, commits) like on GitHub
+- [ ] Move to TanStack Query
 - [ ] ...and more to come
 
 ## Features
