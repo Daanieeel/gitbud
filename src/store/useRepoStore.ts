@@ -24,6 +24,14 @@ const LOG_PAGE_SIZE = 100;
  * path once it drops out of `status.files` (committed/discarded), so a later, genuinely new
  * change to that same path is auto-staged again. */
 const autoStagedPaths = new Map<string, Set<string>>();
+/** Guards against out-of-order `refreshStatus` calls: staging/unstaging triggers it both
+ * directly and via the `repo-changed` filesystem watcher, and those two calls can resolve out
+ * of order. Without this, a slower call that started first can land after a faster one that
+ * started later and overwrite fresh status with stale data — visible as the commit button
+ * flashing enabled/disabled right after a stage/unstage. */
+let statusRequestId = 0;
+/** Same out-of-order guard as `statusRequestId`, for `resetHistory`. */
+let historyRequestId = 0;
 /** Restores the last-open repo across app restarts, so launching GitBud doesn't always land
  * back on whatever repo happens to be first in the sidebar. */
 const LAST_REPO_KEY = "last-selected-repo";
@@ -215,6 +223,7 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   refreshStatus: async () => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
+    const requestId = ++statusRequestId;
     let status = await api.getStatus(repoPath);
 
     if (useSettingsStore.getState().settings.auto_stage_new_changes) {
@@ -237,6 +246,9 @@ export const useRepoStore = create<RepoState>((set, get) => ({
         status = await api.getStatus(repoPath);
       }
     }
+    // A newer refreshStatus call already landed while this one was in flight — applying this
+    // one now would overwrite fresh status with stale data.
+    if (requestId !== statusRequestId) return;
     set({ status });
 
     const selected = get().selectedFilePath;
@@ -484,8 +496,16 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   },
 
   resetHistory: async () => {
-    set({ commits: [], historyExhausted: false });
-    await get().loadMoreHistory();
+    const repoPath = get().selectedRepo;
+    if (!repoPath) return;
+    const requestId = ++historyRequestId;
+    const page = await api.getLog(repoPath, LOG_PAGE_SIZE, 0);
+    // Fetch first, then swap — clearing `commits` up front (the old behavior) briefly hides
+    // anything derived from the last commit (e.g. the commit box's unpushed-commit/Undo row)
+    // on every call, including the frequent ones triggered by the repo-changed file watcher
+    // on a plain stage/unstage.
+    if (requestId !== historyRequestId) return;
+    set({ commits: page, historyExhausted: page.length < LOG_PAGE_SIZE });
   },
 
   loadMoreHistory: async () => {

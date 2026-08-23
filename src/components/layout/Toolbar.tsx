@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { GitPullRequestCreateArrow, GitPullRequestArrowIcon } from "lucide-react";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
+import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
 import { BranchSwitcher } from "@/components/repo/BranchSwitcher";
 import { BranchPruner } from "@/components/repo/BranchPruner";
@@ -21,8 +21,10 @@ export function Toolbar() {
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const branch = useRepoStore((s) => s.branch);
+  const setActiveTab = useRepoStore((s) => s.setActiveTab);
+  const selectPR = usePRStore((s) => s.selectPR);
   const [previewPrOpen, setPreviewPrOpen] = useState(false);
-  const [existingPrUrl, setExistingPrUrl] = useState<string | null>(null);
+  const [existingPrNumber, setExistingPrNumber] = useState<number | null>(null);
 
   useEffect(() => {
     const handleOpenCreatePr = () => setPreviewPrOpen(true);
@@ -31,13 +33,13 @@ export function Toolbar() {
   }, []);
 
   useEffect(() => {
-    setExistingPrUrl(null);
+    setExistingPrNumber(null);
     if (!repoPath || !currentLogin || !branch) return;
     let cancelled = false;
     void api.githubListPullRequests(repoPath, currentLogin, "open", 1).then((pulls) => {
       if (cancelled) return;
       const match = pulls.find((p) => p.head_ref === branch);
-      setExistingPrUrl(match?.html_url ?? null);
+      setExistingPrNumber(match?.number ?? null);
     });
     return () => {
       cancelled = true;
@@ -55,18 +57,26 @@ export function Toolbar() {
       <LfsPanel />
       <div className="flex-1" />
       <OfflineIndicator />
-      {currentLogin && existingPrUrl && (
+      {currentLogin && existingPrNumber != null && (
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="positive" size="sm" onClick={() => void openUrl(existingPrUrl)}>
+            <Button
+              variant="caution"
+              size="sm"
+              onClick={() => {
+                if (!repoPath) return;
+                setActiveTab("pulls");
+                void selectPR(repoPath, currentLogin, existingPrNumber);
+              }}
+            >
               <GitPullRequestArrowIcon className="size-3.5" />
-              Open PR
+              View PR
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Open the existing pull request for this branch</TooltipContent>
+          <TooltipContent>View the existing pull request for this branch</TooltipContent>
         </Tooltip>
       )}
-      {currentLogin && !existingPrUrl && (
+      {currentLogin && existingPrNumber == null && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
