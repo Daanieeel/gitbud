@@ -32,7 +32,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -172,11 +171,6 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
           const showBatchMenu = isBatch && rowSelected;
           return (
             <ContextMenu key={file.path} onOpenChange={(open) => open && handleContextMenu(file.path, row.index)}>
-            <Popover
-              open={confirmDiscardPath === file.path}
-              onOpenChange={(o) => !o && setConfirmDiscardPath(null)}
-            >
-              <PopoverAnchor asChild>
               <ContextMenuTrigger asChild>
                 <div
                   style={{
@@ -229,7 +223,6 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                   {file.status !== "conflicted" && <FileStatusIcon status={file.status} className="size-3.5" />}
                 </div>
               </ContextMenuTrigger>
-              </PopoverAnchor>
               <ContextMenuContent>
                 {showBatchMenu ? (
                   <>
@@ -332,25 +325,6 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                   </>
                 )}
               </ContextMenuContent>
-              <PopoverContent align="start" className="w-56 space-y-2 p-3">
-                <p className="text-sm">Permanently discard changes to "{file.path}"?</p>
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => setConfirmDiscardPath(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => {
-                      setConfirmDiscardPath(null);
-                      discardFileMutation.mutate(file.path);
-                    }}
-                  >
-                    Discard
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
             </ContextMenu>
           );
         })}
@@ -362,6 +336,29 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
           onOpenChange={(open) => !open && setBlamePath(null)}
         />
       )}
+      <Dialog open={confirmDiscardPath !== null} onOpenChange={(o) => !o && setConfirmDiscardPath(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Discard changes to "{confirmDiscardPath}"?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">This permanently discards changes to this file. This can't be undone.</p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDiscardPath(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!confirmDiscardPath) return;
+                discardFileMutation.mutate(confirmDiscardPath);
+                setConfirmDiscardPath(null);
+              }}
+            >
+              Discard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={confirmDiscardBatch} onOpenChange={setConfirmDiscardBatch}>
         <DialogContent>
           <DialogHeader>
