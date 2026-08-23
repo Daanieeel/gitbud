@@ -67,6 +67,29 @@ function runIcon(run: CheckRun) {
   return <XCircleIcon className="size-3.5 shrink-0 text-accent-pink" />;
 }
 
+// GitHub's raw check-run status/conclusion enum values, mapped to human-readable labels.
+const RUN_STATUS_LABEL: Record<string, string> = {
+  queued: "Queued",
+  in_progress: "In progress",
+  waiting: "Waiting",
+  requested: "Requested",
+  pending: "Pending",
+  success: "Success",
+  failure: "Failed",
+  cancelled: "Cancelled",
+  skipped: "Skipped",
+  timed_out: "Timed out",
+  action_required: "Action required",
+  neutral: "Neutral",
+  stale: "Stale",
+  startup_failure: "Startup failure",
+};
+
+function runStatusLabel(run: CheckRun): string {
+  const raw = run.status === "completed" ? (run.conclusion ?? run.status) : run.status;
+  return RUN_STATUS_LABEL[raw] ?? raw.replace(/_/g, " ");
+}
+
 export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: MergePRDialogProps) {
   const mergePR = usePRStore((s) => s.mergePR);
 
@@ -101,12 +124,14 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     };
   }, [open, repoPath, login, pr.head_sha]);
 
-  // Only offer merge methods this repo actually allows (GitHub 405s on a disallowed one), and
-  // start the "delete branch" checkbox at the repo's own default for it rather than always off.
+  // Only offer merge methods this repo (and this base branch's protection rules, e.g. "require
+  // linear history" ruling out merge commits) actually allow — GitHub 405s on a disallowed one
+  // otherwise — and start the "delete branch" checkbox at the repo's own default for it rather
+  // than always off.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    void api.githubGetRepoMergeSettings(repoPath, login).then((settings) => {
+    void api.githubGetRepoMergeSettings(repoPath, login, pr.base_ref).then((settings) => {
       if (cancelled) return;
       setRepoSettings(settings);
       setDeleteBranch(settings.delete_branch_on_merge);
@@ -183,7 +208,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
                       {runIcon(r)}
                       <span className="min-w-0 flex-1 truncate">{r.name}</span>
                       <span className="shrink-0 text-muted-foreground">
-                        {r.status === "completed" ? r.conclusion : r.status}
+                        {runStatusLabel(r)}
                       </span>
                       <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground" />
                     </a>

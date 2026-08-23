@@ -284,21 +284,52 @@ fn default_true() -> bool {
     true
 }
 
+#[derive(Deserialize, Default)]
+struct RawLinearHistorySetting {
+    #[serde(default)]
+    enabled: bool,
+}
+
+#[derive(Deserialize, Default)]
+struct RawBranchProtection {
+    #[serde(default)]
+    required_linear_history: RawLinearHistorySetting,
+}
+
+/// Whether `branch`'s protection rules require a linear history — the one branch-protection
+/// setting that overrides a repo-level merge-method toggle (it forbids merge commits even if
+/// the repo itself allows them, since a merge commit isn't linear). Best-effort: an unprotected
+/// branch (404) or a token without permission to view protection settings (403) both just mean
+/// "no additional restriction visible to us", not an error worth surfacing.
+async fn requires_linear_history(host: &str, token: &str, owner: &str, repo: &str, branch: &str) -> bool {
+    let Ok(gh) = GhClient::new(host, token) else { return false };
+    let path = format!("/repos/{owner}/{repo}/branches/{branch}/protection");
+    let Ok(res) = gh.get(&path).send().await else { return false };
+    if !res.status().is_success() {
+        return false;
+    }
+    res.json::<RawBranchProtection>().await.map(|p| p.required_linear_history.enabled).unwrap_or(false)
+}
+
 /// Which merge methods this repo allows, and whether it defaults to deleting the head branch
 /// on merge — powers the merge dialog so it doesn't offer a method GitHub would reject with a
 /// 405, and so its "Delete branch after merge" checkbox starts at the repo's own convention.
+/// `base_ref` is the PR's target branch, checked for a "required linear history" protection
+/// rule that would additionally rule out a merge commit beyond what the repo-level settings say.
 pub async fn get_repo_merge_settings(
     host: &str,
     token: &str,
     owner: &str,
     repo: &str,
+    base_ref: &str,
 ) -> Result<RepoMergeSettings, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}");
     let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
     let raw: RawRepo = res.json().await.map_err(|e| e.to_string())?;
+    let linear_history = requires_linear_history(host, token, owner, repo, base_ref).await;
     Ok(RepoMergeSettings {
-        allow_merge_commit: raw.allow_merge_commit,
+        allow_merge_commit: raw.allow_merge_commit && !linear_history,
         allow_squash_merge: raw.allow_squash_merge,
         allow_rebase_merge: raw.allow_rebase_merge,
         delete_branch_on_merge: raw.delete_branch_on_merge,
@@ -753,6 +784,7 @@ fn parse_patch(patch: &str) -> Vec<DiffHunk> {
                 content: content.to_string(),
                 old_lineno: None,
                 new_lineno: Some(new_line),
+                highlight_ranges: Vec::new(),
             });
             new_line += 1;
         } else if let Some(content) = raw_line.strip_prefix('-') {
@@ -761,6 +793,7 @@ fn parse_patch(patch: &str) -> Vec<DiffHunk> {
                 content: content.to_string(),
                 old_lineno: Some(old_line),
                 new_lineno: None,
+                highlight_ranges: Vec::new(),
             });
             old_line += 1;
         } else {
@@ -770,11 +803,13 @@ fn parse_patch(patch: &str) -> Vec<DiffHunk> {
                 content: content.to_string(),
                 old_lineno: Some(old_line),
                 new_lineno: Some(new_line),
+                highlight_ranges: Vec::new(),
             });
             old_line += 1;
             new_line += 1;
         }
     }
+    crate::diff::add_intraline_highlights(&mut hunks);
     hunks
 }
 

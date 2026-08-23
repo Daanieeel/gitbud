@@ -48,7 +48,13 @@ fn diff_against_base(
                 _ => LineKind::Context,
             };
             let content = String::from_utf8_lossy(line.content()).trim_end_matches('\n').to_string();
-            let diff_line = DiffLine { kind, content, old_lineno: line.old_lineno(), new_lineno: line.new_lineno() };
+            let diff_line = DiffLine {
+                kind,
+                content,
+                old_lineno: line.old_lineno(),
+                new_lineno: line.new_lineno(),
+                highlight_ranges: Vec::new(),
+            };
             if let Some(last) = hunks.borrow_mut().last_mut() {
                 last.lines.push(diff_line);
             }
@@ -56,7 +62,9 @@ fn diff_against_base(
         }),
     )
     .map_err(|e| e.message().to_string())?;
-    Ok(hunks.into_inner())
+    let mut hunks = hunks.into_inner();
+    crate::diff::add_intraline_highlights(&mut hunks);
+    Ok(hunks)
 }
 
 /// Reads the base/ours/theirs blobs for a conflicted path straight out of the index's

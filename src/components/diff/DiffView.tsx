@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Avatar } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSettingsStore } from "@/store/useSettingsStore";
-import { highlightLine, languageForPath } from "@/lib/highlight";
+import { applyHighlightRanges, highlightLine, languageForPath } from "@/lib/highlight";
 
 interface HunkActions {
   /** Whether the diff being shown is the staged (HEAD->index) or unstaged (index->workdir) side. */
@@ -33,6 +33,15 @@ interface DiffViewProps {
    * side to show. */
   secondaryDiff?: FileDiff | null;
   secondaryHunkActions?: HunkActions;
+}
+
+/** Syntax-highlights a line, then overlays its intraline diff ranges (if any) on top so both
+ * render together. */
+function renderLineHtml(line: DiffLine, language: string | undefined): string {
+  const html = highlightLine(line.content, language);
+  if (line.highlight_ranges.length === 0) return html;
+  const className = line.kind === "addition" ? "diff-intraline-add" : "diff-intraline-del";
+  return applyHighlightRanges(html, line.highlight_ranges, className);
 }
 
 function commentsForLine(
@@ -271,7 +280,7 @@ function UnifiedLine({
           {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
         </span>
         <span
-          dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }}
+          dangerouslySetInnerHTML={{ __html: renderLineHtml(line, language) }}
         />
         {onCopyPermalink && line.new_lineno != null && (
           <Tooltip>
@@ -356,7 +365,7 @@ function SplitCell({ line, language }: { line: DiffLine | null; language: string
       >
         {line.kind === "addition" ? "+" : line.kind === "deletion" ? "-" : " "}
       </span>
-      <span dangerouslySetInnerHTML={{ __html: highlightLine(line.content, language) }} />
+      <span dangerouslySetInnerHTML={{ __html: renderLineHtml(line, language) }} />
     </div>
   );
 }

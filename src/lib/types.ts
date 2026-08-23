@@ -34,6 +34,10 @@ export interface DiffLine {
   content: string;
   old_lineno: number | null;
   new_lineno: number | null;
+  /** [start, end) character ranges into `content` that changed at the character level vs. this
+   * line's paired counterpart on the other side of the edit. Empty for context lines and for
+   * add/delete lines with no counterpart to compare against. */
+  highlight_ranges: [number, number][];
 }
 
 export interface DiffHunk {

@@ -217,3 +217,15 @@
 .hljs-strong {
   font-weight: bold;
 }
+
+/* Intraline diff highlight — the specific changed substring within an addition/deletion line,
+ * layered on top of that line's whole-line tint (see DiffView's line background classes) so the
+ * exact change stands out instead of the whole line reading as uniformly changed. */
+.diff-intraline-add {
+  background-color: color-mix(in srgb, var(--accent-green) 35%, transparent);
+  border-radius: 2px;
+}
+.diff-intraline-del {
+  background-color: color-mix(in srgb, var(--accent-pink) 35%, transparent);
+  border-radius: 2px;
+}

@@ -36,7 +36,7 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [ ] Auto-updater
 - [X] Bring uncommitted changes to other branch feature
 - [X] PR quick link on current branch
-- [ ] GitHub profile pictures in commit history
+- [X] GitHub profile pictures in commit history
 - [ ] Delete branch on remote feature
 - [ ] Pop-out merge conflict resolution editor
 - [ ] Settings redesign

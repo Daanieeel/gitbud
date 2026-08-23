@@ -300,8 +300,8 @@ export const api = {
     }),
   githubDeleteRemoteBranch: (repoPath: string, login: string, branch: string) =>
     invoke<void>("github_delete_remote_branch", { repoPath, login, branch }),
-  githubGetRepoMergeSettings: (repoPath: string, login: string) =>
-    invoke<RepoMergeSettings>("github_get_repo_merge_settings", { repoPath, login }),
+  githubGetRepoMergeSettings: (repoPath: string, login: string, baseRef: string) =>
+    invoke<RepoMergeSettings>("github_get_repo_merge_settings", { repoPath, login, baseRef }),
   githubFindUserAvatarByEmail: (repoPath: string, login: string, email: string) =>
     invoke<string | null>("github_find_user_avatar_by_email", { repoPath, login, email }),
   githubListPullRequestFiles: (repoPath: string, login: string, number: number) =>

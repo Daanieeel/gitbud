@@ -1086,9 +1086,10 @@ async fn github_find_user_avatar_by_email(
 async fn github_get_repo_merge_settings(
     repo_path: String,
     login: String,
+    base_ref: String,
 ) -> Result<github::api::RepoMergeSettings, String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::get_repo_merge_settings(&host, &token, &owner, &repo).await
+    github::api::get_repo_merge_settings(&host, &token, &owner, &repo, &base_ref).await
 }
 
 #[tauri::command]
