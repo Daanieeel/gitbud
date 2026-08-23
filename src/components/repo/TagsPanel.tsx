@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { PlusIcon, TagIcon, Trash2Icon, UploadIcon } from "lucide-react";
+import { ExternalLinkIcon, PlusIcon, TagIcon, Trash2Icon, UploadIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,7 +99,7 @@ export function TagsPanel() {
                       })
                     }
                   >
-                    <TagIcon className="size-3.5" />
+                    <ExternalLinkIcon className="size-3.5" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>Open on GitHub</TooltipContent>
