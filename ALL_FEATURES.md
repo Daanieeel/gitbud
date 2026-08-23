@@ -27,6 +27,7 @@ Exhaustive list of implemented, partial, and not-started features. Status legend
 | Stash management panel | Done | Dedicated dialog, per-file diff preview, per-file partial-apply (this session) |
 | Tags (create/delete/push) | Done | `TagsPanel.tsx` |
 | Fetch/pull/push | Done | Streaming progress, idle-timeout watchdog, cancel button; failures show a cleaned-up error (transport noise/boilerplate stripped) instead of the raw exit status (this session) |
+| Background remote sync | Done | This session — silent `git fetch` (remote-tracking refs only, never touches the working tree) keeps ahead/behind and the remote branch list current without a manual fetch; paused while the window isn't visible, with an immediate catch-up on refocus/repo switch |
 | Diverged-branch sync | Done | This session — toolbar button pulls then pushes in one action when both ahead and behind; if the pull conflicts with a local commit it aborts the merge/rebase immediately and never pushes, suggesting a manual undo-commit/stash/pull/unstash/recommit path instead |
 | Pull strategy (merge/rebase/ff-only) | Done | Settings |
 | Clone | Done | Including "clone from GitHub" repo browser |
@@ -47,13 +48,13 @@ Exhaustive list of implemented, partial, and not-started features. Status legend
 | Non-GitHub identities (SSH key) | Done | This session — unified switcher, per-repo or global scope |
 | GitHub Enterprise Server | Done | Configurable host |
 | GitLab / Bitbucket providers | Not started | Switcher architecture leaves room for it |
-| Pull Requests tab + list/filter/search | Done | State-colored, state-specific icons per PR (open/draft/merged/closed) (this session) |
+| Pull Requests tab + list/filter/search | Done | State-colored, state-specific icons per PR (open/draft/merged/closed) (this session); the open-PR list also refreshes in the background (see Background remote sync) so new/updated PRs surface without reopening the tab |
 | PR detail + checkout + merge (3 strategies) | Done | This session — dedicated merge dialog: method picker (cards, disabled+tooltip'd for methods the repo, classic branch protection, *or* repository rulesets' `allowed_merge_methods` disallow), pre-filled commit title, live per-check CI status as clickable links to the job run, delete-branch-after-merge (remote + local, best-effort), pinned to the PR's head sha to avoid merging unseen commits; allowed-methods settings prefetched as soon as the PR tab loads |
 | Create PR | Partial | No commit/diff preview before submit; not reachable from Toolbar/BranchSwitcher |
 | Quick access to current branch's PR | Done | This session — toolbar button shows "Preview PR" (none exists yet) or "View PR" (jumps to it in the PR tab) depending on whether the current branch already has an open PR |
 | GitHub avatars | Partial | This session — PR authors and review comments show the real GitHub avatar; History tab commit authors resolved by email (GitHub noreply addresses decoded directly, other emails via best-effort user search) so not every commit resolves one; GitLab/Bitbucket not started |
 | CI/Actions status badges | Done | |
-| Watched-PR CI notifications | Done | This session |
+| Watched-PR CI notifications | Done | This session — polling paused while the window isn't visible, decays from 5s down to 60s the longer the app's been open, catches up immediately on refocus/repo switch |
 | Fork sync / upstream tracking | Done | |
 | "Open on GitHub" deep-links + permalinks | Done | |
 | Merged-branch pruner | Done | |
