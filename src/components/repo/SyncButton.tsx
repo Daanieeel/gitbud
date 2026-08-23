@@ -26,6 +26,7 @@ export function SyncButton() {
     Icon = CloudUploadIcon;
     action = push;
     title = "This branch has never been pushed. Publish it to origin";
+    variant = "default";
   } else if (aheadBehind.behind > 0) {
     label = `Pull origin (${aheadBehind.behind})`;
     Icon = ArrowDownIcon;
