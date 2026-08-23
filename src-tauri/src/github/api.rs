@@ -311,11 +311,71 @@ async fn requires_linear_history(host: &str, token: &str, owner: &str, repo: &st
     res.json::<RawBranchProtection>().await.map(|p| p.required_linear_history.enabled).unwrap_or(false)
 }
 
+#[derive(Deserialize)]
+struct RawEffectiveRule {
+    #[serde(rename = "type")]
+    rule_type: String,
+    #[serde(default)]
+    parameters: Option<serde_json::Value>,
+}
+
+/// Repository rulesets (the newer replacement for classic branch protection) can restrict a
+/// branch's PRs to a subset of merge methods via a `pull_request` rule's `allowed_merge_methods`
+/// parameter — a setting that lives entirely outside both the repo-level merge-method toggles
+/// and classic branch protection, so neither of those alone can catch it. The "effective rules
+/// for a branch" endpoint used here does GitHub's own ruleset-matching for us (by branch name
+/// pattern, across every ruleset that applies) rather than requiring us to fetch and evaluate
+/// rulesets ourselves. Returns `None` when no ruleset restricts merge methods (not the same as
+/// an empty list, which would mean "nothing allowed").
+async fn ruleset_allowed_merge_methods(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+) -> Option<Vec<String>> {
+    let gh = GhClient::new(host, token).ok()?;
+    // A `/` in the branch name is a path separator to an HTTP server, not part of the branch
+    // name, unless escaped — GitHub's docs call for encoding it as %2F specifically here.
+    let encoded_branch = branch.replace('/', "%2F");
+    let path = format!("/repos/{owner}/{repo}/rules/branches/{encoded_branch}");
+    let res = gh.get(&path).send().await.ok()?;
+    if !res.status().is_success() {
+        return None;
+    }
+    let rules: Vec<RawEffectiveRule> = res.json().await.ok()?;
+
+    let mut result: Option<Vec<String>> = None;
+    for rule in rules {
+        if rule.rule_type != "pull_request" {
+            continue;
+        }
+        let Some(methods) = rule
+            .parameters
+            .as_ref()
+            .and_then(|p| p.get("allowed_merge_methods"))
+            .and_then(|m| m.as_array())
+        else {
+            continue;
+        };
+        let methods: Vec<String> =
+            methods.iter().filter_map(|v| v.as_str().map(str::to_string)).collect();
+        result = Some(match result {
+            // Multiple applicable rulesets each restricting methods: only what every one of
+            // them allows is actually allowed.
+            Some(existing) => existing.into_iter().filter(|m| methods.contains(m)).collect(),
+            None => methods,
+        });
+    }
+    result
+}
+
 /// Which merge methods this repo allows, and whether it defaults to deleting the head branch
 /// on merge — powers the merge dialog so it doesn't offer a method GitHub would reject with a
 /// 405, and so its "Delete branch after merge" checkbox starts at the repo's own convention.
 /// `base_ref` is the PR's target branch, checked for a "required linear history" protection
-/// rule that would additionally rule out a merge commit beyond what the repo-level settings say.
+/// rule and a ruleset-level allowed-merge-methods restriction, either of which can additionally
+/// rule out a method beyond what the repo-level settings say.
 pub async fn get_repo_merge_settings(
     host: &str,
     token: &str,
@@ -328,10 +388,12 @@ pub async fn get_repo_merge_settings(
     let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
     let raw: RawRepo = res.json().await.map_err(|e| e.to_string())?;
     let linear_history = requires_linear_history(host, token, owner, repo, base_ref).await;
+    let ruleset_methods = ruleset_allowed_merge_methods(host, token, owner, repo, base_ref).await;
+    let ruleset_allows = |method: &str| ruleset_methods.as_ref().is_none_or(|m| m.iter().any(|s| s == method));
     Ok(RepoMergeSettings {
-        allow_merge_commit: raw.allow_merge_commit && !linear_history,
-        allow_squash_merge: raw.allow_squash_merge,
-        allow_rebase_merge: raw.allow_rebase_merge,
+        allow_merge_commit: raw.allow_merge_commit && !linear_history && ruleset_allows("merge"),
+        allow_squash_merge: raw.allow_squash_merge && ruleset_allows("squash"),
+        allow_rebase_merge: raw.allow_rebase_merge && ruleset_allows("rebase"),
         delete_branch_on_merge: raw.delete_branch_on_merge,
     })
 }
