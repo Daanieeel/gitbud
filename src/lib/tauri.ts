@@ -217,6 +217,8 @@ export const api = {
     invoke<string>("checkout_pull_request", { repoPath, number }),
 
   openInTerminal: (path: string) => invoke<void>("open_in_terminal", { path }),
+  openInEditor: (path: string, editor: string, customCommand: string | null) =>
+    invoke<void>("open_in_editor", { path, editor, customCommand }),
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
   exportSettings: (destPath: string) => invoke<void>("export_settings", { destPath }),

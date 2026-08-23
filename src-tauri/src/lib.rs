@@ -1173,6 +1173,13 @@ async fn open_in_terminal(path: String) -> Result<(), String> {
         .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn open_in_editor(path: String, editor: String, custom_command: Option<String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || system::open_in_editor(&path, &editor, custom_command.as_deref()))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 // --- settings ---
 
 #[tauri::command]
@@ -1468,6 +1475,7 @@ pub fn run() {
             sync_upstream,
             checkout_pull_request,
             open_in_terminal,
+            open_in_editor,
             get_settings,
             save_settings,
             export_settings,

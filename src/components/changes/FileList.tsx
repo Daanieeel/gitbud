@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   CheckIcon,
+  CodeIcon,
   CopyIcon,
   ExternalLinkIcon,
   FolderOpenIcon,
@@ -12,6 +13,7 @@ import {
   XIcon,
 } from "lucide-react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { toast } from "sonner";
 import type { ChangeKind, FileEntry } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,6 +39,8 @@ import { githubFileUrl } from "@/lib/github-links";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
+import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
 import { BlameDialog } from "./BlameDialog";
 import { FilePathLabel } from "./FilePathLabel";
 import type { LfsFileInfo } from "@/lib/types";
@@ -77,6 +81,10 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const branch = useRepoStore((s) => s.branch);
   const discardFile = useRepoStore((s) => s.discardFile);
+  const favoriteEditorId = useSettingsStore((s) => s.settings.favorite_editor);
+  const customEditorCommand = useSettingsStore((s) => s.settings.custom_editor_command);
+  const favoriteEditorOption = findEditor(favoriteEditorId);
+  const isCustomEditor = favoriteEditorId === CUSTOM_EDITOR_ID && !!customEditorCommand;
   const [blamePath, setBlamePath] = useState<string | null>(null);
   const [confirmDiscardPath, setConfirmDiscardPath] = useState<string | null>(null);
   const [confirmDiscardBatch, setConfirmDiscardBatch] = useState(false);
@@ -278,6 +286,23 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                       <TerminalIcon className="size-3.5" />
                       Open in Terminal
                     </ContextMenuItem>
+                    {(favoriteEditorOption || isCustomEditor) && (
+                      <ContextMenuItem
+                        onSelect={() => {
+                          if (!repoPath || !favoriteEditorId) return;
+                          void api
+                            .openInEditor(`${repoPath}/${file.path}`, favoriteEditorId, customEditorCommand)
+                            .catch((err) => toast.error(String(err)));
+                        }}
+                      >
+                        {favoriteEditorOption ? (
+                          <img src={favoriteEditorOption.icon} alt="" className="size-3.5" />
+                        ) : (
+                          <CodeIcon className="size-3.5" />
+                        )}
+                        Open in {favoriteEditorOption?.name ?? "Editor"}
+                      </ContextMenuItem>
+                    )}
                     {branch && (
                       <ContextMenuItem
                         onSelect={() => {

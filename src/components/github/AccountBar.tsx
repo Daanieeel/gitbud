@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { KeyRoundIcon, LogInIcon, MapPinIcon, PlusIcon, SettingsIcon, TriangleAlertIcon, XIcon } from "lucide-react";
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
+import { EditorPicker } from "@/components/settings/EditorPicker";
+import { CUSTOM_EDITOR_ID } from "@/lib/editors";
 import { GitHubMark } from "./GitHubMark";
 import { GitLabMark } from "./GitLabMark";
 import { BitbucketMark } from "./BitbucketMark";
@@ -68,6 +70,8 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
     [accounts, sshIdentities],
   );
   const defaultIdentityId = useSettingsStore((s) => s.settings.default_identity_id);
+  const favoriteEditor = useSettingsStore((s) => s.settings.favorite_editor);
+  const updateSettings = useSettingsStore((s) => s.update);
   const selectedRepo = useRepoStore((s) => s.selectedRepo);
   const repoOverride = useRepoStore(
     (s) => s.repos.find((r) => r.path === s.selectedRepo)?.identity_id ?? null,
@@ -133,6 +137,27 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
           >
             {reauthing ? "Reconnecting…" : "Reconnect GitHub"}
           </Button>
+        </div>
+      )}
+      {!collapsed && !favoriteEditor && (
+        <div className="flex flex-col gap-1.5 rounded-md border border-border bg-card p-2.5 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5 font-medium text-foreground">
+            <SettingsIcon className="size-3.5 shrink-0" />
+            No favorite editor set
+          </span>
+          <span>Choose one to enable "Open in…" from the Changes file explorer.</span>
+          <EditorPicker
+            onSelect={(editorId, customCommand) =>
+              void updateSettings({
+                favorite_editor: editorId,
+                custom_editor_command: editorId === CUSTOM_EDITOR_ID ? (customCommand ?? null) : null,
+              })
+            }
+          >
+            <Button size="sm" variant="secondary" className="h-6 px-2 text-xs">
+              Choose Editor
+            </Button>
+          </EditorPicker>
         </div>
       )}
       <div className={cn("flex items-center gap-2", collapsed && "flex-col")}>

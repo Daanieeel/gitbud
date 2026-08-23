@@ -212,6 +212,8 @@ export interface Settings {
   fs_watch_enabled: boolean;
   default_identity_id: string | null;
   desktop_notifications: boolean;
+  favorite_editor: string | null;
+  custom_editor_command: string | null;
 }
 
 // --- GitHub ---
