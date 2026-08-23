@@ -254,7 +254,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
             autoComplete="off"
           />
           <Textarea
-            placeholder="Extra description (optional — leave blank for GitHub's default)"
+            placeholder="Description"
             value={commitMessage}
             onChange={(e) => setCommitMessage(e.target.value)}
             rows={3}
