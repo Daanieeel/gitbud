@@ -4,6 +4,8 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useCommitLog } from "@/hooks/queries/useCommitLog";
 import { useCommitFileDiff, useCommitFiles } from "@/hooks/queries/useCommitDetail";
 import { queryKeys } from "@/lib/queryKeys";
+import { toMainlineCommits } from "@/lib/compact-graph";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { CommitHeader } from "./CommitHeader";
 import { CommitList } from "./CommitList";
 import { CreateBranchAtDialog } from "./CreateBranchAtDialog";
@@ -52,6 +54,11 @@ export function HistoryTab() {
   const [rebaseBaseOid, setRebaseBaseOid] = useState<string | null>(null);
   const commitList = useResizableWidth("panel-width:history-commits", 288, 200, 560);
   const fileList = useResizableWidth("panel-width:history-files", 224, 160, 480);
+  const [compact, setCompact] = useState(() => localStorage.getItem("history:compact") === "true");
+  useEffect(() => {
+    localStorage.setItem("history:compact", String(compact));
+  }, [compact]);
+  const displayedCommits = compact ? toMainlineCommits(commits) : commits;
 
   if (commits.length === 0) {
     return (
@@ -63,15 +70,35 @@ export function HistoryTab() {
 
   return (
     <div className="flex h-full min-w-0 flex-1">
-      <div style={{ width: commitList.width }} className="shrink-0 border-r border-border">
-        <CommitList
-          commits={commits}
-          selectedOid={selectedCommitOid}
-          onSelect={selectCommit}
-          onNeedMore={() => hasNextPage && !isFetchingNextPage && void fetchNextPage()}
-          onCreateBranchHere={setBranchAtOid}
-          onRebaseFromHere={setRebaseBaseOid}
-        />
+      <div style={{ width: commitList.width }} className="flex shrink-0 flex-col border-r border-border">
+        <div className="flex shrink-0 items-center justify-end border-b border-border px-2 py-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <CheckboxGroup
+                className="text-xs text-muted-foreground"
+                checked={compact}
+                onCheckedChange={(checked) => setCompact(checked === true)}
+              >
+                Compact
+              </CheckboxGroup>
+            </TooltipTrigger>
+            <TooltipContent>
+              Show only this branch's own history — merged-in branches collapse to a small bump
+              at the merge commit instead of their own lane
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        <div className="min-h-0 flex-1">
+          <CommitList
+            commits={displayedCommits}
+            selectedOid={selectedCommitOid}
+            onSelect={selectCommit}
+            onNeedMore={() => hasNextPage && !isFetchingNextPage && void fetchNextPage()}
+            onCreateBranchHere={setBranchAtOid}
+            onRebaseFromHere={setRebaseBaseOid}
+            compact={compact}
+          />
+        </div>
       </div>
       <ResizeHandle onPointerDown={commitList.onPointerDown} />
       <div className="flex min-w-0 flex-1 flex-col">

@@ -41,6 +41,7 @@ interface CommitListProps {
   onNeedMore: () => void;
   onCreateBranchHere: (oid: string) => void;
   onRebaseFromHere: (oid: string) => void;
+  compact?: boolean;
 }
 
 function VerificationBadge({ repoPath, login, sha }: { repoPath: string; login: string; sha: string }) {
@@ -99,6 +100,7 @@ export function CommitList({
   onNeedMore,
   onCreateBranchHere,
   onRebaseFromHere,
+  compact,
 }: CommitListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -173,6 +175,7 @@ export function CommitList({
                     prevActiveLanes={commits[row.index - 1]?.active_lanes}
                     laneCount={laneCount}
                     rowHeight={row.size}
+                    compact={compact}
                   />
                   <CommitAuthorAvatar
                     repoPath={repoPath}
