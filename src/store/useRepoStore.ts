@@ -5,6 +5,7 @@ import { api } from "@/lib/tauri";
 import { notify } from "@/lib/notify";
 import { useNetworkStore } from "./useNetworkStore";
 import { useStashStore } from "./useStashStore";
+import { useSettingsStore } from "./useSettingsStore";
 import type {
   AheadBehind,
   BranchInfo,
@@ -18,6 +19,11 @@ import type {
 } from "@/lib/types";
 
 const LOG_PAGE_SIZE = 100;
+/** Paths auto-staged at least once per repo — so a file the user deliberately unstages after
+ * auto-stage picked it up doesn't just get re-staged on the next status refresh. Cleared for a
+ * path once it drops out of `status.files` (committed/discarded), so a later, genuinely new
+ * change to that same path is auto-staged again. */
+const autoStagedPaths = new Map<string, Set<string>>();
 /** Restores the last-open repo across app restarts, so launching GitBud doesn't always land
  * back on whatever repo happens to be first in the sidebar. */
 const LAST_REPO_KEY = "last-selected-repo";
@@ -208,7 +214,28 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   refreshStatus: async () => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
-    const status = await api.getStatus(repoPath);
+    let status = await api.getStatus(repoPath);
+
+    if (useSettingsStore.getState().settings.auto_stage_new_changes) {
+      let seen = autoStagedPaths.get(repoPath);
+      if (!seen) {
+        seen = new Set();
+        autoStagedPaths.set(repoPath, seen);
+      }
+      const currentPaths = new Set(status.files.map((f) => f.path));
+      for (const path of seen) {
+        if (!currentPaths.has(path)) seen.delete(path);
+      }
+
+      const toStage = status.files
+        .filter((f) => f.status !== "conflicted" && (!f.staged || f.partially_staged) && !seen.has(f.path))
+        .map((f) => f.path);
+      if (toStage.length > 0) {
+        await api.stagePaths(repoPath, toStage);
+        toStage.forEach((path) => seen.add(path));
+        status = await api.getStatus(repoPath);
+      }
+    }
     set({ status });
 
     const selected = get().selectedFilePath;

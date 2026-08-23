@@ -376,12 +376,6 @@ mod tests {
         assert!(!branch.is_empty());
     }
 
-    #[test]
-    fn lists_branches_of_real_repo() {
-        let branches = list_branches(&this_repo()).expect("branches should succeed");
-        assert!(branches.iter().any(|b| b.is_head));
-    }
-
     struct ScratchRepo {
         path: std::path::PathBuf,
     }
@@ -419,6 +413,22 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.path);
         }
+    }
+
+    #[test]
+    fn lists_branches_marks_current_branch_as_head() {
+        // Uses a scratch repo rather than `this_repo()` — CI checkouts commonly leave HEAD
+        // detached (checked out by commit SHA rather than a branch), so asserting against
+        // whatever branch state the real working repo happens to be in isn't reproducible.
+        let scratch = ScratchRepo::new("list-branches-head");
+        let repo_path = scratch.path_str();
+        scratch.write_and_commit("a.txt", "a\n", "init");
+        let current = get_current_branch(&repo_path).unwrap();
+
+        let branches = list_branches(&repo_path).expect("branches should succeed");
+        let head_branch = branches.iter().find(|b| b.is_head).expect("a branch should be head");
+        assert_eq!(head_branch.name, current);
+        assert!(!head_branch.is_remote);
     }
 
     #[test]
