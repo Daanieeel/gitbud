@@ -4,6 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
+import { usePullRequestList } from "@/hooks/queries/usePullRequests";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
 import { detectRemoteProvider } from "@/lib/remote-provider";
@@ -31,7 +32,11 @@ export function Toolbar() {
   const setActiveTab = useRepoStore((s) => s.setActiveTab);
   const selectPR = usePRStore((s) => s.selectPR);
   const [previewPrOpen, setPreviewPrOpen] = useState(false);
-  const [existingPrNumber, setExistingPrNumber] = useState<number | null>(null);
+  // Shares the exact same cache useProviderSync keeps warm in the background and CreatePRDialog
+  // invalidates on submit — this is what makes "Preview PR" flip to "View PR" both right after
+  // creating one in-app and after a teammate opens one, without its own separate fetch.
+  const { pulls: openPulls } = usePullRequestList(repoPath, currentLogin, "open");
+  const existingPrNumber = openPulls.find((p) => p.head_ref === branch)?.number ?? null;
   const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: ReturnType<typeof detectRemoteProvider> } | null>(null);
 
   useEffect(() => {
@@ -54,19 +59,6 @@ export function Toolbar() {
     return () => window.removeEventListener("open-create-pr", handleOpenCreatePr);
   }, []);
 
-  useEffect(() => {
-    setExistingPrNumber(null);
-    if (!repoPath || !currentLogin || !branch) return;
-    let cancelled = false;
-    void api.githubListPullRequests(repoPath, currentLogin, "open", 1).then((pulls) => {
-      if (cancelled) return;
-      const match = pulls.find((p) => p.head_ref === branch);
-      setExistingPrNumber(match?.number ?? null);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [repoPath, currentLogin, branch]);
 
   return (
     <header className="flex shrink-0 items-center gap-2 p-2">
