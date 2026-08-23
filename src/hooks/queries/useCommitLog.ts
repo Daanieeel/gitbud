@@ -43,6 +43,14 @@ export function useRevertCommit(repoPath: string | null) {
   });
 }
 
+export function useCreateFixupCommit(repoPath: string | null) {
+  const invalidate = useInvalidateAfterHistoryChange(repoPath);
+  return useMutation({
+    mutationFn: (targetOid: string) => api.createFixupCommit(repoPath as string, targetOid),
+    onSuccess: invalidate,
+  });
+}
+
 export function useInteractiveRebase(repoPath: string | null) {
   const invalidate = useInvalidateAfterHistoryChange(repoPath);
   return useMutation({

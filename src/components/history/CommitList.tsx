@@ -9,6 +9,7 @@ import {
   ListOrderedIcon,
   ShieldCheckIcon,
   Undo2Icon,
+  WrenchIcon,
 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { CommitEntry } from "@/lib/types";
@@ -28,7 +29,8 @@ import { Avatar } from "@/components/ui/avatar";
 import { CIBadge } from "@/components/pr/CIBadge";
 import { CommitGraph } from "./CommitGraph";
 import { useRepoStore } from "@/store/useRepoStore";
-import { useCherryPick, useRevertCommit } from "@/hooks/queries/useCommitLog";
+import { useCherryPick, useCreateFixupCommit, useRevertCommit } from "@/hooks/queries/useCommitLog";
+import { useStatus } from "@/hooks/queries/useRepoStatus";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useAuthorAvatar } from "@/hooks/useAuthorAvatar";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
@@ -107,6 +109,9 @@ export function CommitList({
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const cherryPickMutation = useCherryPick(repoPath);
   const revertCommitMutation = useRevertCommit(repoPath);
+  const createFixupCommitMutation = useCreateFixupCommit(repoPath);
+  const { data: status } = useStatus(repoPath);
+  const hasStagedChanges = status?.files.some((f) => f.staged) ?? false;
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const [tagsByOid, setTagsByOid] = useState<Map<string, string[]>>(new Map());
 
@@ -251,6 +256,13 @@ export function CommitList({
                 <ContextMenuItem onSelect={() => revertCommitMutation.mutate(commit.oid)}>
                   <Undo2Icon className="size-3.5" />
                   Revert
+                </ContextMenuItem>
+                <ContextMenuItem
+                  disabled={!hasStagedChanges}
+                  onSelect={() => createFixupCommitMutation.mutate(commit.oid)}
+                >
+                  <WrenchIcon className="size-3.5" />
+                  Create Fixup Commit
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => onCreateBranchHere(commit.oid)}>
                   <GitBranchPlusIcon className="size-3.5" />

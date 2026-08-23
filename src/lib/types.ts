@@ -112,7 +112,7 @@ export interface BlameLine {
 
 export interface RebaseTodoItem {
   oid: string;
-  action: "pick" | "squash" | "drop";
+  action: "pick" | "squash" | "fixup" | "drop";
 }
 
 export interface RebaseResult {

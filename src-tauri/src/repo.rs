@@ -692,6 +692,21 @@ mod tests {
         assert_eq!(entry.status, ChangeKind::Modified);
         assert!(entry.staged);
     }
+
+    #[test]
+    fn fixup_commit_message_prefixes_the_targets_summary() {
+        let scratch = ScratchRepo::new("fixup-message");
+        let repo_path = scratch.path_str();
+        let target = scratch.write_and_commit("a.txt", "a\n", "add a feature");
+
+        std::fs::write(scratch.path.join("b.txt"), "b\n").unwrap();
+        stage_paths(&repo_path, &["b.txt".to_string()]).unwrap();
+        let fixup_oid = create_fixup_commit(&repo_path, &target).unwrap();
+
+        let repo = Repository::open(&repo_path).unwrap();
+        let commit = repo.find_commit(git2::Oid::from_str(&fixup_oid).unwrap()).unwrap();
+        assert_eq!(commit.summary(), Some("fixup! add a feature"));
+    }
 }
 
 pub fn commit(repo_path: &str, summary: &str, description: &str) -> Result<String, String> {
@@ -715,6 +730,19 @@ pub fn commit(repo_path: &str, summary: &str, description: &str) -> Result<Strin
         .map_err(|e| e.message().to_string())?;
 
     Ok(oid.to_string())
+}
+
+/// Commits the currently staged changes with a `fixup! <target's summary>` message — same as
+/// `git commit --fixup=<target>`. Pairs with `interactive_rebase`'s "fixup" action and the
+/// frontend's autosquash pass, which recognizes this exact prefix to auto-arrange the commit
+/// right after its target the next time an interactive rebase touches this range.
+pub fn create_fixup_commit(repo_path: &str, target_oid: &str) -> Result<String, String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let target = repo
+        .find_commit(git2::Oid::from_str(target_oid).map_err(|e| e.message().to_string())?)
+        .map_err(|e| e.message().to_string())?;
+    let summary = target.summary().unwrap_or("").to_string();
+    commit(repo_path, &format!("fixup! {summary}"), "")
 }
 
 pub fn amend_commit(repo_path: &str, summary: &str, description: &str) -> Result<String, String> {

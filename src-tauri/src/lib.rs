@@ -155,6 +155,13 @@ async fn commit(repo_path: String, summary: String, description: String) -> Resu
 }
 
 #[tauri::command]
+async fn create_fixup_commit(repo_path: String, target_oid: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || repo::create_fixup_commit(&repo_path, &target_oid))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn amend_commit(repo_path: String, summary: String, description: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || repo::amend_commit(&repo_path, &summary, &description))
         .await
@@ -1437,6 +1444,7 @@ pub fn run() {
             unstage_hunk,
             discard_hunk,
             commit,
+            create_fixup_commit,
             amend_commit,
             undo_last_commit,
             cherry_pick,

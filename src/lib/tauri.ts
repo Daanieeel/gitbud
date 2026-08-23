@@ -83,6 +83,8 @@ export const api = {
     invoke<void>("discard_hunk", { repoPath, path, hunkIndex }),
   commit: (repoPath: string, summary: string, description: string) =>
     invoke<string>("commit", { repoPath, summary, description }),
+  createFixupCommit: (repoPath: string, targetOid: string) =>
+    invoke<string>("create_fixup_commit", { repoPath, targetOid }),
   amendCommit: (repoPath: string, summary: string, description: string) =>
     invoke<string>("amend_commit", { repoPath, summary, description }),
   undoLastCommit: (repoPath: string) => invoke<[string, string]>("undo_last_commit", { repoPath }),

@@ -22,5 +22,5 @@ Complete in chronological order.
 - [x] add an interface for resolving this error when pushing and pulling at the same time: "Diverging branches can't be fast-forwarded"
 - [x] Add keyboard arrow-key navigation to lists (commits, files, branches, PRs)
 - [x] Diff viewer: add setting for diff algorithm choice (myers/patience/histogram/minimal)
-- [ ] Fixup commit + autosquash: quick "commit --fixup" action from commit context menu, plus rebase -i --autosquash support
+- [x] Fixup commit + autosquash: quick "commit --fixup" action from commit context menu, plus rebase -i --autosquash support
 - [ ] add line by line staging support (keep chunk staging as well though)

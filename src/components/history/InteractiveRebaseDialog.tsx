@@ -9,19 +9,21 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { cn } from "@/lib/utils";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useCommitLog, useInteractiveRebase } from "@/hooks/queries/useCommitLog";
+import { applyAutosquash, type RebaseAction } from "@/lib/autosquash";
 import type { CommitEntry } from "@/lib/types";
 
-type Action = "pick" | "squash" | "drop";
+type Action = RebaseAction;
 
 interface Row {
   commit: CommitEntry;
   action: Action;
 }
 
-const ACTIONS: Action[] = ["pick", "squash", "drop"];
+const ACTIONS: Action[] = ["pick", "squash", "fixup", "drop"];
 
 interface InteractiveRebaseDialogProps {
   /** The commit to rebase onto — everything after it (down to HEAD) is up for reordering. */
@@ -34,7 +36,12 @@ export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRe
   const { commits } = useCommitLog(repoPath);
   const rebaseMutation = useInteractiveRebase(repoPath);
 
-  const initialRows = useMemo<Row[]>(() => {
+  const [autosquash, setAutosquash] = useState(() => localStorage.getItem("rebase:autosquash") !== "false");
+  useEffect(() => {
+    localStorage.setItem("rebase:autosquash", String(autosquash));
+  }, [autosquash]);
+
+  const pickRows = useMemo<Row[]>(() => {
     if (!baseOid) return [];
     const baseIndex = commits.findIndex((c) => c.oid === baseOid);
     if (baseIndex <= 0) return [];
@@ -44,20 +51,25 @@ export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRe
       .reverse()
       .map((commit) => ({ commit, action: "pick" as Action }));
   }, [baseOid, commits]);
+  const initialRows = useMemo(
+    () => (autosquash ? applyAutosquash(pickRows) : pickRows),
+    [pickRows, autosquash],
+  );
 
   const [rows, setRows] = useState<Row[]>(initialRows);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset local state whenever a new base is chosen (dialog re-opens).
+  // Reset local state whenever a new base is chosen (dialog re-opens) or autosquash is toggled.
   useEffect(() => {
     if (baseOid) {
       setRows(initialRows);
       setError(null);
     }
-    // Only when the dialog target changes, not on every commits/initialRows recompute.
-  }, [baseOid]);
+    // Only when the dialog target or autosquash changes, not on every commits/initialRows recompute.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseOid, autosquash]);
 
   const cycleAction = (index: number) => {
     setRows((prev) =>
@@ -109,10 +121,17 @@ export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRe
         <DialogHeader>
           <DialogTitle>Interactive Rebase</DialogTitle>
           <DialogDescription>
-            Drag to reorder, click the action to cycle pick → squash → drop. Any conflict aborts
-            cleanly with no changes made. There's no partial state to recover from.
+            Drag to reorder, click the action to cycle pick → squash → fixup → drop. Any conflict
+            aborts cleanly with no changes made. There's no partial state to recover from.
           </DialogDescription>
         </DialogHeader>
+        <CheckboxGroup
+          className="-mt-1 text-xs text-muted-foreground"
+          checked={autosquash}
+          onCheckedChange={(checked) => setAutosquash(checked === true)}
+        >
+          Autosquash fixup!/squash! commits next to their target
+        </CheckboxGroup>
         <div className="max-h-96 overflow-auto rounded-md border border-border">
           {rows.map((row, index) => (
             <div
@@ -136,6 +155,7 @@ export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRe
                   "w-16 shrink-0 rounded px-1.5 py-0.5 text-center text-xs font-medium uppercase",
                   row.action === "pick" && "bg-accent-green/20 text-accent-green",
                   row.action === "squash" && "bg-accent-yellow/20 text-accent-yellow",
+                  row.action === "fixup" && "bg-accent-purple/20 text-accent-purple",
                   row.action === "drop" && "bg-destructive/20 text-destructive",
                 )}
               >
