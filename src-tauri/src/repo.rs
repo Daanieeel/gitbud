@@ -310,6 +310,33 @@ pub fn discard_file(repo_path: &str, path: &str) -> Result<(), String> {
     }
 }
 
+/// Appends the given paths to the repo's root `.gitignore`, anchored with a leading `/` so
+/// they match only that exact path rather than any same-named file anywhere in the tree.
+/// Paths already present are skipped rather than duplicated.
+pub fn add_to_gitignore(repo_path: &str, paths: &[String]) -> Result<(), String> {
+    let gitignore_path = std::path::Path::new(repo_path).join(".gitignore");
+    let mut content = std::fs::read_to_string(&gitignore_path).unwrap_or_default();
+    let existing: std::collections::HashSet<&str> = content.lines().collect();
+
+    let to_add: Vec<String> = paths
+        .iter()
+        .map(|p| format!("/{p}"))
+        .filter(|entry| !existing.contains(entry.as_str()))
+        .collect();
+    if to_add.is_empty() {
+        return Ok(());
+    }
+
+    if !content.is_empty() && !content.ends_with('\n') {
+        content.push('\n');
+    }
+    for entry in to_add {
+        content.push_str(&entry);
+        content.push('\n');
+    }
+    std::fs::write(&gitignore_path, content).map_err(|e| e.to_string())
+}
+
 /// Resolves a merge conflict on `path` by taking one side wholesale: writes that side's
 /// blob content to the working tree and stages it, clearing the conflict.
 pub fn resolve_conflict(repo_path: &str, path: &str, side: &str) -> Result<(), String> {

@@ -4,6 +4,7 @@ import {
   CheckIcon,
   CodeIcon,
   CopyIcon,
+  EyeOffIcon,
   ExternalLinkIcon,
   FolderOpenIcon,
   TerminalIcon,
@@ -40,7 +41,7 @@ import { FileTypeIcon } from "@/lib/file-icons";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
-import { useDiscardFile } from "@/hooks/queries/useRepoStatus";
+import { useAddToGitignore, useDiscardFile } from "@/hooks/queries/useRepoStatus";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
 import { BlameDialog } from "./BlameDialog";
@@ -84,6 +85,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
   const { data: branchData } = useBranches(repoPath);
   const branch = branchData?.branch ?? null;
   const discardFileMutation = useDiscardFile(repoPath);
+  const addToGitignoreMutation = useAddToGitignore(repoPath);
   const favoriteEditorId = useSettingsStore((s) => s.settings.favorite_editor);
   const customEditorCommand = useSettingsStore((s) => s.settings.custom_editor_command);
   const favoriteEditorOption = findEditor(favoriteEditorId);
@@ -259,6 +261,10 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                       <CopyIcon className="size-3.5" />
                       Copy Paths
                     </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => addToGitignoreMutation.mutate(selectedList)}>
+                      <EyeOffIcon className="size-3.5" />
+                      Add {selectedList.length} Files to .gitignore
+                    </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem variant="destructive" onSelect={() => setConfirmDiscardBatch(true)}>
                       <Trash2Icon className="size-3.5" />
@@ -322,6 +328,10 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                     <ContextMenuItem onSelect={() => setBlamePath(file.path)}>
                       <UserIcon className="size-3.5" />
                       Blame File
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => addToGitignoreMutation.mutate([file.path])}>
+                      <EyeOffIcon className="size-3.5" />
+                      Add to .gitignore
                     </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem

@@ -81,6 +81,14 @@ export function useDiscardFiles(repoPath: string | null) {
   });
 }
 
+export function useAddToGitignore(repoPath: string | null) {
+  const invalidate = useInvalidateStatus(repoPath);
+  return useMutation({
+    mutationFn: (paths: string[]) => api.addToGitignore(repoPath as string, paths),
+    onSuccess: invalidate,
+  });
+}
+
 export function useStageHunk(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({

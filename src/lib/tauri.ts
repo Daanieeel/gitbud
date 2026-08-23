@@ -55,6 +55,7 @@ export const api = {
   unstagePaths: (repoPath: string, paths: string[]) =>
     invoke<void>("unstage_paths", { repoPath, paths }),
   discardFile: (repoPath: string, path: string) => invoke<void>("discard_file", { repoPath, path }),
+  addToGitignore: (repoPath: string, paths: string[]) => invoke<void>("add_to_gitignore", { repoPath, paths }),
   resolveConflict: (repoPath: string, path: string, side: "ours" | "theirs") =>
     invoke<void>("resolve_conflict", { repoPath, path, side }),
   getConflictSides: (repoPath: string, path: string) =>

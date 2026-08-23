@@ -104,6 +104,13 @@ async fn discard_file(repo_path: String, path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn add_to_gitignore(repo_path: String, paths: Vec<String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || repo::add_to_gitignore(&repo_path, &paths))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn resolve_conflict(repo_path: String, path: String, side: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || repo::resolve_conflict(&repo_path, &path, &side))
         .await
@@ -1392,6 +1399,7 @@ pub fn run() {
             stage_paths,
             unstage_paths,
             discard_file,
+            add_to_gitignore,
             resolve_conflict,
             read_working_file,
             stage_hunk,
