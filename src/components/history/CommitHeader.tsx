@@ -32,7 +32,7 @@ export function CommitHeader({ repoPath, oid }: CommitHeaderProps) {
   const matchingTags = tags.filter((t) => t.oid === oid);
 
   return (
-    <div className="flex shrink-0 flex-col gap-1.5 border-b border-border px-3 py-2.5">
+    <div className="flex max-h-[300px] shrink-0 flex-col gap-1.5 overflow-auto border-b border-border px-3 py-2.5">
       <div className="flex items-center gap-1.5">
         {matchingTags.map((t) => (
           <span
