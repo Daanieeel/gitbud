@@ -73,13 +73,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Build download links from release assets
+      - name: Build release notes (changelog + download links)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+
+          gh api "repos/$REPO/releases/generate-notes" -f tag_name="$TAG" --jq .body > changelog.md
 
           assets=$(gh release view "$TAG" --repo "$REPO" --json assets --jq '.assets[].name')
 
@@ -100,6 +102,10 @@ jobs:
           appimage=$(find_url '\.AppImage$')
 
           {
+            cat changelog.md
+            echo ""
+            echo "---"
+            echo ""
             echo "See the assets below to download and install for your platform."
             echo ""
             echo "**macOS:**"
