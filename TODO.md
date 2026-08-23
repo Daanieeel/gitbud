@@ -18,7 +18,7 @@ Complete in chronological order.
 - [x] (BUG) Settings > General > Favorite Editor: The selector isnt scrollable
 - [x] Pull Request Tab > Single PR > "Merge..." button > Dialog: add an option to change the target branch
 - [x] Any diff viewer: a feature we want is inline diff viewing. if only a small portion of a line is changed, we currently show the whole line removed and added again but we highlight the changed portion. this is good and should stay. however, when there was a lot of change in a line, the porbablity for it matching with the old version on some singular letters is high. this can get really messy. so if the changed portion of a line is above 10-20 characters, we should show the whole line removed and added again instead of highlighting the changed portion
-- [ ] Command palette: switch from substring match to fuzzy scored match (goto anything style)
+- [x] Command palette: switch from substring match to fuzzy scored match (goto anything style)
 - [ ] add an interface for resolving this error when pushing and pulling at the same time: "Diverging branches can't be fast-forwarded"
 - [ ] Add keyboard arrow-key navigation to lists (commits, files, branches, PRs)
 - [ ] Diff viewer: add setting for diff algorithm choice (myers/patience/histogram/minimal)

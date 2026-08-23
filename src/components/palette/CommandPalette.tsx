@@ -6,6 +6,7 @@ import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches, useCheckoutBranch } from "@/hooks/queries/useBranches";
 import { useStatus } from "@/hooks/queries/useRepoStatus";
+import { fuzzyScore } from "@/lib/fuzzy";
 import type { CommitSearchResult } from "@/lib/types";
 
 interface CommandPaletteProps {
@@ -56,32 +57,49 @@ export function CommandPalette({ open, onOpenChange, mode }: CommandPaletteProps
   }, [mode, selectedRepo, query]);
 
   const entries = useMemo<Entry[]>(() => {
-    const needle = query.trim().toLowerCase();
-    const matches = (s: string) => !needle || s.toLowerCase().includes(needle);
+    const needle = query.trim();
 
-    const repoEntries: Entry[] = repos
-      .filter((r) => matches(r.name))
-      .map((r) => ({ kind: "repo", key: `repo:${r.path}`, label: r.name, sublabel: r.group, path: r.path }));
+    // Score every candidate against the needle and drop non-matches, rather than the old plain
+    // substring filter — "goto anything" style, so e.g. "gtany" finds "GoToAnything.ts". Scored
+    // and sorted together across all kinds (not per-category) so the most relevant result overall
+    // — a branch, a file, whatever — always lands first.
+    const scored: { entry: Entry; score: number }[] = [];
 
-    if (mode === "repos") return repoEntries;
+    for (const r of repos) {
+      const score = fuzzyScore(needle, r.name);
+      if (score !== null) {
+        scored.push({ score, entry: { kind: "repo", key: `repo:${r.path}`, label: r.name, sublabel: r.group, path: r.path } });
+      }
+    }
 
-    const branchEntries: Entry[] = branches
-      .filter((b) => !b.is_remote && matches(b.name))
-      .map((b) => ({ kind: "branch", key: `branch:${b.name}`, label: b.name, sublabel: "branch", name: b.name }));
+    if (mode !== "repos") {
+      for (const b of branches) {
+        if (b.is_remote) continue;
+        const score = fuzzyScore(needle, b.name);
+        if (score !== null) {
+          scored.push({ score, entry: { kind: "branch", key: `branch:${b.name}`, label: b.name, sublabel: "branch", name: b.name } });
+        }
+      }
 
-    const fileEntries: Entry[] = (status?.files ?? [])
-      .filter((f) => matches(f.path))
-      .map((f) => ({ kind: "file", key: `file:${f.path}`, label: f.path, sublabel: "changed file", path: f.path }));
+      for (const f of status?.files ?? []) {
+        const score = fuzzyScore(needle, f.path);
+        if (score !== null) {
+          scored.push({ score, entry: { kind: "file", key: `file:${f.path}`, label: f.path, sublabel: "changed file", path: f.path } });
+        }
+      }
 
-    const commitEntries: Entry[] = commitResults.map((c) => ({
-      kind: "commit",
-      key: `commit:${c.oid}`,
-      label: c.summary,
-      sublabel: `${c.short_oid} · ${c.author_name}`,
-      oid: c.oid,
-    }));
+      // Already filtered server-side (by summary/author/oid, not just summary) — score for
+      // sorting purposes only, falling back to 0 rather than dropping a result the backend
+      // already decided was relevant.
+      for (const c of commitResults) {
+        scored.push({
+          score: fuzzyScore(needle, c.summary) ?? 0,
+          entry: { kind: "commit", key: `commit:${c.oid}`, label: c.summary, sublabel: `${c.short_oid} · ${c.author_name}`, oid: c.oid },
+        });
+      }
+    }
 
-    return [...repoEntries, ...branchEntries, ...fileEntries, ...commitEntries];
+    return scored.sort((a, b) => b.score - a.score).map((s) => s.entry);
   }, [query, repos, branches, status, commitResults, mode]);
 
   const activate = (entry: Entry) => {
