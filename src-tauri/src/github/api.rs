@@ -149,8 +149,11 @@ struct RawPullRequest {
     user: RawUser,
     head: RawRef,
     base: RawRef,
+    // GitHub's list-pull-requests endpoint (unlike get-a-single-pull-request) doesn't include a
+    // `merged` boolean at all — only `merged_at`, null for an unmerged PR. Deriving `merged`
+    // from that instead of trusting a `merged` field means both endpoints report it correctly.
     #[serde(default)]
-    merged: bool,
+    merged_at: Option<String>,
     #[serde(default)]
     mergeable: Option<bool>,
     #[serde(default)]
@@ -171,7 +174,7 @@ impl From<RawPullRequest> for PullRequest {
             head_sha: raw.head.sha,
             base_ref: raw.base.ref_name,
             base_sha: raw.base.sha,
-            merged: raw.merged,
+            merged: raw.merged_at.is_some(),
             mergeable: raw.mergeable,
             labels: raw.labels.into_iter().map(|l| l.name).collect(),
         }
