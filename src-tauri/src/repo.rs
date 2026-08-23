@@ -398,29 +398,6 @@ mod tests {
     }
 
     #[test]
-    fn probe_rename_detection() {
-        // Case: newly-created (never committed) file, staged, then moved before further staging.
-        let scratch = ScratchRepo::new("rename-probe-new");
-        let repo_path = scratch.path_str();
-        scratch.write_and_commit("existing.txt", "existing\n", "base");
-        std::fs::write(scratch.path.join("brand_new.txt"), "hello world\nthis is a decently long file\nwith several lines\nso similarity detection works\n").unwrap();
-        stage_paths(&repo_path, &["brand_new.txt".to_string()]).unwrap();
-        std::fs::rename(scratch.path.join("brand_new.txt"), scratch.path.join("brand_new_renamed.txt")).unwrap();
-        let status = get_status(&repo_path).unwrap();
-        eprintln!("PROBE NEW-FILE-THEN-MOVED (unstaged after): {:?}", status);
-
-        // Case: dir move
-        let scratch2 = ScratchRepo::new("rename-probe-dir");
-        let repo_path2 = scratch2.path_str();
-        std::fs::create_dir_all(scratch2.path.join("src")).unwrap();
-        scratch2.write_and_commit("src/mod.rs", "fn main() {}\nlet x = 1;\nlet y = 2;\n", "base");
-        std::fs::create_dir_all(scratch2.path.join("lib")).unwrap();
-        std::fs::rename(scratch2.path.join("src/mod.rs"), scratch2.path.join("lib/mod.rs")).unwrap();
-        let status2 = get_status(&repo_path2).unwrap();
-        eprintln!("PROBE DIR MOVE: {:?}", status2);
-    }
-
-    #[test]
     fn reads_current_branch_of_real_repo() {
         let branch = get_current_branch(&this_repo()).expect("branch should succeed");
         assert!(!branch.is_empty());
