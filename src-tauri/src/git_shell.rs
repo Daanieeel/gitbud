@@ -72,15 +72,25 @@ fn stream_reader(
     app: AppHandle,
     event: String,
     stream_name: &'static str,
+    capture: Option<Arc<Mutex<Vec<String>>>>,
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
         let mut pending = Vec::new();
         let mut buf = [0u8; 4096];
         let emit = |app: &AppHandle, segment: &[u8]| {
             let line = String::from_utf8_lossy(segment).trim().to_string();
-            if !line.is_empty() {
-                let _ = app.emit(&event, GitOutputLine { stream: stream_name.into(), line });
+            if line.is_empty() {
+                return;
             }
+            // Progress-meter lines (git's own "Counting objects: 45% (.../...)") always carry a
+            // percentage — excluding them keeps a failure message focused on the actual error
+            // (e.g. a server-side rejection reason) instead of the transfer noise leading up to it.
+            if let Some(capture) = &capture {
+                if !line.contains('%') {
+                    capture.lock().unwrap().push(line.clone());
+                }
+            }
+            let _ = app.emit(&event, GitOutputLine { stream: stream_name.into(), line });
         };
         loop {
             match reader.read(&mut buf) {
@@ -150,9 +160,19 @@ fn run_streaming(app: &AppHandle, cwd: Option<&str>, args: &[&str], event_id: &s
         .map_err(|_| "internal lock error".to_string())?
         .insert(event_id.to_string(), RunningOp { pid: child.id(), cancelled: Arc::clone(&cancelled) });
 
+    let captured_stderr: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+
     let channel = event_channel(event_id);
-    let out_handle = stream_reader(stdout, Arc::clone(&last_activity), app.clone(), channel.clone(), "stdout");
-    let err_handle = stream_reader(stderr, Arc::clone(&last_activity), app.clone(), channel, "stderr");
+    let out_handle =
+        stream_reader(stdout, Arc::clone(&last_activity), app.clone(), channel.clone(), "stdout", None);
+    let err_handle = stream_reader(
+        stderr,
+        Arc::clone(&last_activity),
+        app.clone(),
+        channel,
+        "stderr",
+        Some(Arc::clone(&captured_stderr)),
+    );
 
     let done = Arc::new(AtomicBool::new(false));
     let watchdog_done = Arc::clone(&done);
@@ -191,8 +211,43 @@ fn run_streaming(app: &AppHandle, cwd: Option<&str>, args: &[&str], event_id: &s
             IDLE_TIMEOUT.as_secs()
         ))
     } else {
-        Err(format!("git {} exited with {status}", args.join(" ")))
+        let stderr_lines = captured_stderr.lock().unwrap();
+        let detail = summarize_git_error(&stderr_lines);
+        if detail.is_empty() {
+            Err(format!("git {} exited with {status}", args.join(" ")))
+        } else {
+            Err(detail.join("\n"))
+        }
     }
+}
+
+/// Reduces raw git stderr down to the lines a user actually needs to understand and act on a
+/// failure, dropping transport bookkeeping (object counts, delta compression stats, the "To
+/// <url>" line) and git's own "remote: " passthrough prefix, plus the generic "error: failed to
+/// push some refs..." line that git always prints alongside a more specific reason and adds
+/// nothing beyond what the caller already knows (a push failed).
+fn summarize_git_error(lines: &[String]) -> Vec<String> {
+    const NOISE_PREFIXES: &[&str] = &[
+        "Enumerating objects",
+        "Counting objects",
+        "Compressing objects",
+        "Writing objects",
+        "Total ",
+        "Delta compression",
+        "To http",
+        "To git@",
+        "To ssh://",
+    ];
+    let mut seen = std::collections::HashSet::new();
+    lines
+        .iter()
+        .map(|line| line.strip_prefix("remote:").map(str::trim).unwrap_or(line.as_str()))
+        .filter(|line| !line.is_empty())
+        .filter(|line| !NOISE_PREFIXES.iter().any(|prefix| line.starts_with(prefix)))
+        .filter(|line| !line.starts_with("error: failed to push some refs"))
+        .filter(|line| seen.insert(line.to_string()))
+        .map(str::to_string)
+        .collect()
 }
 
 pub fn fetch(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
@@ -206,6 +261,21 @@ pub fn pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), Stri
         PullStrategy::Merge => &["pull", "--progress"],
         PullStrategy::Rebase => &["pull", "--rebase", "--progress"],
         PullStrategy::FfOnly => &["pull", "--ff-only", "--progress"],
+    };
+    run_streaming(app, Some(repo_path), args, event_id)
+}
+
+/// Aborts a pull that resulted in a conflict, restoring the working tree to exactly how it was
+/// beforehand — used when a caller wants a clean slate instead of working through the conflict
+/// resolution UI (e.g. the "sync" button's fallback: undo the local commit, stash, pull,
+/// unstash, then recommit). `--ff-only` pulls never leave a conflicted state to abort (they just
+/// fail outright without touching anything), so only merge/rebase are handled here.
+pub fn abort_pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
+    use crate::settings::PullStrategy;
+    let strategy = crate::settings::get_settings().map(|s| s.pull_strategy).unwrap_or(PullStrategy::Merge);
+    let args: &[&str] = match strategy {
+        PullStrategy::Rebase => &["rebase", "--abort"],
+        _ => &["merge", "--abort"],
     };
     run_streaming(app, Some(repo_path), args, event_id)
 }
@@ -234,6 +304,14 @@ pub fn rename_branch_remote(
     run_streaming(app, Some(repo_path), &["push", "-u", "origin", new_name], event_id)?;
     let _ = run_streaming(app, Some(repo_path), &["push", "origin", "--delete", old_name], event_id);
     Ok(())
+}
+
+/// Deletes `name` on `origin`. A no-op-shaped failure (the branch was never pushed, or someone
+/// else already deleted it) is a normal git error here — callers that only want this as a
+/// best-effort cleanup step should swallow it themselves, matching `rename_branch_remote`'s
+/// old-name delete.
+pub fn delete_branch_remote(app: &AppHandle, repo_path: &str, name: &str, event_id: &str) -> Result<(), String> {
+    run_streaming(app, Some(repo_path), &["push", "origin", "--delete", name], event_id)
 }
 
 pub fn lfs_pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {

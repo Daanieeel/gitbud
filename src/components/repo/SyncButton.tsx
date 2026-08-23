@@ -1,4 +1,4 @@
-import { ArrowDownIcon, ArrowUpIcon, CloudUploadIcon, RefreshCwIcon } from "lucide-react";
+import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, CloudUploadIcon, RefreshCwIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -12,6 +12,7 @@ export function SyncButton() {
   const fetch = useRepoStore((s) => s.fetch);
   const pull = useRepoStore((s) => s.pull);
   const push = useRepoStore((s) => s.push);
+  const syncBranch = useRepoStore((s) => s.syncBranch);
   const { available, reason } = useIdentityAvailability();
 
   if (!selectedRepo) return null;
@@ -26,6 +27,13 @@ export function SyncButton() {
     Icon = CloudUploadIcon;
     action = push;
     title = "This branch has never been pushed. Publish it to origin";
+    variant = "default";
+  } else if (aheadBehind.behind > 0 && aheadBehind.ahead > 0) {
+    label = `Sync (${aheadBehind.behind}↓ ${aheadBehind.ahead}↑)`;
+    Icon = ArrowUpDownIcon;
+    action = syncBranch;
+    title = "Pulls, then pushes. If the pull conflicts with your local commit(s), aborts and suggests a safer manual path instead of pushing";
+    variant = "default";
   } else if (aheadBehind.behind > 0) {
     label = `Pull origin (${aheadBehind.behind})`;
     Icon = ArrowDownIcon;

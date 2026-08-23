@@ -16,6 +16,13 @@ pub struct DiffLine {
     pub content: String,
     pub old_lineno: Option<u32>,
     pub new_lineno: Option<u32>,
+    /// [start, end) character ranges into `content` that changed at the word level, relative to
+    /// this line's paired counterpart on the other side of the edit (a deletion's ranges are
+    /// relative to the addition that replaced it, and vice versa). Empty for context lines and
+    /// for add/delete lines with no same-position counterpart to compare against — those still
+    /// render as a plain whole-line change.
+    #[serde(default)]
+    pub highlight_ranges: Vec<(u32, u32)>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,6 +73,7 @@ fn build_file_diff(path: &str, old_path: Option<&str>, diff: &Diff) -> Result<Fi
                 content,
                 old_lineno: line.old_lineno(),
                 new_lineno: line.new_lineno(),
+                highlight_ranges: Vec::new(),
             };
             if let Some(last) = hunks.borrow_mut().last_mut() {
                 last.lines.push(diff_line);
@@ -75,13 +83,87 @@ fn build_file_diff(path: &str, old_path: Option<&str>, diff: &Diff) -> Result<Fi
     )
     .map_err(|e| e.message().to_string())?;
 
+    let mut hunks = hunks.into_inner();
+    add_intraline_highlights(&mut hunks);
+
     Ok(FileDiff {
         is_image: crate::image_diff::is_image_path(path),
         path: path.to_string(),
         old_path: old_path.map(|s| s.to_string()),
         is_binary: is_binary.into_inner(),
-        hunks: hunks.into_inner(),
+        hunks,
     })
+}
+
+/// Character-level diff between one deletion/addition line pair, returning [start, end)
+/// *character* offsets (not bytes — matches how the frontend counts positions in `content` when
+/// overlaying these onto its syntax-highlighted HTML) into `old`/`new` respectively for the
+/// substrings that actually changed. Char-level rather than word-level on purpose: code changes
+/// very often land inside a single "word" by whitespace's definition (e.g. `compute_old` ->
+/// `compute_new`), which a word-level diff would highlight in its entirety instead of just the
+/// `old`/`new` part that changed. Equal stretches are left unhighlighted so only the substantive
+/// change stands out.
+fn intraline_diff(old: &str, new: &str) -> (Vec<(u32, u32)>, Vec<(u32, u32)>) {
+    use similar::{ChangeTag, TextDiff};
+
+    let diff = TextDiff::from_chars(old, new);
+    let mut old_ranges = Vec::new();
+    let mut new_ranges = Vec::new();
+    let mut old_pos: u32 = 0;
+    let mut new_pos: u32 = 0;
+
+    for change in diff.iter_all_changes() {
+        let len = change.value().chars().count() as u32;
+        match change.tag() {
+            ChangeTag::Equal => {
+                old_pos += len;
+                new_pos += len;
+            }
+            ChangeTag::Delete => {
+                old_ranges.push((old_pos, old_pos + len));
+                old_pos += len;
+            }
+            ChangeTag::Insert => {
+                new_ranges.push((new_pos, new_pos + len));
+                new_pos += len;
+            }
+        }
+    }
+    (old_ranges, new_ranges)
+}
+
+/// Finds each hunk's "replace" blocks — a run of deletion lines immediately followed by a run
+/// of addition lines, git's usual shape for "this line changed" — and fills in `highlight_ranges`
+/// for the lines that pair up 1:1 across the two runs (extra lines on the longer side are left
+/// as plain whole-line changes, same as before this existed).
+pub fn add_intraline_highlights(hunks: &mut [DiffHunk]) {
+    for hunk in hunks {
+        let mut i = 0;
+        while i < hunk.lines.len() {
+            if hunk.lines[i].kind != LineKind::Deletion {
+                i += 1;
+                continue;
+            }
+            let del_start = i;
+            while i < hunk.lines.len() && hunk.lines[i].kind == LineKind::Deletion {
+                i += 1;
+            }
+            let del_end = i;
+            let add_start = i;
+            while i < hunk.lines.len() && hunk.lines[i].kind == LineKind::Addition {
+                i += 1;
+            }
+            let add_end = i;
+
+            let pair_count = (del_end - del_start).min(add_end - add_start);
+            for offset in 0..pair_count {
+                let (old_ranges, new_ranges) =
+                    intraline_diff(&hunk.lines[del_start + offset].content, &hunk.lines[add_start + offset].content);
+                hunk.lines[del_start + offset].highlight_ranges = old_ranges;
+                hunk.lines[add_start + offset].highlight_ranges = new_ranges;
+            }
+        }
+    }
 }
 
 /// Diff a single file, either the staged side (HEAD -> index) or unstaged side (index -> workdir).
@@ -192,6 +274,63 @@ mod tests {
         repo::unstage_paths(&repo_path, &["a.txt".to_string()]).unwrap();
         let staged_after = repo::get_status(&repo_path).unwrap();
         assert!(staged_after.files.iter().any(|f| f.path == "a.txt" && !f.staged));
+    }
+
+    fn line(kind: LineKind, content: &str) -> DiffLine {
+        DiffLine { kind, content: content.to_string(), old_lineno: None, new_lineno: None, highlight_ranges: Vec::new() }
+    }
+
+    #[test]
+    fn intraline_highlights_only_the_changed_word() {
+        let mut hunks = vec![DiffHunk {
+            header: String::new(),
+            lines: vec![
+                line(LineKind::Deletion, "let value = compute_old(x);"),
+                line(LineKind::Addition, "let value = compute_new(x);"),
+            ],
+        }];
+        add_intraline_highlights(&mut hunks);
+
+        let del = &hunks[0].lines[0];
+        let add = &hunks[0].lines[1];
+        assert!(!del.highlight_ranges.is_empty());
+        assert!(!add.highlight_ranges.is_empty());
+
+        let del_chars: Vec<char> = del.content.chars().collect();
+        let highlighted: String = del
+            .highlight_ranges
+            .iter()
+            .flat_map(|&(start, end)| del_chars[start as usize..end as usize].iter())
+            .collect();
+        assert_eq!(highlighted, "old");
+
+        let add_chars: Vec<char> = add.content.chars().collect();
+        let highlighted: String = add
+            .highlight_ranges
+            .iter()
+            .flat_map(|&(start, end)| add_chars[start as usize..end as usize].iter())
+            .collect();
+        assert_eq!(highlighted, "new");
+    }
+
+    #[test]
+    fn intraline_leaves_unpaired_lines_unhighlighted() {
+        // Two deletions, one addition — the first deletion pairs with the addition and gets
+        // highlighted; the extra second deletion has no counterpart and stays a plain
+        // whole-line change.
+        let mut hunks = vec![DiffHunk {
+            header: String::new(),
+            lines: vec![
+                line(LineKind::Deletion, "a"),
+                line(LineKind::Deletion, "c"),
+                line(LineKind::Addition, "b"),
+            ],
+        }];
+        add_intraline_highlights(&mut hunks);
+
+        assert!(!hunks[0].lines[0].highlight_ranges.is_empty());
+        assert!(hunks[0].lines[1].highlight_ranges.is_empty());
+        assert!(!hunks[0].lines[2].highlight_ranges.is_empty());
     }
 }
 

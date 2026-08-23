@@ -1,9 +1,11 @@
 import { create } from "zustand";
+import { toast } from "sonner";
 import { api } from "@/lib/tauri";
 import { notify } from "@/lib/notify";
 import { overallFrom, type Overall } from "@/components/pr/CIBadge";
 import { useNetworkStore } from "./useNetworkStore";
 import { isBrokenTokenError, useGitHubStore } from "./useGitHubStore";
+import { useRepoStore } from "./useRepoStore";
 import type { PullRequest, PullRequestFile, ReviewComment } from "@/lib/types";
 
 export type PRFilter = "open" | "closed" | "all";
@@ -51,7 +53,17 @@ interface PRState {
     assignees: string[],
     reviewers: string[],
   ) => Promise<PullRequest>;
-  mergePR: (repoPath: string, login: string, number: number, method: string) => Promise<void>;
+  mergePR: (
+    repoPath: string,
+    login: string,
+    number: number,
+    method: string,
+    commitTitle: string,
+    commitMessage: string,
+    sha: string,
+    deleteBranch: boolean,
+    headRef: string,
+  ) => Promise<void>;
 }
 
 export const usePRStore = create<PRState>((set, get) => ({
@@ -176,8 +188,28 @@ export const usePRStore = create<PRState>((set, get) => ({
     return pr;
   },
 
-  mergePR: async (repoPath, login, number, method) => {
-    await api.githubMergePullRequest(repoPath, login, number, method);
+  mergePR: async (repoPath, login, number, method, commitTitle, commitMessage, sha, deleteBranch, headRef) => {
+    await api.githubMergePullRequest(
+      repoPath,
+      login,
+      number,
+      method,
+      commitTitle.trim() || null,
+      commitMessage.trim() || null,
+      sha || null,
+    );
+    if (deleteBranch) {
+      try {
+        await api.githubDeleteRemoteBranch(repoPath, login, headRef);
+      } catch (err) {
+        toast.error(String(err));
+      }
+      // Best-effort: the merged branch is very often not even checked out locally, and
+      // git2 errors on deleting whichever branch IS currently checked out — neither case
+      // should block on or surface an error for what's just opportunistic local cleanup.
+      await api.deleteBranch(repoPath, headRef).catch(() => {});
+      void useRepoStore.getState().refreshBranches();
+    }
     await get().load(repoPath, login);
   },
 }));

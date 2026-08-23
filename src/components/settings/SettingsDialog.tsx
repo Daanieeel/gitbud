@@ -22,6 +22,8 @@ import {
 import { GitHubMark } from "@/components/github/GitHubMark";
 import { UpdateChecker } from "./UpdateChecker";
 import { SigningWizard } from "./SigningWizard";
+import { EditorPicker } from "./EditorPicker";
+import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -79,6 +81,7 @@ function Select<T extends string>({
 
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { settings, update, exportTo, importFrom } = useSettingsStore();
+  const favoriteEditor = findEditor(settings.favorite_editor);
   const [importExportError, setImportExportError] = useState<string | null>(null);
   const clientId = useGitHubStore((s) => s.clientId);
   const setClientId = useGitHubStore((s) => s.setClientId);
@@ -193,6 +196,37 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   <Checkbox
                     checked={settings.auto_stage_new_changes}
                     onCheckedChange={(checked) => void update({ auto_stage_new_changes: checked === true })}
+                  />
+                </Row>
+                <Row label="Favorite editor">
+                  <EditorPicker
+                    onSelect={(favorite_editor, customCommand) =>
+                      void update({
+                        favorite_editor,
+                        custom_editor_command: favorite_editor === CUSTOM_EDITOR_ID ? (customCommand ?? null) : null,
+                      })
+                    }
+                  >
+                    <Button variant="secondary" size="sm" className="h-8 w-56 justify-start gap-2">
+                      {favoriteEditor ? (
+                        <>
+                          <img src={favoriteEditor.icon} alt="" className="size-4 shrink-0" />
+                          <span className="truncate">{favoriteEditor.name}</span>
+                        </>
+                      ) : settings.favorite_editor === CUSTOM_EDITOR_ID ? (
+                        <span className="truncate font-mono text-xs">{settings.custom_editor_command}</span>
+                      ) : (
+                        <span className="text-muted-foreground">Choose an editor…</span>
+                      )}
+                    </Button>
+                  </EditorPicker>
+                </Row>
+                <Row label="Open PR on provider after creation">
+                  <Checkbox
+                    checked={settings.open_pr_on_provider_after_creation}
+                    onCheckedChange={(checked) =>
+                      void update({ open_pr_on_provider_after_creation: checked === true })
+                    }
                   />
                 </Row>
               </>

@@ -19,6 +19,9 @@ const DEFAULT_SETTINGS: Settings = {
   fs_watch_enabled: true,
   default_identity_id: null,
   desktop_notifications: true,
+  favorite_editor: null,
+  custom_editor_command: null,
+  open_pr_on_provider_after_creation: true,
 };
 
 function applyTheme(theme: Settings["theme"]) {

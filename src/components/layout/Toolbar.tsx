@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
-import { GitPullRequestCreateArrow } from "lucide-react";
+import { GitPullRequestCreateArrow, GitPullRequestArrowIcon } from "lucide-react";
 import { useGitHubStore } from "@/store/useGitHubStore";
+import { useRepoStore } from "@/store/useRepoStore";
+import { usePRStore } from "@/store/usePRStore";
+import { api } from "@/lib/tauri";
 import { BranchSwitcher } from "@/components/repo/BranchSwitcher";
 import { BranchPruner } from "@/components/repo/BranchPruner";
 import { TagsPanel } from "@/components/repo/TagsPanel";
@@ -16,13 +19,32 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 export function Toolbar() {
   const currentLogin = useGitHubStore((s) => s.currentLogin);
+  const repoPath = useRepoStore((s) => s.selectedRepo);
+  const branch = useRepoStore((s) => s.branch);
+  const setActiveTab = useRepoStore((s) => s.setActiveTab);
+  const selectPR = usePRStore((s) => s.selectPR);
   const [previewPrOpen, setPreviewPrOpen] = useState(false);
+  const [existingPrNumber, setExistingPrNumber] = useState<number | null>(null);
 
   useEffect(() => {
     const handleOpenCreatePr = () => setPreviewPrOpen(true);
     window.addEventListener("open-create-pr", handleOpenCreatePr);
     return () => window.removeEventListener("open-create-pr", handleOpenCreatePr);
   }, []);
+
+  useEffect(() => {
+    setExistingPrNumber(null);
+    if (!repoPath || !currentLogin || !branch) return;
+    let cancelled = false;
+    void api.githubListPullRequests(repoPath, currentLogin, "open", 1).then((pulls) => {
+      if (cancelled) return;
+      const match = pulls.find((p) => p.head_ref === branch);
+      setExistingPrNumber(match?.number ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath, currentLogin, branch]);
 
   return (
     <header className="flex shrink-0 items-center gap-2 p-2">
@@ -35,7 +57,26 @@ export function Toolbar() {
       <LfsPanel />
       <div className="flex-1" />
       <OfflineIndicator />
-      {currentLogin && (
+      {currentLogin && existingPrNumber != null && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="caution"
+              size="sm"
+              onClick={() => {
+                if (!repoPath) return;
+                setActiveTab("pulls");
+                void selectPR(repoPath, currentLogin, existingPrNumber);
+              }}
+            >
+              <GitPullRequestArrowIcon className="size-3.5" />
+              View PR
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>View the existing pull request for this branch</TooltipContent>
+        </Tooltip>
+      )}
+      {currentLogin && existingPrNumber == null && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

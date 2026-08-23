@@ -54,6 +54,14 @@ export function BranchSwitcher() {
   const [renameBusy, setRenameBusy] = useState(false);
   const [pendingSwitch, setPendingSwitch] = useState<string | null>(null);
   const [switchChoice, setSwitchChoice] = useState<"leave" | "bring">("leave");
+  const [pendingDelete, setPendingDelete] = useState<{
+    name: string;
+    uncommitted: boolean;
+    unmerged: boolean;
+    published: boolean;
+  } | null>(null);
+  const [deleteOnRemote, setDeleteOnRemote] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const handleOpenBranchSwitcher = () => setOpen(true);
@@ -65,6 +73,9 @@ export function BranchSwitcher() {
     () => branches.filter((b) => !b.is_remote && b.name.toLowerCase().includes(filter.toLowerCase())),
     [branches, filter],
   );
+  // Unfiltered (unlike `local`, above) — deciding whether delete should be disabled at all, or
+  // which branch to fall back to, must not depend on whatever the user's typed into the search box.
+  const allLocalBranches = useMemo(() => branches.filter((b) => !b.is_remote), [branches]);
   // A local branch with no matching origin/<name> remote branch has never been pushed —
   // labeled "local" so it stands out from regular (tracked) branches, which need no label.
   const remoteBranchNames = useMemo(
@@ -147,6 +158,37 @@ export function BranchSwitcher() {
       if (elapsed < 400) await new Promise((resolve) => setTimeout(resolve, 400 - elapsed));
       setSwitching(false);
       setPendingSwitch(null);
+    }
+  };
+
+  // Deletes right away when nothing's at risk (no uncommitted changes on it, fully merged,
+  // never pushed); otherwise opens the confirmation dialog with whichever of those is true.
+  const requestDelete = async (name: string) => {
+    const published = !isLocalOnly(name);
+    const uncommitted = name === branch && (status?.files.length ?? 0) > 0;
+    const target =
+      allLocalBranches.find((b) => b.name !== name && (b.name === "main" || b.name === "master"))?.name ??
+      allLocalBranches.find((b) => b.name !== name)?.name;
+    // No other branch to compare against shouldn't happen (delete is disabled when this is the
+    // only local branch) — but if it somehow does, err conservative and treat as unmerged.
+    const unmerged = !target || !(selectedRepo && (await api.isBranchMerged(selectedRepo, name, target).catch(() => false)));
+
+    if (!published && !uncommitted && !unmerged) {
+      void deleteBranch(name);
+      return;
+    }
+    setDeleteOnRemote(false);
+    setPendingDelete({ name, uncommitted, unmerged, published });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    try {
+      await deleteBranch(pendingDelete.name, { deleteRemote: pendingDelete.published && deleteOnRemote });
+    } finally {
+      setDeleting(false);
+      setPendingDelete(null);
     }
   };
 
@@ -279,8 +321,8 @@ export function BranchSwitcher() {
                   </ContextMenuItem>
                   <ContextMenuItem
                     variant="destructive"
-                    disabled={b.is_head}
-                    onSelect={() => void deleteBranch(b.name)}
+                    disabled={allLocalBranches.length <= 1}
+                    onSelect={() => void requestDelete(b.name)}
                   >
                     <Trash2Icon className="size-3.5" />
                     Delete
@@ -403,6 +445,56 @@ export function BranchSwitcher() {
             </Button>
             <Button disabled={switching} onClick={() => void confirmSwitch()}>
               Switch Branch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setPendingDelete(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete "{pendingDelete?.name}"?</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-2">
+            {pendingDelete?.uncommitted && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+                <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+                <span>You have uncommitted changes on this branch. They'll be lost.</span>
+              </div>
+            )}
+            {pendingDelete?.unmerged && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+                <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+                <span>This branch has commits not merged anywhere else</span>
+              </div>
+            )}
+            {pendingDelete?.published && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
+                <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
+                <span>This branch is published to origin</span>
+              </div>
+            )}
+          </div>
+          {pendingDelete?.published && (
+            <CheckboxGroup
+              className="text-sm text-muted-foreground"
+              variant="destructive"
+              checked={deleteOnRemote}
+              onCheckedChange={(checked) => setDeleteOnRemote(checked === true)}
+            >
+              Delete on remote
+            </CheckboxGroup>
+          )}
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setPendingDelete(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" disabled={deleting} onClick={() => void confirmDelete()}>
+              Delete Branch
             </Button>
           </DialogFooter>
         </DialogContent>

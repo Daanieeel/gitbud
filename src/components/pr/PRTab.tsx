@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { GitPullRequestCreateArrow, TriangleAlertIcon } from "lucide-react";
+import { TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -7,10 +7,10 @@ import { isBrokenTokenError, useGitHubStore } from "@/store/useGitHubStore";
 import { usePRStore, type PRFilter } from "@/store/usePRStore";
 import { PRList } from "./PRList";
 import { PRDetail } from "./PRDetail";
-import { CreatePRDialog } from "./CreatePRDialog";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { api } from "@/lib/tauri";
+import { prefetchMergeSettings } from "@/lib/mergeSettingsPrefetch";
 
 const FILTERS: { key: PRFilter; label: string }[] = [
   { key: "open", label: "Open" },
@@ -35,9 +35,8 @@ export function PRTab() {
   const openSignIn = useGitHubStore((s) => s.openSignIn);
 
   const [hasRemote, setHasRemote] = useState<boolean | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
   const [reauthing, setReauthing] = useState(false);
-  const { width, onPointerDown } = useResizableWidth("panel-width:pr-list", 320, 240, 640);
+  const { width, onPointerDown } = useResizableWidth("panel-width:pr-list", 260, 240, 640);
 
   useEffect(() => {
     if (!repoPath) return;
@@ -47,6 +46,15 @@ export function PRTab() {
   useEffect(() => {
     if (repoPath && currentLogin && hasRemote) void load(repoPath, currentLogin);
   }, [repoPath, currentLogin, hasRemote, filter, load]);
+
+  // Warm the merge dialog's allowed-methods check as soon as this tab has PRs to show, so it's
+  // (very likely) already resolved by the time the user actually opens a merge dialog — most
+  // PRs in a repo target the same one or two base branches.
+  useEffect(() => {
+    if (!repoPath || !currentLogin) return;
+    const baseRefs = new Set(pulls.map((p) => p.base_ref));
+    for (const baseRef of baseRefs) prefetchMergeSettings(repoPath, currentLogin, baseRef);
+  }, [repoPath, currentLogin, pulls]);
 
   if (!repoPath) return null;
 
@@ -96,25 +104,19 @@ export function PRTab() {
   return (
     <div className="flex h-full min-w-0 flex-1">
       <div style={{ width }} className="flex shrink-0 flex-col border-r border-border">
-        <div className="flex shrink-0 items-center justify-between border-b border-border p-2">
-          <div className="flex gap-1">
-            {FILTERS.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => setFilter(f.key)}
-                className={cn(
-                  "rounded-md px-2 py-1 text-xs hover:bg-accent",
-                  filter === f.key && "bg-accent font-medium",
-                )}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-          <Button size="sm" variant="positive" onClick={() => setCreateOpen(true)}>
-            <GitPullRequestCreateArrow className="size-3.5" />
-            Preview PR
-          </Button>
+        <div className="flex shrink-0 items-center gap-1 border-b border-border p-2">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={cn(
+                "rounded-md px-2 py-1 text-xs hover:bg-accent",
+                filter === f.key && "bg-accent font-medium",
+              )}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
         <div className="border-b border-border px-2 py-1 text-xs text-muted-foreground">
           {loading && pulls.length === 0 ? "Loading…" : `${pulls.length} ${filter}`}
@@ -142,7 +144,6 @@ export function PRTab() {
           Select a pull request
         </div>
       )}
-      <CreatePRDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }

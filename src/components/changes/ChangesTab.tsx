@@ -20,6 +20,7 @@ export function ChangesTab() {
   const selectedFileImageDiff = useRepoStore((s) => s.selectedFileImageDiff);
   const selectFile = useRepoStore((s) => s.selectFile);
   const toggleStaged = useRepoStore((s) => s.toggleStaged);
+  const discardFiles = useRepoStore((s) => s.discardFiles);
   const stageHunk = useRepoStore((s) => s.stageHunk);
   const unstageHunk = useRepoStore((s) => s.unstageHunk);
   const discardHunk = useRepoStore((s) => s.discardHunk);
@@ -86,6 +87,8 @@ export function ChangesTab() {
                 selectedPath={selectedFilePath}
                 onSelect={(path) => void selectFile(path)}
                 onToggle={(path, staged) => void toggleStaged([path], staged)}
+                onToggleMany={(paths, staged) => void toggleStaged(paths, staged)}
+                onDiscardMany={(paths) => void discardFiles(paths)}
               />
             </div>
           </>

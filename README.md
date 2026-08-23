@@ -35,12 +35,16 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 
 - [ ] Auto-updater
 - [X] Bring uncommitted changes to other branch feature
-- [ ] PR quick link on current branch
-- [ ] GitHub profile pictures in commit history
-- [ ] Delete branch on remote feature
+- [X] PR quick link on current branch
+- [X] GitHub profile pictures in commit history
+- [X] Delete branch on remote feature
 - [ ] Pop-out merge conflict resolution editor
 - [ ] Settings redesign
-- [ ] Open File in Editor
+- [X] Open File in Editor
+- [ ] Better PR viewer (comments, files, commits) like on GitHub
+- [ ] Move to TanStack Query
+- [ ] Live-syncing with git provider (PRs, commits etc)
+- [ ] Improve git blame view
 - [ ] ...and more to come
 
 ## Features
