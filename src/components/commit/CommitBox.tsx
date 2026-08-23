@@ -89,12 +89,14 @@ export function CommitBox() {
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
         }}
+        autoComplete="off"
       />
       <Textarea
         placeholder="Description"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         rows={3}
+        autoComplete="off"
       />
       {protectedWarning && (
         <div className="flex items-center gap-1.5 rounded-md bg-accent-yellow/10 px-2 py-1 text-xs text-accent-yellow">
