@@ -794,6 +794,15 @@ async fn has_upstream_remote(repo_path: String) -> bool {
         .unwrap_or(false)
 }
 
+/// Host and best-effort web URL for a repo's `origin` remote, regardless of which forge it's
+/// hosted on (GitHub, GitLab, Bitbucket, self-hosted, ...).
+#[tauri::command]
+async fn remote_web_info(repo_path: String) -> Option<(String, String)> {
+    tauri::async_runtime::spawn_blocking(move || config::remote_web_info(&repo_path))
+        .await
+        .unwrap_or(None)
+}
+
 #[tauri::command]
 async fn get_upstream_ahead_behind(
     repo_path: String,
@@ -1471,6 +1480,7 @@ pub fn run() {
             git_clone,
             get_ahead_behind,
             has_upstream_remote,
+            remote_web_info,
             get_upstream_ahead_behind,
             sync_upstream,
             checkout_pull_request,
