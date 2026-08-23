@@ -113,3 +113,38 @@ pub fn get_commit_image_diff(repo_path: &str, oid: &str, path: &str) -> Result<I
         new: new_blob,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_image_path_matches_known_extensions() {
+        assert!(is_image_path("foo.png"));
+        assert!(is_image_path("dir/nested/logo.SVG"));
+        assert!(is_image_path("icon.ICO"));
+        assert!(is_image_path("photo.jpeg"));
+    }
+
+    #[test]
+    fn is_image_path_rejects_non_images() {
+        assert!(!is_image_path("main.rs"));
+        assert!(!is_image_path("README"));
+        assert!(!is_image_path("archive.tar.gz"));
+        assert!(!is_image_path(""));
+    }
+
+    #[test]
+    fn mime_for_maps_known_extensions() {
+        assert_eq!(mime_for("a.png"), "image/png");
+        assert_eq!(mime_for("a.jpg"), "image/jpeg");
+        assert_eq!(mime_for("a.JPEG"), "image/jpeg");
+        assert_eq!(mime_for("a.svg"), "image/svg+xml");
+    }
+
+    #[test]
+    fn mime_for_falls_back_for_unknown_extensions() {
+        assert_eq!(mime_for("a.psd"), "application/octet-stream");
+        assert_eq!(mime_for("noext"), "application/octet-stream");
+    }
+}

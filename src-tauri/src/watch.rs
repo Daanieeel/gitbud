@@ -56,3 +56,45 @@ pub fn start_watching(app: AppHandle, repo_path: String) -> Result<RecommendedWa
 
     Ok(watcher)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use notify::EventKind;
+    use std::path::PathBuf;
+
+    fn event_for(paths: &[&str]) -> Event {
+        let mut event = Event::new(EventKind::Any);
+        event.paths = paths.iter().map(PathBuf::from).collect();
+        event
+    }
+
+    #[test]
+    fn lock_files_are_noise() {
+        assert!(is_noise(&event_for(&["/repo/.git/index.lock"])));
+    }
+
+    #[test]
+    fn loose_objects_are_noise() {
+        assert!(is_noise(&event_for(&["/repo/.git/objects/ab/cdef1234"])));
+    }
+
+    #[test]
+    fn tracked_file_edits_are_not_noise() {
+        assert!(!is_noise(&event_for(&["/repo/src/main.rs"])));
+    }
+
+    #[test]
+    fn ref_and_head_updates_are_not_noise() {
+        assert!(!is_noise(&event_for(&["/repo/.git/HEAD"])));
+        assert!(!is_noise(&event_for(&["/repo/.git/refs/heads/main"])));
+    }
+
+    #[test]
+    fn mixed_event_is_noise_only_if_every_path_is_noise() {
+        assert!(!is_noise(&event_for(&[
+            "/repo/.git/objects/ab/cdef1234",
+            "/repo/src/main.rs",
+        ])));
+    }
+}
