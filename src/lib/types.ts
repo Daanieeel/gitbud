@@ -66,9 +66,26 @@ export interface CommitEntry {
   author_email: string;
   timestamp: number;
   parent_ids: string[];
+  unpushed: boolean;
   lane: number;
   parent_lanes: number[];
   active_lanes: number[];
+}
+
+export interface CommitAuthor {
+  name: string;
+  email: string;
+}
+
+export interface CommitDetail {
+  oid: string;
+  short_oid: string;
+  summary: string;
+  description: string;
+  authors: CommitAuthor[];
+  timestamp: number;
+  insertions: number;
+  deletions: number;
 }
 
 export interface CommitSearchResult {
@@ -95,7 +112,7 @@ export interface BlameLine {
 
 export interface RebaseTodoItem {
   oid: string;
-  action: "pick" | "squash" | "drop";
+  action: "pick" | "squash" | "fixup" | "drop";
 }
 
 export interface RebaseResult {
@@ -193,6 +210,7 @@ export interface CherryPickResult {
 export type ThemeMode = "light" | "dark" | "system";
 export type PullStrategy = "merge" | "rebase" | "ff-only";
 export type DiffViewMode = "unified" | "split";
+export type DiffAlgorithm = "myers" | "minimal" | "patience";
 export type SidebarSort = "name" | "recent" | "group" | "manual";
 
 export interface Settings {
@@ -205,6 +223,7 @@ export interface Settings {
   diff_view: DiffViewMode;
   ignore_whitespace: boolean;
   diff_font_size: number;
+  diff_algorithm: DiffAlgorithm;
   show_ahead_behind: boolean;
   sidebar_sort: SidebarSort;
   auto_stage_new_changes: boolean;

@@ -13,8 +13,7 @@ export const SELECTED_PR_POLL_MS = 10_000;
 export const BACKGROUND_PR_POLL_MS = 60_000;
 
 /** Whether the Pull Requests tab is the active tab — CI polling only ever runs there; switching
- * to Changes/History stops it (watched-PR desktop notifications are a separate, independent
- * background poll — see useProviderSync — and keep working from any tab). */
+ * to Changes/History stops it. */
 export function useIsPrTabActive(): boolean {
   return useRepoStore((s) => s.activeTab === "pulls");
 }

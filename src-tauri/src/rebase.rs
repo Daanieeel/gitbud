@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RebaseTodoItem {
     pub oid: String,
-    /// "pick" | "squash" | "drop"
+    /// "pick" | "squash" | "fixup" | "drop"
     pub action: String,
 }
 
@@ -85,17 +85,21 @@ pub fn interactive_rebase(
         let tree_id = index.write_tree().map_err(|e| e.message().to_string())?;
         let tree = repo.find_tree(tree_id).map_err(|e| e.message().to_string())?;
 
-        if item.action == "squash" {
+        if item.action == "squash" || item.action == "fixup" {
             let Some(prev_oid) = previous_commit_for_squash else {
                 rollback(&repo)?;
-                return Err("cannot squash: no preceding commit to squash into".to_string());
+                return Err(format!("cannot {}: no preceding commit to combine into", item.action));
             };
             let prev_commit = repo.find_commit(prev_oid).map_err(|e| e.message().to_string())?;
-            let combined_message = format!(
-                "{}\n\n{}",
-                prev_commit.message().unwrap_or(""),
-                commit.message().unwrap_or("")
-            );
+            // "squash" combines both messages (like `git commit --squash`, editable at the end);
+            // "fixup" keeps only the target's message and discards this commit's, matching
+            // `git commit --fixup`'s whole point — the fixup commit's own message is usually
+            // just "fixup! <target>" and not worth keeping.
+            let combined_message = if item.action == "squash" {
+                format!("{}\n\n{}", prev_commit.message().unwrap_or(""), commit.message().unwrap_or(""))
+            } else {
+                prev_commit.message().unwrap_or("").to_string()
+            };
             let new_oid = prev_commit
                 .amend(
                     Some(&branch_ref_name),
@@ -244,6 +248,33 @@ mod tests {
         let log = crate::history::get_log(&repo_path, 10, 0).unwrap();
         assert_eq!(log.len(), 2); // base + one squashed commit
         assert!(log[0].summary.contains("add a"));
+        assert!(scratch.path.join("a.txt").exists());
+        assert!(scratch.path.join("b.txt").exists());
+    }
+
+    #[test]
+    fn fixup_keeps_only_the_targets_message() {
+        let scratch = ScratchRepo::new("fixup");
+        let repo_path = scratch.path_str();
+        let base = scratch.write_and_commit("base.txt", "base\n", "base");
+        let first = scratch.write_and_commit("a.txt", "a\n", "add a");
+        std::fs::write(scratch.path.join("b.txt"), "b\n").unwrap();
+        crate::repo::stage_paths(&repo_path, &["b.txt".to_string()]).unwrap();
+        let second = crate::repo::create_fixup_commit(&repo_path, &first).unwrap();
+
+        let entries = crate::history::get_log(&repo_path, 10, 0).unwrap();
+        assert_eq!(entries[0].summary, "fixup! add a");
+
+        let todo = vec![
+            RebaseTodoItem { oid: first, action: "pick".to_string() },
+            RebaseTodoItem { oid: second, action: "fixup".to_string() },
+        ];
+        let result = interactive_rebase(&repo_path, &base, &todo).unwrap();
+        assert!(result.success);
+
+        let log = crate::history::get_log(&repo_path, 10, 0).unwrap();
+        assert_eq!(log.len(), 2); // base + one combined commit
+        assert_eq!(log[0].summary, "add a");
         assert!(scratch.path.join("a.txt").exists());
         assert!(scratch.path.join("b.txt").exists());
     }

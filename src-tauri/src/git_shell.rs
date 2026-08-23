@@ -254,15 +254,32 @@ pub fn fetch(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), Str
     run_streaming(app, Some(repo_path), &["fetch", "--prune", "--progress"], event_id)
 }
 
-pub fn pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
+fn pull_args(strategy: crate::settings::PullStrategy) -> &'static [&'static str] {
     use crate::settings::PullStrategy;
-    let strategy = crate::settings::get_settings().map(|s| s.pull_strategy).unwrap_or(PullStrategy::Merge);
-    let args: &[&str] = match strategy {
+    match strategy {
         PullStrategy::Merge => &["pull", "--progress"],
         PullStrategy::Rebase => &["pull", "--rebase", "--progress"],
         PullStrategy::FfOnly => &["pull", "--ff-only", "--progress"],
-    };
-    run_streaming(app, Some(repo_path), args, event_id)
+    }
+}
+
+pub fn pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
+    let strategy = crate::settings::get_settings()
+        .map(|s| s.pull_strategy)
+        .unwrap_or(crate::settings::PullStrategy::Merge);
+    run_streaming(app, Some(repo_path), pull_args(strategy), event_id)
+}
+
+/// Pulls with an explicit, one-off strategy rather than the user's configured default — used to
+/// resolve a `--ff-only` pull that failed because the branches have diverged: the user picks
+/// merge or rebase right there instead of it just failing with no way forward from the UI.
+pub fn pull_with_strategy(
+    app: &AppHandle,
+    repo_path: &str,
+    event_id: &str,
+    strategy: crate::settings::PullStrategy,
+) -> Result<(), String> {
+    run_streaming(app, Some(repo_path), pull_args(strategy), event_id)
 }
 
 /// Aborts a pull that resulted in a conflict, restoring the working tree to exactly how it was

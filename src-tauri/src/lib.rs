@@ -104,6 +104,13 @@ async fn discard_file(repo_path: String, path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn add_to_gitignore(repo_path: String, paths: Vec<String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || repo::add_to_gitignore(&repo_path, &paths))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn resolve_conflict(repo_path: String, path: String, side: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || repo::resolve_conflict(&repo_path, &path, &side))
         .await
@@ -127,8 +134,32 @@ async fn stage_hunk(repo_path: String, path: String, hunk_index: usize) -> Resul
 }
 
 #[tauri::command]
+async fn stage_hunk_lines(
+    repo_path: String,
+    path: String,
+    hunk_index: usize,
+    line_indices: Vec<usize>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || hunk::stage_hunk_lines(&repo_path, &path, hunk_index, &line_indices))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn unstage_hunk(repo_path: String, path: String, hunk_index: usize) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || hunk::unstage_hunk(&repo_path, &path, hunk_index))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn unstage_hunk_lines(
+    repo_path: String,
+    path: String,
+    hunk_index: usize,
+    line_indices: Vec<usize>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || hunk::unstage_hunk_lines(&repo_path, &path, hunk_index, &line_indices))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -141,8 +172,27 @@ async fn discard_hunk(repo_path: String, path: String, hunk_index: usize) -> Res
 }
 
 #[tauri::command]
+async fn discard_hunk_lines(
+    repo_path: String,
+    path: String,
+    hunk_index: usize,
+    line_indices: Vec<usize>,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || hunk::discard_hunk_lines(&repo_path, &path, hunk_index, &line_indices))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn commit(repo_path: String, summary: String, description: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || repo::commit(&repo_path, &summary, &description))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn create_fixup_commit(repo_path: String, target_oid: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || repo::create_fixup_commit(&repo_path, &target_oid))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -299,6 +349,13 @@ async fn get_commit_image_diff(repo_path: String, oid: String, path: String) -> 
 #[tauri::command]
 async fn get_log(repo_path: String, limit: usize, skip: usize) -> Result<Vec<history::CommitEntry>, String> {
     tauri::async_runtime::spawn_blocking(move || history::get_log(&repo_path, limit, skip))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn get_commit_detail(repo_path: String, oid: String) -> Result<history::CommitDetail, String> {
+    tauri::async_runtime::spawn_blocking(move || history::get_commit_detail(&repo_path, &oid))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -750,6 +807,19 @@ async fn git_pull(app: AppHandle, repo_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn git_pull_with_strategy(
+    app: AppHandle,
+    repo_path: String,
+    strategy: settings::PullStrategy,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_shell::pull_with_strategy(&app, &repo_path, &repo_path, strategy)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn git_abort_pull(app: AppHandle, repo_path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || git_shell::abort_pull(&app, &repo_path, &repo_path))
         .await
@@ -954,6 +1024,17 @@ async fn github_create_pull_request(
 ) -> Result<github::api::PullRequest, String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
     github::api::create_pull_request(&host, &token, &owner, &repo, &title, &head, &base, &body, draft).await
+}
+
+#[tauri::command]
+async fn github_update_pull_request_base(
+    repo_path: String,
+    login: String,
+    number: u64,
+    base: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::update_pull_request_base(&host, &token, &owner, &repo, number, &base).await
 }
 
 #[tauri::command]
@@ -1392,12 +1473,17 @@ pub fn run() {
             stage_paths,
             unstage_paths,
             discard_file,
+            add_to_gitignore,
             resolve_conflict,
             read_working_file,
             stage_hunk,
+            stage_hunk_lines,
             unstage_hunk,
+            unstage_hunk_lines,
             discard_hunk,
+            discard_hunk_lines,
             commit,
+            create_fixup_commit,
             amend_commit,
             undo_last_commit,
             cherry_pick,
@@ -1424,6 +1510,7 @@ pub fn run() {
             get_image_diff,
             get_commit_image_diff,
             get_log,
+            get_commit_detail,
             get_branch_commits,
             search_commits,
             list_tags,
@@ -1474,6 +1561,7 @@ pub fn run() {
             init_repo,
             git_fetch,
             git_pull,
+            git_pull_with_strategy,
             git_abort_pull,
             git_push,
             cancel_git_operation,
@@ -1508,6 +1596,7 @@ pub fn run() {
             github_list_pull_requests,
             github_get_pull_request,
             github_create_pull_request,
+            github_update_pull_request_base,
             github_list_labels,
             github_list_assignable_users,
             github_add_labels,

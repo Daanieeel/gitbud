@@ -6,6 +6,7 @@ import type {
   BranchInfo,
   CheckRun,
   CherryPickResult,
+  CommitDetail,
   CommitEntry,
   ConflictSides,
   CommitSearchResult,
@@ -55,6 +56,7 @@ export const api = {
   unstagePaths: (repoPath: string, paths: string[]) =>
     invoke<void>("unstage_paths", { repoPath, paths }),
   discardFile: (repoPath: string, path: string) => invoke<void>("discard_file", { repoPath, path }),
+  addToGitignore: (repoPath: string, paths: string[]) => invoke<void>("add_to_gitignore", { repoPath, paths }),
   resolveConflict: (repoPath: string, path: string, side: "ours" | "theirs") =>
     invoke<void>("resolve_conflict", { repoPath, path, side }),
   getConflictSides: (repoPath: string, path: string) =>
@@ -75,12 +77,20 @@ export const api = {
     invoke<string>("read_working_file", { repoPath, path }),
   stageHunk: (repoPath: string, path: string, hunkIndex: number) =>
     invoke<void>("stage_hunk", { repoPath, path, hunkIndex }),
+  stageHunkLines: (repoPath: string, path: string, hunkIndex: number, lineIndices: number[]) =>
+    invoke<void>("stage_hunk_lines", { repoPath, path, hunkIndex, lineIndices }),
   unstageHunk: (repoPath: string, path: string, hunkIndex: number) =>
     invoke<void>("unstage_hunk", { repoPath, path, hunkIndex }),
+  unstageHunkLines: (repoPath: string, path: string, hunkIndex: number, lineIndices: number[]) =>
+    invoke<void>("unstage_hunk_lines", { repoPath, path, hunkIndex, lineIndices }),
   discardHunk: (repoPath: string, path: string, hunkIndex: number) =>
     invoke<void>("discard_hunk", { repoPath, path, hunkIndex }),
+  discardHunkLines: (repoPath: string, path: string, hunkIndex: number, lineIndices: number[]) =>
+    invoke<void>("discard_hunk_lines", { repoPath, path, hunkIndex, lineIndices }),
   commit: (repoPath: string, summary: string, description: string) =>
     invoke<string>("commit", { repoPath, summary, description }),
+  createFixupCommit: (repoPath: string, targetOid: string) =>
+    invoke<string>("create_fixup_commit", { repoPath, targetOid }),
   amendCommit: (repoPath: string, summary: string, description: string) =>
     invoke<string>("amend_commit", { repoPath, summary, description }),
   undoLastCommit: (repoPath: string) => invoke<[string, string]>("undo_last_commit", { repoPath }),
@@ -116,6 +126,8 @@ export const api = {
     invoke<FileDiff>("get_file_diff", { repoPath, path, staged }),
   getCommitFiles: (repoPath: string, oid: string) =>
     invoke<[string, string][]>("get_commit_files", { repoPath, oid }),
+  getCommitDetail: (repoPath: string, oid: string) =>
+    invoke<CommitDetail>("get_commit_detail", { repoPath, oid }),
   getCommitFileDiff: (repoPath: string, oid: string, path: string) =>
     invoke<FileDiff>("get_commit_file_diff", { repoPath, oid, path }),
   getBranchDiffFiles: (repoPath: string, base: string, head: string) =>
@@ -203,6 +215,8 @@ export const api = {
 
   gitFetch: (repoPath: string) => invoke<void>("git_fetch", { repoPath }),
   gitPull: (repoPath: string) => invoke<void>("git_pull", { repoPath }),
+  gitPullWithStrategy: (repoPath: string, strategy: "merge" | "rebase") =>
+    invoke<void>("git_pull_with_strategy", { repoPath, strategy }),
   gitAbortPull: (repoPath: string) => invoke<void>("git_abort_pull", { repoPath }),
   gitPush: (repoPath: string) => invoke<void>("git_push", { repoPath }),
   gitClone: (url: string, dest: string) => invoke<void>("git_clone", { url, dest }),
@@ -270,6 +284,8 @@ export const api = {
       draft,
     }),
   readPrTemplate: (repoPath: string) => invoke<string | null>("read_pr_template", { repoPath }),
+  githubUpdatePullRequestBase: (repoPath: string, login: string, number: number, base: string) =>
+    invoke<void>("github_update_pull_request_base", { repoPath, login, number, base }),
   githubListLabels: (repoPath: string, login: string) =>
     invoke<Label[]>("github_list_labels", { repoPath, login }),
   githubListAssignableUsers: (repoPath: string, login: string) =>

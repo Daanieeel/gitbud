@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ChevronsUpDownIcon,
   CloudUploadIcon,
@@ -61,6 +61,7 @@ export function BranchSwitcher() {
 
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
+  const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameRemote, setRenameRemote] = useState(false);
@@ -87,6 +88,15 @@ export function BranchSwitcher() {
     () => branches.filter((b) => !b.is_remote && b.name.toLowerCase().includes(filter.toLowerCase())),
     [branches, filter],
   );
+  // Typing (or reopening) resets the keyboard highlight back to the top of the list rather
+  // than leaving it wherever it was, matching standard combobox behavior.
+  useEffect(() => {
+    setHighlightedIndex(0);
+  }, [filter, open]);
+  const highlightedRowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  useEffect(() => {
+    highlightedRowRefs.current.get(highlightedIndex)?.scrollIntoView({ block: "nearest" });
+  }, [highlightedIndex]);
   // Unfiltered (unlike `local`, above) — deciding whether delete should be disabled at all, or
   // which branch to fall back to, must not depend on whatever the user's typed into the search box.
   const allLocalBranches = useMemo(() => branches.filter((b) => !b.is_remote), [branches]);
@@ -270,25 +280,38 @@ export function BranchSwitcher() {
             autoComplete="off"
             placeholder="Find or create branch"
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => setFilter(e.target.value.replace(/\s/g, "-"))}
             onKeyDown={(e) => {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                const lastIndex = local.length - 1;
+                if (lastIndex < 0) return;
+                setHighlightedIndex((i) =>
+                  e.key === "ArrowDown" ? Math.min(i + 1, lastIndex) : Math.max(i - 1, 0),
+                );
+                return;
+              }
               if (e.key !== "Enter") return;
-              const name = filter.trim();
-              if (!name) return;
-              if (exactMatch) void doCheckout(name);
-              else void doCreate(name);
+              const highlighted = local[highlightedIndex];
+              if (highlighted) void doCheckout(highlighted.name);
+              else if (canCreate) void doCreate(filter.trim());
             }}
             className="h-7"
           />
         </div>
         <div className="flex max-h-64 flex-col gap-1 overflow-auto p-1">
-          {local.map((b) => (
+          {local.map((b, index) => (
               <ContextMenu key={b.name}>
                 <ContextMenuTrigger asChild>
                   <div
+                    ref={(el) => {
+                      if (el) highlightedRowRefs.current.set(index, el);
+                      else highlightedRowRefs.current.delete(index);
+                    }}
                     className={cn(
                       "flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
                       b.is_head && "bg-accent",
+                      index === highlightedIndex && "ring-1 ring-inset ring-primary",
                     )}
                     onClick={() => void doCheckout(b.name)}
                   >

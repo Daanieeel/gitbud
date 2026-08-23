@@ -227,10 +227,75 @@ pub fn create_branch_at(
     Ok(())
 }
 
+/// Finds unstaged-rename pairs (a workdir path git2 would pair with a different index path)
+/// via `renames_index_to_workdir` detection, so callers can stage/unstage both halves of a
+/// move together — staging only one half would leave the other tracked unchanged in the
+/// index, splitting what should be a single rename back into a separate add + delete on the
+/// next status read.
+fn find_index_to_workdir_rename_pairs(repo: &Repository) -> Result<Vec<(String, String)>, String> {
+    let mut opts = StatusOptions::new();
+    opts.include_untracked(true)
+        .recurse_untracked_dirs(true)
+        .renames_index_to_workdir(true);
+    let statuses = repo.statuses(Some(&mut opts)).map_err(|e| e.message().to_string())?;
+
+    let mut pairs = Vec::new();
+    for entry in statuses.iter() {
+        let Some(diff) = entry.index_to_workdir() else { continue };
+        let (Some(new_p), Some(old_p)) = (diff.new_file().path(), diff.old_file().path()) else {
+            continue;
+        };
+        let new_p = new_p.to_string_lossy().to_string();
+        let old_p = old_p.to_string_lossy().to_string();
+        if new_p != old_p {
+            pairs.push((new_p, old_p));
+        }
+    }
+    Ok(pairs)
+}
+
+/// Same as above but for the staged (HEAD-vs-index) side, via `renames_head_to_index`.
+fn find_head_to_index_rename_pairs(repo: &Repository) -> Result<Vec<(String, String)>, String> {
+    let mut opts = StatusOptions::new();
+    opts.renames_head_to_index(true);
+    let statuses = repo.statuses(Some(&mut opts)).map_err(|e| e.message().to_string())?;
+
+    let mut pairs = Vec::new();
+    for entry in statuses.iter() {
+        let Some(diff) = entry.head_to_index() else { continue };
+        let (Some(new_p), Some(old_p)) = (diff.new_file().path(), diff.old_file().path()) else {
+            continue;
+        };
+        let new_p = new_p.to_string_lossy().to_string();
+        let old_p = old_p.to_string_lossy().to_string();
+        if new_p != old_p {
+            pairs.push((new_p, old_p));
+        }
+    }
+    Ok(pairs)
+}
+
+/// Expands `paths` to include the other half of any rename pair either path belongs to.
+fn with_rename_partners(paths: &[String], pairs: &[(String, String)]) -> Vec<String> {
+    let mut expanded: Vec<String> = paths.to_vec();
+    for path in paths {
+        if let Some((new_p, old_p)) = pairs.iter().find(|(n, o)| n == path || o == path) {
+            expanded.push(new_p.clone());
+            expanded.push(old_p.clone());
+        }
+    }
+    expanded.sort();
+    expanded.dedup();
+    expanded
+}
+
 pub fn stage_paths(repo_path: &str, paths: &[String]) -> Result<(), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let rename_pairs = find_index_to_workdir_rename_pairs(&repo)?;
+    let paths = with_rename_partners(paths, &rename_pairs);
+
     let mut index = repo.index().map_err(|e| e.message().to_string())?;
-    for path in paths {
+    for path in &paths {
         let full = std::path::Path::new(repo_path).join(path);
         if full.exists() {
             index.add_path(std::path::Path::new(path)).map_err(|e| e.message().to_string())?;
@@ -247,7 +312,9 @@ pub fn unstage_paths(repo_path: &str, paths: &[String]) -> Result<(), String> {
     match head {
         Some(commit) => {
             let obj = commit.as_object();
-            for path in paths {
+            let rename_pairs = find_head_to_index_rename_pairs(&repo)?;
+            let paths = with_rename_partners(paths, &rename_pairs);
+            for path in &paths {
                 repo.reset_default(Some(obj), [std::path::Path::new(path)])
                     .map_err(|e| e.message().to_string())?;
             }
@@ -310,6 +377,33 @@ pub fn discard_file(repo_path: &str, path: &str) -> Result<(), String> {
     }
 }
 
+/// Appends the given paths to the repo's root `.gitignore`, anchored with a leading `/` so
+/// they match only that exact path rather than any same-named file anywhere in the tree.
+/// Paths already present are skipped rather than duplicated.
+pub fn add_to_gitignore(repo_path: &str, paths: &[String]) -> Result<(), String> {
+    let gitignore_path = std::path::Path::new(repo_path).join(".gitignore");
+    let mut content = std::fs::read_to_string(&gitignore_path).unwrap_or_default();
+    let existing: std::collections::HashSet<&str> = content.lines().collect();
+
+    let to_add: Vec<String> = paths
+        .iter()
+        .map(|p| format!("/{p}"))
+        .filter(|entry| !existing.contains(entry.as_str()))
+        .collect();
+    if to_add.is_empty() {
+        return Ok(());
+    }
+
+    if !content.is_empty() && !content.ends_with('\n') {
+        content.push('\n');
+    }
+    for entry in to_add {
+        content.push_str(&entry);
+        content.push('\n');
+    }
+    std::fs::write(&gitignore_path, content).map_err(|e| e.to_string())
+}
+
 /// Resolves a merge conflict on `path` by taking one side wholesale: writes that side's
 /// blob content to the working tree and stages it, clearing the conflict.
 pub fn resolve_conflict(repo_path: &str, path: &str, side: &str) -> Result<(), String> {
@@ -368,6 +462,36 @@ mod tests {
         for f in &status.files {
             assert!(!f.path.is_empty());
         }
+    }
+
+    #[test]
+    fn staging_one_half_of_an_unstaged_rename_stages_both_halves() {
+        let scratch = ScratchRepo::new("rename-stage");
+        let repo_path = scratch.path_str();
+        scratch.write_and_commit(
+            "old_name.txt",
+            "hello world\nthis is a decently long file\nwith several lines\nso similarity detection works\n",
+            "base",
+        );
+        std::fs::rename(scratch.path.join("old_name.txt"), scratch.path.join("new_name.txt")).unwrap();
+
+        // Staging only the new (added) half shouldn't leave the old half fully tracked and
+        // unchanged in the index — that would split the rename back into an add + delete pair.
+        stage_paths(&repo_path, &["new_name.txt".to_string()]).unwrap();
+        let status = get_status(&repo_path).unwrap();
+        assert_eq!(status.files.len(), 1, "rename should stay a single entry: {status:?}");
+        assert_eq!(status.files[0].path, "new_name.txt");
+        assert_eq!(status.files[0].old_path.as_deref(), Some("old_name.txt"));
+        assert_eq!(status.files[0].status, ChangeKind::Renamed);
+        assert!(status.files[0].staged);
+
+        // Unstaging it back should restore the single unstaged rename, not orphan either half.
+        unstage_paths(&repo_path, &["new_name.txt".to_string()]).unwrap();
+        let status = get_status(&repo_path).unwrap();
+        assert_eq!(status.files.len(), 1, "unstage should stay a single entry: {status:?}");
+        assert_eq!(status.files[0].path, "new_name.txt");
+        assert_eq!(status.files[0].old_path.as_deref(), Some("old_name.txt"));
+        assert!(!status.files[0].staged);
     }
 
     #[test]
@@ -568,6 +692,21 @@ mod tests {
         assert_eq!(entry.status, ChangeKind::Modified);
         assert!(entry.staged);
     }
+
+    #[test]
+    fn fixup_commit_message_prefixes_the_targets_summary() {
+        let scratch = ScratchRepo::new("fixup-message");
+        let repo_path = scratch.path_str();
+        let target = scratch.write_and_commit("a.txt", "a\n", "add a feature");
+
+        std::fs::write(scratch.path.join("b.txt"), "b\n").unwrap();
+        stage_paths(&repo_path, &["b.txt".to_string()]).unwrap();
+        let fixup_oid = create_fixup_commit(&repo_path, &target).unwrap();
+
+        let repo = Repository::open(&repo_path).unwrap();
+        let commit = repo.find_commit(git2::Oid::from_str(&fixup_oid).unwrap()).unwrap();
+        assert_eq!(commit.summary(), Some("fixup! add a feature"));
+    }
 }
 
 pub fn commit(repo_path: &str, summary: &str, description: &str) -> Result<String, String> {
@@ -591,6 +730,19 @@ pub fn commit(repo_path: &str, summary: &str, description: &str) -> Result<Strin
         .map_err(|e| e.message().to_string())?;
 
     Ok(oid.to_string())
+}
+
+/// Commits the currently staged changes with a `fixup! <target's summary>` message — same as
+/// `git commit --fixup=<target>`. Pairs with `interactive_rebase`'s "fixup" action and the
+/// frontend's autosquash pass, which recognizes this exact prefix to auto-arrange the commit
+/// right after its target the next time an interactive rebase touches this range.
+pub fn create_fixup_commit(repo_path: &str, target_oid: &str) -> Result<String, String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let target = repo
+        .find_commit(git2::Oid::from_str(target_oid).map_err(|e| e.message().to_string())?)
+        .map_err(|e| e.message().to_string())?;
+    let summary = target.summary().unwrap_or("").to_string();
+    commit(repo_path, &format!("fixup! {summary}"), "")
 }
 
 pub fn amend_commit(repo_path: &str, summary: &str, description: &str) -> Result<String, String> {

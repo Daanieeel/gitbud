@@ -4,6 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
+import { useCommitLog } from "@/hooks/queries/useCommitLog";
 import { usePullRequestList } from "@/hooks/queries/usePullRequests";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
@@ -29,6 +30,15 @@ export function Toolbar() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const { data: branchData } = useBranches(repoPath);
   const branch = branchData?.branch ?? null;
+  const branches = branchData?.branches ?? [];
+  const hasOtherBranch = branches.some((b) => !b.is_remote && b.name !== branch);
+  const { commits } = useCommitLog(repoPath);
+  const hasCommits = commits.length > 0;
+  const previewPrDisabledReason = !hasCommits
+    ? "No commits yet"
+    : !hasOtherBranch
+      ? "No branch to open into"
+      : null;
   const setActiveTab = useRepoStore((s) => s.setActiveTab);
   const selectPR = usePRStore((s) => s.selectPR);
   const [previewPrOpen, setPreviewPrOpen] = useState(false);
@@ -106,16 +116,20 @@ export function Toolbar() {
       {currentLogin && existingPrNumber == null && (
         <Tooltip>
           <TooltipTrigger asChild>
+            {/* Not a real `disabled` attribute: a disabled element receives no pointer events
+             * in most browsers, which would silently prevent the tooltip from showing. */}
             <Button
               variant="positive"
               size="sm"
-              onClick={() => setPreviewPrOpen(true)}
+              aria-disabled={previewPrDisabledReason != null}
+              className={previewPrDisabledReason != null ? "cursor-not-allowed opacity-40" : undefined}
+              onClick={() => previewPrDisabledReason == null && setPreviewPrOpen(true)}
             >
               <GitPullRequestCreateArrow className="size-3.5" />
               Preview PR
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Preview and open a pull request for this branch</TooltipContent>
+          <TooltipContent>{previewPrDisabledReason ?? "Preview and open a pull request for this branch"}</TooltipContent>
         </Tooltip>
       )}
       <SyncButton />

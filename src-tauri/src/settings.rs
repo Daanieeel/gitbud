@@ -25,6 +25,18 @@ pub enum DiffViewMode {
     Split,
 }
 
+/// The three line-diff algorithms libgit2 (which every diff in this app goes through) actually
+/// implements — "histogram" isn't offered because libgit2 itself has no such algorithm; getting
+/// it would mean shelling out to the real `git` CLI for diffing instead, which is a much bigger
+/// change than a diff-algorithm setting.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DiffAlgorithm {
+    Myers,
+    Minimal,
+    Patience,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum SidebarSort {
@@ -51,6 +63,7 @@ pub struct Settings {
     pub diff_view: DiffViewMode,
     pub ignore_whitespace: bool,
     pub diff_font_size: u32,
+    pub diff_algorithm: DiffAlgorithm,
 
     // Sidebar
     pub show_ahead_behind: bool,
@@ -95,6 +108,7 @@ impl Default for Settings {
             diff_view: DiffViewMode::Unified,
             ignore_whitespace: false,
             diff_font_size: 12,
+            diff_algorithm: DiffAlgorithm::Myers,
             show_ahead_behind: true,
             sidebar_sort: SidebarSort::Group,
             auto_stage_new_changes: true,

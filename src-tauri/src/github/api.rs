@@ -433,6 +433,35 @@ pub async fn create_pull_request(
     Ok(raw.into())
 }
 
+#[derive(Debug, Serialize)]
+struct UpdatePrBaseBody<'a> {
+    base: &'a str,
+}
+
+/// Retargets an open PR onto a different base branch — GitHub's merge endpoint always merges
+/// into whatever base is currently set, so changing the target has to happen as its own PATCH
+/// beforehand rather than as part of the merge call itself.
+pub async fn update_pull_request_base(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    base: &str,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}");
+    check(
+        gh.patch(&path)
+            .json(&UpdatePrBaseBody { base })
+            .send()
+            .await
+            .map_err(|e| e.to_string())?,
+    )
+    .await?;
+    Ok(())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Label {
     pub name: String,

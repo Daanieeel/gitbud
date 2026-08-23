@@ -18,6 +18,7 @@ import {
 } from "@/hooks/queries/useStashes";
 import { cn } from "@/lib/utils";
 import { FileTypeIcon } from "@/lib/file-icons";
+import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "./FilePathLabel";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
@@ -39,19 +40,6 @@ function parseStashMessage(message: string): { branch: string | null; descriptio
   if (labeled) return { branch: labeled[1], description: labeled[2] };
   return { branch: null, description: message };
 }
-
-// Same git2 Delta status names getCommitFiles returns for the History tab (a stash is just
-// a commit under the hood), so the same status-color mapping applies here.
-const STASH_STATUS_DOT_COLOR: Record<string, string> = {
-  Added: "bg-accent-green",
-  Untracked: "bg-accent-green",
-  Copied: "bg-accent-green",
-  Modified: "bg-accent-green",
-  Deleted: "bg-accent-pink",
-  Renamed: "bg-muted-foreground",
-  Typechange: "bg-muted-foreground",
-  Conflicted: "bg-destructive",
-};
 
 function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
@@ -107,16 +95,9 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
                   className="flex min-w-0 flex-1 cursor-pointer items-center gap-2"
                   onClick={() => setSelectedPath(path)}
                 >
-                  <span className="relative shrink-0">
-                    <FileTypeIcon path={path} className="size-3.5" />
-                    <span
-                      className={cn(
-                        "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                        STASH_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
-                      )}
-                    />
-                  </span>
+                  <FileTypeIcon path={path} className="size-3.5 shrink-0" />
                   <FilePathLabel path={path} />
+                  <FileStatusIcon status={status} className="size-3.5" />
                 </span>
               </TooltipTrigger>
               <TooltipContent>{`${path} (${status})`}</TooltipContent>

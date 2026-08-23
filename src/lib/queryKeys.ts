@@ -17,6 +17,7 @@ export const queryKeys = {
   stashFileDiff: (repoPath: string, index: number, path: string) =>
     ["repo", repoPath, "stash-file-diff", index, path] as const,
   fileDiff: (repoPath: string, path: string) => ["repo", repoPath, "file-diff", path] as const,
+  commitDetail: (repoPath: string, oid: string) => ["repo", repoPath, "commit-detail", oid] as const,
   commitFiles: (repoPath: string, oid: string) => ["repo", repoPath, "commit-files", oid] as const,
   commitFileDiff: (repoPath: string, oid: string, path: string) =>
     ["repo", repoPath, "commit-file-diff", oid, path] as const,

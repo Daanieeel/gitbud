@@ -1,7 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from "react";
+import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import {
-  BellIcon,
-  BellRingIcon,
   GitPullRequestIcon,
   GitPullRequestDraftIcon,
   GitPullRequestClosedIcon,
@@ -11,10 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { PullRequest } from "@/lib/types";
-import { usePRStore } from "@/store/usePRStore";
 import { prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
 import { CIBadge } from "./CIBadge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type PRStatus = "merged" | "draft" | "closed" | "open";
@@ -54,8 +51,6 @@ interface PRListProps {
 
 export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMore, loadingMore, onLoadMore, onSelect }: PRListProps) {
   const [filter, setFilter] = useState("");
-  const watched = usePRStore((s) => s.watched);
-  const toggleWatch = usePRStore((s) => s.toggleWatch);
   const isPrTabActive = useIsPrTabActive();
 
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -86,6 +81,24 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
     );
   }, [pulls, filter]);
 
+  const listRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const numberKeys = useMemo(() => filtered.map((p) => String(p.number)), [filtered]);
+  const handleArrowNav = useArrowKeyFileNav(
+    numberKeys,
+    selectedNumber !== null ? String(selectedNumber) : null,
+    (key) => onSelect(Number(key)),
+  );
+
+  useEffect(() => {
+    if (selectedNumber === null) return;
+    rowRefs.current.get(selectedNumber)?.scrollIntoView({ block: "nearest" });
+  }, [selectedNumber]);
+
+  useEffect(() => {
+    listRef.current?.focus();
+  }, []);
+
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0 border-b border-border p-2">
@@ -96,7 +109,12 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
           className="h-7"
         />
       </div>
-      <div className="min-h-0 flex-1 overflow-auto">
+      <div
+        ref={listRef}
+        tabIndex={0}
+        onKeyDown={handleArrowNav}
+        className="min-h-0 flex-1 overflow-auto outline-none"
+      >
         {loading && pulls.length === 0 ? (
           <div className="flex flex-col">
             {Array.from({ length: 10 }).map((_, i) => (
@@ -118,6 +136,10 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
             return (
               <div
                 key={pr.number}
+                ref={(el) => {
+                  if (el) rowRefs.current.set(pr.number, el);
+                  else rowRefs.current.delete(pr.number);
+                }}
                 className={cn(
                   "flex cursor-pointer items-start gap-2 border-b border-border/50 px-2 py-2 text-sm hover:bg-accent",
                   selectedNumber === pr.number && "bg-accent",
@@ -138,31 +160,6 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
                       sha={pr.head_sha}
                       pollIntervalMs={prPollIntervalMs(pr, isPrTabActive, pr.number === selectedNumber)}
                     />
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleWatch(pr.number);
-                          }}
-                          className={cn(
-                            "text-muted-foreground hover:text-foreground",
-                            watched.includes(pr.number) && "text-accent-yellow",
-                          )}
-                        >
-                          {watched.includes(pr.number) ? (
-                            <BellRingIcon className="size-3" />
-                          ) : (
-                            <BellIcon className="size-3" />
-                          )}
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        {watched.includes(pr.number)
-                          ? "Stop notifying me when CI status changes"
-                          : "Notify me when CI status changes"}
-                      </TooltipContent>
-                    </Tooltip>
                     {pr.merged && (
                       <span className="rounded bg-accent-purple/20 px-1 text-accent-purple">merged</span>
                     )}

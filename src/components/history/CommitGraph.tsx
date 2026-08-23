@@ -15,15 +15,23 @@ function laneColor(lane: number): string {
   return LANE_COLORS[lane % LANE_COLORS.length];
 }
 
+const MERGE_BUMP_WIDTH = 10;
+
 interface CommitGraphProps {
   commit: CommitEntry;
   prevActiveLanes: number[] | undefined;
   laneCount: number;
   rowHeight: number;
+  /** Compact mode: only the mainline (lane 0) is ever drawn, so a merge commit gets a small
+   * decorative bump instead of a real edge into another lane — there's no other lane to draw. */
+  compact?: boolean;
 }
 
-export function CommitGraph({ commit, prevActiveLanes, laneCount, rowHeight }: CommitGraphProps) {
-  const width = Math.max(laneCount, commit.lane + 1) * LANE_WIDTH + LANE_WIDTH / 2;
+export function CommitGraph({ commit, prevActiveLanes, laneCount, rowHeight, compact }: CommitGraphProps) {
+  const isMerge = commit.parent_ids.length > 1;
+  const width = compact
+    ? LANE_WIDTH + (isMerge ? MERGE_BUMP_WIDTH : 0)
+    : Math.max(laneCount, commit.lane + 1) * LANE_WIDTH + LANE_WIDTH / 2;
   const midY = rowHeight / 2;
   const x = (lane: number) => lane * LANE_WIDTH + LANE_WIDTH / 2;
 
@@ -75,7 +83,33 @@ export function CommitGraph({ commit, prevActiveLanes, laneCount, rowHeight }: C
         />
       ))}
 
-      <circle cx={x(commit.lane)} cy={midY} r={DOT_RADIUS} fill={laneColor(commit.lane)} />
+      {/* Unpushed commits render as a hollow dot rather than the usual solid fill — the same
+       * convention other git clients use to distinguish local-only commits at a glance. */}
+      {commit.unpushed ? (
+        <circle
+          cx={x(commit.lane)}
+          cy={midY}
+          r={DOT_RADIUS - 0.75}
+          fill="var(--background)"
+          stroke={laneColor(commit.lane)}
+          strokeWidth={1.5}
+        />
+      ) : (
+        <circle cx={x(commit.lane)} cy={midY} r={DOT_RADIUS} fill={laneColor(commit.lane)} />
+      )}
+
+      {/* Compact mode collapses every merged-in branch out of the graph entirely, so a merge
+       * commit gets this decorative bump — signaling "something merged in here" — instead of a
+       * real edge into a lane that no longer exists. */}
+      {compact && isMerge && (
+        <path
+          d={`M ${x(0)} ${midY - 6} C ${x(0) + MERGE_BUMP_WIDTH} ${midY - 6}, ${x(0) + MERGE_BUMP_WIDTH} ${midY + 6}, ${x(0)} ${midY + 6}`}
+          fill="none"
+          stroke={laneColor(1)}
+          strokeWidth={1.5}
+          opacity={0.6}
+        />
+      )}
     </svg>
   );
 }

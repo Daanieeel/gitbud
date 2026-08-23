@@ -50,7 +50,7 @@ export function CreateBranchAtDialog({ oid, onOpenChange }: CreateBranchAtDialog
           autoFocus
           placeholder="Branch name"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => setName(e.target.value.replace(/\s/g, "-"))}
           onKeyDown={(e) => e.key === "Enter" && void submit()}
         />
         <CheckboxGroup

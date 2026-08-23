@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS: Settings = {
   diff_view: "unified",
   ignore_whitespace: false,
   diff_font_size: 12,
+  diff_algorithm: "myers",
   show_ahead_behind: true,
   sidebar_sort: "group",
   auto_stage_new_changes: true,

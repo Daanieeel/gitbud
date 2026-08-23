@@ -125,6 +125,10 @@ export function ChangesTab() {
                     staged: false,
                     onStage: (i) => stageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
                     onDiscard: (i) => discardHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
+                    onStageLines: (i, lineIndices) =>
+                      stageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i, lineIndices }),
+                    onDiscardLines: (i, lineIndices) =>
+                      discardHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i, lineIndices }),
                   }
                 : undefined
             }
@@ -133,6 +137,8 @@ export function ChangesTab() {
                 ? {
                     staged: true,
                     onUnstage: (i) => unstageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
+                    onUnstageLines: (i, lineIndices) =>
+                      unstageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i, lineIndices }),
                   }
                 : undefined
             }

@@ -2,16 +2,13 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
-import { overallFrom, type Overall } from "@/components/pr/CIBadge";
-import { notify } from "@/lib/notify";
 import { useNetworkStore } from "@/store/useNetworkStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useRepoSyncing } from "@/hooks/queries/useGitSync";
-import type { PullRequest } from "@/lib/types";
 
-// The open-PR list and watched-PR CI checks are cheap REST GETs — poll them fast right after
-// opening the app or switching repos (when "did anything change" is most likely to matter and
-// most worth answering quickly), then back off in two steps as that stops being freshly true.
+// The open-PR list refresh is a cheap REST GET — poll it fast right after opening the app or
+// switching repos (when "did anything change" is most likely to matter and most worth
+// answering quickly), then back off in two steps as that stops being freshly true.
 // Tiers checked in order — the first one whose `maxElapsedMs` the elapsed time is still under
 // wins. The last tier's `maxElapsedMs` is Infinity so there's always a match.
 const POLL_TIERS: { maxElapsedMs: number; intervalMs: number }[] = [
@@ -34,7 +31,7 @@ function isWindowVisible() {
  * reads straight off the local .git). This is the one place that reaches out on a timer to catch
  * what local-first can't see: what a teammate pushed.
  *
- * Three things, all paused while the window isn't visible (minimized/backgrounded/another tab
+ * Two things, both paused while the window isn't visible (minimized/backgrounded/another tab
  * costs nothing) and refreshed once immediately on becoming visible again:
  *  - a silent `git fetch` for the selected repo, updating remote-tracking refs so ahead/behind
  *    counts and the remote branch list reflect what's actually on origin — never touches the
@@ -42,33 +39,21 @@ function isWindowVisible() {
  *    own constant, slow interval — see FETCH_INTERVAL_MS above for why.
  *  - a refresh of the (already-cached) open-PR list, so a new PR or a new commit pushed to an
  *    existing one shows up without needing to leave and reopen the PR tab
- *  - CI status for watched (starred) PRs, unchanged from before — the desktop-notification
- *    trigger for "a PR I'm watching just went green/red"
- * The latter two share a three-tier schedule (see constants above — 5s for the first 3 minutes,
- * 30s for the next 30, 60s after that), reset whenever this repo/login is (re)selected — not on
- * every window refocus, so alt-tabbing back and forth doesn't perpetually re-arm the fast
- * interval. A plain refocus still gets one immediate refresh of all three (via the
- * visibilitychange listener below), just not a sustained fast window.
+ * This shares a three-tier schedule (see constants above — 5s for the first 3 minutes, 30s for
+ * the next 30, 60s after that), reset whenever this repo/login is (re)selected — not on every
+ * window refocus, so alt-tabbing back and forth doesn't perpetually re-arm the fast interval. A
+ * plain refocus still gets one immediate refresh of both (via the visibilitychange listener
+ * below), just not a sustained fast window.
  *
  * Skips its own fetch step entirely while a manual sync (the toolbar's fetch/pull/push/sync
  * button) is already running for this repo, so it never races or duplicates that work.
  */
-export function useProviderSync(
-  repoPath: string | null,
-  login: string | null,
-  watched: number[],
-  pulls: PullRequest[],
-) {
+export function useProviderSync(repoPath: string | null, login: string | null) {
   const queryClient = useQueryClient();
-  const previousOverall = useRef<Map<number, Overall>>(new Map());
   const manualSyncInFlight = useRepoSyncing(repoPath);
-  // Interval/visibility setup only needs to happen once per (repoPath, login) — reading
-  // everything else through refs means a PR list refetch, the user starring another PR, or a
-  // manual sync starting/finishing doesn't tear down and recreate the timers.
-  const watchedRef = useRef(watched);
-  watchedRef.current = watched;
-  const pullsRef = useRef(pulls);
-  pullsRef.current = pulls;
+  // Interval/visibility setup only needs to happen once per (repoPath, login) — reading this
+  // through a ref means a manual sync starting/finishing doesn't tear down and recreate the
+  // timers.
   const manualSyncRef = useRef(manualSyncInFlight);
   manualSyncRef.current = manualSyncInFlight;
 
@@ -96,27 +81,9 @@ export function useProviderSync(
       void queryClient.invalidateQueries({ queryKey: queryKeys.prList(repoPath, login, "open") });
     };
 
-    const pollWatchedChecks = async () => {
-      if (!login) return;
-      for (const number of watchedRef.current) {
-        const pr = pullsRef.current.find((p) => p.number === number);
-        if (!pr) continue;
-        const runs = await api.githubListCheckRuns(repoPath, login, pr.head_sha).catch(() => null);
-        if (cancelled || !runs) continue;
-        queryClient.setQueryData(queryKeys.checkRuns(repoPath, login, pr.head_sha), runs);
-        const overall = overallFrom(runs);
-        const previous = previousOverall.current.get(number);
-        if (previous && previous !== overall && (overall === "passing" || overall === "failing")) {
-          void notify(`CI ${overall}: #${number}`, pr.title);
-        }
-        previousOverall.current.set(number, overall);
-      }
-    };
-
     const runCheapCheck = async () => {
       if (cancelled || !isWindowVisible()) return;
       refreshOpenPulls();
-      await pollWatchedChecks();
     };
 
     // Self-rescheduling rather than setInterval, since the delay itself changes (fast → steady)

@@ -4,6 +4,7 @@ import {
   CheckIcon,
   CodeIcon,
   CopyIcon,
+  EyeOffIcon,
   ExternalLinkIcon,
   FolderOpenIcon,
   TerminalIcon,
@@ -14,7 +15,7 @@ import {
 } from "lucide-react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
-import type { ChangeKind, FileEntry } from "@/lib/types";
+import type { FileEntry } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -31,16 +32,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubFileUrl } from "@/lib/github-links";
 import { FileTypeIcon } from "@/lib/file-icons";
+import { FileStatusIcon } from "@/lib/file-status";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
-import { useDiscardFile } from "@/hooks/queries/useRepoStatus";
+import { useAddToGitignore, useDiscardFile } from "@/hooks/queries/useRepoStatus";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
 import { BlameDialog } from "./BlameDialog";
@@ -59,16 +60,6 @@ function formatBytes(bytes: number): string {
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
 }
 
-const STATUS_DOT_COLOR: Record<ChangeKind, string> = {
-  added: "bg-accent-green",
-  untracked: "bg-accent-green",
-  modified: "bg-accent-green",
-  deleted: "bg-accent-pink",
-  renamed: "bg-muted-foreground",
-  type_change: "bg-muted-foreground",
-  conflicted: "bg-destructive",
-};
-
 interface FileListProps {
   files: FileEntry[];
   selectedPath: string | null;
@@ -84,6 +75,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
   const { data: branchData } = useBranches(repoPath);
   const branch = branchData?.branch ?? null;
   const discardFileMutation = useDiscardFile(repoPath);
+  const addToGitignoreMutation = useAddToGitignore(repoPath);
   const favoriteEditorId = useSettingsStore((s) => s.settings.favorite_editor);
   const customEditorCommand = useSettingsStore((s) => s.settings.custom_editor_command);
   const favoriteEditorOption = findEditor(favoriteEditorId);
@@ -179,11 +171,6 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
           const showBatchMenu = isBatch && rowSelected;
           return (
             <ContextMenu key={file.path} onOpenChange={(open) => open && handleContextMenu(file.path, row.index)}>
-            <Popover
-              open={confirmDiscardPath === file.path}
-              onOpenChange={(o) => !o && setConfirmDiscardPath(null)}
-            >
-              <PopoverAnchor asChild>
               <ContextMenuTrigger asChild>
                 <div
                   style={{
@@ -217,19 +204,11 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                           : "Stage"}
                     </TooltipContent>
                   </Tooltip>
-                  <span className="relative shrink-0">
-                    {file.status === "conflicted" ? (
-                      <TriangleAlertIcon className="size-3.5 text-destructive" />
-                    ) : (
-                      <FileTypeIcon path={file.path} className="size-3.5" />
-                    )}
-                    <span
-                      className={cn(
-                        "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                        STATUS_DOT_COLOR[file.status],
-                      )}
-                    />
-                  </span>
+                  {file.status === "conflicted" ? (
+                    <TriangleAlertIcon className="size-3.5 shrink-0 text-destructive" />
+                  ) : (
+                    <FileTypeIcon path={file.path} className="size-3.5 shrink-0" />
+                  )}
                   <FilePathLabel path={file.path} />
                   {lfsInfo[file.path] && (
                     <Tooltip>
@@ -241,9 +220,9 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                       <TooltipContent>Tracked by Git LFS</TooltipContent>
                     </Tooltip>
                   )}
+                  {file.status !== "conflicted" && <FileStatusIcon status={file.status} className="size-3.5" />}
                 </div>
               </ContextMenuTrigger>
-              </PopoverAnchor>
               <ContextMenuContent>
                 {showBatchMenu ? (
                   <>
@@ -258,6 +237,10 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                     <ContextMenuItem onSelect={() => void copyToClipboard(selectedList.join("\n"))}>
                       <CopyIcon className="size-3.5" />
                       Copy Paths
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => addToGitignoreMutation.mutate(selectedList)}>
+                      <EyeOffIcon className="size-3.5" />
+                      Add {selectedList.length} Files to .gitignore
                     </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem variant="destructive" onSelect={() => setConfirmDiscardBatch(true)}>
@@ -299,7 +282,11 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                         }}
                       >
                         {favoriteEditorOption ? (
-                          <img src={favoriteEditorOption.icon} alt="" className="size-3.5" />
+                          <img
+                            src={favoriteEditorOption.icon}
+                            alt=""
+                            className={favoriteEditorOption.id === "zed" ? "size-4" : "size-3.5"}
+                          />
                         ) : (
                           <CodeIcon className="size-3.5" />
                         )}
@@ -323,6 +310,10 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                       <UserIcon className="size-3.5" />
                       Blame File
                     </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => addToGitignoreMutation.mutate([file.path])}>
+                      <EyeOffIcon className="size-3.5" />
+                      Add to .gitignore
+                    </ContextMenuItem>
                     <ContextMenuSeparator />
                     <ContextMenuItem
                       variant="destructive"
@@ -334,25 +325,6 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                   </>
                 )}
               </ContextMenuContent>
-              <PopoverContent align="start" className="w-56 space-y-2 p-3">
-                <p className="text-sm">Permanently discard changes to "{file.path}"?</p>
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => setConfirmDiscardPath(null)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => {
-                      setConfirmDiscardPath(null);
-                      discardFileMutation.mutate(file.path);
-                    }}
-                  >
-                    Discard
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
             </ContextMenu>
           );
         })}
@@ -364,6 +336,29 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
           onOpenChange={(open) => !open && setBlamePath(null)}
         />
       )}
+      <Dialog open={confirmDiscardPath !== null} onOpenChange={(o) => !o && setConfirmDiscardPath(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Discard changes to "{confirmDiscardPath}"?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">This permanently discards changes to this file. This can't be undone.</p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmDiscardPath(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (!confirmDiscardPath) return;
+                discardFileMutation.mutate(confirmDiscardPath);
+                setConfirmDiscardPath(null);
+              }}
+            >
+              Discard
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={confirmDiscardBatch} onOpenChange={setConfirmDiscardBatch}>
         <DialogContent>
           <DialogHeader>

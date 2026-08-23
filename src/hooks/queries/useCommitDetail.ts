@@ -8,6 +8,15 @@ import type { FileDiff, ImageDiff } from "@/lib/types";
 // default — see queryClient.ts) would be pure waste here. Cache forever, fetch once.
 const IMMUTABLE = { refetchOnMount: false as const, staleTime: Infinity };
 
+export function useCommitDetail(repoPath: string | null, oid: string | null) {
+  return useQuery({
+    queryKey: queryKeys.commitDetail(repoPath ?? "", oid ?? ""),
+    queryFn: () => api.getCommitDetail(repoPath as string, oid as string),
+    enabled: !!repoPath && !!oid,
+    ...IMMUTABLE,
+  });
+}
+
 export function useCommitFiles(repoPath: string | null, oid: string | null) {
   return useQuery({
     queryKey: queryKeys.commitFiles(repoPath ?? "", oid ?? ""),

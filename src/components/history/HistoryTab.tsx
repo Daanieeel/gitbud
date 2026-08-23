@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useCommitLog } from "@/hooks/queries/useCommitLog";
 import { useCommitFileDiff, useCommitFiles } from "@/hooks/queries/useCommitDetail";
+import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { queryKeys } from "@/lib/queryKeys";
+import { toMainlineCommits } from "@/lib/compact-graph";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
+import { CommitHeader } from "./CommitHeader";
 import { CommitList } from "./CommitList";
 import { CreateBranchAtDialog } from "./CreateBranchAtDialog";
 import { InteractiveRebaseDialog } from "./InteractiveRebaseDialog";
@@ -12,21 +16,11 @@ import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubFileUrl } from "@/lib/github-links";
 import { FileTypeIcon } from "@/lib/file-icons";
+import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
-const COMMIT_STATUS_DOT_COLOR: Record<string, string> = {
-  Added: "bg-accent-green",
-  Untracked: "bg-accent-green",
-  Copied: "bg-accent-green",
-  Modified: "bg-accent-green",
-  Deleted: "bg-accent-pink",
-  Renamed: "bg-muted-foreground",
-  Typechange: "bg-muted-foreground",
-  Conflicted: "bg-destructive",
-};
 
 export function HistoryTab() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -61,6 +55,14 @@ export function HistoryTab() {
   const [rebaseBaseOid, setRebaseBaseOid] = useState<string | null>(null);
   const commitList = useResizableWidth("panel-width:history-commits", 288, 200, 560);
   const fileList = useResizableWidth("panel-width:history-files", 224, 160, 480);
+  const [compact, setCompact] = useState(() => localStorage.getItem("history:compact") === "true");
+  useEffect(() => {
+    localStorage.setItem("history:compact", String(compact));
+  }, [compact]);
+  const displayedCommits = compact ? toMainlineCommits(commits) : commits;
+  const commitFilePaths = useMemo(() => selectedCommitFiles.map(([path]) => path), [selectedCommitFiles]);
+  const handleFileArrowNav = useArrowKeyFileNav(commitFilePaths, selectedCommitFilePath, selectCommitFile);
+  const fileListRef = useRef<HTMLDivElement>(null);
 
   if (commits.length === 0) {
     return (
@@ -72,59 +74,83 @@ export function HistoryTab() {
 
   return (
     <div className="flex h-full min-w-0 flex-1">
-      <div style={{ width: commitList.width }} className="shrink-0 border-r border-border">
-        <CommitList
-          commits={commits}
-          selectedOid={selectedCommitOid}
-          onSelect={selectCommit}
-          onNeedMore={() => hasNextPage && !isFetchingNextPage && void fetchNextPage()}
-          onCreateBranchHere={setBranchAtOid}
-          onRebaseFromHere={setRebaseBaseOid}
-        />
+      <div style={{ width: commitList.width }} className="flex shrink-0 flex-col border-r border-border">
+        <div className="flex shrink-0 items-center justify-end border-b border-border px-2 py-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <CheckboxGroup
+                className="text-xs text-muted-foreground"
+                checked={compact}
+                onCheckedChange={(checked) => setCompact(checked === true)}
+              >
+                Compact
+              </CheckboxGroup>
+            </TooltipTrigger>
+            <TooltipContent>
+              Show only this branch's own history — merged-in branches collapse to a small bump
+              at the merge commit instead of their own lane
+            </TooltipContent>
+          </Tooltip>
+        </div>
+        <div className="min-h-0 flex-1">
+          <CommitList
+            commits={displayedCommits}
+            selectedOid={selectedCommitOid}
+            onSelect={selectCommit}
+            onNeedMore={() => hasNextPage && !isFetchingNextPage && void fetchNextPage()}
+            onCreateBranchHere={setBranchAtOid}
+            onRebaseFromHere={setRebaseBaseOid}
+            compact={compact}
+          />
+        </div>
       </div>
       <ResizeHandle onPointerDown={commitList.onPointerDown} />
-      <div style={{ width: fileList.width }} className="shrink-0 overflow-auto border-r border-border">
-        {selectedCommitFiles.map(([path, status]) => (
-          <Tooltip key={path}>
-            <TooltipTrigger asChild>
-              <div
-                className={cn(
-                  "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
-                  selectedCommitFilePath === path && "bg-accent",
-                )}
-                onClick={() => selectCommitFile(path)}
-              >
-                <span className="relative shrink-0">
-                  <FileTypeIcon path={path} className="size-3.5" />
-                  <span
+      <div className="flex min-w-0 flex-1 flex-col">
+        {selectedCommitOid && <CommitHeader repoPath={repoPath} oid={selectedCommitOid} />}
+        <div className="flex min-h-0 flex-1">
+          <div
+            ref={fileListRef}
+            tabIndex={0}
+            onKeyDown={handleFileArrowNav}
+            style={{ width: fileList.width }}
+            className="shrink-0 overflow-auto border-r border-border outline-none"
+          >
+            {selectedCommitFiles.map(([path, status]) => (
+              <Tooltip key={path}>
+                <TooltipTrigger asChild>
+                  <div
                     className={cn(
-                      "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                      COMMIT_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
+                      "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
+                      selectedCommitFilePath === path && "bg-accent",
                     )}
-                  />
-                </span>
-                <FilePathLabel path={path} />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>{`${path} (${status})`}</TooltipContent>
-          </Tooltip>
-        ))}
-      </div>
-      <ResizeHandle onPointerDown={fileList.onPointerDown} />
-      <div className="min-w-0 flex-1">
-        <DiffView
-          path={selectedCommitFilePath}
-          diff={selectedCommitFileDiff?.diff ?? null}
-          imageDiff={selectedCommitFileDiff?.imageDiff ?? null}
-          onCopyPermalink={(line) => {
-            if (!repoPath || !selectedCommitOid || !selectedCommitFilePath) return;
-            void githubFileUrl(repoPath, selectedCommitOid, selectedCommitFilePath, line).then(
-              (url) => {
-                if (url) void copyToClipboard(url);
-              },
-            );
-          }}
-        />
+                    onClick={() => selectCommitFile(path)}
+                  >
+                    <FileTypeIcon path={path} className="size-3.5 shrink-0" />
+                    <FilePathLabel path={path} />
+                    <FileStatusIcon status={status} className="size-3.5" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>{`${path} (${status})`}</TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+          <ResizeHandle onPointerDown={fileList.onPointerDown} />
+          <div className="min-w-0 flex-1">
+            <DiffView
+              path={selectedCommitFilePath}
+              diff={selectedCommitFileDiff?.diff ?? null}
+              imageDiff={selectedCommitFileDiff?.imageDiff ?? null}
+              onCopyPermalink={(line) => {
+                if (!repoPath || !selectedCommitOid || !selectedCommitFilePath) return;
+                void githubFileUrl(repoPath, selectedCommitOid, selectedCommitFilePath, line).then(
+                  (url) => {
+                    if (url) void copyToClipboard(url);
+                  },
+                );
+              }}
+            />
+          </div>
+        </div>
       </div>
       <CreateBranchAtDialog oid={branchAtOid} onOpenChange={(open) => !open && setBranchAtOid(null)} />
       <InteractiveRebaseDialog

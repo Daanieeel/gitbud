@@ -9,6 +9,7 @@ import {
   ListOrderedIcon,
   ShieldCheckIcon,
   Undo2Icon,
+  WrenchIcon,
 } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { CommitEntry } from "@/lib/types";
@@ -28,9 +29,11 @@ import { Avatar } from "@/components/ui/avatar";
 import { CIBadge } from "@/components/pr/CIBadge";
 import { CommitGraph } from "./CommitGraph";
 import { useRepoStore } from "@/store/useRepoStore";
-import { useCherryPick, useRevertCommit } from "@/hooks/queries/useCommitLog";
+import { useCherryPick, useCreateFixupCommit, useRevertCommit } from "@/hooks/queries/useCommitLog";
+import { useStatus } from "@/hooks/queries/useRepoStatus";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useAuthorAvatar } from "@/hooks/useAuthorAvatar";
+import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 
 const ROW_HEIGHT = 52;
 
@@ -41,6 +44,7 @@ interface CommitListProps {
   onNeedMore: () => void;
   onCreateBranchHere: (oid: string) => void;
   onRebaseFromHere: (oid: string) => void;
+  compact?: boolean;
 }
 
 function VerificationBadge({ repoPath, login, sha }: { repoPath: string; login: string; sha: string }) {
@@ -70,7 +74,7 @@ function VerificationBadge({ repoPath, login, sha }: { repoPath: string; login: 
   );
 }
 
-function CommitAuthorAvatar({
+export function CommitAuthorAvatar({
   repoPath,
   login,
   email,
@@ -99,11 +103,15 @@ export function CommitList({
   onNeedMore,
   onCreateBranchHere,
   onRebaseFromHere,
+  compact,
 }: CommitListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const cherryPickMutation = useCherryPick(repoPath);
   const revertCommitMutation = useRevertCommit(repoPath);
+  const createFixupCommitMutation = useCreateFixupCommit(repoPath);
+  const { data: status } = useStatus(repoPath);
+  const hasStagedChanges = status?.files.some((f) => f.staged) ?? false;
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const [tagsByOid, setTagsByOid] = useState<Map<string, string[]>>(new Map());
 
@@ -141,8 +149,22 @@ export function CommitList({
     if (lastIndex >= commits.length - 5) onNeedMore();
   }, [lastIndex, commits.length, onNeedMore]);
 
+  const oids = useMemo(() => commits.map((c) => c.oid), [commits]);
+  const handleArrowNav = useArrowKeyFileNav(oids, selectedOid, onSelect);
+
+  useEffect(() => {
+    parentRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedOid) return;
+    const index = commits.findIndex((c) => c.oid === selectedOid);
+    if (index === -1) return;
+    virtualizer.scrollToIndex(index, { align: "auto" });
+  }, [selectedOid, commits, virtualizer]);
+
   return (
-    <div ref={parentRef} className="h-full overflow-auto">
+    <div ref={parentRef} tabIndex={0} onKeyDown={handleArrowNav} className="h-full overflow-auto outline-none">
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {items.map((row) => {
           const commit = commits[row.index];
@@ -173,6 +195,7 @@ export function CommitList({
                     prevActiveLanes={commits[row.index - 1]?.active_lanes}
                     laneCount={laneCount}
                     rowHeight={row.size}
+                    compact={compact}
                   />
                   <CommitAuthorAvatar
                     repoPath={repoPath}
@@ -233,6 +256,13 @@ export function CommitList({
                 <ContextMenuItem onSelect={() => revertCommitMutation.mutate(commit.oid)}>
                   <Undo2Icon className="size-3.5" />
                   Revert
+                </ContextMenuItem>
+                <ContextMenuItem
+                  disabled={!hasStagedChanges}
+                  onSelect={() => createFixupCommitMutation.mutate(commit.oid)}
+                >
+                  <WrenchIcon className="size-3.5" />
+                  Create Fixup Commit
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => onCreateBranchHere(commit.oid)}>
                   <GitBranchPlusIcon className="size-3.5" />
