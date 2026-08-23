@@ -171,6 +171,84 @@ pub fn get_branch_commits(repo_path: &str, base: &str, head: &str) -> Result<Vec
     Ok(results)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitAuthor {
+    pub name: String,
+    pub email: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommitDetail {
+    pub oid: String,
+    pub short_oid: String,
+    pub summary: String,
+    pub description: String,
+    /// The commit's own author, followed by any `Co-authored-by:` trailers found in the
+    /// message body — deduplicated by email against the primary author and each other.
+    pub authors: Vec<CommitAuthor>,
+    pub timestamp: i64,
+    pub insertions: usize,
+    pub deletions: usize,
+}
+
+/// Fetches everything the commit-detail header needs beyond what's already in `CommitEntry`:
+/// the full message split into summary/description, all authors (including co-authors parsed
+/// from the message trailers), and the commit's diffstat against its first parent.
+pub fn get_commit_detail(repo_path: &str, oid: &str) -> Result<CommitDetail, String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let commit_oid = git2::Oid::from_str(oid).map_err(|e| e.message().to_string())?;
+    let commit = repo.find_commit(commit_oid).map_err(|e| e.message().to_string())?;
+
+    let summary = commit.summary().unwrap_or("").to_string();
+    let message = commit.message().unwrap_or("").to_string();
+    let description = message
+        .strip_prefix(&summary)
+        .unwrap_or("")
+        .trim_start_matches(['\n', '\r'])
+        .trim_end()
+        .to_string();
+
+    let author = commit.author();
+    let mut authors = vec![CommitAuthor {
+        name: author.name().unwrap_or("").to_string(),
+        email: author.email().unwrap_or("").to_string(),
+    }];
+    const COAUTHOR_PREFIX: &str = "co-authored-by:";
+    for line in description.lines() {
+        let trimmed = line.trim();
+        if !trimmed.to_lowercase().starts_with(COAUTHOR_PREFIX) {
+            continue;
+        }
+        let rest = trimmed[COAUTHOR_PREFIX.len()..].trim();
+        let Some((name, email)) = rest.rsplit_once('<') else {
+            continue;
+        };
+        let name = name.trim().to_string();
+        let email = email.trim_end_matches('>').trim().to_string();
+        if !authors.iter().any(|a| a.email.eq_ignore_ascii_case(&email)) {
+            authors.push(CommitAuthor { name, email });
+        }
+    }
+
+    let tree = commit.tree().map_err(|e| e.message().to_string())?;
+    let parent_tree = commit.parent(0).ok().and_then(|p| p.tree().ok());
+    let diff = repo
+        .diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), None)
+        .map_err(|e| e.message().to_string())?;
+    let stats = diff.stats().map_err(|e| e.message().to_string())?;
+
+    Ok(CommitDetail {
+        oid: commit_oid.to_string(),
+        short_oid: commit_oid.to_string().chars().take(7).collect(),
+        summary,
+        description,
+        authors,
+        timestamp: commit.time().seconds(),
+        insertions: stats.insertions(),
+        deletions: stats.deletions(),
+    })
+}
+
 pub fn get_log(repo_path: &str, limit: usize, skip: usize) -> Result<Vec<CommitEntry>, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut revwalk = repo.revwalk().map_err(|e| e.message().to_string())?;
@@ -251,6 +329,43 @@ mod tests {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.path);
         }
+    }
+
+    #[test]
+    fn commit_detail_splits_message_and_parses_coauthors_and_stats() {
+        let scratch = ScratchRepo::new("detail");
+        let repo_path = scratch.path_str();
+
+        std::fs::write(scratch.path.join("a.txt"), "one\ntwo\n").unwrap();
+        crate::repo::stage_paths(&repo_path, &["a.txt".to_string()]).unwrap();
+        let base_oid = crate::repo::commit(&repo_path, "base", "").unwrap();
+        let base_detail = get_commit_detail(&repo_path, &base_oid).unwrap();
+        assert_eq!(base_detail.description, "");
+        assert_eq!(base_detail.authors.len(), 1);
+        assert_eq!(base_detail.insertions, 2);
+        assert_eq!(base_detail.deletions, 0);
+
+        std::fs::write(scratch.path.join("a.txt"), "one\nthree\n").unwrap();
+        crate::repo::stage_paths(&repo_path, &["a.txt".to_string()]).unwrap();
+        let oid = crate::repo::commit(
+            &repo_path,
+            "fix the thing",
+            "Longer explanation.\n\nCo-authored-by: Helper <helper@example.com>",
+        )
+        .unwrap();
+
+        let detail = get_commit_detail(&repo_path, &oid).unwrap();
+        assert_eq!(detail.summary, "fix the thing");
+        assert_eq!(
+            detail.description,
+            "Longer explanation.\n\nCo-authored-by: Helper <helper@example.com>"
+        );
+        assert_eq!(detail.authors.len(), 2);
+        assert_eq!(detail.authors[0].email, "test@example.com");
+        assert_eq!(detail.authors[1].name, "Helper");
+        assert_eq!(detail.authors[1].email, "helper@example.com");
+        assert_eq!(detail.insertions, 1);
+        assert_eq!(detail.deletions, 1);
     }
 
     #[test]

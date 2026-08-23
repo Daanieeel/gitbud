@@ -6,6 +6,7 @@ import type {
   BranchInfo,
   CheckRun,
   CherryPickResult,
+  CommitDetail,
   CommitEntry,
   ConflictSides,
   CommitSearchResult,
@@ -117,6 +118,8 @@ export const api = {
     invoke<FileDiff>("get_file_diff", { repoPath, path, staged }),
   getCommitFiles: (repoPath: string, oid: string) =>
     invoke<[string, string][]>("get_commit_files", { repoPath, oid }),
+  getCommitDetail: (repoPath: string, oid: string) =>
+    invoke<CommitDetail>("get_commit_detail", { repoPath, oid }),
   getCommitFileDiff: (repoPath: string, oid: string, path: string) =>
     invoke<FileDiff>("get_commit_file_diff", { repoPath, oid, path }),
   getBranchDiffFiles: (repoPath: string, base: string, head: string) =>

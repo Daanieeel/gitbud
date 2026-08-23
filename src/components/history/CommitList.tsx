@@ -70,7 +70,7 @@ function VerificationBadge({ repoPath, login, sha }: { repoPath: string; login: 
   );
 }
 
-function CommitAuthorAvatar({
+export function CommitAuthorAvatar({
   repoPath,
   login,
   email,

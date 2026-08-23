@@ -311,6 +311,13 @@ async fn get_log(repo_path: String, limit: usize, skip: usize) -> Result<Vec<his
 }
 
 #[tauri::command]
+async fn get_commit_detail(repo_path: String, oid: String) -> Result<history::CommitDetail, String> {
+    tauri::async_runtime::spawn_blocking(move || history::get_commit_detail(&repo_path, &oid))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn search_commits(repo_path: String, query: String, limit: usize) -> Result<Vec<history::CommitSearchResult>, String> {
     tauri::async_runtime::spawn_blocking(move || history::search_commits(&repo_path, &query, limit))
         .await
@@ -1432,6 +1439,7 @@ pub fn run() {
             get_image_diff,
             get_commit_image_diff,
             get_log,
+            get_commit_detail,
             get_branch_commits,
             search_commits,
             list_tags,

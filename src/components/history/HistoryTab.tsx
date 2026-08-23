@@ -4,6 +4,7 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useCommitLog } from "@/hooks/queries/useCommitLog";
 import { useCommitFileDiff, useCommitFiles } from "@/hooks/queries/useCommitDetail";
 import { queryKeys } from "@/lib/queryKeys";
+import { CommitHeader } from "./CommitHeader";
 import { CommitList } from "./CommitList";
 import { CreateBranchAtDialog } from "./CreateBranchAtDialog";
 import { InteractiveRebaseDialog } from "./InteractiveRebaseDialog";
@@ -83,48 +84,53 @@ export function HistoryTab() {
         />
       </div>
       <ResizeHandle onPointerDown={commitList.onPointerDown} />
-      <div style={{ width: fileList.width }} className="shrink-0 overflow-auto border-r border-border">
-        {selectedCommitFiles.map(([path, status]) => (
-          <Tooltip key={path}>
-            <TooltipTrigger asChild>
-              <div
-                className={cn(
-                  "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
-                  selectedCommitFilePath === path && "bg-accent",
-                )}
-                onClick={() => selectCommitFile(path)}
-              >
-                <span className="relative shrink-0">
-                  <FileTypeIcon path={path} className="size-3.5" />
-                  <span
+      <div className="flex min-w-0 flex-1 flex-col">
+        {selectedCommitOid && <CommitHeader repoPath={repoPath} oid={selectedCommitOid} />}
+        <div className="flex min-h-0 flex-1">
+          <div style={{ width: fileList.width }} className="shrink-0 overflow-auto border-r border-border">
+            {selectedCommitFiles.map(([path, status]) => (
+              <Tooltip key={path}>
+                <TooltipTrigger asChild>
+                  <div
                     className={cn(
-                      "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
-                      COMMIT_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
+                      "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
+                      selectedCommitFilePath === path && "bg-accent",
                     )}
-                  />
-                </span>
-                <FilePathLabel path={path} />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>{`${path} (${status})`}</TooltipContent>
-          </Tooltip>
-        ))}
-      </div>
-      <ResizeHandle onPointerDown={fileList.onPointerDown} />
-      <div className="min-w-0 flex-1">
-        <DiffView
-          path={selectedCommitFilePath}
-          diff={selectedCommitFileDiff?.diff ?? null}
-          imageDiff={selectedCommitFileDiff?.imageDiff ?? null}
-          onCopyPermalink={(line) => {
-            if (!repoPath || !selectedCommitOid || !selectedCommitFilePath) return;
-            void githubFileUrl(repoPath, selectedCommitOid, selectedCommitFilePath, line).then(
-              (url) => {
-                if (url) void copyToClipboard(url);
-              },
-            );
-          }}
-        />
+                    onClick={() => selectCommitFile(path)}
+                  >
+                    <span className="relative shrink-0">
+                      <FileTypeIcon path={path} className="size-3.5" />
+                      <span
+                        className={cn(
+                          "absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-1 ring-background",
+                          COMMIT_STATUS_DOT_COLOR[status] ?? "bg-muted-foreground",
+                        )}
+                      />
+                    </span>
+                    <FilePathLabel path={path} />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>{`${path} (${status})`}</TooltipContent>
+              </Tooltip>
+            ))}
+          </div>
+          <ResizeHandle onPointerDown={fileList.onPointerDown} />
+          <div className="min-w-0 flex-1">
+            <DiffView
+              path={selectedCommitFilePath}
+              diff={selectedCommitFileDiff?.diff ?? null}
+              imageDiff={selectedCommitFileDiff?.imageDiff ?? null}
+              onCopyPermalink={(line) => {
+                if (!repoPath || !selectedCommitOid || !selectedCommitFilePath) return;
+                void githubFileUrl(repoPath, selectedCommitOid, selectedCommitFilePath, line).then(
+                  (url) => {
+                    if (url) void copyToClipboard(url);
+                  },
+                );
+              }}
+            />
+          </div>
+        </div>
       </div>
       <CreateBranchAtDialog oid={branchAtOid} onOpenChange={(open) => !open && setBranchAtOid(null)} />
       <InteractiveRebaseDialog

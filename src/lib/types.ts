@@ -71,6 +71,22 @@ export interface CommitEntry {
   active_lanes: number[];
 }
 
+export interface CommitAuthor {
+  name: string;
+  email: string;
+}
+
+export interface CommitDetail {
+  oid: string;
+  short_oid: string;
+  summary: string;
+  description: string;
+  authors: CommitAuthor[];
+  timestamp: number;
+  insertions: number;
+  deletions: number;
+}
+
 export interface CommitSearchResult {
   oid: string;
   short_oid: string;
