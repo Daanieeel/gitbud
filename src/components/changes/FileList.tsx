@@ -289,7 +289,11 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                         }}
                       >
                         {favoriteEditorOption ? (
-                          <img src={favoriteEditorOption.icon} alt="" className="size-3.5" />
+                          <img
+                            src={favoriteEditorOption.icon}
+                            alt=""
+                            className={favoriteEditorOption.id === "zed" ? "size-4" : "size-3.5"}
+                          />
                         ) : (
                           <CodeIcon className="size-3.5" />
                         )}

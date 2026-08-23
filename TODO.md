@@ -12,7 +12,7 @@ Complete in chronological order.
 - [x] changes tab > filed explorer: we need to add detection for file moving. currently would pick up moved files as added/deleted pairs
 - [x] files in all file explorers (PR, commits, stash, changes tab): they have a dot indicator (green/red) that indicates the status of the file (modified, deleted, added, etc.). make sure we specify more precisely. green = creaded, red = deleted, orange = modified, blue = moved. also, dont display a dot indicator. on the far right of the file name, display the status as an icon. make sure this icon is never pushed away by a long file name (long file paths must be truncated in the middle, just like we are currently doing)
 - [x] Toolbar > Preview PR button: disable the button if no commit exists on the current branch or if no other branch exists. in both cases, disable the button and add a toolbar explaining why the button is disabled (in a VERY short and clear way. no long sentence.)
-- [ ] Changes > File Explorer > Right Click > Open in Editor option: Zed logo needs to be a little larger (inspired by the VS Code logo)
+- [x] Changes > File Explorer > Right Click > Open in Editor option: Zed logo needs to be a little larger (inspired by the VS Code logo)
 - [ ] History Tab: show unpushed commits in a different way than pushed commits
 - [ ] Hostory Tab: add a compact mode. compact mode only shows the current branch's graph and hides all other branches. it should only show when something was merged into the current branch or out of it. but dont show all branches parallel to each other, just the branching out and in from the current branch
 - [ ] (BUG) Settings > General > Favorite Editor: The selector isnt scrollable
