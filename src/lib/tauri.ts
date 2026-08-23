@@ -90,6 +90,10 @@ export const api = {
     invoke<CherryPickResult>("revert_commit", { repoPath, oid }),
   deleteBranch: (repoPath: string, name: string) =>
     invoke<void>("delete_branch", { repoPath, name }),
+  deleteBranchRemote: (repoPath: string, name: string) =>
+    invoke<void>("delete_branch_remote", { repoPath, name }),
+  isBranchMerged: (repoPath: string, branch: string, target: string) =>
+    invoke<boolean>("is_branch_merged", { repoPath, branch, target }),
   renameBranch: (repoPath: string, oldName: string, newName: string) =>
     invoke<void>("rename_branch", { repoPath, oldName, newName }),
   renameBranchRemote: (repoPath: string, oldName: string, newName: string) =>

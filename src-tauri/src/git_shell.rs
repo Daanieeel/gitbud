@@ -306,6 +306,14 @@ pub fn rename_branch_remote(
     Ok(())
 }
 
+/// Deletes `name` on `origin`. A no-op-shaped failure (the branch was never pushed, or someone
+/// else already deleted it) is a normal git error here — callers that only want this as a
+/// best-effort cleanup step should swallow it themselves, matching `rename_branch_remote`'s
+/// old-name delete.
+pub fn delete_branch_remote(app: &AppHandle, repo_path: &str, name: &str, event_id: &str) -> Result<(), String> {
+    run_streaming(app, Some(repo_path), &["push", "origin", "--delete", name], event_id)
+}
+
 pub fn lfs_pull(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), String> {
     run_streaming(app, Some(repo_path), &["lfs", "pull"], event_id)
 }

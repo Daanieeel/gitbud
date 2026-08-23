@@ -183,6 +183,22 @@ async fn delete_branch(repo_path: String, name: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn delete_branch_remote(app: AppHandle, repo_path: String, name: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_shell::delete_branch_remote(&app, &repo_path, &name, &repo_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn is_branch_merged(repo_path: String, branch: String, target: String) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || repo::is_branch_merged(&repo_path, &branch, &target))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn rename_branch(repo_path: String, old_name: String, new_name: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || repo::rename_branch(&repo_path, &old_name, &new_name))
         .await
@@ -1371,6 +1387,8 @@ pub fn run() {
             cherry_pick,
             revert_commit,
             delete_branch,
+            delete_branch_remote,
+            is_branch_merged,
             rename_branch,
             rename_branch_remote,
             merge_branch,

@@ -494,6 +494,28 @@ mod tests {
     }
 
     #[test]
+    fn is_branch_merged_reflects_whether_target_has_the_branchs_commits() {
+        let scratch = ScratchRepo::new("branch-merged");
+        let repo_path = scratch.path_str();
+        scratch.write_and_commit("a.txt", "a\n", "base");
+        create_branch(&repo_path, "feature", true).unwrap();
+        scratch.write_and_commit("b.txt", "b\n", "feature work");
+        checkout_branch(&repo_path, "main").ok().or_else(|| checkout_branch(&repo_path, "master").ok());
+
+        // `feature` has a commit `main`/`master` doesn't — not merged yet.
+        let default_branch = list_branches(&repo_path)
+            .unwrap()
+            .into_iter()
+            .find(|b| !b.is_remote && b.is_head)
+            .unwrap()
+            .name;
+        assert!(!is_branch_merged(&repo_path, "feature", &default_branch).unwrap());
+
+        merge_branch(&repo_path, "feature").unwrap();
+        assert!(is_branch_merged(&repo_path, "feature", &default_branch).unwrap());
+    }
+
+    #[test]
     fn discard_file_removes_untracked_file() {
         let scratch = ScratchRepo::new("discard-untracked");
         let repo_path = scratch.path_str();
@@ -700,6 +722,29 @@ pub fn delete_branch(repo_path: &str, name: &str) -> Result<(), String> {
         .find_branch(name, git2::BranchType::Local)
         .map_err(|e| e.message().to_string())?;
     branch.delete().map_err(|e| e.message().to_string())
+}
+
+/// Whether `branch`'s commits are all already reachable from `target` — i.e. deleting `branch`
+/// wouldn't lose any history, the same "fully merged" check `git branch -d` (as opposed to the
+/// force `-D`) makes before refusing to delete an unmerged branch.
+pub fn is_branch_merged(repo_path: &str, branch: &str, target: &str) -> Result<bool, String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let branch_oid = repo
+        .find_branch(branch, git2::BranchType::Local)
+        .map_err(|e| e.message().to_string())?
+        .get()
+        .target()
+        .ok_or("branch has no target")?;
+    let target_oid = repo
+        .find_branch(target, git2::BranchType::Local)
+        .map_err(|e| e.message().to_string())?
+        .get()
+        .target()
+        .ok_or("target has no target")?;
+    if branch_oid == target_oid {
+        return Ok(true);
+    }
+    repo.graph_descendant_of(target_oid, branch_oid).map_err(|e| e.message().to_string())
 }
 
 /// On the case-insensitive-but-case-preserving filesystems most desktop OSes default to (APFS,

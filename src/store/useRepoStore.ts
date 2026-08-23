@@ -98,7 +98,7 @@ interface RepoState {
 
   checkoutBranch: (branch: string) => Promise<void>;
   createBranch: (name: string, checkout: boolean) => Promise<void>;
-  deleteBranch: (name: string) => Promise<void>;
+  deleteBranch: (name: string, opts?: { deleteRemote?: boolean }) => Promise<void>;
   renameBranch: (oldName: string, newName: string, alsoRenameRemote?: boolean) => Promise<void>;
   mergeBranch: (name: string) => Promise<CherryPickResult>;
   cherryPick: (oid: string) => Promise<CherryPickResult>;
@@ -449,10 +449,27 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     }
   },
 
-  deleteBranch: async (name) => {
+  deleteBranch: async (name, opts) => {
     const repoPath = get().selectedRepo;
     if (!repoPath) return;
+    // Deleting the checked-out branch: git refuses outright, so move off it first. The caller
+    // is expected to have already confirmed there's somewhere else to go (disabling delete
+    // entirely when this is the only local branch).
+    if (get().branch === name) {
+      const fallback =
+        get().branches.find((b) => !b.is_remote && b.name !== name && (b.name === "main" || b.name === "master")) ??
+        get().branches.find((b) => !b.is_remote && b.name !== name);
+      if (!fallback) return;
+      await get().checkoutBranch(fallback.name);
+    }
     await api.deleteBranch(repoPath, name);
+    if (opts?.deleteRemote) {
+      toast.success(`Deleted ${name} locally`);
+      await runSync(get, set, repoPath, () => api.deleteBranchRemote(repoPath, name), {
+        description: `Deleting ${name} on origin…`,
+        doneMessage: `Deleted ${name} on origin`,
+      });
+    }
     await get().refreshBranches();
   },
 
