@@ -104,15 +104,17 @@ export function CommitBox() {
       )}
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button disabled={disabled || committing} onClick={() => void submit()}>
+          <Button className="w-full" disabled={disabled || committing} onClick={() => void submit()}>
             <GitCommitIcon className={cn("size-3.5", committing && "animate-spin")} />
-            {committing
-              ? amending
-                ? "Amending…"
-                : "Committing…"
-              : amending
-                ? `Amend Last Commit on ${branch ?? "…"}`
-                : `Commit to ${branch ?? "…"}`}
+            <span className="min-w-0 truncate">
+              {committing
+                ? amending
+                  ? "Amending…"
+                  : "Committing…"
+                : amending
+                  ? `Amend Last Commit on ${branch ?? "…"}`
+                  : `Commit to ${branch ?? "…"}`}
+            </span>
           </Button>
         </TooltipTrigger>
         <TooltipContent>
