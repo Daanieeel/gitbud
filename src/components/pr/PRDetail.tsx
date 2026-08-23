@@ -9,6 +9,7 @@ import { CIBadge } from "./CIBadge";
 import { MergePRDialog } from "./MergePRDialog";
 import { usePRStore } from "@/store/usePRStore";
 import { useAddReviewComment, usePullRequestDetail } from "@/hooks/queries/usePullRequests";
+import { prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
 import { api } from "@/lib/tauri";
 import type { ImageDiff, PullRequest } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -39,6 +40,7 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
   const files = data?.files ?? [];
   const comments = data?.comments ?? [];
   const addCommentMutation = useAddReviewComment(repoPath, login, pr.number);
+  const isPrTabActive = useIsPrTabActive();
 
   const [checkingOut, setCheckingOut] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
@@ -88,7 +90,12 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
             {pr.head_ref} → {pr.base_ref}
           </div>
         </div>
-        <CIBadge repoPath={repoPath} login={login} sha={pr.head_sha} />
+        <CIBadge
+          repoPath={repoPath}
+          login={login}
+          sha={pr.head_sha}
+          pollIntervalMs={prPollIntervalMs(pr, isPrTabActive, true)}
+        />
         <Tooltip>
           <TooltipTrigger asChild>
             <a

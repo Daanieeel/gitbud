@@ -12,6 +12,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { PullRequest } from "@/lib/types";
 import { usePRStore } from "@/store/usePRStore";
+import { prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
 import { CIBadge } from "./CIBadge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,6 +56,7 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
   const [filter, setFilter] = useState("");
   const watched = usePRStore((s) => s.watched);
   const toggleWatch = usePRStore((s) => s.toggleWatch);
+  const isPrTabActive = useIsPrTabActive();
 
   const observerTarget = useRef<HTMLDivElement>(null);
 
@@ -130,7 +132,12 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
                     <span>
                       #{pr.number} by {pr.author_login}
                     </span>
-                    <CIBadge repoPath={repoPath} login={login} sha={pr.head_sha} />
+                    <CIBadge
+                      repoPath={repoPath}
+                      login={login}
+                      sha={pr.head_sha}
+                      pollIntervalMs={prPollIntervalMs(pr, isPrTabActive, pr.number === selectedNumber)}
+                    />
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button

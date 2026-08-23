@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CheckCircle2Icon, CircleDashedIcon, XCircleIcon } from "lucide-react";
-import { checkRunsPollInterval, useCheckRuns } from "@/hooks/queries/useCheckRuns";
+import { useCheckRuns } from "@/hooks/queries/useCheckRuns";
 import { CheckRunsRefresh } from "./CheckRunsRefresh";
 import type { CheckRun } from "@/lib/types";
 import {
@@ -14,6 +14,9 @@ interface CIBadgeProps {
   repoPath: string;
   login: string;
   sha: string;
+  /** From prPollIntervalMs — null (the default) means don't auto-poll this badge at all, just
+   * show whatever's cached and let the manual refresh button do the rest. */
+  pollIntervalMs?: number | null;
 }
 
 export type Overall = "passing" | "failing" | "pending" | "none";
@@ -72,8 +75,13 @@ const OVERALL_COLOR: Record<Overall, string> = {
   none: "text-accent-yellow",
 };
 
-export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
-  const { data: runs = null, refetch, isFetching, dataUpdatedAt } = useCheckRuns(repoPath, login, sha);
+export function CIBadge({ repoPath, login, sha, pollIntervalMs = null }: CIBadgeProps) {
+  const {
+    data: runs = null,
+    refetch,
+    isFetching,
+    dataUpdatedAt,
+  } = useCheckRuns(repoPath, login, sha, pollIntervalMs);
   const [open, setOpen] = useState(false);
 
   if (runs === null || runs.length === 0) return null;
@@ -99,7 +107,7 @@ export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
               dataUpdatedAt={dataUpdatedAt}
               isFetching={isFetching}
               onRefresh={() => void refetch()}
-              pollIntervalMs={checkRunsPollInterval(runs)}
+              pollIntervalMs={pollIntervalMs}
             />
           </div>
           {runs.map((run) => (

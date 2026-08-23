@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useMergePullRequest } from "@/hooks/queries/usePullRequests";
-import { checkRunsPollInterval, useCheckRuns } from "@/hooks/queries/useCheckRuns";
+import { prPollIntervalMs, useCheckRuns, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
 import { CheckRunsRefresh } from "./CheckRunsRefresh";
 import { runIcon, runStatusLabel } from "./CIBadge";
 import { api } from "@/lib/tauri";
@@ -68,12 +68,18 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
   const [commitMessage, setCommitMessage] = useState("");
   const [deleteBranch, setDeleteBranch] = useState(false);
   const [merging, setMerging] = useState(false);
+  const isPrTabActive = useIsPrTabActive();
   const {
     data: runs = null,
     refetch: refetchRuns,
     isFetching: runsFetching,
     dataUpdatedAt: runsUpdatedAt,
-  } = useCheckRuns(open ? repoPath : null, open ? login : null, open ? pr.head_sha : null);
+  } = useCheckRuns(
+    open ? repoPath : null,
+    open ? login : null,
+    open ? pr.head_sha : null,
+    open ? prPollIntervalMs(pr, isPrTabActive, true) : null,
+  );
   const [repoSettings, setRepoSettings] = useState<RepoMergeSettings | null>(null);
 
   // Force a fresh check-runs fetch every time this dialog opens — you're about to merge, so a
@@ -181,7 +187,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
                 dataUpdatedAt={runsUpdatedAt}
                 isFetching={runsFetching}
                 onRefresh={() => void refetchRuns()}
-                pollIntervalMs={checkRunsPollInterval(runs ?? undefined)}
+                pollIntervalMs={open ? prPollIntervalMs(pr, isPrTabActive, true) : null}
               />
             </div>
             <div className="flex flex-col gap-1 rounded-md border border-border p-1 text-xs">
