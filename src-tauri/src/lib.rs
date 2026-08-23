@@ -1073,6 +1073,16 @@ async fn github_delete_remote_branch(repo_path: String, login: String, branch: S
 }
 
 #[tauri::command]
+async fn github_find_user_avatar_by_email(
+    repo_path: String,
+    login: String,
+    email: String,
+) -> Result<Option<String>, String> {
+    let (host, token, _owner, _repo) = github_resolve(&repo_path, &login)?;
+    github::api::find_user_avatar_by_email(&host, &token, &email).await
+}
+
+#[tauri::command]
 async fn github_get_repo_merge_settings(
     repo_path: String,
     login: String,
@@ -1465,6 +1475,7 @@ pub fn run() {
             github_merge_pull_request,
             github_delete_remote_branch,
             github_get_repo_merge_settings,
+            github_find_user_avatar_by_email,
             github_list_pull_request_files,
             github_get_pull_request_image_diff,
             github_list_review_comments,

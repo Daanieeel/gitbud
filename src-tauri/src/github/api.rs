@@ -133,6 +133,31 @@ struct RawUser {
 }
 
 #[derive(Deserialize)]
+struct SearchUsersResponse {
+    items: Vec<RawUser>,
+}
+
+/// Looks up a GitHub avatar for a plain git commit author by email — used for commit history,
+/// where (unlike a PR/review author) all we start with is whatever the commit itself recorded.
+/// Only finds a match if that email is public/verified on the account's GitHub profile, so
+/// this is "if available", not a hard guarantee. One request per unique email (callers should
+/// cache), not per commit.
+pub async fn find_user_avatar_by_email(host: &str, token: &str, email: &str) -> Result<Option<String>, String> {
+    let gh = GhClient::new(host, token)?;
+    let query = format!("{email} in:email");
+    let res = check(
+        gh.get("/search/users")
+            .query(&[("q", query.as_str()), ("per_page", "1")])
+            .send()
+            .await
+            .map_err(|e| e.to_string())?,
+    )
+    .await?;
+    let parsed: SearchUsersResponse = res.json().await.map_err(|e| e.to_string())?;
+    Ok(parsed.items.into_iter().next().map(|u| u.avatar_url))
+}
+
+#[derive(Deserialize)]
 struct RawRef {
     #[serde(rename = "ref")]
     ref_name: String,
