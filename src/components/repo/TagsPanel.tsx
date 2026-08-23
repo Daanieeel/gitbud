@@ -1,33 +1,26 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { PlusIcon, TagIcon, Trash2Icon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useCreateTag, useDeleteTag, usePushTag, useTags } from "@/hooks/queries/useTags";
 import { githubRepoUrl } from "@/lib/github-links";
 import { cn } from "@/lib/utils";
-import type { TagInfo } from "@/lib/types";
 
 export function TagsPanel() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const [open, setOpen] = useState(false);
-  const [tags, setTags] = useState<TagInfo[]>([]);
+  const { data: tags } = useTags(repoPath, open);
+  const createTag = useCreateTag(repoPath);
+  const deleteTag = useDeleteTag(repoPath);
+  const pushTag = usePushTag(repoPath);
   const [newName, setNewName] = useState("");
   const [newMessage, setNewMessage] = useState("");
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const busy = busyKey !== null;
-
-  const load = () => {
-    if (!repoPath) return;
-    void api.listTags(repoPath).then(setTags);
-  };
-
-  useEffect(() => {
-    if (open) load();
-  }, [open, repoPath]);
 
   if (!repoPath) return null;
 
@@ -46,19 +39,17 @@ export function TagsPanel() {
   const create = () =>
     runBusy("create", async () => {
       if (!newName.trim()) return;
-      await api.createTag(repoPath, newName.trim(), newMessage.trim());
+      await createTag.mutateAsync({ name: newName.trim(), message: newMessage.trim() });
       setNewName("");
       setNewMessage("");
-      load();
     });
 
   const remove = (name: string) =>
     runBusy(`${name}:delete`, async () => {
-      await api.deleteTag(repoPath, name);
-      load();
+      await deleteTag.mutateAsync(name);
     });
 
-  const push = (name: string) => runBusy(`${name}:push`, () => api.pushTag(repoPath, name));
+  const push = (name: string) => runBusy(`${name}:push`, () => pushTag.mutateAsync(name));
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

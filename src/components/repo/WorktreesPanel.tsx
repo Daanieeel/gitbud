@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { FolderOpenIcon, FolderTreeIcon, LockIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useAddWorktree, useRemoveWorktree, useWorktrees } from "@/hooks/queries/useWorktrees";
+import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
 import type { WorktreeInfo } from "@/lib/types";
 
@@ -14,7 +16,10 @@ export function WorktreesPanel() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const branches = useRepoStore((s) => s.branches);
   const addExistingRepo = useRepoStore((s) => s.addExistingRepo);
-  const [worktrees, setWorktrees] = useState<WorktreeInfo[]>([]);
+  const queryClient = useQueryClient();
+  const { data: worktrees } = useWorktrees(repoPath);
+  const addWorktree = useAddWorktree(repoPath);
+  const removeWorktree = useRemoveWorktree(repoPath);
   const [busy, setBusy] = useState(false);
   const [actionPath, setActionPath] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,11 +35,10 @@ export function WorktreesPanel() {
 
   const refresh = () => {
     if (!repoPath) return;
-    void api.listWorktrees(repoPath).then(setWorktrees);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.worktrees(repoPath) });
   };
 
   useEffect(() => {
-    refresh();
     setExistingBranch(localBranches[0]?.name ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [repoPath]);
@@ -52,11 +56,10 @@ export function WorktreesPanel() {
     setBusy(true);
     setError(null);
     try {
-      await api.addWorktree(repoPath, path.trim(), branch, mode === "new");
+      await addWorktree.mutateAsync({ path: path.trim(), branch, createBranch: mode === "new" });
       setPath("");
       setNewBranch("");
       setShowForm(false);
-      refresh();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -80,9 +83,8 @@ export function WorktreesPanel() {
     setActionPath(wt.path);
     setError(null);
     try {
-      await api.removeWorktree(repoPath, wt.path, force);
+      await removeWorktree.mutateAsync({ path: wt.path, force });
       setConfirmForcePath(null);
-      refresh();
     } catch (e) {
       if (!force) {
         setConfirmForcePath(wt.path);

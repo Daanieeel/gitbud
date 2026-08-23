@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronDownIcon, FolderKanbanIcon, SettingsIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,20 +8,16 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import { useWorkspaces } from "@/hooks/queries/useWorkspaces";
+import { useWorkspaceFilterStore } from "@/store/useWorkspaceFilterStore";
 import { WorkspaceDialog } from "./WorkspaceDialog";
 import { cn } from "@/lib/utils";
 
 export function WorkspacePicker() {
-  const workspaces = useWorkspaceStore((s) => s.workspaces);
-  const activeId = useWorkspaceStore((s) => s.activeId);
-  const setActive = useWorkspaceStore((s) => s.setActive);
-  const init = useWorkspaceStore((s) => s.init);
+  const { data: workspaces } = useWorkspaces();
+  const activeId = useWorkspaceFilterStore((s) => s.activeId);
+  const setActive = useWorkspaceFilterStore((s) => s.setActive);
   const [manageOpen, setManageOpen] = useState(false);
-
-  useEffect(() => {
-    void init();
-  }, [init]);
 
   const active = workspaces.find((w) => w.id === activeId);
 

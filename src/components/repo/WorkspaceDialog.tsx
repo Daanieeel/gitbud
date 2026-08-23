@@ -11,7 +11,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useRepoStore } from "@/store/useRepoStore";
-import { useWorkspaceStore } from "@/store/useWorkspaceStore";
+import {
+  useCreateWorkspace,
+  useDeleteWorkspace,
+  useUpdateWorkspace,
+  useWorkspaces,
+} from "@/hooks/queries/useWorkspaces";
 import { cn } from "@/lib/utils";
 
 interface WorkspaceDialogProps {
@@ -23,10 +28,10 @@ const NEW_ID = "__new__";
 
 export function WorkspaceDialog({ open, onOpenChange }: WorkspaceDialogProps) {
   const repos = useRepoStore((s) => s.repos);
-  const workspaces = useWorkspaceStore((s) => s.workspaces);
-  const create = useWorkspaceStore((s) => s.create);
-  const update = useWorkspaceStore((s) => s.update);
-  const remove = useWorkspaceStore((s) => s.remove);
+  const { data: workspaces } = useWorkspaces();
+  const createMutation = useCreateWorkspace();
+  const updateMutation = useUpdateWorkspace();
+  const removeMutation = useDeleteWorkspace();
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -62,9 +67,9 @@ export function WorkspaceDialog({ open, onOpenChange }: WorkspaceDialogProps) {
   const save = async () => {
     if (!name.trim()) return;
     if (editingId === NEW_ID) {
-      await create(name, [...selected]);
+      await createMutation.mutateAsync({ name, repoPaths: [...selected] });
     } else if (editingId) {
-      await update(editingId, name, [...selected]);
+      await updateMutation.mutateAsync({ id: editingId, name, repoPaths: [...selected] });
     }
     setEditingId(null);
   };
@@ -135,7 +140,7 @@ export function WorkspaceDialog({ open, onOpenChange }: WorkspaceDialogProps) {
                       size="sm"
                       className="text-destructive hover:text-destructive"
                       onClick={() => {
-                        void remove(editingId);
+                        void removeMutation.mutateAsync(editingId);
                         setEditingId(null);
                       }}
                     >

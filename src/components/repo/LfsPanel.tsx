@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
 import { DatabaseIcon, DownloadIcon, UploadIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useHasLfs } from "@/hooks/queries/useLfs";
 import { cn } from "@/lib/utils";
 
 export function LfsPanel() {
@@ -12,15 +11,7 @@ export function LfsPanel() {
   const syncing = useRepoStore((s) => s.syncing);
   const pullLfs = useRepoStore((s) => s.pullLfs);
   const pushLfs = useRepoStore((s) => s.pushLfs);
-  const [hasLfs, setHasLfs] = useState(false);
-
-  useEffect(() => {
-    if (!repoPath) {
-      setHasLfs(false);
-      return;
-    }
-    void api.hasLfs(repoPath).then(setHasLfs);
-  }, [repoPath]);
+  const { data: hasLfs } = useHasLfs(repoPath);
 
   if (!repoPath || !hasLfs) return null;
 

@@ -41,7 +41,7 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [ ] Pop-out merge conflict resolution editor
 - [ ] Settings redesign
 - [X] Open File in Editor
-- [X] Better PR viewer (comments, files, commits) like on GitHub
+- [ ] Better PR viewer (comments, files, commits) like on GitHub
 - [ ] Move to TanStack Query
 - [ ] Live-syncing with git provider (PRs, commits etc)
 - [ ] Improve git blame view
