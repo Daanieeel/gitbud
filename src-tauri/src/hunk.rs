@@ -1,4 +1,4 @@
-use crate::diff::apply_whitespace_setting;
+use crate::diff::apply_diff_settings;
 use git2::{ApplyLocation, Delta, DiffOptions, Patch, Repository};
 
 /// Builds a minimal unified-diff patch for a single hunk (identified by `hunk_index` within
@@ -88,7 +88,7 @@ pub fn stage_hunk(repo_path: &str, path: &str, hunk_index: usize) -> Result<(), 
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut opts = DiffOptions::new();
     opts.pathspec(path).include_untracked(true).recurse_untracked_dirs(true);
-    apply_whitespace_setting(&mut opts);
+    apply_diff_settings(&mut opts);
     let diff = repo
         .diff_index_to_workdir(None, Some(&mut opts))
         .map_err(|e| e.message().to_string())?;
@@ -106,7 +106,7 @@ pub fn unstage_hunk(repo_path: &str, path: &str, hunk_index: usize) -> Result<()
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut opts = DiffOptions::new();
     opts.pathspec(path);
-    apply_whitespace_setting(&mut opts);
+    apply_diff_settings(&mut opts);
     let head_tree = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
     let diff = repo
         .diff_tree_to_index(head_tree.as_ref(), None, Some(&mut opts))
@@ -125,7 +125,7 @@ pub fn discard_hunk(repo_path: &str, path: &str, hunk_index: usize) -> Result<()
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut opts = DiffOptions::new();
     opts.pathspec(path).include_untracked(true).recurse_untracked_dirs(true);
-    apply_whitespace_setting(&mut opts);
+    apply_diff_settings(&mut opts);
     let diff = repo
         .diff_index_to_workdir(None, Some(&mut opts))
         .map_err(|e| e.message().to_string())?;

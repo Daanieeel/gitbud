@@ -29,7 +29,7 @@ import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
-import type { DiffViewMode, PullStrategy, SidebarSort, ThemeMode } from "@/lib/types";
+import type { DiffAlgorithm, DiffViewMode, PullStrategy, SidebarSort, ThemeMode } from "@/lib/types";
 
 const SECTIONS = [
   { key: "General", icon: SettingsIcon },
@@ -291,6 +291,13 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   <Checkbox
                     checked={settings.ignore_whitespace}
                     onCheckedChange={(checked) => void update({ ignore_whitespace: checked === true })}
+                  />
+                </Row>
+                <Row label="Diff algorithm">
+                  <Select
+                    value={settings.diff_algorithm}
+                    options={["myers", "minimal", "patience"] as DiffAlgorithm[]}
+                    onChange={(diff_algorithm) => void update({ diff_algorithm })}
                   />
                 </Row>
                 <Row label="Font size">

@@ -210,6 +210,7 @@ export interface CherryPickResult {
 export type ThemeMode = "light" | "dark" | "system";
 export type PullStrategy = "merge" | "rebase" | "ff-only";
 export type DiffViewMode = "unified" | "split";
+export type DiffAlgorithm = "myers" | "minimal" | "patience";
 export type SidebarSort = "name" | "recent" | "group" | "manual";
 
 export interface Settings {
@@ -222,6 +223,7 @@ export interface Settings {
   diff_view: DiffViewMode;
   ignore_whitespace: boolean;
   diff_font_size: number;
+  diff_algorithm: DiffAlgorithm;
   show_ahead_behind: boolean;
   sidebar_sort: SidebarSort;
   auto_stage_new_changes: boolean;

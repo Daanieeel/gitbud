@@ -181,11 +181,23 @@ pub fn add_intraline_highlights(hunks: &mut [DiffHunk]) {
     }
 }
 
-/// Diff a single file, either the staged side (HEAD -> index) or unstaged side (index -> workdir).
-/// Applies the user's whitespace-handling preference to a set of diff options.
-pub(crate) fn apply_whitespace_setting(opts: &mut DiffOptions) {
-    if crate::settings::get_settings().map(|s| s.ignore_whitespace).unwrap_or(false) {
+/// Applies the user's whitespace-handling and diff-algorithm preferences to a set of diff
+/// options — the one place every diff/hunk-staging call site goes through so both settings
+/// take effect everywhere consistently.
+pub(crate) fn apply_diff_settings(opts: &mut DiffOptions) {
+    let settings = crate::settings::get_settings().unwrap_or_default();
+    if settings.ignore_whitespace {
         opts.ignore_whitespace(true);
+    }
+    use crate::settings::DiffAlgorithm;
+    match settings.diff_algorithm {
+        DiffAlgorithm::Myers => {}
+        DiffAlgorithm::Minimal => {
+            opts.minimal(true);
+        }
+        DiffAlgorithm::Patience => {
+            opts.patience(true);
+        }
     }
 }
 
@@ -196,7 +208,7 @@ pub fn get_file_diff(repo_path: &str, path: &str, staged: bool) -> Result<FileDi
         .include_untracked(true)
         .recurse_untracked_dirs(true)
         .show_untracked_content(true);
-    apply_whitespace_setting(&mut opts);
+    apply_diff_settings(&mut opts);
 
     let diff = if staged {
         let head_tree = repo.head().ok().and_then(|h| h.peel_to_tree().ok());
@@ -404,7 +416,7 @@ pub fn get_commit_file_diff(repo_path: &str, oid: &str, path: &str) -> Result<Fi
 
     let mut opts = DiffOptions::new();
     opts.pathspec(path);
-    apply_whitespace_setting(&mut opts);
+    apply_diff_settings(&mut opts);
 
     let diff = repo
         .diff_tree_to_tree(parent_tree.as_ref(), Some(&tree), Some(&mut opts))
@@ -469,7 +481,7 @@ pub fn get_branch_diff_file(repo_path: &str, base: &str, head: &str, path: &str)
 
     let mut opts = DiffOptions::new();
     opts.pathspec(path);
-    apply_whitespace_setting(&mut opts);
+    apply_diff_settings(&mut opts);
 
     let diff = repo
         .diff_tree_to_tree(Some(&base_tree), Some(&head_tree), Some(&mut opts))
