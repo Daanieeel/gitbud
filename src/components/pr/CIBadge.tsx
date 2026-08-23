@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CheckCircle2Icon, CircleDashedIcon, XCircleIcon } from "lucide-react";
-import { useCheckRuns } from "@/hooks/queries/useCheckRuns";
+import { checkRunsPollInterval, useCheckRuns } from "@/hooks/queries/useCheckRuns";
+import { CheckRunsRefresh } from "./CheckRunsRefresh";
 import type { CheckRun } from "@/lib/types";
 import {
   Popover,
@@ -72,7 +73,7 @@ const OVERALL_COLOR: Record<Overall, string> = {
 };
 
 export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
-  const { data: runs = null } = useCheckRuns(repoPath, login, sha);
+  const { data: runs = null, refetch, isFetching, dataUpdatedAt } = useCheckRuns(repoPath, login, sha);
   const [open, setOpen] = useState(false);
 
   if (runs === null || runs.length === 0) return null;
@@ -92,6 +93,15 @@ export function CIBadge({ repoPath, login, sha }: CIBadgeProps) {
           </TooltipTrigger>
         </PopoverTrigger>
         <PopoverContent className="w-72 p-1" align="start">
+          <div className="flex items-center justify-between gap-2 px-2 py-1">
+            <span className="text-xs font-medium text-muted-foreground">Checks</span>
+            <CheckRunsRefresh
+              dataUpdatedAt={dataUpdatedAt}
+              isFetching={isFetching}
+              onRefresh={() => void refetch()}
+              pollIntervalMs={checkRunsPollInterval(runs)}
+            />
+          </div>
           {runs.map((run) => (
             <a
               key={run.name}

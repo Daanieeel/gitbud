@@ -16,7 +16,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useMergePullRequest } from "@/hooks/queries/usePullRequests";
-import { useCheckRuns } from "@/hooks/queries/useCheckRuns";
+import { checkRunsPollInterval, useCheckRuns } from "@/hooks/queries/useCheckRuns";
+import { CheckRunsRefresh } from "./CheckRunsRefresh";
 import { runIcon, runStatusLabel } from "./CIBadge";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
@@ -67,7 +68,12 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
   const [commitMessage, setCommitMessage] = useState("");
   const [deleteBranch, setDeleteBranch] = useState(false);
   const [merging, setMerging] = useState(false);
-  const { data: runs = null } = useCheckRuns(open ? repoPath : null, open ? login : null, open ? pr.head_sha : null);
+  const {
+    data: runs = null,
+    refetch: refetchRuns,
+    isFetching: runsFetching,
+    dataUpdatedAt: runsUpdatedAt,
+  } = useCheckRuns(open ? repoPath : null, open ? login : null, open ? pr.head_sha : null);
   const [repoSettings, setRepoSettings] = useState<RepoMergeSettings | null>(null);
 
   // Force a fresh check-runs fetch every time this dialog opens — you're about to merge, so a
@@ -169,7 +175,15 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
           )}
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Checks</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">Checks</span>
+              <CheckRunsRefresh
+                dataUpdatedAt={runsUpdatedAt}
+                isFetching={runsFetching}
+                onRefresh={() => void refetchRuns()}
+                pollIntervalMs={checkRunsPollInterval(runs ?? undefined)}
+              />
+            </div>
             <div className="flex flex-col gap-1 rounded-md border border-border p-1 text-xs">
               {runs === null ? (
                 <div className="flex flex-col gap-1.5 py-0.5">
