@@ -11,19 +11,19 @@
 
 </div>
 
-Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. GitBud gives you the workflow you already know — sidebar, changes, history, PRs, stage-and-commit, one-click sync — without the bundled Chromium tax. It's built on Tauri, not Electron, so it opens instantly and gets out of your way.
+Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. GitBud gives you the workflow you already know (sidebar, changes, history, PRs, stage-and-commit, one-click sync) without the bundled Chromium tax. It's built on Tauri, not Electron, so it opens instantly and gets out of your way.
 
 <div align="center">
 <img src="resources/screenshots.png" alt="GitBud screenshots" width="900">
 </div>
 
-> **Status: early and moving fast.** GitBud is pre-1.0 and under active development — the core workflow (stage, commit, branch, sync, review PRs) is solid daily-driver territory, but expect rough edges elsewhere. This is a good time to open issues, suggest features, or send a PR that shapes where it goes next.
+> **Status: early and moving fast.** GitBud is pre-1.0 and under active development. The core workflow (stage, commit, branch, sync, review PRs) is solid daily-driver territory, but expect rough edges elsewhere. This is a good time to open issues, suggest features, or send a PR that shapes where it goes next.
 
 ## Contents
 
 - [Roadmap](#roadmap)
 - [Features](#features)
-- [Performance, not as an afterthought](#performance-not-as-an-afterthought)
+- [Performance](#performance)
 - [Getting Started](#getting-started)
   - [Download](#download)
   - [Build from source](#build-from-source)
@@ -42,41 +42,43 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [ ] Settings redesign
 - [X] Open File in Editor
 - [ ] Better PR viewer (comments, files, commits) like on GitHub
-- [ ] Move to TanStack Query
-- [ ] Live-syncing with git provider (PRs, commits etc)
+- [X] Move to TanStack Query
+- [X] Live-syncing with git provider (PRs, commits etc)
 - [ ] Improve git blame view
+- [ ] View releases in-app
 - [ ] ...and more to come
 
 ## Features
 
-- **Find any repo fast** — sidebar grouped by owner/remote, filterable, with dirty-state and ahead/behind badges at a glance; right-click for terminal, Finder, or copy-path
-- **Stage exactly what you mean** — whole files *or individual hunks*, discard down to a single hunk, real syntax-highlighted inline diffs, virtualized so huge repos don't lag
-- **Resolve conflicts without leaving the app** — dedicated view: Use Mine / Use Theirs / edit manually / mark resolved
-- **Commit with confidence** — summary + description that survives tab switches, one-click amend, warnings before you commit to a protected branch
-- **See your history clearly** — virtualized log with a real `git log --graph`-style lane graph, cherry-pick, revert, create-branch-here, plus CI status and GPG/SSH verification badges right on each commit
-- **Manage branches in one place** — create/rename/delete/merge from a single popover, with a one-click pruner for branches already merged
-- **Review and ship PRs in-app** — browse open/closed/all, create with your `.github/PULL_REQUEST_TEMPLATE.md` auto-loaded, checkout locally in one click, leave inline review comments, merge/squash/rebase
-- **Sign in the way you already work** — zero-config via a detected `gh` CLI login, or Device Flow if you'd rather skip the CLI; GitHub Enterprise Server supported too
-- **Sync without surprises** — fetch/pull/push with live streamed output, your choice of pull strategy, fork/upstream tracking with one-click fast-forward
-- **Tune it to your workflow** — theme, git identity (global or per-repo), diff whitespace/font-size, sidebar sort, custom git binary, filesystem-watch toggle
+- Sidebar of repos grouped by owner/remote, filterable, with dirty-state and ahead/behind badges; right-click for terminal, Finder, or copy-path
+- Stage, unstage, and discard whole files, individual hunks, or individual lines; syntax-highlighted diffs; virtualized file/commit lists
+- Conflict resolution view: per-block accept-ours/accept-theirs, manual edit, or a raw-marker fallback
+- Commit box with summary/description that persists across tab switches, one-click amend, a warning before committing to a protected branch
+- History view with a `git log --graph`-style lane graph (with an optional compact mode that collapses merged-in branches), unpushed-commit indicator, cherry-pick, revert, create-branch-here, interactive rebase (reorder/squash/fixup/drop, with autosquash), and CI/GPG/SSH verification badges on each commit
+- Branch create/rename/delete/merge from one popover, plus a one-click pruner for already-merged branches
+- Pull request list, detail view, and creation (auto-loads `.github/PULL_REQUEST_TEMPLATE.md`), local checkout, inline review comments, and merge (merge/squash/rebase, with an option to change the target branch first)
+- Sign-in via a detected `gh` CLI login or OAuth Device Flow; GitHub Enterprise Server supported
+- Fetch/pull/push with streamed output, a choice of pull strategy, a resolve dialog for `--ff-only` pulls that hit diverging branches, and fork/upstream tracking
+- Command palette with fuzzy matching across repos, branches, files, and commits
+- Settings for theme, git identity (global or per-repo), diff whitespace/font-size/algorithm, sidebar sort, custom git binary path, and the filesystem watcher
 
-## Performance, not as an afterthought
+## Performance
 
-These are the actual reasons this project exists:
+A few design choices that keep this lighter than the average Electron-based git client:
 
-- Idle RAM target: **under 50MB** with a repo open
-- Cold start to interactive: **under 1 second**
-- No polling, anywhere — repo state changes are pushed by filesystem events
-- Every list (files, commits) is virtualized
-- Diffs are computed in Rust and shipped as structured hunks, never raw file blobs
+- Idle RAM target: under 150MB with a repo open
+- Cold start to interactive: under a second
+- Local repo state (status, log, branches) updates from filesystem events, not polling. Remote-facing data (open PRs, CI checks, a background fetch) is polled on a backoff schedule, since GitHub has no push channel for that
+- File and commit lists are virtualized
+- Diffs are computed in Rust and sent to the frontend as structured hunks, not raw file blobs
 
 ## Getting Started
 
 ### Download
 
-Pre-built installers for macOS, Windows, and Linux are published on the [Releases page](https://github.com/Daanieeel/gitbud/releases) whenever a new version ships. They aren't code-signed yet, so your OS will warn you before the first launch — that's expected for a project this early, not a red flag.
+Pre-built installers for macOS, Windows, and Linux are published on the [Releases page](https://github.com/Daanieeel/gitbud/releases) whenever a new version ships. They aren't code-signed yet, so your OS will warn you before the first launch. That's expected for a project this early, not a red flag.
 
-**macOS:** you'll see `"GitBud.app" is damaged and can't be opened` — this is Gatekeeper blocking an unnotarized app, not actual corruption. Fix it by removing the quarantine flag:
+**macOS:** you'll see `"GitBud.app" is damaged and can't be opened`. This is Gatekeeper blocking an unnotarized app, not actual corruption. Fix it by removing the quarantine flag:
 
 ```bash
 xattr -cr /Applications/GitBud.app
@@ -107,7 +109,7 @@ cargo test
 
 ### GitHub features
 
-Pull requests, checks, and review comments need a signed-in GitHub account. GitBud has no bundled OAuth credentials (it's not affiliated with GitHub) — the easiest path is having the [GitHub CLI](https://cli.github.com/) installed and logged in (`gh auth login`); GitBud will detect it automatically. Otherwise, sign in via Device Flow using your own [OAuth App](https://github.com/settings/applications/new) (Settings → GitHub).
+Pull requests, checks, and review comments need a signed-in GitHub account. GitBud has no bundled OAuth credentials (it's not affiliated with GitHub). The easiest path is having the [GitHub CLI](https://cli.github.com/) installed and logged in (`gh auth login`); GitBud will detect it automatically. Otherwise, sign in via Device Flow using your own [OAuth App](https://github.com/settings/applications/new) (Settings > GitHub).
 
 ## Architecture
 
