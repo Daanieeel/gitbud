@@ -469,13 +469,13 @@ export function BranchSwitcher() {
             {pendingDelete?.unmerged && (
               <div className="flex items-start gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
                 <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-                <span>This branch has commits not merged anywhere else. They'll become unreachable.</span>
+                <span>This branch has commits not merged anywhere else</span>
               </div>
             )}
             {pendingDelete?.published && (
               <div className="flex items-start gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
                 <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-                <span>This branch is published to origin.</span>
+                <span>This branch is published to origin</span>
               </div>
             )}
           </div>
