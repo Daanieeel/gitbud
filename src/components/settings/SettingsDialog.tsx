@@ -29,7 +29,14 @@ import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
-import type { DiffAlgorithm, DiffViewMode, PullStrategy, SidebarSort, ThemeMode } from "@/lib/types";
+import type {
+  DiffAlgorithm,
+  DiffViewMode,
+  OpenPrAfterCreation,
+  PullStrategy,
+  SidebarSort,
+  ThemeMode,
+} from "@/lib/types";
 
 const SECTIONS = [
   { key: "General", icon: SettingsIcon },
@@ -40,6 +47,11 @@ const SECTIONS = [
   { key: "Advanced", icon: SlidersHorizontalIcon },
 ] as const;
 type Section = (typeof SECTIONS)[number]["key"];
+
+const OPEN_PR_OPTIONS: { key: OpenPrAfterCreation; label: string; description: string }[] = [
+  { key: "in-app", label: "In-App", description: "Open the pull request in the Pull Requests tab" },
+  { key: "provider", label: "Provider", description: "Open the pull request in your browser" },
+];
 
 interface SettingsDialogProps {
   open: boolean;
@@ -221,14 +233,27 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     </Button>
                   </EditorPicker>
                 </Row>
-                <Row label="Open PR on provider after creation">
-                  <Checkbox
-                    checked={settings.open_pr_on_provider_after_creation}
-                    onCheckedChange={(checked) =>
-                      void update({ open_pr_on_provider_after_creation: checked === true })
-                    }
-                  />
-                </Row>
+                <div className="flex flex-col gap-1.5 py-1.5">
+                  <span className="text-sm text-muted-foreground">Open PR after creation</span>
+                  <div className="flex gap-2">
+                    {OPEN_PR_OPTIONS.map((o) => (
+                      <button
+                        key={o.key}
+                        type="button"
+                        onClick={() => void update({ open_pr_after_creation: o.key })}
+                        className={cn(
+                          "flex-1 rounded-md border border-border p-2 text-left",
+                          settings.open_pr_after_creation === o.key && "border-2 border-primary bg-primary/10 p-[7px]",
+                        )}
+                      >
+                        <div className="flex flex-col gap-1">
+                          <div className="text-sm font-medium">{o.label}</div>
+                          <div className="text-xs text-muted-foreground">{o.description}</div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </>
             )}
 

@@ -46,6 +46,13 @@ pub enum SidebarSort {
     Manual,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum OpenPrAfterCreation {
+    InApp,
+    Provider,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -90,7 +97,11 @@ pub struct Settings {
     pub desktop_notifications: bool,
 
     // Pull requests
-    pub open_pr_on_provider_after_creation: bool,
+    /// Renamed from the old `open_pr_on_provider_after_creation: bool` — the key changed, so any
+    /// settings file written before this field existed simply has no value for it and falls back
+    /// to `Settings::default()`'s `InApp`, which is the intended one-time retroactive default
+    /// switch for existing users (they used to get the provider opened in-browser by default).
+    pub open_pr_after_creation: OpenPrAfterCreation,
 
     // Editor
     /// Id of the chosen "Open in <editor>" target (see `system::EDITORS`), or `"custom"` for
@@ -124,7 +135,7 @@ impl Default for Settings {
             desktop_notifications: true,
             favorite_editor: None,
             custom_editor_command: None,
-            open_pr_on_provider_after_creation: true,
+            open_pr_after_creation: OpenPrAfterCreation::InApp,
         }
     }
 }

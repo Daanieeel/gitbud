@@ -212,6 +212,7 @@ export type PullStrategy = "merge" | "rebase" | "ff-only";
 export type DiffViewMode = "unified" | "split";
 export type DiffAlgorithm = "myers" | "minimal" | "patience";
 export type SidebarSort = "name" | "recent" | "group" | "manual";
+export type OpenPrAfterCreation = "in-app" | "provider";
 
 export interface Settings {
   theme: ThemeMode;
@@ -233,7 +234,7 @@ export interface Settings {
   desktop_notifications: boolean;
   favorite_editor: string | null;
   custom_editor_command: string | null;
-  open_pr_on_provider_after_creation: boolean;
+  open_pr_after_creation: OpenPrAfterCreation;
 }
 
 // --- GitHub ---
