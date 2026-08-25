@@ -71,7 +71,8 @@ function prefetchRepo(repoPath: string) {
     }),
     queryClient.prefetchQuery({
       queryKey: queryKeys.aheadBehind(repoPath),
-      queryFn: () => api.getAheadBehind(repoPath).catch(() => ({ ahead: 0, behind: 0, published: true })),
+      queryFn: () =>
+        api.getAheadBehind(repoPath).catch(() => ({ ahead: 0, behind: 0, published: true, head_on_remote: true })),
     }),
     queryClient.prefetchQuery({ queryKey: queryKeys.stashes(repoPath), queryFn: () => api.listStashes(repoPath) }),
     queryClient.prefetchInfiniteQuery({

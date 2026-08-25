@@ -22,6 +22,24 @@ pub struct AheadBehind {
     /// has never been pushed (`git push` would fail without `-u`) — distinct from being merely
     /// up to date, which also reports `ahead: 0, behind: 0`.
     pub published: bool,
+    /// Whether HEAD's commit already exists on some remote-tracking branch, published or not.
+    /// A freshly created local branch reports `published: false` even though HEAD is the exact
+    /// commit its parent branch already pushed — this field lets callers tell "genuinely new,
+    /// unpushed commit" apart from "just hasn't been published from *this* branch yet".
+    pub head_on_remote: bool,
+}
+
+/// Whether `oid` already exists on some remote-tracking branch (`refs/remotes/*`), either as
+/// that branch's exact tip or as one of its ancestors.
+fn is_oid_on_any_remote(repo: &git2::Repository, oid: git2::Oid) -> bool {
+    let Ok(branches) = repo.branches(Some(git2::BranchType::Remote)) else { return false };
+    for branch in branches.flatten() {
+        let Some(remote_oid) = branch.0.get().target() else { continue };
+        if remote_oid == oid || repo.graph_descendant_of(remote_oid, oid).unwrap_or(false) {
+            return true;
+        }
+    }
+    false
 }
 
 /// How long a streamed git operation can go with zero output before we assume it's stuck
@@ -402,13 +420,20 @@ pub fn get_ahead_behind(repo_path: &str) -> Result<AheadBehind, String> {
     let upstream_ref = format!("refs/remotes/origin/{branch_name}");
     let upstream_oid = match repo.refname_to_id(&upstream_ref) {
         Ok(oid) => oid,
-        Err(_) => return Ok(AheadBehind { ahead: 0, behind: 0, published: false }),
+        Err(_) => {
+            return Ok(AheadBehind {
+                ahead: 0,
+                behind: 0,
+                published: false,
+                head_on_remote: is_oid_on_any_remote(&repo, local_oid),
+            })
+        }
     };
 
     let (ahead, behind) = repo
         .graph_ahead_behind(local_oid, upstream_oid)
         .map_err(|e| e.message().to_string())?;
-    Ok(AheadBehind { ahead, behind, published: true })
+    Ok(AheadBehind { ahead, behind, published: true, head_on_remote: ahead == 0 })
 }
 
 /// Ahead/behind of the local branch vs. `upstream/{branch}` (the fork's origin, as opposed
@@ -430,7 +455,7 @@ pub fn get_upstream_ahead_behind(repo_path: &str, branch: &str) -> Result<Option
     let (ahead, behind) = repo
         .graph_ahead_behind(local_oid, upstream_oid)
         .map_err(|e| e.message().to_string())?;
-    Ok(Some(AheadBehind { ahead, behind, published: true }))
+    Ok(Some(AheadBehind { ahead, behind, published: true, head_on_remote: ahead == 0 }))
 }
 
 // `run_streaming` (and everything built on it — fetch/pull/push/clone/lfs_pull/etc, plus the

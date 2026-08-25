@@ -397,7 +397,7 @@ export function RepoSidebar() {
     void Promise.all(
       repos.map(
         async (r) =>
-          [r.path, await api.getAheadBehind(r.path).catch(() => ({ ahead: 0, behind: 0, published: true }))] as const,
+          [r.path, await api.getAheadBehind(r.path).catch(() => ({ ahead: 0, behind: 0, published: true, head_on_remote: true }))] as const,
       ),
     ).then((results) => {
       if (cancelled) return;
@@ -421,7 +421,7 @@ export function RepoSidebar() {
         .then((isDirty) => setDirty((prev) => ({ ...prev, [path]: isDirty })));
       void api
         .getAheadBehind(path)
-        .catch(() => ({ ahead: 0, behind: 0, published: true }))
+        .catch(() => ({ ahead: 0, behind: 0, published: true, head_on_remote: true }))
         .then((ab) => setAheadBehind((prev) => ({ ...prev, [path]: ab })));
     });
     return () => {

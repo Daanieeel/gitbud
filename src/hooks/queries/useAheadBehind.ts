@@ -3,7 +3,7 @@ import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 import type { AheadBehind } from "@/lib/types";
 
-const DEFAULT_AHEAD_BEHIND: AheadBehind = { ahead: 0, behind: 0, published: true };
+const DEFAULT_AHEAD_BEHIND: AheadBehind = { ahead: 0, behind: 0, published: true, head_on_remote: true };
 
 export function useAheadBehind(repoPath: string | null) {
   return useQuery({
