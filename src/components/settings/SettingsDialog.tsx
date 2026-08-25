@@ -212,10 +212,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                 </Row>
                 <Row label="Favorite editor">
                   <EditorPicker
-                    onSelect={(favorite_editor, customCommand) =>
+                    onSelect={(favorite_editor, customAppPath) =>
                       void update({
                         favorite_editor,
-                        custom_editor_command: favorite_editor === CUSTOM_EDITOR_ID ? (customCommand ?? null) : null,
+                        custom_editor_command: favorite_editor === CUSTOM_EDITOR_ID ? (customAppPath ?? null) : null,
                       })
                     }
                   >
@@ -226,7 +226,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                           <span className="truncate">{favoriteEditor.name}</span>
                         </>
                       ) : settings.favorite_editor === CUSTOM_EDITOR_ID ? (
-                        <span className="truncate font-mono text-xs">{settings.custom_editor_command}</span>
+                        <span className="truncate text-xs" title={settings.custom_editor_command ?? undefined}>
+                          {settings.custom_editor_command?.split("/").pop()}
+                        </span>
                       ) : (
                         <span className="text-muted-foreground">Choose an editor…</span>
                       )}

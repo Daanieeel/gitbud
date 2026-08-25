@@ -167,10 +167,10 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
           </span>
           <span>Choose one to enable "Open in…" from the Changes file explorer.</span>
           <EditorPicker
-            onSelect={(editorId, customCommand) =>
+            onSelect={(editorId, customAppPath) =>
               void updateSettings({
                 favorite_editor: editorId,
-                custom_editor_command: editorId === CUSTOM_EDITOR_ID ? (customCommand ?? null) : null,
+                custom_editor_command: editorId === CUSTOM_EDITOR_ID ? (customAppPath ?? null) : null,
               })
             }
           >

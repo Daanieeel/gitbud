@@ -107,8 +107,8 @@ pub struct Settings {
     /// Id of the chosen "Open in <editor>" target (see `system::EDITORS`), or `"custom"` for
     /// `custom_editor_command`. `None` means no favorite editor has been chosen yet.
     pub favorite_editor: Option<String>,
-    /// Shell command template used when `favorite_editor` is `"custom"` — `{path}` is replaced
-    /// with the file's absolute path.
+    /// Absolute path to the app bundle (macOS `.app`) or executable the user picked via a file
+    /// dialog, used when `favorite_editor` is `"custom"`.
     pub custom_editor_command: Option<String>,
 }
 

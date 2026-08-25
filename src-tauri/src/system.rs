@@ -23,20 +23,18 @@ const EDITORS: &[(&str, &str, &str)] = &[
 ];
 
 /// Opens `path` in the user's chosen editor. `editor` is one of the ids in `EDITORS`, or
-/// `"custom"` — in which case `custom_command` is a shell command template with a `{path}`
-/// placeholder (e.g. `micro {path}`), run through the platform shell so the user can freely
-/// include flags/arguments.
-pub fn open_in_editor(path: &str, editor: &str, custom_command: Option<&str>) -> Result<(), String> {
+/// `"custom"`, in which case `custom_app_path` is the absolute path to an app bundle (macOS
+/// `.app`) or executable (Windows `.exe`, Linux binary) the user picked via a file dialog.
+pub fn open_in_editor(path: &str, editor: &str, custom_app_path: Option<&str>) -> Result<(), String> {
     if editor == "custom" {
-        let template = custom_command.ok_or("No custom editor command configured")?;
-        let command = template.replace("{path}", path);
-        #[cfg(target_os = "windows")]
+        let app_path = custom_app_path.ok_or("No custom editor configured")?;
+        #[cfg(target_os = "macos")]
         {
-            Command::new("cmd").args(["/c", &command]).spawn().map_err(|e| e.to_string())?;
+            Command::new("open").args(["-a", app_path, path]).spawn().map_err(|e| e.to_string())?;
         }
-        #[cfg(not(target_os = "windows"))]
+        #[cfg(not(target_os = "macos"))]
         {
-            Command::new("sh").arg("-c").arg(&command).spawn().map_err(|e| e.to_string())?;
+            Command::new(app_path).arg(path).spawn().map_err(|e| e.to_string())?;
         }
         return Ok(());
     }

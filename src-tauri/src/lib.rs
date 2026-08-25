@@ -1264,8 +1264,8 @@ async fn open_in_terminal(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn open_in_editor(path: String, editor: String, custom_command: Option<String>) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || system::open_in_editor(&path, &editor, custom_command.as_deref()))
+async fn open_in_editor(path: String, editor: String, custom_app_path: Option<String>) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || system::open_in_editor(&path, &editor, custom_app_path.as_deref()))
         .await
         .map_err(|e| e.to_string())?
 }
