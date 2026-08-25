@@ -4,6 +4,7 @@ import { api } from "@/lib/tauri";
 import { queryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
 import { runGitSync } from "@/lib/gitSync";
+import { clearAutoStagedPaths } from "@/hooks/queries/useRepoStatus";
 import type { RepoEntry } from "@/lib/types";
 
 /** Restores the last-open repo across app restarts, so launching GitBud doesn't always land
@@ -168,6 +169,8 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   removeRepo: async (path) => {
     const repos = await api.removeRepo(path);
     set({ repos });
+    queryClient.removeQueries({ queryKey: queryKeys.repo(path) });
+    clearAutoStagedPaths(path);
     if (get().selectedRepo === path) {
       set({ selectedRepo: null });
       if (repos.length > 0) await get().selectRepo(repos[0].path);

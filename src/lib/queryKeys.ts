@@ -8,6 +8,7 @@ export const queryKeys = {
 
   repo: (repoPath: string) => ["repo", repoPath] as const,
   status: (repoPath: string) => ["repo", repoPath, "status"] as const,
+  dirty: (repoPath: string) => ["repo", repoPath, "dirty"] as const,
   branches: (repoPath: string) => ["repo", repoPath, "branches"] as const,
   aheadBehind: (repoPath: string) => ["repo", repoPath, "ahead-behind"] as const,
   remoteProvider: (repoPath: string) => ["repo", repoPath, "remote-provider"] as const,

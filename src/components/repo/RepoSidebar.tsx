@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -54,7 +55,11 @@ import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { detectRemoteProvider } from "@/lib/remote-provider";
 import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import type { AheadBehind, RepoEntry } from "@/lib/types";
+
+const DEFAULT_AHEAD_BEHIND: AheadBehind = { ahead: 0, behind: 0, published: true, head_on_remote: true };
 
 function groupRepos(repos: RepoEntry[]): Map<string, RepoEntry[]> {
   const groups = new Map<string, RepoEntry[]>();
@@ -282,7 +287,7 @@ function RepoRow({
               <img
                 src={favoriteEditorOption.icon}
                 alt=""
-                className={favoriteEditorOption.id === "zed" ? "size-4" : "size-3.5"}
+                className={favoriteEditorOption.id === "zed" ? "size-5" : "size-3.5"}
               />
             ) : (
               <CodeIcon className="size-3.5" />
@@ -330,8 +335,6 @@ export function RepoSidebar() {
 
   const { width, onPointerDown } = useResizableWidth("sidebar-width:repos", 256, 200, 480);
   const [filter, setFilter] = useState("");
-  const [dirty, setDirty] = useState<Record<string, boolean>>({});
-  const [aheadBehind, setAheadBehind] = useState<Record<string, AheadBehind>>({});
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const [confirmRemovePath, setConfirmRemovePath] = useState<string | null>(null);
   const [pinSectionRepo, setPinSectionRepo] = useState<RepoEntry | null>(null);
@@ -386,43 +389,41 @@ export function RepoSidebar() {
     setConfirmRemoveSection(null);
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all(
-      repos.map(async (r) => [r.path, await api.isDirty(r.path).catch(() => false)] as const),
-    ).then((results) => {
-      if (cancelled) return;
-      setDirty(Object.fromEntries(results));
-    });
-    void Promise.all(
-      repos.map(
-        async (r) =>
-          [r.path, await api.getAheadBehind(r.path).catch(() => ({ ahead: 0, behind: 0, published: true, head_on_remote: true }))] as const,
-      ),
-    ).then((results) => {
-      if (cancelled) return;
-      setAheadBehind(Object.fromEntries(results));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [repos]);
+  // Routed through TanStack Query (same query keys `useAheadBehind`/etc. use for the selected
+  // repo) instead of separate uncached `api.*` calls, so a repo-changed event for the selected
+  // repo doesn't trigger two independent fetches of the same data — one here, one in whichever
+  // tab is showing it.
+  const dirtyQueries = useQueries({
+    queries: repos.map((r) => ({
+      queryKey: queryKeys.dirty(r.path),
+      queryFn: () => api.isDirty(r.path).catch(() => false),
+    })),
+  });
+  const dirty = useMemo(
+    () => Object.fromEntries(repos.map((r, i) => [r.path, !!dirtyQueries[i]?.data])),
+    [repos, dirtyQueries],
+  );
 
-  // The effect above only recomputes dirty/aheadBehind when the repo *list* changes (add/remove),
-  // so a commit or other git activity in an already-listed repo never refreshed its dot here —
-  // unlike the Changes tab, which does subscribe to repo-changed (see useRepoStore). Refresh just
-  // the affected repo on each event instead of redoing the full list.
+  const aheadBehindQueries = useQueries({
+    queries: repos.map((r) => ({
+      queryKey: queryKeys.aheadBehind(r.path),
+      queryFn: () => api.getAheadBehind(r.path).catch(() => DEFAULT_AHEAD_BEHIND),
+    })),
+  });
+  const aheadBehind = useMemo(
+    () => Object.fromEntries(repos.map((r, i) => [r.path, aheadBehindQueries[i]?.data])),
+    [repos, aheadBehindQueries],
+  ) as Record<string, AheadBehind>;
+
+  // `useRepoStore`'s own repo-changed listener already invalidates the *selected* repo's full
+  // query subtree (status/branches/aheadBehind/etc). This just extends that same invalidation
+  // to every other repo shown in the sidebar, scoped to the two cheap keys above rather than a
+  // full status refetch (which would also re-run auto-stage for repos the user isn't looking at).
   useEffect(() => {
     const unlisten = listen<string>("repo-changed", (event) => {
       const path = event.payload;
-      void api
-        .isDirty(path)
-        .catch(() => false)
-        .then((isDirty) => setDirty((prev) => ({ ...prev, [path]: isDirty })));
-      void api
-        .getAheadBehind(path)
-        .catch(() => ({ ahead: 0, behind: 0, published: true, head_on_remote: true }))
-        .then((ab) => setAheadBehind((prev) => ({ ...prev, [path]: ab })));
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dirty(path) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(path) });
     });
     return () => {
       void unlisten.then((f) => f());

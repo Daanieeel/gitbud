@@ -9,6 +9,12 @@ import { useSettingsStore } from "@/store/useSettingsStore";
 // change to that same path is auto-staged again.
 const autoStagedPaths = new Map<string, Set<string>>();
 
+/** Drops a removed repo's auto-stage bookkeeping so it doesn't linger for the rest of the
+ * app session. */
+export function clearAutoStagedPaths(repoPath: string) {
+  autoStagedPaths.delete(repoPath);
+}
+
 async function fetchStatus(repoPath: string) {
   let status = await api.getStatus(repoPath);
 
