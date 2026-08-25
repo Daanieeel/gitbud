@@ -15,7 +15,8 @@ Exhaustive list of implemented, partial, and not-started features. Status legend
 | "Add to .gitignore" file action | Done | This session — single-file and multi-file selection context menu |
 | Multi-select in Changes file explorer | Done | This session — shift-click range select, cmd/ctrl-click toggle, batch stage/unstage/discard/copy-paths via a distinct context menu when multiple files are selected |
 | Commit (+ amend) | Done | `CommitBox.tsx`; amend pre-fills last message; summary/description inputs have autocomplete off |
-| Commit message history | Done | localStorage, per-machine not per-repo (`lib/commit-history.ts`) |
+| Commit message history | Not started | |
+| Auto-stage new changes | Done | Settings toggle, off by default; auto-stages new/modified files on status refresh (`useRepoStatus.ts`) — a fully-unstaged path the user deliberately unstaged stays that way, but a partially-staged file's new hunk is always staged (fixed this session — used to get stuck unstaged) |
 | Pre-filled commit message for single-file commits | Done | Summary only, when field is empty |
 | Undo last commit | Done | This session — soft-reset button below Commit for any unpushed commit; pre-fills the form with the undone message so repeated clicks walk back the whole unpushed chain |
 | Protected branch guard | Done | Warning in `CommitBox.tsx` + icon in `BranchSwitcher.tsx` for main/master |
@@ -41,7 +42,7 @@ Exhaustive list of implemented, partial, and not-started features. Status legend
 | Git LFS awareness | Done | Detection, file-list badges, pull/push (this session) |
 | Blame | Done | Full-file view, click to jump to History |
 | Commit signature verification | Done | "Verified" badges via GitHub API |
-| Commit graph | Partial | Lane assignment + tags shown; branch labels only for current branch. Compact mode (this session) collapses merged-in branches to a bump at the merge commit instead of their own lane; unpushed commits render as a hollow dot |
+| Commit graph | Partial | Lane assignment + tags shown, no branch-tip labels. Compact mode collapses merged-in branches to a bump at the merge commit instead of their own lane; unpushed commits render as a hollow dot |
 | Commit detail header | Done | This session — summary/description, authors (incl. `Co-authored-by:` trailers, hoverable avatars), date, copiable hash, diffstat, tags — above the History tab's file explorer |
 
 ## GitHub integration
@@ -55,7 +56,8 @@ Exhaustive list of implemented, partial, and not-started features. Status legend
 | GitLab / Bitbucket providers | Not started | Switcher architecture leaves room for it |
 | Pull Requests tab + list/filter/search | Done | State-colored, state-specific icons per PR (open/draft/merged/closed) (this session); the open-PR list also refreshes in the background (see Background remote sync) so new/updated PRs surface without reopening the tab |
 | PR detail + checkout + merge (3 strategies) | Done | Dedicated merge dialog: method picker (cards, disabled+tooltip'd for methods the repo, classic branch protection, *or* repository rulesets' `allowed_merge_methods` disallow), pre-filled commit title, live per-check CI status as clickable links to the job run, editable target branch (this session — retargets the PR via a PATCH before merging), delete-branch-after-merge (remote + local; local delete now correctly handles the checked-out-branch case by checking out the base first, fixed this session), pinned to the PR's head sha to avoid merging unseen commits; allowed-methods settings prefetched as soon as the PR tab loads. File explorer is horizontally resizable (this session) |
-| Create PR | Partial | No commit/diff preview before submit; not reachable from Toolbar/BranchSwitcher |
+| Create PR | Done | Files/Commits tabs with full diff preview (`DiffView`) before submit; reachable from Toolbar's "Preview PR" button |
+| Open PR after creation | Done | Settings choice between staying in-app (jumps to the PR tab, selects it) or opening the provider in the browser on submit |
 | Quick access to current branch's PR | Done | Toolbar button shows "Preview PR" (none exists yet, disabled with a reason when there's no commit or no other branch to open into — this session) or "View PR" (jumps to it in the PR tab) depending on whether the current branch already has an open PR |
 | GitHub avatars | Partial | PR authors and review comments show the real GitHub avatar; History tab commit authors resolved by email (GitHub noreply addresses decoded directly, other emails via best-effort user search) so not every commit resolves one; GitLab/Bitbucket not started |
 | CI/Actions status badges | Done | |
@@ -82,9 +84,11 @@ Exhaustive list of implemented, partial, and not-started features. Status legend
 | Sidebar: ahead/behind badges | Done | |
 | Sidebar: animated sync status | Done | |
 | Repo workspaces (named saved groups) | Done | This session |
-| Multi-repo batch fetch/pull | Done | This session |
+| Multi-repo batch fetch/pull | Done | Split into separate "Fetch All" / "Pull All" buttons (this session — was one button that always pulled) |
 | Drag-and-drop folder to add repo | Done | |
 | Desktop notifications | Done | Long-running sync completion |
+| Offline-mode indicator | Done | Toolbar badge when a network-level error is detected (`OfflineIndicator.tsx`, `useNetworkStore.ts`); clears on the next successful network action |
+| Open repo in browser / editor | Done | This session — sidebar context menu and toolbar button open the repo on its remote (provider logo) or in the user's favorite editor (`editors.ts`, settings-configured) |
 | Default window size | Done | Tuned this session (doubled, then reduced ~25%) |
 | App icon | Done | Redesigned this session (fox/git-motif) |
 | Layout / information-architecture redesign | **Not started** | Still ad hoc placement; needs a dedicated design pass |
@@ -97,7 +101,6 @@ Exhaustive list of implemented, partial, and not-started features. Status legend
 | GPG/SSH commit-signing setup wizard | Not started | |
 | Localization / i18n framework | Not started | |
 | Plugin/extension hook points | Not started | |
-| Offline-mode indicator | Not started | |
 
 ## Platform
 
