@@ -10,7 +10,7 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { useStatus } from "@/hooks/queries/useRepoStatus";
 import { useCommitLog } from "@/hooks/queries/useCommitLog";
-import { useAheadBehind } from "@/hooks/queries/useAheadBehind";
+import { useAheadBehind, DEFAULT_AHEAD_BEHIND } from "@/hooks/queries/useAheadBehind";
 import { useCommit, useAmendCommit, useUndoLastCommit } from "@/hooks/queries/useCommitActions";
 import { cn, isProtectedBranch } from "@/lib/utils";
 import { notify } from "@/lib/notify";
@@ -22,7 +22,7 @@ export function CommitBox() {
   const branch = branchData?.branch ?? null;
   const { data: status } = useStatus(repoPath);
   const { commits } = useCommitLog(repoPath);
-  const { data: aheadBehind } = useAheadBehind(repoPath);
+  const { data: aheadBehind = DEFAULT_AHEAD_BEHIND } = useAheadBehind(repoPath);
   const summary = useRepoStore((s) => s.commitSummary);
   const description = useRepoStore((s) => s.commitDescription);
   const amending = useRepoStore((s) => s.amending);
