@@ -122,7 +122,7 @@ export function Toolbar() {
                     className={favoriteEditorOption.id === "zed" ? "size-5" : "size-3.5"}
                   />
                 ) : customIcon ? (
-                  <img src={customIcon} alt="" className="size-3.5" />
+                  <img src={customIcon} alt="" className="size-5" />
                 ) : (
                   <CodeIcon className="size-3.5" />
                 )}
