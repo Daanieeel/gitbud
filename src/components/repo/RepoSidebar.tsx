@@ -40,6 +40,7 @@ import { BatchSyncTrigger } from "./BatchSyncPanel";
 import { PinToSectionDialog } from "./PinToSectionDialog";
 import { WorkspacePicker } from "./WorkspacePicker";
 import { AccountBar } from "@/components/github/AccountBar";
+import { OfflineIndicator } from "@/components/layout/OfflineIndicator";
 import { GitHubMark } from "@/components/github/GitHubMark";
 import { GitLabMark } from "@/components/github/GitLabMark";
 import { BitbucketMark } from "@/components/github/BitbucketMark";
@@ -47,6 +48,7 @@ import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
+import { useNetworkStore } from "@/store/useNetworkStore";
 import { useWorkspaces } from "@/hooks/queries/useWorkspaces";
 import { useWorkspaceFilterStore } from "@/store/useWorkspaceFilterStore";
 import { useRepoSyncing } from "@/hooks/queries/useGitSync";
@@ -326,6 +328,7 @@ export function RepoSidebar() {
   const addExistingRepo = useRepoStore((s) => s.addExistingRepo);
   const setReposLocal = useRepoStore.setState;
   const syncing = useRepoSyncing(selectedRepo);
+  const offline = useNetworkStore((s) => s.offline);
   const [dragOver, setDragOver] = useState(false);
   const sidebarSort = useSettingsStore((s) => s.settings.sidebar_sort);
   const showAheadBehind = useSettingsStore((s) => s.settings.show_ahead_behind);
@@ -590,6 +593,11 @@ export function RepoSidebar() {
               <BatchSyncTrigger repos={filtered} totalCount={repos.length} iconOnly />
             </div>
           )}
+          {offline && (
+            <div className="flex shrink-0 flex-col items-center gap-1.5 p-1.5 pt-0">
+              <OfflineIndicator iconOnly />
+            </div>
+          )}
           <AccountBar collapsed />
         </>
       ) : (
@@ -793,6 +801,11 @@ export function RepoSidebar() {
       {repos.length > 0 && (
         <div className="shrink-0 border-t border-border p-2">
           <BatchSyncTrigger repos={filtered} totalCount={repos.length} />
+        </div>
+      )}
+      {offline && (
+        <div className="shrink-0 px-2 pb-1.5">
+          <OfflineIndicator />
         </div>
       )}
       <AccountBar />
