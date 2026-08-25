@@ -71,6 +71,11 @@ pub struct Settings {
 
     // Changes
     pub auto_stage_new_changes: bool,
+    /// Internal migration flag, not exposed in the UI. Missing/`false` (the case for settings
+    /// files written before this field existed) means `auto_stage_new_changes` must be forced
+    /// off once, since it used to default to `true`.
+    #[serde(default)]
+    pub auto_stage_migrated: bool,
 
     // Advanced
     pub git_binary_path: Option<String>,
@@ -111,7 +116,8 @@ impl Default for Settings {
             diff_algorithm: DiffAlgorithm::Myers,
             show_ahead_behind: true,
             sidebar_sort: SidebarSort::Group,
-            auto_stage_new_changes: true,
+            auto_stage_new_changes: false,
+            auto_stage_migrated: true,
             git_binary_path: None,
             fs_watch_enabled: true,
             default_identity_id: None,
@@ -140,7 +146,13 @@ pub fn get_settings() -> Result<Settings, String> {
         return Ok(Settings::default());
     }
     let contents = fs::read_to_string(&file).map_err(|e| e.to_string())?;
-    serde_json::from_str(&contents).map_err(|e| e.to_string())
+    let mut settings: Settings = serde_json::from_str(&contents).map_err(|e| e.to_string())?;
+    if !settings.auto_stage_migrated {
+        settings.auto_stage_new_changes = false;
+        settings.auto_stage_migrated = true;
+        save_settings(&settings)?;
+    }
+    Ok(settings)
 }
 
 pub fn save_settings(settings: &Settings) -> Result<(), String> {
@@ -188,13 +200,21 @@ pub fn set_git_identity(
     email: &str,
     global: bool,
 ) -> Result<(), String> {
-    if global {
-        let mut config = git2::Config::open_default().map_err(|e| e.message().to_string())?;
+    if global
+            {
+
+        let mu
+            t config = git2::Config::open
+            _default().map_err(|e| e.message().to_string())?;
         config.set_str("user.name", name).map_err(|e| e.message().to_string())?;
         config.set_str("user.email", email).map_err(|e| e.message().to_string())?;
     } else {
-        let repo = git2::Repository::open(repo_path).map_err(|e| e.message().to_string())?;
-        let mut config = repo.config().map_err(|e| e.message().to_string())?;
+        let re
+            po = git2::Repository::open
+            (repo_path).map_err(|e| e.message().to_string())?;
+        let mu
+            t config = repo.config().map_
+            err(|e| e.message().to_string())?;
         config.set_str("user.name", name).map_err(|e| e.message().to_string())?;
         config.set_str("user.email", email).map_err(|e| e.message().to_string())?;
     }
