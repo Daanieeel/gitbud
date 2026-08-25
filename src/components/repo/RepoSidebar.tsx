@@ -4,7 +4,9 @@ import {
   ChevronRightIcon,
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
+  CodeIcon,
   CopyIcon,
+  ExternalLinkIcon,
   FolderOpenIcon,
   MinusIcon,
   PanelLeftCloseIcon,
@@ -16,7 +18,7 @@ import {
   Trash2Icon,
   XIcon,
 } from "lucide-react";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { listen } from "@tauri-apps/api/event";
 import { Input } from "@/components/ui/input";
@@ -31,11 +33,15 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { AddRepoMenu } from "./AddRepoMenu";
 import { BatchSyncTrigger } from "./BatchSyncPanel";
 import { PinToSectionDialog } from "./PinToSectionDialog";
 import { WorkspacePicker } from "./WorkspacePicker";
 import { AccountBar } from "@/components/github/AccountBar";
+import { GitHubMark } from "@/components/github/GitHubMark";
+import { GitLabMark } from "@/components/github/GitLabMark";
+import { BitbucketMark } from "@/components/github/BitbucketMark";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -46,6 +52,8 @@ import { useRepoSyncing } from "@/hooks/queries/useGitSync";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
+import { detectRemoteProvider } from "@/lib/remote-provider";
+import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
 import type { AheadBehind, RepoEntry } from "@/lib/types";
 
 function groupRepos(repos: RepoEntry[]): Map<string, RepoEntry[]> {
@@ -128,8 +136,24 @@ function RepoRow({
   sectionContext,
   onRemoveFromSection,
 }: RepoRowProps) {
+  const favoriteEditorId = useSettingsStore((s) => s.settings.favorite_editor);
+  const customEditorCommand = useSettingsStore((s) => s.settings.custom_editor_command);
+  const favoriteEditorOption = findEditor(favoriteEditorId);
+  const isCustomEditor = favoriteEditorId === CUSTOM_EDITOR_ID && !!customEditorCommand;
+  const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: ReturnType<typeof detectRemoteProvider> } | null>(null);
+
   return (
-    <ContextMenu>
+    <ContextMenu
+      onOpenChange={(open) => {
+        if (!open) return;
+        setRemoteInfo(null);
+        void api.remoteWebInfo(repo.path).then((info) => {
+          if (!info) return;
+          const [host, url] = info;
+          setRemoteInfo({ url, provider: detectRemoteProvider(host) });
+        });
+      }}
+    >
       <ContextMenuTrigger asChild>
         <div
           draggable={draggable}
@@ -247,6 +271,34 @@ function RepoRow({
           <CopyIcon className="size-3.5" />
           Copy Path
         </ContextMenuItem>
+        {(favoriteEditorOption || isCustomEditor) && (
+          <ContextMenuItem
+            onSelect={() => {
+              if (!favoriteEditorId) return;
+              void api.openInEditor(repo.path, favoriteEditorId, customEditorCommand).catch((err) => toast.error(String(err)));
+            }}
+          >
+            {favoriteEditorOption ? (
+              <img
+                src={favoriteEditorOption.icon}
+                alt=""
+                className={favoriteEditorOption.id === "zed" ? "size-4" : "size-3.5"}
+              />
+            ) : (
+              <CodeIcon className="size-3.5" />
+            )}
+            Open in {favoriteEditorOption?.name ?? "Editor"}
+          </ContextMenuItem>
+        )}
+        {remoteInfo && (
+          <ContextMenuItem onSelect={() => void openUrl(remoteInfo.url)}>
+            {remoteInfo.provider === "github" && <GitHubMark className="size-3.5" />}
+            {remoteInfo.provider === "gitlab" && <GitLabMark className="size-3.5" />}
+            {remoteInfo.provider === "bitbucket" && <BitbucketMark className="size-3.5" />}
+            {remoteInfo.provider === "unknown" && <ExternalLinkIcon className="size-3.5" />}
+            Open in Browser
+          </ContextMenuItem>
+        )}
         <ContextMenuItem onSelect={onPinToSection}>
           <PinIcon className="size-3.5" />
           Pin to Section…
