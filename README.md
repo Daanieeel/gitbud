@@ -86,18 +86,18 @@ xattr -cr /Applications/GitBud.app
 
 ### Build from source
 
-**Prerequisites:** [Node.js](https://nodejs.org/) 18+, [Rust](https://rustup.rs/), and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.
+**Prerequisites:** [Bun](https://bun.sh/), [Rust](https://rustup.rs/), and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.
 
 ```bash
 git clone https://github.com/Daanieeel/gitbud.git
 cd gitbud
-npm install
+bun install
 
 # run in dev mode (hot-reloads the frontend, rebuilds Rust on change)
-npm run tauri dev
+bun run tauri dev
 
 # build a release binary
-npm run tauri build
+bun run tauri build
 ```
 
 Run the Rust test suite from `src-tauri/`:

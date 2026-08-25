@@ -25,6 +25,7 @@ import { useBranches } from "@/hooks/queries/useBranches";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useCreatePullRequest } from "@/hooks/queries/usePullRequests";
 import { useSettingsStore } from "@/store/useSettingsStore";
+import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import type { FileDiff, ImageDiff, Label, AssignableUser, Milestone, Project, CommitSearchResult } from "@/lib/types";
@@ -47,7 +48,10 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const branches = branchData?.branches ?? [];
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const createPRMutation = useCreatePullRequest(repoPath, currentLogin);
-  const openPrAfterCreation = useSettingsStore((s) => s.settings.open_pr_on_provider_after_creation);
+  const openPrAfterCreation = useSettingsStore((s) => s.settings.open_pr_after_creation);
+  const setActiveTab = useRepoStore((s) => s.setActiveTab);
+  const setPRFilter = usePRStore((s) => s.setFilter);
+  const selectPR = usePRStore((s) => s.selectPR);
 
   const localBranches = useMemo(
     () => branches.filter((b) => !b.is_remote && b.name !== branch),
@@ -182,7 +186,13 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
         ),
       ]);
       onOpenChange(false);
-      if (openPrAfterCreation) void openUrl(pr.html_url);
+      if (openPrAfterCreation === "provider") {
+        void openUrl(pr.html_url);
+      } else {
+        setPRFilter("open");
+        selectPR(pr.number);
+        setActiveTab("pulls");
+      }
       setTitle("");
       setBody("");
       setSelectedLabels([]);

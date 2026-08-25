@@ -41,6 +41,7 @@ export function Toolbar() {
       : null;
   const setActiveTab = useRepoStore((s) => s.setActiveTab);
   const selectPR = usePRStore((s) => s.selectPR);
+  const setPRFilter = usePRStore((s) => s.setFilter);
   const [previewPrOpen, setPreviewPrOpen] = useState(false);
   // Shares the exact same cache useProviderSync keeps warm in the background and CreatePRDialog
   // invalidates on submit — this is what makes "Preview PR" flip to "View PR" both right after
@@ -102,8 +103,9 @@ export function Toolbar() {
               size="sm"
               onClick={() => {
                 if (!repoPath) return;
-                setActiveTab("pulls");
+                setPRFilter("open");
                 selectPR(existingPrNumber);
+                setActiveTab("pulls");
               }}
             >
               <GitPullRequestArrowIcon className="size-3.5" />

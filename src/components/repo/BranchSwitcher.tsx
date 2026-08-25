@@ -402,7 +402,7 @@ export function BranchSwitcher() {
             spellCheck={false}
             disabled={renameBusy}
             value={renameValue}
-            onChange={(e) => setRenameValue(e.target.value)}
+            onChange={(e) => setRenameValue(e.target.value.replace(/\s/g, "-"))}
             onKeyDown={(e) => {
               if (e.key === "Enter") void commitRename();
             }}
