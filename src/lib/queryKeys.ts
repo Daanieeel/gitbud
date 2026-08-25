@@ -5,6 +5,7 @@
 // what the fs-watcher's `repo-changed` event uses instead of a hand-maintained refresh list.
 export const queryKeys = {
   workspaces: ["workspaces"] as const,
+  customEditorIcon: (appPath: string) => ["custom-editor-icon", appPath] as const,
 
   repo: (repoPath: string) => ["repo", repoPath] as const,
   status: (repoPath: string) => ["repo", repoPath, "status"] as const,

@@ -56,7 +56,8 @@ import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { detectRemoteProvider } from "@/lib/remote-provider";
-import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
+import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
+import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
 import { queryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
 import type { AheadBehind, RepoEntry } from "@/lib/types";
@@ -147,6 +148,8 @@ function RepoRow({
   const customEditorCommand = useSettingsStore((s) => s.settings.custom_editor_command);
   const favoriteEditorOption = findEditor(favoriteEditorId);
   const isCustomEditor = favoriteEditorId === CUSTOM_EDITOR_ID && !!customEditorCommand;
+  const customIcon = useCustomEditorIcon(isCustomEditor ? customEditorCommand : null);
+  const editorName = favoriteEditorOption?.name ?? (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
   const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: ReturnType<typeof detectRemoteProvider> } | null>(null);
 
   return (
@@ -291,10 +294,12 @@ function RepoRow({
                 alt=""
                 className={favoriteEditorOption.id === "zed" ? "size-4" : "size-3.5"}
               />
+            ) : customIcon ? (
+              <img src={customIcon} alt="" className="size-3.5" />
             ) : (
               <CodeIcon className="size-3.5" />
             )}
-            Open in {favoriteEditorOption?.name ?? "Editor"}
+            Open in {editorName}
           </ContextMenuItem>
         )}
         {remoteInfo && (

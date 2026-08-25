@@ -1270,6 +1270,11 @@ async fn open_in_editor(path: String, editor: String, custom_app_path: Option<St
         .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn get_app_icon(app_path: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || system::get_app_icon(&app_path)).await.ok()?
+}
+
 // --- settings ---
 
 #[tauri::command]
@@ -1574,6 +1579,7 @@ pub fn run() {
             checkout_pull_request,
             open_in_terminal,
             open_in_editor,
+            get_app_icon,
             get_settings,
             save_settings,
             export_settings,

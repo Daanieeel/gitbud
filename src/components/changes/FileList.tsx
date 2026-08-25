@@ -43,7 +43,8 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { useAddToGitignore, useDiscardFile } from "@/hooks/queries/useRepoStatus";
 import { useSettingsStore } from "@/store/useSettingsStore";
-import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
+import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
+import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
 import { BlameDialog } from "./BlameDialog";
 import { FilePathLabel } from "./FilePathLabel";
 import type { LfsFileInfo } from "@/lib/types";
@@ -80,6 +81,8 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
   const customEditorCommand = useSettingsStore((s) => s.settings.custom_editor_command);
   const favoriteEditorOption = findEditor(favoriteEditorId);
   const isCustomEditor = favoriteEditorId === CUSTOM_EDITOR_ID && !!customEditorCommand;
+  const customIcon = useCustomEditorIcon(isCustomEditor ? customEditorCommand : null);
+  const editorName = favoriteEditorOption?.name ?? (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
   const [blamePath, setBlamePath] = useState<string | null>(null);
   const [confirmDiscardPath, setConfirmDiscardPath] = useState<string | null>(null);
   const [confirmDiscardBatch, setConfirmDiscardBatch] = useState(false);
@@ -287,10 +290,12 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                             alt=""
                             className={favoriteEditorOption.id === "zed" ? "size-5" : "size-3.5"}
                           />
+                        ) : customIcon ? (
+                          <img src={customIcon} alt="" className="size-3.5" />
                         ) : (
                           <CodeIcon className="size-3.5" />
                         )}
-                        Open in {favoriteEditorOption?.name ?? "Editor"}
+                        Open in {editorName}
                       </ContextMenuItem>
                     )}
                     {branch && (

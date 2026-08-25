@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ColumnsIcon,
+  CodeIcon,
   DownloadIcon,
   GitBranchIcon,
   PanelLeftIcon,
@@ -23,7 +24,8 @@ import { GitHubMark } from "@/components/github/GitHubMark";
 import { UpdateChecker } from "./UpdateChecker";
 import { SigningWizard } from "./SigningWizard";
 import { EditorPicker } from "./EditorPicker";
-import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
+import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
+import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -94,6 +96,9 @@ function Select<T extends string>({
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { settings, update, exportTo, importFrom } = useSettingsStore();
   const favoriteEditor = findEditor(settings.favorite_editor);
+  const customEditorIcon = useCustomEditorIcon(
+    settings.favorite_editor === CUSTOM_EDITOR_ID ? settings.custom_editor_command : null,
+  );
   const [importExportError, setImportExportError] = useState<string | null>(null);
   const clientId = useGitHubStore((s) => s.clientId);
   const setClientId = useGitHubStore((s) => s.setClientId);
@@ -225,10 +230,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                           <img src={favoriteEditor.icon} alt="" className="size-4 shrink-0" />
                           <span className="truncate">{favoriteEditor.name}</span>
                         </>
-                      ) : settings.favorite_editor === CUSTOM_EDITOR_ID ? (
-                        <span className="truncate text-xs" title={settings.custom_editor_command ?? undefined}>
-                          {settings.custom_editor_command?.split("/").pop()}
-                        </span>
+                      ) : settings.favorite_editor === CUSTOM_EDITOR_ID && settings.custom_editor_command ? (
+                        <>
+                          {customEditorIcon ? (
+                            <img src={customEditorIcon} alt="" className="size-4 shrink-0" />
+                          ) : (
+                            <CodeIcon className="size-4 shrink-0" />
+                          )}
+                          <span className="truncate" title={settings.custom_editor_command}>
+                            {customEditorName(settings.custom_editor_command)}
+                          </span>
+                        </>
                       ) : (
                         <span className="text-muted-foreground">Choose an editor…</span>
                       )}
