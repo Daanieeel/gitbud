@@ -15,7 +15,7 @@ const DEFAULT_SETTINGS: Settings = {
   diff_algorithm: "myers",
   show_ahead_behind: true,
   sidebar_sort: "group",
-  auto_stage_new_changes: true,
+  auto_stage_new_changes: false,
   git_binary_path: null,
   fs_watch_enabled: true,
   default_identity_id: null,
