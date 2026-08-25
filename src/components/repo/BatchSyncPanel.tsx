@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { ArrowDownToLineIcon, CheckIcon, CircleIcon, DownloadIcon, RefreshCwIcon, XCircleIcon } from "lucide-react";
+import { ArrowDownToLineIcon, CheckIcon, CircleIcon, RefreshCwIcon, XCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -43,7 +43,7 @@ export function BatchSyncTrigger({
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="secondary" size="icon" disabled={running} onClick={run("fetch")}>
-              <DownloadIcon className={cn("size-4", running && "animate-pulse")} />
+              <RefreshCwIcon className={cn("size-4", running && "animate-spin")} />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Fetch {scope}</TooltipContent>
@@ -65,7 +65,7 @@ export function BatchSyncTrigger({
       <Tooltip>
         <TooltipTrigger asChild>
           <Button variant="secondary" size="sm" className="flex-1" disabled={running} onClick={run("fetch")}>
-            <DownloadIcon className={cn("size-3.5", running && "animate-pulse")} />
+            <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
             {`Fetch${suffix}`}
           </Button>
         </TooltipTrigger>
