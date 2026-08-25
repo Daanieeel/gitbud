@@ -200,21 +200,13 @@ pub fn set_git_identity(
     email: &str,
     global: bool,
 ) -> Result<(), String> {
-    if global
-            {
-
-        let mu
-            t config = git2::Config::open
-            _default().map_err(|e| e.message().to_string())?;
+    if global {
+        let mut config = git2::Config::open_default().map_err(|e| e.message().to_string())?;
         config.set_str("user.name", name).map_err(|e| e.message().to_string())?;
         config.set_str("user.email", email).map_err(|e| e.message().to_string())?;
     } else {
-        let re
-            po = git2::Repository::open
-            (repo_path).map_err(|e| e.message().to_string())?;
-        let mu
-            t config = repo.config().map_
-            err(|e| e.message().to_string())?;
+        let repo = git2::Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+        let mut config = repo.config().map_err(|e| e.message().to_string())?;
         config.set_str("user.name", name).map_err(|e| e.message().to_string())?;
         config.set_str("user.email", email).map_err(|e| e.message().to_string())?;
     }
