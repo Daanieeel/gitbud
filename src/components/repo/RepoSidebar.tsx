@@ -287,7 +287,7 @@ function RepoRow({
               <img
                 src={favoriteEditorOption.icon}
                 alt=""
-                className={favoriteEditorOption.id === "zed" ? "size-5" : "size-3.5"}
+                className={favoriteEditorOption.id === "zed" ? "size-4" : "size-3.5"}
               />
             ) : (
               <CodeIcon className="size-3.5" />
