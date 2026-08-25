@@ -6,11 +6,15 @@ const CONCURRENCY = 4;
 
 type RepoOutcome = "pending" | "running" | "done" | "error";
 
+type BatchSyncKind = "fetch" | "pull";
+
 interface BatchSyncState {
   running: boolean;
+  kind: BatchSyncKind | null;
   outcomes: Record<string, RepoOutcome>;
   errors: Record<string, string>;
 
+  runFetchAll: (repoPaths: string[]) => Promise<void>;
   runPullAll: (repoPaths: string[]) => Promise<void>;
   dismiss: () => void;
 }
@@ -30,11 +34,13 @@ function run(
   set: (partial: Partial<BatchSyncState>) => void,
   get: () => BatchSyncState,
   repoPaths: string[],
+  kind: BatchSyncKind,
   action: (repoPath: string) => Promise<void>,
 ) {
   return async () => {
     set({
       running: true,
+      kind,
       outcomes: Object.fromEntries(repoPaths.map((p) => [p, "pending" as RepoOutcome])),
       errors: {},
     });
@@ -56,11 +62,17 @@ function run(
 
 export const useBatchSyncStore = create<BatchSyncState>((set, get) => ({
   running: false,
+  kind: null,
   outcomes: {},
   errors: {},
 
+  runFetchAll: (repoPaths) =>
+    run(set, get, repoPaths, "fetch", async (path) => {
+      await api.gitFetch(path);
+    })(),
+
   runPullAll: (repoPaths) =>
-    run(set, get, repoPaths, async (path) => {
+    run(set, get, repoPaths, "pull", async (path) => {
       await api.gitPull(path);
       await useRepoStore.getState().loadRepos();
     })(),
