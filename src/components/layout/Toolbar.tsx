@@ -87,44 +87,46 @@ export function Toolbar() {
       <WorktreesPanel />
       <ReflogPanel />
       <LfsPanel />
-      {remoteInfo && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" onClick={() => void openUrl(remoteInfo.url)}>
-              {remoteInfo.provider === "github" && <GitHubMark className="size-3.5" />}
-              {remoteInfo.provider === "gitlab" && <GitLabMark className="size-3.5" />}
-              {remoteInfo.provider === "bitbucket" && <BitbucketMark className="size-3.5" />}
-              {remoteInfo.provider === "unknown" && <ExternalLinkIcon className="size-3.5" />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>View repo on remote</TooltipContent>
-        </Tooltip>
-      )}
-      {(favoriteEditorOption || isCustomEditor) && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                if (!repoPath || !favoriteEditorId) return;
-                void api.openInEditor(repoPath, favoriteEditorId, customEditorCommand).catch((err) => toast.error(String(err)));
-              }}
-            >
-              {favoriteEditorOption ? (
-                <img
-                  src={favoriteEditorOption.icon}
-                  alt=""
-                  className={favoriteEditorOption.id === "zed" ? "size-5" : "size-3.5"}
-                />
-              ) : (
-                <CodeIcon className="size-3.5" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Open in {favoriteEditorOption?.name ?? "Editor"}</TooltipContent>
-        </Tooltip>
-      )}
+      <div className="flex flex-row gap-0">
+        {remoteInfo && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={() => void openUrl(remoteInfo.url)}>
+                {remoteInfo.provider === "github" && <GitHubMark className="size-3.5" />}
+                {remoteInfo.provider === "gitlab" && <GitLabMark className="size-3.5" />}
+                {remoteInfo.provider === "bitbucket" && <BitbucketMark className="size-3.5" />}
+                {remoteInfo.provider === "unknown" && <ExternalLinkIcon className="size-3.5" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>View repo on remote</TooltipContent>
+          </Tooltip>
+        )}
+        {(favoriteEditorOption || isCustomEditor) && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  if (!repoPath || !favoriteEditorId) return;
+                  void api.openInEditor(repoPath, favoriteEditorId, customEditorCommand).catch((err) => toast.error(String(err)));
+                }}
+              >
+                {favoriteEditorOption ? (
+                  <img
+                    src={favoriteEditorOption.icon}
+                    alt=""
+                    className={favoriteEditorOption.id === "zed" ? "size-5" : "size-3.5"}
+                  />
+                ) : (
+                  <CodeIcon className="size-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Open in {favoriteEditorOption?.name ?? "Editor"}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       <div className="flex-1" />
       <OfflineIndicator />
       {currentLogin && existingPrNumber != null && (
