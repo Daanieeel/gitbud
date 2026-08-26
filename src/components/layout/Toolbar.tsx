@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { GitPullRequestCreateArrow, GitPullRequestArrowIcon, ExternalLinkIcon, CodeIcon } from "lucide-react";
+import { GitPullRequestCreateArrow, GitPullRequestArrowIcon, ExternalLinkIcon, CodeIcon, ArrowUpIcon } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import { useGitHubStore } from "@/store/useGitHubStore";
@@ -215,16 +215,17 @@ export function Toolbar() {
             </TooltipTrigger>
             <TooltipContent>{previewPrDisabledReason ?? "Preview and open a pull request for this branch"}</TooltipContent>
           </Tooltip>
-          <PopoverContent className="w-72 space-y-3 p-3" align="end">
-            <p className="text-sm">
-              This branch has commits that haven't been pushed yet. Push them before previewing the PR?
+          <PopoverContent className="w-fit space-y-3 p-3" align="center">
+            <p className="max-w-xs text-sm opacity-80">
+              This branch has unpushed commits.
             </p>
-            <div className="flex justify-end gap-2">
-              <Button size="sm" variant="ghost" onClick={() => { setPushConfirmOpen(false); setPreviewPrOpen(true); }}>
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" onClick={() => { setPushConfirmOpen(false); setPreviewPrOpen(true); }}>
                 Preview Without Pushing
               </Button>
-              <Button size="sm" variant="positive" disabled={syncing} onClick={() => void handlePushThenPreview()}>
-                Push &amp; Preview
+              <Button size="sm" variant="default" disabled={syncing} onClick={() => void handlePushThenPreview()}>
+                <ArrowUpIcon className="size-3.5" />
+                Push ({aheadBehind.ahead}) &amp; Preview
               </Button>
             </div>
           </PopoverContent>
