@@ -20,7 +20,7 @@ import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
-import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
+import { CardPicker } from "@gitbud/ui/card-picker";
 import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
 import { api } from "@/lib/tauri";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -545,13 +545,20 @@ export function SigningSetupDialog({
               {providerLink?.note && (
                 <p className="text-xs text-muted-foreground">{providerLink.note}</p>
               )}
-              <CheckboxGroup
-                className="text-sm"
-                checked={addedConfirmed}
-                onCheckedChange={(checked) => setAddedConfirmed(checked === true)}
+              <button
+                type="button"
+                aria-pressed={addedConfirmed}
+                onClick={() => setAddedConfirmed((c) => !c)}
+                className={cn(
+                  "rounded-md border border-border p-2 text-left",
+                  addedConfirmed && "border-2 border-primary bg-primary/10 p-[7px]",
+                )}
               >
-                I've added this key to my account
-              </CheckboxGroup>
+                <div className="flex items-center gap-2">
+                  <CheckIcon className={cn("size-3.5 shrink-0", !addedConfirmed && "opacity-0")} />
+                  <span className="text-sm font-medium">I've added this key to my account</span>
+                </div>
+              </button>
               {error && <p className="text-xs text-destructive">{error}</p>}
             </div>
           )}
@@ -642,59 +649,6 @@ function ProviderPicker({
           <span className="text-xs font-medium">{PROVIDER_LABEL[o.value]}</span>
         </button>
       ))}
-    </div>
-  );
-}
-
-/** Same selectable-card pattern as MergePRDialog's merge-method picker: a short title, a
- * one-line description, a primary-tinted border when selected — and, when disabled, a tooltip
- * explaining why instead of the option just vanishing. */
-function CardPicker<T extends string>({
-  value,
-  onChange,
-  options,
-}: {
-  value: T;
-  onChange: (v: T) => void;
-  options: {
-    value: T;
-    label: string;
-    description: string;
-    disabled?: boolean;
-    disabledReason?: string;
-  }[];
-}) {
-  return (
-    <div className="flex gap-2">
-      {options.map((o) => {
-        const card = (
-          <button
-            key={o.value}
-            type="button"
-            // Not a real `disabled` attribute: that would block pointer events in most
-            // browsers, silently preventing the tooltip below from ever showing on hover.
-            aria-disabled={o.disabled}
-            className={cn(
-              "flex-1 rounded-md border border-border p-2 text-left",
-              o.disabled && "cursor-not-allowed opacity-40",
-              value === o.value && "border-2 border-primary bg-primary/10 p-[7px]",
-            )}
-            onClick={() => !o.disabled && onChange(o.value)}
-          >
-            <div className="flex flex-col gap-1">
-              <div className="text-sm font-medium">{o.label}</div>
-              <div className="text-xs text-muted-foreground">{o.description}</div>
-            </div>
-          </button>
-        );
-        if (!o.disabled || !o.disabledReason) return card;
-        return (
-          <Tooltip key={o.value}>
-            <TooltipTrigger asChild>{card}</TooltipTrigger>
-            <TooltipContent>{o.disabledReason}</TooltipContent>
-          </Tooltip>
-        );
-      })}
     </div>
   );
 }
