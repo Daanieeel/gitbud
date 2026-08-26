@@ -40,16 +40,16 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: apps/desktop/src-tauri
 
       - uses: oven-sh/setup-bun@v2
 
       - run: bun install --frozen-lockfile
 
       - name: cargo check
-        working-directory: src-tauri
+        working-directory: apps/desktop/src-tauri
         run: cargo check --locked
 
       - name: cargo test
-        working-directory: src-tauri
+        working-directory: apps/desktop/src-tauri
         run: cargo test --locked
