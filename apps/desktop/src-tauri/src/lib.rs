@@ -855,6 +855,42 @@ async fn get_signing_status(repo_path: String) -> Result<signing::SigningStatus,
         .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+async fn export_gpg_public_key(key_id: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || signing::export_gpg_public_key(&key_id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn test_signing(format: String, key: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || signing::test_signing(&format, &key))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Best-effort: whether `login`'s GitHub account already has this SSH pubkey registered as a
+/// signing key. Returns `Ok(false)` (not an error) when the check itself can't be answered —
+/// e.g. an older sign-in without the `read:public_key` scope — since that's meant to fail open
+/// into "show the manual confirm checkbox", not block the wizard.
+#[tauri::command]
+async fn github_has_ssh_signing_key(login: String, pubkey: String) -> Result<bool, String> {
+    let host = github::auth::get_host()?;
+    let token = github::auth::get_token(&login)?;
+    Ok(github::api::has_ssh_signing_key(&host, &token, &pubkey)
+        .await
+        .unwrap_or(false))
+}
+
+#[tauri::command]
+async fn github_has_gpg_key(login: String, key_id: String) -> Result<bool, String> {
+    let host = github::auth::get_host()?;
+    let token = github::auth::get_token(&login)?;
+    Ok(github::api::has_gpg_key(&host, &token, &key_id)
+        .await
+        .unwrap_or(false))
+}
+
 // --- git identities: GitHub accounts (see github/) plus plain SSH-key identities ---
 
 #[tauri::command]
@@ -2063,6 +2099,10 @@ pub fn run() {
             configure_signing,
             disable_signing,
             get_signing_status,
+            export_gpg_public_key,
+            test_signing,
+            github_has_ssh_signing_key,
+            github_has_gpg_key,
             list_ssh_identities,
             add_ssh_identity,
             remove_ssh_identity,

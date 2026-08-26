@@ -78,6 +78,103 @@ pub fn generate_ssh_signing_key(path: &str, email: &str) -> Result<String, Strin
     std::fs::read_to_string(format!("{path}.pub")).map_err(|e| e.to_string())
 }
 
+/// Exports an OpenPGP key's public key in the armored form providers expect pasted into a
+/// "New GPG key" field.
+pub fn export_gpg_public_key(key_id: &str) -> Result<String, String> {
+    let output = Command::new("gpg")
+        .args(["--armor", "--export", key_id])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    let armored = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if armored.is_empty() {
+        return Err(format!("No public key exported for {key_id}"));
+    }
+    Ok(armored)
+}
+
+/// Signs a throwaway payload and verifies it right back, proving the signing mechanism this
+/// key/format actually works end to end — not just that git config points at it. `key` is a
+/// private key file path for `"ssh"`, or a key id for anything else (OpenPGP).
+pub fn test_signing(format: &str, key: &str) -> Result<(), String> {
+    const PAYLOAD: &[u8] = b"gitbud commit signing test\n";
+    const PRINCIPAL: &str = "gitbud-test";
+
+    if format == "ssh" {
+        let pubkey = std::fs::read_to_string(format!("{key}.pub"))
+            .map_err(|e| format!("couldn't read {key}.pub: {e}"))?;
+        let signature = crate::commit_service::ssh_sign(key, PAYLOAD)?;
+
+        let dir = std::env::temp_dir();
+        let suffix = std::process::id();
+        let payload_path = dir.join(format!("gitbud-sign-test-{suffix}"));
+        let sig_path = dir.join(format!("gitbud-sign-test-{suffix}.sig"));
+        let allowed_signers_path = dir.join(format!("gitbud-sign-test-{suffix}.allowed_signers"));
+        std::fs::write(&payload_path, PAYLOAD).map_err(|e| e.to_string())?;
+        std::fs::write(&sig_path, &signature).map_err(|e| e.to_string())?;
+        std::fs::write(
+            &allowed_signers_path,
+            format!("{PRINCIPAL} {}", pubkey.trim()),
+        )
+        .map_err(|e| e.to_string())?;
+
+        let result = (|| {
+            let file = std::fs::File::open(&payload_path).map_err(|e| e.to_string())?;
+            let output = Command::new("ssh-keygen")
+                .args([
+                    "-Y",
+                    "verify",
+                    "-f",
+                    allowed_signers_path.to_str().ok_or("bad temp path")?,
+                    "-I",
+                    PRINCIPAL,
+                    "-n",
+                    "git",
+                    "-s",
+                    sig_path.to_str().ok_or("bad temp path")?,
+                ])
+                .stdin(std::process::Stdio::from(file))
+                .output()
+                .map_err(|e| e.to_string())?;
+            if !output.status.success() {
+                return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+            }
+            Ok(())
+        })();
+
+        let _ = std::fs::remove_file(&payload_path);
+        let _ = std::fs::remove_file(&sig_path);
+        let _ = std::fs::remove_file(&allowed_signers_path);
+        result
+    } else {
+        let signature = crate::commit_service::gpg_sign(key, PAYLOAD)?;
+
+        let dir = std::env::temp_dir();
+        let suffix = std::process::id();
+        let payload_path = dir.join(format!("gitbud-sign-test-{suffix}"));
+        let sig_path = dir.join(format!("gitbud-sign-test-{suffix}.asc"));
+        std::fs::write(&payload_path, PAYLOAD).map_err(|e| e.to_string())?;
+        std::fs::write(&sig_path, &signature).map_err(|e| e.to_string())?;
+
+        let output = Command::new("gpg")
+            .args(["--verify"])
+            .arg(&sig_path)
+            .arg(&payload_path)
+            .output();
+
+        let _ = std::fs::remove_file(&payload_path);
+        let _ = std::fs::remove_file(&sig_path);
+
+        let output = output.map_err(|e| e.to_string())?;
+        if !output.status.success() {
+            return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        }
+        Ok(())
+    }
+}
+
 fn open_config(repo_path: &str, global: bool) -> Result<Config, String> {
     if global {
         Config::open_default().map_err(|e| e.message().to_string())

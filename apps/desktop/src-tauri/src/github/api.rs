@@ -546,6 +546,46 @@ pub struct Label {
     pub color: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct GithubSshKey {
+    key: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct GithubGpgKey {
+    key_id: String,
+}
+
+/// Best-effort check for whether `pubkey` (an `ssh-ed25519 AAAA...` line, comment ignored) is
+/// already registered on the signed-in account as a **signing** key. Needs the `read:public_key`
+/// scope, which older sign-ins won't have — callers should treat any error here as "couldn't
+/// confirm" rather than "not found", not surface it as a hard failure.
+pub async fn has_ssh_signing_key(host: &str, token: &str, pubkey: &str) -> Result<bool, String> {
+    let gh = GhClient::new(host, token)?;
+    let res = check(
+        gh.get("/user/ssh_signing_keys")
+            .send()
+            .await
+            .map_err(send_err)?,
+    )
+    .await?;
+    let keys: Vec<GithubSshKey> = res.json().await.map_err(|e| e.to_string())?;
+    let material = |k: &str| k.split_whitespace().take(2).collect::<Vec<_>>().join(" ");
+    let target = material(pubkey);
+    Ok(keys.iter().any(|k| material(&k.key) == target))
+}
+
+/// Same idea for a GPG key id — needs `read:gpg_key`.
+pub async fn has_gpg_key(host: &str, token: &str, key_id: &str) -> Result<bool, String> {
+    let gh = GhClient::new(host, token)?;
+    let res = check(gh.get("/user/gpg_keys").send().await.map_err(send_err)?).await?;
+    let keys: Vec<GithubGpgKey> = res.json().await.map_err(|e| e.to_string())?;
+    let needle = key_id.trim_start_matches("0x").to_uppercase();
+    Ok(keys.iter().any(|k| {
+        needle.ends_with(&k.key_id.to_uppercase()) || k.key_id.to_uppercase().ends_with(&needle)
+    }))
+}
+
 pub async fn list_labels(
     host: &str,
     token: &str,
