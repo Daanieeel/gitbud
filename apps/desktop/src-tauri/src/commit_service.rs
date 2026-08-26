@@ -1,6 +1,6 @@
 use git2::{Commit, Oid, Repository, Signature, Tree};
 use std::io::Write;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 /// Resolves what ref a "HEAD-relative" commit should update — HEAD's *symbolic* target
 /// (e.g. "refs/heads/main"), not HEAD itself, so a direct write here never detaches it.
@@ -42,7 +42,7 @@ pub fn ssh_sign(key_path: &str, buffer: &[u8]) -> Result<String, String> {
     let sig_path = dir.join(format!("gitbud-commit-buf-{}.sig", std::process::id()));
     let _ = std::fs::remove_file(&sig_path);
 
-    let output = Command::new("ssh-keygen")
+    let output = crate::signing::command_with_path("ssh-keygen")
         .args(["-Y", "sign", "-n", "git", "-f", key_path])
         .arg(&buf_path)
         .output();
@@ -61,7 +61,7 @@ pub fn ssh_sign(key_path: &str, buffer: &[u8]) -> Result<String, String> {
 
 /// Detached-signs `buffer` with a GPG key, returning the armored `PGP SIGNATURE` block.
 pub fn gpg_sign(key_id: &str, buffer: &[u8]) -> Result<String, String> {
-    let mut child = Command::new("gpg")
+    let mut child = crate::signing::command_with_path("gpg")
         .args([
             "--batch",
             "--yes",
