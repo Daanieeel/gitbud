@@ -870,6 +870,13 @@ async fn export_gpg_public_key(key_id: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+async fn read_ssh_public_key(pub_key_path: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || signing::read_ssh_public_key(&pub_key_path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn test_signing(format: String, key: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || signing::test_signing(&format, &key))
         .await
@@ -2104,6 +2111,7 @@ pub fn run() {
             list_gpg_keys,
             generate_gpg_key,
             generate_ssh_signing_key,
+            read_ssh_public_key,
             configure_signing,
             disable_signing,
             get_signing_status,

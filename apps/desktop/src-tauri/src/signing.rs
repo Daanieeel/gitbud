@@ -123,6 +123,12 @@ pub fn generate_ssh_signing_key(path: &str, email: &str) -> Result<String, Strin
     std::fs::read_to_string(format!("{path}.pub")).map_err(|e| e.to_string())
 }
 
+/// Reads back the public key file the user just picked with a file dialog, so the wizard can
+/// preview/copy it the same way it does for a freshly generated key.
+pub fn read_ssh_public_key(pub_key_path: &str) -> Result<String, String> {
+    std::fs::read_to_string(pub_key_path).map_err(|e| e.to_string())
+}
+
 /// Exports an OpenPGP key's public key in the armored form providers expect pasted into a
 /// "New GPG key" field.
 pub fn export_gpg_public_key(key_id: &str) -> Result<String, String> {

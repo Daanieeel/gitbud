@@ -76,6 +76,7 @@ export const api = {
     invoke<string>("generate_gpg_key", { name, email }),
   generateSshSigningKey: (path: string, email: string) =>
     invoke<string>("generate_ssh_signing_key", { path, email }),
+  readSshPublicKey: (pubKeyPath: string) => invoke<string>("read_ssh_public_key", { pubKeyPath }),
   configureSigning: (repoPath: string, format: string, signingKey: string, global: boolean) =>
     invoke<void>("configure_signing", { repoPath, format, signingKey, global }),
   disableSigning: (repoPath: string, global: boolean) =>

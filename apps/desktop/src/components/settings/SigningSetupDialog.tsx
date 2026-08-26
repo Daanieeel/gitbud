@@ -21,6 +21,7 @@ import { Input } from "@gitbud/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { CardPicker } from "@gitbud/ui/card-picker";
+import { Checkbox } from "@gitbud/ui/checkbox";
 import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
 import { api } from "@/lib/tauri";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -157,9 +158,9 @@ export function SigningSetupDialog({
     });
     if (!isSinglePath(file)) return;
     setSshKeyPath(file.endsWith(".pub") ? file.slice(0, -4) : file);
-    // No pubkey preview for an imported key — reading arbitrary files isn't wired up on the
-    // frontend, and the next step degrades fine without one (link + note, no copy box).
-    setPubkey(null);
+    await runBusy("readExistingSsh", async () => {
+      setPubkey((await api.readSshPublicKey(file)).trim());
+    });
   };
 
   const generateGpg = () =>
@@ -545,20 +546,18 @@ export function SigningSetupDialog({
               {providerLink?.note && (
                 <p className="text-xs text-muted-foreground">{providerLink.note}</p>
               )}
-              <button
-                type="button"
-                aria-pressed={addedConfirmed}
-                onClick={() => setAddedConfirmed((c) => !c)}
+              <label
                 className={cn(
-                  "rounded-md border border-border p-2 text-left",
+                  "mt-2 flex cursor-pointer items-center gap-2 rounded-md border border-border p-2",
                   addedConfirmed && "border-2 border-primary bg-primary/10 p-[7px]",
                 )}
               >
-                <div className="flex items-center gap-2">
-                  <CheckIcon className={cn("size-3.5 shrink-0", !addedConfirmed && "opacity-0")} />
-                  <span className="text-sm font-medium">I've added this key to my account</span>
-                </div>
-              </button>
+                <Checkbox
+                  checked={addedConfirmed}
+                  onCheckedChange={(checked) => setAddedConfirmed(checked === true)}
+                />
+                <span className="text-sm font-medium">I've added this key to my account</span>
+              </label>
               {error && <p className="text-xs text-destructive">{error}</p>}
             </div>
           )}

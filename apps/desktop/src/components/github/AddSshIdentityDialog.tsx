@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@gitbud/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
+import { CardPicker } from "@gitbud/ui/card-picker";
 import { useIdentityStore } from "@/store/useIdentityStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@gitbud/ui/utils";
@@ -101,35 +102,13 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <KeyRoundIcon className="size-4" /> Add SSH Identity
+            <KeyRoundIcon className="size-5" /> Add SSH Identity
           </DialogTitle>
           <DialogDescription>
             A plain git identity authenticated by an SSH key. No hosted-provider account or API
             access, just this host and key used when pushing/pulling.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex gap-1 rounded-md bg-muted/40 p-1 text-sm">
-          <button
-            type="button"
-            className={cn(
-              "flex-1 rounded-sm py-1 text-center",
-              mode === "quick" ? "bg-background shadow-sm" : "text-muted-foreground",
-            )}
-            onClick={() => setMode("quick")}
-          >
-            Quick
-          </button>
-          <button
-            type="button"
-            className={cn(
-              "flex-1 rounded-sm py-1 text-center",
-              mode === "advanced" ? "bg-background shadow-sm" : "text-muted-foreground",
-            )}
-            onClick={() => setMode("advanced")}
-          >
-            Advanced
-          </button>
-        </div>
         <div className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
             Label (optional)
@@ -147,22 +126,48 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
               onChange={(e) => setHost(e.target.value)}
             />
           </label>
+          <CardPicker
+            value={mode}
+            onChange={setMode}
+            options={[
+              {
+                value: "quick",
+                label: "Generate new key",
+                description: "Creates a new ed25519 key just for this host",
+              },
+              {
+                value: "advanced",
+                label: "Use existing key",
+                description: "Point at a private key you already have",
+              },
+            ]}
+          />
           {mode === "quick" ? (
             <div className="flex flex-col gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                disabled={!host.trim() || generating}
-                onClick={() => void generateKey()}
-              >
-                <SparklesIcon className="size-3.5" />
-                {generating ? "Generating…" : pubkey ? "Regenerate key" : "Generate a new key"}
-              </Button>
+              <div className="flex gap-2">
+                <Input
+                  readOnly
+                  placeholder="Generate new key…"
+                  value={keyPath}
+                  className="h-8 font-mono text-xs"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  disabled={!host.trim() || generating}
+                  onClick={() => void generateKey()}
+                >
+                  <SparklesIcon className={cn("size-3.5", generating && "animate-spin")} />
+                  {generating ? "Generating…" : "Generate"}
+                </Button>
+              </div>
               {pubkey && (
                 <>
-                  <div className="flex items-center gap-2 rounded-sm bg-muted/40 p-1.5 text-xs">
-                    <span className="min-w-0 flex-1 truncate font-mono">{pubkey}</span>
+                  <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
+                    <span className="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-sm">
+                      {pubkey}
+                    </span>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
@@ -188,11 +193,12 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
               SSH private key
               <div className="flex gap-2">
                 <Input
-                  placeholder="~/.ssh/id_ed25519"
+                  readOnly
+                  placeholder="No file chosen"
                   value={keyPath}
-                  onChange={(e) => setKeyPath(e.target.value)}
+                  className="h-8 font-mono text-xs"
                 />
-                <Button type="button" variant="secondary" size="sm" onClick={() => void pickKey()}>
+                <Button type="button" size="sm" variant="secondary" onClick={() => void pickKey()}>
                   <FolderOpenIcon className="size-3.5" />
                   Browse
                 </Button>
