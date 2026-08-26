@@ -1,13 +1,19 @@
 {
   "meta": {
-    "title": "GitBud — Git, without the friction",
+    "title": "GitBud: Git, without the friction",
     "description": "GitBud is a fast, native Git client for developers who want a clear history, obvious diffs, and nothing standing in the way of shipping."
   },
   "hero": {
     "eyebrow": "Open Source Git Client",
-    "headline": ["Understand your history,", "not just your diffs."],
-    "description": "GitBud is a fast, native Git client for developers who want a clear history, obvious diffs, and nothing standing in the way of shipping.",
-    "primaryCta": "Download for Mac",
+    "headline": ["A lightweight and fast Git client.", "Free forever, no catch."],
+    "description": "GitBud is a native app that's actually fast, light on memory and CPU. No more waiting on a web UI to catch up with you. Setup wizards walk you through the fiddly parts, and your full history stays available offline. Reviews, checks, and pull requests all live right in the app.",
+    "download": {
+      "fallback": "Download",
+      "mac": "Download for macOS",
+      "windows": "Download for Windows",
+      "linux": "Download for Linux",
+      "moreOptions": "More download options"
+    },
     "secondaryCta": "View on GitHub",
     "mediaPlaceholder": "Product video coming soon",
     "trust": {

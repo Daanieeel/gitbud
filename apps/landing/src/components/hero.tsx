@@ -1,20 +1,57 @@
+import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@gitbud/ui/button";
 import { getMessages } from "@/i18n/get-messages";
+import { DownloadButton, type ReleaseAssets } from "@/components/download-button";
 
-function PlayIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" className="ml-0.5 size-5">
-      <path d="M8 5.14v13.72a1 1 0 0 0 1.5.86l11-6.86a1 1 0 0 0 0-1.72l-11-6.86a1 1 0 0 0-1.5.86Z" />
-    </svg>
-  );
+interface GitHubReleaseAsset {
+  name: string;
+  browser_download_url: string;
 }
 
-export function Hero() {
+interface GitHubRelease {
+  assets: GitHubReleaseAsset[];
+}
+
+const EMPTY_ASSETS: ReleaseAssets = {
+  macArm: null,
+  macIntel: null,
+  windowsExe: null,
+  windowsMsi: null,
+  linuxAppImage: null,
+  linuxDeb: null,
+  linuxRpm: null,
+};
+
+async function getReleaseAssets(): Promise<ReleaseAssets> {
+  try {
+    const res = await fetch("https://api.github.com/repos/Daanieeel/gitbud/releases/latest");
+    if (!res.ok) return EMPTY_ASSETS;
+    // SAFETY: GitHub's releases endpoint always returns an assets array of {name, browser_download_url}.
+    const release = (await res.json()) as GitHubRelease;
+    const find = (pattern: RegExp) =>
+      release.assets.find((asset) => pattern.test(asset.name))?.browser_download_url ?? null;
+
+    return {
+      macArm: find(/_aarch64\.dmg$/i),
+      macIntel: find(/_x(64|86_64)\.dmg$/i),
+      windowsExe: find(/-setup\.exe$/i),
+      windowsMsi: find(/\.msi$/i),
+      linuxAppImage: find(/\.AppImage$/i),
+      linuxDeb: find(/\.deb$/i),
+      linuxRpm: find(/\.rpm$/i),
+    };
+  } catch {
+    return EMPTY_ASSETS;
+  }
+}
+
+export async function Hero() {
   const { hero } = getMessages();
+  const assets = await getReleaseAssets();
 
   return (
-    <section className="mx-auto max-w-6xl px-6 pt-32 pb-16 sm:pt-36">
+    <section className="mx-auto max-w-7xl px-6 pt-40 pb-16 sm:pt-48">
       <div className="grid gap-8 sm:grid-cols-[1fr_auto] sm:items-start">
         <div>
           <p className="text-muted-foreground text-xs uppercase">{hero.eyebrow}</p>
@@ -26,12 +63,12 @@ export function Hero() {
             ))}
           </h1>
         </div>
-        <div className="flex flex-col gap-6 sm:pt-2">
-          <p className="text-muted-foreground max-w-sm text-base">{hero.description}</p>
+        <div className="flex flex-col gap-6 sm:pt-12">
+          <p className="text-muted-foreground max-w-sm text-base text-justify">
+            {hero.description}
+          </p>
           <div className="flex flex-wrap gap-3">
-            <Button size="lg" asChild>
-              <Link href="https://github.com/Daanieeel/gitbud/releases">{hero.primaryCta}</Link>
-            </Button>
+            <DownloadButton assets={assets} labels={hero.download} />
             <Button size="lg" variant="secondary" asChild>
               <Link
                 href="https://github.com/Daanieeel/gitbud"
@@ -45,13 +82,14 @@ export function Hero() {
         </div>
       </div>
 
-      <div className="from-accent-blue/20 via-accent-purple/15 to-accent-pink/20 border-border mt-16 flex aspect-video items-center justify-center overflow-hidden rounded-3xl border bg-gradient-to-br">
-        <div className="text-muted-foreground flex flex-col items-center gap-3">
-          <span className="border-border bg-card flex size-14 items-center justify-center rounded-full border">
-            <PlayIcon />
-          </span>
-          <span className="text-sm font-medium">{hero.mediaPlaceholder}</span>
-        </div>
+      <div className="bg-accent border-border relative mt-16 aspect-video overflow-hidden rounded-3xl border">
+        <Image
+          src="/screenshots.png"
+          alt={hero.mediaPlaceholder}
+          fill
+          priority
+          className="scale-110 object-cover"
+        />
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-4">
