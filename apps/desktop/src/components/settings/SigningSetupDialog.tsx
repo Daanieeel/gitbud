@@ -359,28 +359,30 @@ export function SigningSetupDialog({
 
           {step === "key" && (
             <div className="flex flex-col gap-2">
-              <CardPicker
-                value={keyMode}
-                onChange={setKeyMode}
-                options={[
-                  {
-                    value: "generate",
-                    label: "Generate new key",
-                    description:
-                      format === "ssh"
-                        ? "Creates a new ed25519 key just for signing"
-                        : "Creates a new GPG key just for signing",
-                  },
-                  {
-                    value: "existing",
-                    label: "Choose existing key",
-                    description:
-                      format === "ssh"
-                        ? "Use an SSH key you already have"
-                        : "Pick a key already in your keyring",
-                  },
-                ]}
-              />
+              <div className="mb-2">
+                <CardPicker
+                  value={keyMode}
+                  onChange={setKeyMode}
+                  options={[
+                    {
+                      value: "generate",
+                      label: "Generate new key",
+                      description:
+                        format === "ssh"
+                          ? "Creates a new ed25519 key just for signing"
+                          : "Creates a new GPG key just for signing",
+                    },
+                    {
+                      value: "existing",
+                      label: "Choose existing key",
+                      description:
+                        format === "ssh"
+                          ? "Use an SSH key you already have"
+                          : "Pick a key already in your keyring",
+                    },
+                  ]}
+                />
+              </div>
               {format === "ssh" ? (
                 keyMode === "generate" ? (
                   <div className="flex gap-2">
