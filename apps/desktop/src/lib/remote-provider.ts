@@ -22,7 +22,7 @@ export function signingKeySettingsUrl(
       return format === "ssh"
         ? {
             url: `https://${host}/settings/ssh/new`,
-            note: 'Set "Key type" to Signing Key — an Authentication key alone won\'t mark your commits Verified.',
+            note: 'Set "Key type" to Signing Key. An Authentication key alone won\'t mark your commits Verified.',
           }
         : { url: `https://${host}/settings/gpg/new`, note: "" };
     case "gitlab":

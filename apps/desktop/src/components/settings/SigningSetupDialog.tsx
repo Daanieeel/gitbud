@@ -210,19 +210,26 @@ export function SigningSetupDialog({
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           {STEP_ORDER.map((s, i) => (
             <div key={s} className="flex flex-1 items-center gap-1">
-              <div
-                className={cn(
-                  "flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px]",
-                  i < stepIndex && "border-primary bg-primary text-primary-foreground",
-                  i === stepIndex && "border-primary text-primary",
-                  i > stepIndex && "border-border",
-                )}
-              >
-                {i < stepIndex ? <CheckIcon className="size-3" /> : i + 1}
+              <div className="flex items-center gap-2">
+                <div
+                  className={cn(
+                    "flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px]",
+                    i < stepIndex && "border-primary bg-primary text-primary-foreground",
+                    i === stepIndex && "border-primary text-primary",
+                    i > stepIndex && "border-border",
+                  )}
+                >
+                  {i < stepIndex ? <CheckIcon className="size-3" /> : i + 1}
+                </div>
+                <span
+                  className={cn(
+                    "whitespace-nowrap",
+                    i === stepIndex && "font-medium text-foreground",
+                  )}
+                >
+                  {STEP_LABEL[s]}
+                </span>
               </div>
-              <span className={cn(i === stepIndex && "font-medium text-foreground")}>
-                {STEP_LABEL[s]}
-              </span>
               {i < STEP_ORDER.length - 1 && <div className="mx-1 h-px flex-1 bg-border" />}
             </div>
           ))}
@@ -239,7 +246,7 @@ export function SigningSetupDialog({
                   {
                     value: "ssh",
                     label: "SSH",
-                    description: "Recommended — nothing extra to install",
+                    description: "Recommended. Nothing extra to install",
                   },
                   {
                     value: "openpgp",
@@ -516,7 +523,7 @@ function CheckRow({
       )}
       <span className={state === "unconfirmed" ? "text-muted-foreground" : undefined}>
         {label}
-        {state === "unconfirmed" && " — couldn't confirm, trusting you added it"}
+        {state === "unconfirmed" && " (couldn't confirm, trusting you added it)"}
       </span>
     </div>
   );
