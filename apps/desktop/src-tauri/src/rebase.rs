@@ -111,32 +111,28 @@ pub fn interactive_rebase(
             } else {
                 prev_commit.message().unwrap_or("").to_string()
             };
-            let new_oid = prev_commit
-                .amend(
-                    Some(&branch_ref_name),
-                    None,
-                    None,
-                    None,
-                    Some(&combined_message),
-                    Some(&tree),
-                )
-                .map_err(|e| e.message().to_string())?;
+            let new_oid = crate::commit_service::amend_commit_object(
+                &repo,
+                &prev_commit,
+                Some(&branch_ref_name),
+                &combined_message,
+                &tree,
+            )?;
             previous_commit_for_squash = Some(new_oid);
         } else {
             let parent = match previous_commit_for_squash {
                 Some(oid) => repo.find_commit(oid).map_err(|e| e.message().to_string())?,
                 None => base_commit.clone(),
             };
-            let new_oid = repo
-                .commit(
-                    Some(&branch_ref_name),
-                    &commit.author(),
-                    &signature,
-                    commit.message().unwrap_or(""),
-                    &tree,
-                    &[&parent],
-                )
-                .map_err(|e| e.message().to_string())?;
+            let new_oid = crate::commit_service::create_commit(
+                &repo,
+                Some(&branch_ref_name),
+                &commit.author(),
+                &signature,
+                commit.message().unwrap_or(""),
+                &tree,
+                &[&parent],
+            )?;
             previous_commit_for_squash = Some(new_oid);
         }
 

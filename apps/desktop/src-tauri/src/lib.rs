@@ -1,4 +1,5 @@
 mod blame;
+mod commit_service;
 mod config;
 mod diff;
 mod git_shell;

@@ -794,16 +794,16 @@ pub fn commit(repo_path: &str, summary: &str, description: &str) -> Result<Strin
     let parent_commit = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
     let parents: Vec<&git2::Commit> = parent_commit.iter().collect();
 
-    let oid = repo
-        .commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            &message,
-            &tree,
-            &parents,
-        )
-        .map_err(|e| e.message().to_string())?;
+    let head_ref = crate::commit_service::resolve_head_ref_name(&repo)?;
+    let oid = crate::commit_service::create_commit(
+        &repo,
+        Some(&head_ref),
+        &signature,
+        &signature,
+        &message,
+        &tree,
+        &parents,
+    )?;
 
     Ok(oid.to_string())
 }
@@ -840,9 +840,14 @@ pub fn amend_commit(repo_path: &str, summary: &str, description: &str) -> Result
         format!("{summary}\n\n{description}")
     };
 
-    let oid = head_commit
-        .amend(Some("HEAD"), None, None, None, Some(&message), Some(&tree))
-        .map_err(|e| e.message().to_string())?;
+    let head_ref = crate::commit_service::resolve_head_ref_name(&repo)?;
+    let oid = crate::commit_service::amend_commit_object(
+        &repo,
+        &head_commit,
+        Some(&head_ref),
+        &message,
+        &tree,
+    )?;
     Ok(oid.to_string())
 }
 
@@ -906,16 +911,16 @@ pub fn cherry_pick(repo_path: &str, oid: &str) -> Result<CherryPickResult, Strin
         .and_then(|h| h.peel_to_commit())
         .map_err(|e| e.message().to_string())?;
 
-    let new_oid = repo
-        .commit(
-            Some("HEAD"),
-            &commit.author(),
-            &signature,
-            commit.message().unwrap_or(""),
-            &tree,
-            &[&parent],
-        )
-        .map_err(|e| e.message().to_string())?;
+    let head_ref = crate::commit_service::resolve_head_ref_name(&repo)?;
+    let new_oid = crate::commit_service::create_commit(
+        &repo,
+        Some(&head_ref),
+        &commit.author(),
+        &signature,
+        commit.message().unwrap_or(""),
+        &tree,
+        &[&parent],
+    )?;
 
     repo.cleanup_state().map_err(|e| e.message().to_string())?;
     Ok(CherryPickResult {
@@ -965,16 +970,16 @@ pub fn revert_commit(repo_path: &str, oid: &str) -> Result<CherryPickResult, Str
         commit.id()
     );
 
-    let new_oid = repo
-        .commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            &message,
-            &tree,
-            &[&parent],
-        )
-        .map_err(|e| e.message().to_string())?;
+    let head_ref = crate::commit_service::resolve_head_ref_name(&repo)?;
+    let new_oid = crate::commit_service::create_commit(
+        &repo,
+        Some(&head_ref),
+        &signature,
+        &signature,
+        &message,
+        &tree,
+        &[&parent],
+    )?;
 
     repo.cleanup_state().map_err(|e| e.message().to_string())?;
     Ok(CherryPickResult {
@@ -1115,16 +1120,16 @@ pub fn merge_branch(repo_path: &str, branch_name: &str) -> Result<CherryPickResu
         .map_err(|e| e.message().to_string())?;
 
     let message = format!("Merge branch '{branch_name}'");
-    let new_oid = repo
-        .commit(
-            Some("HEAD"),
-            &signature,
-            &signature,
-            &message,
-            &tree,
-            &[&head_commit, &their_commit],
-        )
-        .map_err(|e| e.message().to_string())?;
+    let head_ref = crate::commit_service::resolve_head_ref_name(&repo)?;
+    let new_oid = crate::commit_service::create_commit(
+        &repo,
+        Some(&head_ref),
+        &signature,
+        &signature,
+        &message,
+        &tree,
+        &[&head_commit, &their_commit],
+    )?;
     repo.cleanup_state().map_err(|e| e.message().to_string())?;
     Ok(CherryPickResult {
         conflicted: false,
