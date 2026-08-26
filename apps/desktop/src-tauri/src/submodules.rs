@@ -36,6 +36,10 @@ mod tests {
         let repo_root = std::path::Path::new(manifest_dir)
             .parent()
             .unwrap()
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
             .to_string_lossy()
             .to_string();
 

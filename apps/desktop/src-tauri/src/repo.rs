@@ -488,9 +488,14 @@ mod tests {
     use super::*;
 
     fn this_repo() -> String {
-        // src-tauri/src/repo.rs -> repo root is two levels up from CARGO_MANIFEST_DIR (src-tauri)
+        // CARGO_MANIFEST_DIR is apps/desktop/src-tauri; the real repo root (where .git lives) is
+        // two levels up: apps/desktop/src-tauri -> apps/desktop -> repo root.
         let manifest_dir = env!("CARGO_MANIFEST_DIR");
         std::path::Path::new(manifest_dir)
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
             .parent()
             .unwrap()
             .to_string_lossy()
