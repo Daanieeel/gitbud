@@ -208,8 +208,9 @@ export function SigningSetupDialog({
         </DialogHeader>
 
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          {STEP_ORDER.map((s, i) => (
-            <div key={s} className="flex flex-1 items-center gap-1">
+          {STEP_ORDER.map((s, i) => {
+            const isLast = i === STEP_ORDER.length - 1;
+            const group = (
               <div className="flex items-center gap-2">
                 <div
                   className={cn(
@@ -230,186 +231,211 @@ export function SigningSetupDialog({
                   {STEP_LABEL[s]}
                 </span>
               </div>
-              {i < STEP_ORDER.length - 1 && <div className="mx-1 h-px flex-1 bg-border" />}
-            </div>
-          ))}
+            );
+            const connector = <div className="mx-1 h-px flex-1 bg-border" />;
+            // The last step's connector is its own leading line rather than the previous
+            // step's trailing one — otherwise it has to share a cramped cell with whichever
+            // step's label happens to be the longest, and the line to its left can shrink away
+            // to nothing.
+            return (
+              <div key={s} className="flex flex-1 items-center gap-1">
+                {isLast ? (
+                  <>
+                    {connector}
+                    {group}
+                  </>
+                ) : (
+                  <>
+                    {group}
+                    {connector}
+                  </>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {step === "intro" && (
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Key type</span>
-              <CardPicker
-                value={format}
-                onChange={setFormat}
-                options={[
-                  {
-                    value: "ssh",
-                    label: "SSH",
-                    description: "Recommended. Nothing extra to install",
-                  },
-                  {
-                    value: "openpgp",
-                    label: "GPG",
-                    description: "Older, widely recognized standard",
-                    disabled: !gpgAvailable,
-                    disabledReason: "gpg not found on PATH",
-                  },
-                ]}
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Scope</span>
-              <CardPicker
-                value={global ? "global" : "repo"}
-                onChange={(v) => setGlobal(v === "global")}
-                options={[
-                  { value: "repo", label: "This repo", description: "Just the current repository" },
-                  {
-                    value: "global",
-                    label: "All repos",
-                    description: "Every repo on this machine",
-                  },
-                ]}
-              />
-            </div>
-          </div>
-        )}
-
-        {step === "key" && (
-          <div className="flex flex-col gap-2">
-            {format === "ssh" ? (
-              <div className="flex gap-2">
-                <Input
-                  placeholder="~/.ssh/gitbud_signing_ed25519"
-                  value={sshKeyPath}
-                  onChange={(e) => setSshKeyPath(e.target.value)}
-                  className="h-8"
+        <div className="min-h-64">
+          {step === "intro" && (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Key type</span>
+                <CardPicker
+                  value={format}
+                  onChange={setFormat}
+                  options={[
+                    {
+                      value: "ssh",
+                      label: "SSH",
+                      description: "Recommended. Nothing extra to install",
+                    },
+                    {
+                      value: "openpgp",
+                      label: "GPG",
+                      description: "Older, widely recognized standard",
+                      disabled: !gpgAvailable,
+                      disabledReason: "gpg not found on PATH",
+                    },
+                  ]}
                 />
-                <Button size="sm" variant="secondary" onClick={() => void pickExistingSshKey()}>
-                  <FolderOpenIcon className="size-3.5" />
-                  Existing
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => void generateSsh()}
-                >
-                  <SparklesIcon
-                    className={cn("size-3.5", busyKey === "generateSsh" && "animate-spin")}
-                  />
-                  {busyKey === "generateSsh" ? "Generating…" : "Generate"}
-                </Button>
               </div>
-            ) : (
-              <div className="flex gap-2">
-                <select
-                  value={selectedGpgKey}
-                  onChange={(e) => setSelectedGpgKey(e.target.value)}
-                  className="h-8 flex-1 rounded-md border border-input bg-transparent px-2 text-sm"
-                >
-                  <option value="">Choose a key…</option>
-                  {gpgKeys.map(([id, uid]) => (
-                    <option key={id} value={id}>
-                      {uid} ({id.slice(-8)})
-                    </option>
-                  ))}
-                </select>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  disabled={busy}
-                  onClick={() => void generateGpg()}
-                >
-                  <SparklesIcon
-                    className={cn("size-3.5", busyKey === "generateGpg" && "animate-spin")}
-                  />
-                  {busyKey === "generateGpg" ? "Generating…" : "Generate"}
-                </Button>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs font-medium text-muted-foreground">Scope</span>
+                <CardPicker
+                  value={global ? "global" : "repo"}
+                  onChange={(v) => setGlobal(v === "global")}
+                  options={[
+                    {
+                      value: "repo",
+                      label: "This repo",
+                      description: "Just the current repository",
+                    },
+                    {
+                      value: "global",
+                      label: "All repos",
+                      description: "Every repo on this machine",
+                    },
+                  ]}
+                />
               </div>
-            )}
-            <p className="text-xs text-muted-foreground">
-              A generated key has no passphrase. GitBud signs silently on every commit, with nothing
-              extra to type each time.
-            </p>
-          </div>
-        )}
+            </div>
+          )}
 
-        {step === "provider" && (
-          <div className="flex flex-col gap-2.5">
-            {activePubkey && (
-              <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
-                <span className="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-xs">
-                  {activePubkey}
-                </span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => void copyToClipboard(activePubkey)}
-                      className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                    >
-                      <CopyIcon className="size-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Copy public key</TooltipContent>
-                </Tooltip>
-              </div>
-            )}
-            <div className="flex items-center gap-1.5">
-              {providerLink ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void openUrl(providerLink.url)}
-                  className="self-start"
-                >
-                  <ExternalLinkIcon className="size-3.5" />
-                  Open signing key settings
-                </Button>
+          {step === "key" && (
+            <div className="flex flex-col gap-2">
+              {format === "ssh" ? (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="~/.ssh/gitbud_signing_ed25519"
+                    value={sshKeyPath}
+                    onChange={(e) => setSshKeyPath(e.target.value)}
+                    className="h-8"
+                  />
+                  <Button size="sm" variant="secondary" onClick={() => void pickExistingSshKey()}>
+                    <FolderOpenIcon className="size-3.5" />
+                    Existing
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void generateSsh()}
+                  >
+                    <SparklesIcon
+                      className={cn("size-3.5", busyKey === "generateSsh" && "animate-spin")}
+                    />
+                    {busyKey === "generateSsh" ? "Generating…" : "Generate"}
+                  </Button>
+                </div>
               ) : (
-                <p className="text-xs text-muted-foreground">
-                  Paste this key wherever your provider manages signing keys.
+                <div className="flex gap-2">
+                  <select
+                    value={selectedGpgKey}
+                    onChange={(e) => setSelectedGpgKey(e.target.value)}
+                    className="h-8 flex-1 rounded-md border border-input bg-transparent px-2 text-sm"
+                  >
+                    <option value="">Choose a key…</option>
+                    {gpgKeys.map(([id, uid]) => (
+                      <option key={id} value={id}>
+                        {uid} ({id.slice(-8)})
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void generateGpg()}
+                  >
+                    <SparklesIcon
+                      className={cn("size-3.5", busyKey === "generateGpg" && "animate-spin")}
+                    />
+                    {busyKey === "generateGpg" ? "Generating…" : "Generate"}
+                  </Button>
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground">
+                A generated key has no passphrase. GitBud signs silently on every commit, with
+                nothing extra to type each time.
+              </p>
+            </div>
+          )}
+
+          {step === "provider" && (
+            <div className="flex flex-col gap-2.5">
+              {activePubkey && (
+                <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
+                  <span className="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-xs">
+                    {activePubkey}
+                  </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => void copyToClipboard(activePubkey)}
+                        className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <CopyIcon className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Copy public key</TooltipContent>
+                  </Tooltip>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                {providerLink ? (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => void openUrl(providerLink.url)}
+                    className="self-start"
+                  >
+                    <ExternalLinkIcon className="size-3.5" />
+                    Open signing key settings
+                  </Button>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Paste this key wherever your provider manages signing keys.
+                  </p>
+                )}
+                {providerLink?.note && <InfoTooltip text={providerLink.note} />}
+              </div>
+              <label className="flex items-center gap-1.5 text-sm">
+                <input
+                  type="checkbox"
+                  checked={addedConfirmed}
+                  onChange={(e) => setAddedConfirmed(e.target.checked)}
+                />
+                I've added this key to my account
+              </label>
+              {error && <p className="text-xs text-destructive">{error}</p>}
+            </div>
+          )}
+
+          {step === "verify" && (
+            <div className="flex flex-col gap-1.5 text-sm">
+              <CheckRow label="Key ready" state="ok" />
+              <CheckRow
+                label="Test signature verified locally"
+                state={checks.testSigned === "pending" ? "checking" : checks.testSigned}
+              />
+              {checks.providerConfirmed !== "skipped" && (
+                <CheckRow
+                  label="Found on your GitHub account"
+                  state={
+                    checks.providerConfirmed === "checking" ? "checking" : checks.providerConfirmed
+                  }
+                />
+              )}
+              {done && (
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-accent-green">
+                  <CheckIcon className="size-3.5" />
+                  Signing is on. Every commit from here is signed automatically.
                 </p>
               )}
-              {providerLink?.note && <InfoTooltip text={providerLink.note} />}
+              {error && <p className="text-xs text-destructive">{error}</p>}
             </div>
-            <label className="flex items-center gap-1.5 text-sm">
-              <input
-                type="checkbox"
-                checked={addedConfirmed}
-                onChange={(e) => setAddedConfirmed(e.target.checked)}
-              />
-              I've added this key to my account
-            </label>
-            {error && <p className="text-xs text-destructive">{error}</p>}
-          </div>
-        )}
-
-        {step === "verify" && (
-          <div className="flex flex-col gap-1.5 text-sm">
-            <CheckRow label="Key ready" state="ok" />
-            <CheckRow
-              label="Test signature verified locally"
-              state={checks.testSigned === "pending" ? "checking" : checks.testSigned}
-            />
-            {checks.providerConfirmed !== "skipped" && (
-              <CheckRow
-                label="Found on your GitHub account"
-                state={
-                  checks.providerConfirmed === "checking" ? "checking" : checks.providerConfirmed
-                }
-              />
-            )}
-            {done && (
-              <p className="mt-1 flex items-center gap-1.5 text-xs text-accent-green">
-                <CheckIcon className="size-3.5" />
-                Signing is on. Every commit from here is signed automatically.
-              </p>
-            )}
-            {error && <p className="text-xs text-destructive">{error}</p>}
-          </div>
-        )}
+          )}
+        </div>
 
         <DialogFooter>
           {step !== "intro" && !done && (
