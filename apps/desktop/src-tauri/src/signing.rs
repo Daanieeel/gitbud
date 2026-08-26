@@ -25,13 +25,24 @@ fn output_error(output: &Output) -> String {
 /// still wins.
 fn augmented_path() -> std::ffi::OsString {
     let extra: &[&str] = if cfg!(target_os = "macos") {
-        &["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/usr/local/sbin"]
+        &[
+            "/opt/homebrew/bin",
+            "/opt/homebrew/sbin",
+            "/usr/local/bin",
+            "/usr/local/sbin",
+        ]
     } else {
-        &["/home/linuxbrew/.linuxbrew/bin", "/home/linuxbrew/.linuxbrew/sbin", "/usr/local/bin"]
+        &[
+            "/home/linuxbrew/.linuxbrew/bin",
+            "/home/linuxbrew/.linuxbrew/sbin",
+            "/usr/local/bin",
+        ]
     };
     match std::env::var_os("PATH") {
-        Some(path) => std::env::join_paths(std::env::split_paths(&path).chain(extra.iter().map(std::path::PathBuf::from)))
-            .unwrap_or(path),
+        Some(path) => std::env::join_paths(
+            std::env::split_paths(&path).chain(extra.iter().map(std::path::PathBuf::from)),
+        )
+        .unwrap_or(path),
         None => extra.join(":").into(),
     }
 }
