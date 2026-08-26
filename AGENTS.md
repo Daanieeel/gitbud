@@ -1,3 +1,5 @@
+Bun/Turborepo monorepo: the desktop app is `apps/desktop/` (its `src/` is what `@/*` resolves to below), shared UI components + Tailwind theme are `packages/ui/` (imported as `@gitbud/ui/*`).
+
 Never use en/em dashes in texts
 
 Make sure that [ALL_FEATURES.md](ALL_FEATURES.md) stays up to date
