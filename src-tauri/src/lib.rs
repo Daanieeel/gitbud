@@ -12,6 +12,7 @@ mod pr_cache;
 mod rebase;
 mod reflog;
 mod repo;
+mod repo_icon;
 mod settings;
 mod signing;
 mod ssh_identity;
@@ -1473,6 +1474,11 @@ async fn get_app_icon(app_path: String) -> Option<String> {
     tauri::async_runtime::spawn_blocking(move || system::get_app_icon(&app_path)).await.ok()?
 }
 
+#[tauri::command]
+async fn get_repo_icon(repo_path: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || repo_icon::get_repo_icon(&repo_path)).await.ok()?
+}
+
 // --- settings ---
 
 #[tauri::command]
@@ -1781,6 +1787,7 @@ pub fn run() {
             open_in_terminal,
             open_in_editor,
             get_app_icon,
+            get_repo_icon,
             get_settings,
             save_settings,
             export_settings,

@@ -83,6 +83,7 @@ Exhaustive list of implemented, partial, and not-started features. Status legend
 | Sidebar: custom sections | Done | Per-repo override of auto-derived group |
 | Sidebar: ahead/behind badges | Done | |
 | Sidebar: animated sync status | Done | |
+| Sidebar: repo icon detection | Done | This session: scans the working tree for a favicon/logo file (`favicon.svg`/`.ico`, `logo.svg`/`.png`, etc. under root/`public`/`static`/`assets`/`.github`), shown next to the name and as the collapsed-rail avatar in place of the letter fallback; falls back silently when nothing is found |
 | Repo workspaces (named saved groups) | Done | This session |
 | Multi-repo batch fetch/pull | Done | Split into separate "Fetch All" / "Pull All" buttons (this session, was one button that always pulled) |
 | Drag-and-drop folder to add repo | Done | |

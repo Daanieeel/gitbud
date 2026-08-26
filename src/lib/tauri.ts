@@ -238,6 +238,7 @@ export const api = {
   openInEditor: (path: string, editor: string, customAppPath: string | null) =>
     invoke<void>("open_in_editor", { path, editor, customAppPath }),
   getAppIcon: (appPath: string) => invoke<string | null>("get_app_icon", { appPath }),
+  getRepoIcon: (repoPath: string) => invoke<string | null>("get_repo_icon", { repoPath }),
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
   exportSettings: (destPath: string) => invoke<void>("export_settings", { destPath }),
