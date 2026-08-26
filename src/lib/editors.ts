@@ -46,3 +46,10 @@ export const MANUFACTURER_ORDER = ["Microsoft", "JetBrains", "Apple", "Google", 
 export function findEditor(id: string | null | undefined): EditorOption | undefined {
   return EDITORS.find((e) => e.id === id);
 }
+
+/** Display name for a custom editor from its picked app path, e.g. "Sublime Text" from
+ * "/Applications/Sublime Text.app" or "subl" from "C:\Tools\subl.exe". */
+export function customEditorName(appPath: string): string {
+  const base = appPath.split(/[\\/]/).pop() ?? appPath;
+  return base.replace(/\.(app|exe)$/i, "");
+}

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { CheckIcon, CircleIcon, RefreshCwIcon, XCircleIcon } from "lucide-react";
+import { ArrowDownToLineIcon, CheckIcon, CircleIcon, RefreshCwIcon, XCircleIcon } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -20,49 +20,74 @@ export function BatchSyncTrigger({
   iconOnly?: boolean;
 }) {
   const running = useBatchSyncStore((s) => s.running);
+  const runFetchAll = useBatchSyncStore((s) => s.runFetchAll);
   const runPullAll = useBatchSyncStore((s) => s.runPullAll);
 
   if (repos.length === 0) return null;
   const filtered = repos.length < totalCount;
-  const title = filtered ? "Pull every repo currently matching the filter" : "Pull every repo in the sidebar";
+  const scope = filtered ? "every repo currently matching the filter" : "every repo in the sidebar";
+  const suffix = filtered ? ` ${repos.length}/${totalCount}` : " All";
 
-  const run = () => {
+  const run = (kind: "fetch" | "pull") => () => {
     toast.custom((id) => <BatchSyncToastContent toastId={id} />, {
       id: BATCH_TOAST_ID,
       duration: Infinity,
     });
-    void runPullAll(repos.map((r) => r.path));
+    const paths = repos.map((r) => r.path);
+    void (kind === "fetch" ? runFetchAll(paths) : runPullAll(paths));
   };
 
   if (iconOnly) {
     return (
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button variant="secondary" size="icon" disabled={running} onClick={run}>
-            <RefreshCwIcon className={cn("size-4", running && "animate-spin")} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>{title}</TooltipContent>
-      </Tooltip>
+      <>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="secondary" size="icon" disabled={running} onClick={run("fetch")}>
+              <RefreshCwIcon className={cn("size-4", running && "animate-spin")} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Fetch {scope}</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="secondary" size="icon" disabled={running} onClick={run("pull")}>
+              <ArrowDownToLineIcon className={cn("size-4", running && "animate-pulse")} />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Pull {scope}</TooltipContent>
+        </Tooltip>
+      </>
     );
   }
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <Button variant="secondary" size="sm" className="w-full" disabled={running} onClick={run}>
-          <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
-          {filtered ? `Update ${repos.length}/${totalCount}` : "Update All"}
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{title}</TooltipContent>
-    </Tooltip>
+    <div className="flex gap-2">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="secondary" size="sm" className="flex-1" disabled={running} onClick={run("fetch")}>
+            <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
+            {`Fetch${suffix}`}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Fetch {scope}</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="secondary" size="sm" className="flex-1" disabled={running} onClick={run("pull")}>
+            <ArrowDownToLineIcon className={cn("size-3.5", running && "animate-pulse")} />
+            {`Pull${suffix}`}
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>Pull {scope}</TooltipContent>
+      </Tooltip>
+    </div>
   );
 }
 
 function BatchSyncToastContent({ toastId }: { toastId: string | number }) {
   const repos = useRepoStore((s) => s.repos);
   const running = useBatchSyncStore((s) => s.running);
+  const kind = useBatchSyncStore((s) => s.kind);
   const outcomes = useBatchSyncStore((s) => s.outcomes);
   const errors = useBatchSyncStore((s) => s.errors);
   const dismiss = useBatchSyncStore((s) => s.dismiss);
@@ -84,7 +109,7 @@ function BatchSyncToastContent({ toastId }: { toastId: string | number }) {
   return (
     <div className="flex w-[22rem] flex-col gap-1.5 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg">
       <div className="flex items-center justify-between text-sm font-medium">
-        <span>Update All: {running ? "running…" : "done"}</span>
+        <span>{kind === "fetch" ? "Fetch All" : "Pull All"}: {running ? "running…" : "done"}</span>
         <span className="text-xs text-muted-foreground">
           {doneCount}/{entries.length}
           {errorCount > 0 && ` (${errorCount} failed)`}

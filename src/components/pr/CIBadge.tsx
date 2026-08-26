@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { CheckCircle2Icon, CircleDashedIcon, XCircleIcon } from "lucide-react";
 import { useCheckRuns } from "@/hooks/queries/useCheckRuns";
+import { useNetworkStore } from "@/store/useNetworkStore";
 import { CheckRunsRefresh } from "./CheckRunsRefresh";
 import type { CheckRun } from "@/lib/types";
 import {
@@ -83,12 +84,17 @@ export function CIBadge({ repoPath, login, sha, pollIntervalMs = null }: CIBadge
     dataUpdatedAt,
   } = useCheckRuns(repoPath, login, sha, pollIntervalMs);
   const [open, setOpen] = useState(false);
+  const offline = useNetworkStore((s) => s.offline);
 
   if (runs === null || runs.length === 0) return null;
   const overall = overallFrom(runs);
 
   const Icon = OVERALL_ICON[overall];
-  const color = OVERALL_COLOR[overall];
+  // CI conclusions can flip fast on remote (a rerun, a force-push retriggering checks), so an
+  // offline-cached result gets a visibly muted treatment here rather than looking as trustworthy
+  // as a fresh one — this is the one place that needs its own local staleness signal, beyond the
+  // app's collective offline hints (toolbar icon, PRTab's "You are offline" card).
+  const color = offline ? "text-muted-foreground/60" : OVERALL_COLOR[overall];
 
   return (
     <Tooltip>
@@ -96,7 +102,7 @@ export function CIBadge({ repoPath, login, sha, pollIntervalMs = null }: CIBadge
         <PopoverTrigger asChild>
           <TooltipTrigger asChild>
             <button onClick={(e) => e.stopPropagation()}>
-              <Icon className={`size-3.5 ${color}`} />
+              <Icon className={`size-3.5 ${color} ${offline ? "opacity-60" : ""}`} />
             </button>
           </TooltipTrigger>
         </PopoverTrigger>
@@ -125,7 +131,9 @@ export function CIBadge({ repoPath, login, sha, pollIntervalMs = null }: CIBadge
           ))}
         </PopoverContent>
       </Popover>
-      <TooltipContent>{`CI: ${overall}`}</TooltipContent>
+      <TooltipContent>
+        {offline ? `CI: ${overall} — cached while offline, may be outdated` : `CI: ${overall}`}
+      </TooltipContent>
     </Tooltip>
   );
 }

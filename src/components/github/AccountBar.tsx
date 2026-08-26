@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Avatar } from "@/components/ui/avatar";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useIdentityStore, githubIdentityId, sshIdentityId, type UnifiedIdentity } from "@/store/useIdentityStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
@@ -28,7 +29,7 @@ import { cn } from "@/lib/utils";
 
 function IdentityAvatar({ identity }: { identity: UnifiedIdentity }) {
   if (identity.kind === "github") {
-    return <img src={identity.avatarUrl} alt="" className="size-6 shrink-0 rounded-full" />;
+    return <Avatar src={identity.avatarUrl} alt="" className="size-6" />;
   }
   return (
     <Tooltip>
@@ -167,10 +168,10 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
           </span>
           <span>Choose one to enable "Open in…" from the Changes file explorer.</span>
           <EditorPicker
-            onSelect={(editorId, customCommand) =>
+            onSelect={(editorId, customAppPath) =>
               void updateSettings({
                 favorite_editor: editorId,
-                custom_editor_command: editorId === CUSTOM_EDITOR_ID ? (customCommand ?? null) : null,
+                custom_editor_command: editorId === CUSTOM_EDITOR_ID ? (customAppPath ?? null) : null,
               })
             }
           >

@@ -6,7 +6,9 @@ import {
   CopyIcon,
   EyeOffIcon,
   ExternalLinkIcon,
+  FileXIcon,
   FolderOpenIcon,
+  FolderXIcon,
   TerminalIcon,
   Trash2Icon,
   TriangleAlertIcon,
@@ -23,6 +25,9 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
@@ -41,9 +46,10 @@ import { FileStatusIcon } from "@/lib/file-status";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
-import { useAddToGitignore, useDiscardFile } from "@/hooks/queries/useRepoStatus";
+import { useAddToGitignore, useDiscardFile, useIgnoreExtension, useIgnoreFolder } from "@/hooks/queries/useRepoStatus";
 import { useSettingsStore } from "@/store/useSettingsStore";
-import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
+import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
+import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
 import { BlameDialog } from "./BlameDialog";
 import { FilePathLabel } from "./FilePathLabel";
 import type { LfsFileInfo } from "@/lib/types";
@@ -58,6 +64,22 @@ function formatBytes(bytes: number): string {
     unit++;
   }
   return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
+}
+
+/** Every ancestor folder of a repo-relative file path, shallowest first, e.g.
+ * "src/components/changes/FileList.tsx" -> ["src", "src/components", "src/components/changes"].
+ * Empty for a root-level file, which has no folder to ignore. */
+function ancestorFolders(path: string): string[] {
+  const parts = path.split("/").slice(0, -1);
+  return parts.map((_, i) => parts.slice(0, i + 1).join("/"));
+}
+
+/** A file's extension for a "*.ext" gitignore pattern, or `null` for a file with none (or a
+ * dotfile like ".gitignore", where treating the whole name as an "extension" isn't useful). */
+function fileExtension(path: string): string | null {
+  const basename = path.split("/").pop() ?? "";
+  const dotIndex = basename.lastIndexOf(".");
+  return dotIndex > 0 ? basename.slice(dotIndex + 1) : null;
 }
 
 interface FileListProps {
@@ -76,10 +98,14 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
   const branch = branchData?.branch ?? null;
   const discardFileMutation = useDiscardFile(repoPath);
   const addToGitignoreMutation = useAddToGitignore(repoPath);
+  const ignoreFolderMutation = useIgnoreFolder(repoPath);
+  const ignoreExtensionMutation = useIgnoreExtension(repoPath);
   const favoriteEditorId = useSettingsStore((s) => s.settings.favorite_editor);
   const customEditorCommand = useSettingsStore((s) => s.settings.custom_editor_command);
   const favoriteEditorOption = findEditor(favoriteEditorId);
   const isCustomEditor = favoriteEditorId === CUSTOM_EDITOR_ID && !!customEditorCommand;
+  const customIcon = useCustomEditorIcon(isCustomEditor ? customEditorCommand : null);
+  const editorName = favoriteEditorOption?.name ?? (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
   const [blamePath, setBlamePath] = useState<string | null>(null);
   const [confirmDiscardPath, setConfirmDiscardPath] = useState<string | null>(null);
   const [confirmDiscardBatch, setConfirmDiscardBatch] = useState(false);
@@ -250,10 +276,6 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                   </>
                 ) : (
                   <>
-                    <ContextMenuItem onSelect={() => void copyToClipboard(file.path)}>
-                      <CopyIcon className="size-3.5" />
-                      Copy Path
-                    </ContextMenuItem>
                     <ContextMenuItem
                       onSelect={() => {
                         if (!repoPath) return;
@@ -287,10 +309,12 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                             alt=""
                             className={favoriteEditorOption.id === "zed" ? "size-4" : "size-3.5"}
                           />
+                        ) : customIcon ? (
+                          <img src={customIcon} alt="" className="size-3.5" />
                         ) : (
                           <CodeIcon className="size-3.5" />
                         )}
-                        Open in {favoriteEditorOption?.name ?? "Editor"}
+                        Open in {editorName}
                       </ContextMenuItem>
                     )}
                     {branch && (
@@ -306,14 +330,56 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                         View File on GitHub
                       </ContextMenuItem>
                     )}
+                    <ContextMenuSeparator />
+                    <ContextMenuItem onSelect={() => void copyToClipboard(file.path)}>
+                      <CopyIcon className="size-3.5" />
+                      Copy Path
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
                     <ContextMenuItem onSelect={() => setBlamePath(file.path)}>
                       <UserIcon className="size-3.5" />
                       Blame File
                     </ContextMenuItem>
+                    <ContextMenuSeparator />
                     <ContextMenuItem onSelect={() => addToGitignoreMutation.mutate([file.path])}>
                       <EyeOffIcon className="size-3.5" />
-                      Add to .gitignore
+                      Ignore This File
                     </ContextMenuItem>
+                    {ancestorFolders(file.path).length > 0 && (
+                      <ContextMenuSub>
+                        <ContextMenuSubTrigger>
+                          <FolderXIcon className="size-3.5" />
+                          Ignore Folder
+                        </ContextMenuSubTrigger>
+                        <ContextMenuSubContent>
+                          {ancestorFolders(file.path).map((folder, depth) => {
+                            const name = folder.slice(folder.lastIndexOf("/") + 1);
+                            return (
+                              <ContextMenuItem key={folder} onSelect={() => ignoreFolderMutation.mutate(folder)}>
+                                <span
+                                  className="truncate font-mono text-xs"
+                                  style={{ paddingLeft: depth * 6 }}
+                                >
+                                  {depth > 0 && <span className="text-muted-foreground/60">└ </span>}
+                                  {name}/
+                                </span>
+                              </ContextMenuItem>
+                            );
+                          })}
+                        </ContextMenuSubContent>
+                      </ContextMenuSub>
+                    )}
+                    {fileExtension(file.path) && (
+                      <ContextMenuItem
+                        onSelect={() => {
+                          const ext = fileExtension(file.path);
+                          if (ext) ignoreExtensionMutation.mutate(ext);
+                        }}
+                      >
+                        <FileXIcon className="size-3.5" />
+                        Ignore All .{fileExtension(file.path)} Files
+                      </ContextMenuItem>
+                    )}
                     <ContextMenuSeparator />
                     <ContextMenuItem
                       variant="destructive"

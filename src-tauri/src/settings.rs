@@ -53,6 +53,27 @@ pub enum OpenPrAfterCreation {
     Provider,
 }
 
+/// How long already-fetched, no-longer-viewed data stays in memory before being freed, trading
+/// memory for snappier repo/tab switching. Only affects the frontend's in-memory query cache for
+/// cheap-to-refetch local git data (status, branches, log, diffs, ...); it's unrelated to the
+/// always-on local SQLite mirror for GitHub PR data (repo-scoped PR/CI data plus a separate,
+/// indefinitely-kept avatar cache — see `pr_cache.rs`), or that data's own deliberate eviction on
+/// leaving a PR/tab/repo, neither of which is configurable.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CacheLevel {
+    None,
+    Minimal,
+    Balanced,
+    Relaxed,
+}
+
+impl Default for CacheLevel {
+    fn default() -> Self {
+        CacheLevel::Balanced
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -107,15 +128,19 @@ pub struct Settings {
     /// Id of the chosen "Open in <editor>" target (see `system::EDITORS`), or `"custom"` for
     /// `custom_editor_command`. `None` means no favorite editor has been chosen yet.
     pub favorite_editor: Option<String>,
-    /// Shell command template used when `favorite_editor` is `"custom"` — `{path}` is replaced
-    /// with the file's absolute path.
+    /// Absolute path to the app bundle (macOS `.app`) or executable the user picked via a file
+    /// dialog, used when `favorite_editor` is `"custom"`.
     pub custom_editor_command: Option<String>,
+
+    // Performance
+    #[serde(default)]
+    pub cache_level: CacheLevel,
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            theme: ThemeMode::Dark,
+            theme: ThemeMode::System,
             default_clone_dir: None,
             git_name: None,
             git_email: None,
@@ -136,6 +161,7 @@ impl Default for Settings {
             favorite_editor: None,
             custom_editor_command: None,
             open_pr_after_creation: OpenPrAfterCreation::InApp,
+            cache_level: CacheLevel::Balanced,
         }
     }
 }

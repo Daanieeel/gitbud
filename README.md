@@ -46,6 +46,9 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [X] Live-syncing with git provider (PRs, commits etc)
 - [ ] Improve git blame view
 - [ ] View releases in-app
+- [ ] Commit sigining setup wizard
+- [ ] Full screen reclone/relocate/remove from gitbud prompt for repo paths that the app cant find anymroe (moved/deleted)
+- [ ] .gitignore tab for managing gitignore rules in an interactive UI
 - [ ] ...and more to come
 
 ## Features
@@ -66,7 +69,7 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 
 A few design choices that keep this lighter than the average Electron-based git client:
 
-- Idle RAM target: under 150MB with a repo open
+- Idle RAM target: under 50MB base + variable in-memory cached repo data (can be disabled via settings)
 - Cold start to interactive: under a second
 - Local repo state (status, log, branches) updates from filesystem events, not polling. Remote-facing data (open PRs, CI checks, a background fetch) is polled on a backoff schedule, since GitHub has no push channel for that
 - File and commit lists are virtualized

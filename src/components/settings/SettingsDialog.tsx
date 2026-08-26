@@ -1,35 +1,45 @@
 import { useEffect, useState } from "react";
 import {
   ColumnsIcon,
+  CodeIcon,
   DownloadIcon,
+  FolderOpenIcon,
   GitBranchIcon,
   PanelLeftIcon,
   SaveIcon,
   SettingsIcon,
   SlidersHorizontalIcon,
+  Trash2Icon,
   UploadIcon,
 } from "lucide-react";
 import { save, open as openFileDialog } from "@tauri-apps/plugin-dialog";
+import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { GitHubMark } from "@/components/github/GitHubMark";
 import { UpdateChecker } from "./UpdateChecker";
 import { SigningWizard } from "./SigningWizard";
 import { EditorPicker } from "./EditorPicker";
-import { CUSTOM_EDITOR_ID, findEditor } from "@/lib/editors";
+import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
+import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
+import { Slider } from "@/components/ui/slider";
 import type {
+  CacheLevel,
   DiffAlgorithm,
   DiffViewMode,
   OpenPrAfterCreation,
@@ -48,6 +58,13 @@ const SECTIONS = [
 ] as const;
 type Section = (typeof SECTIONS)[number]["key"];
 
+const CACHE_LEVELS: { key: CacheLevel; label: string; tooltip: string }[] = [
+  { key: "none", label: "None", tooltip: "Freed instantly. Lowest memory, most refetching." },
+  { key: "minimal", label: "Minimal", tooltip: "Freed after 5 seconds." },
+  { key: "balanced", label: "Balanced", tooltip: "Freed after 30 seconds. Default." },
+  { key: "relaxed", label: "Relaxed", tooltip: "Freed after 2 minutes. Snappiest, most memory." },
+];
+
 const OPEN_PR_OPTIONS: { key: OpenPrAfterCreation; label: string; description: string }[] = [
   { key: "in-app", label: "In-App", description: "Open the pull request in the Pull Requests tab" },
   { key: "provider", label: "Provider", description: "Open the pull request in your browser" },
@@ -56,6 +73,18 @@ const OPEN_PR_OPTIONS: { key: OpenPrAfterCreation; label: string; description: s
 interface SettingsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ["KB", "MB", "GB", "TB"];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit++;
+  }
+  return `${value.toFixed(value < 10 ? 1 : 0)} ${units[unit]}`;
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
@@ -91,10 +120,61 @@ function Select<T extends string>({
   );
 }
 
+/** Clear button + confirm popover shared by the "Cached repo data" and "Cached user avatars"
+ * rows below — same interaction, different scope/copy. */
+function ClearCacheButton({
+  clearing,
+  disabled,
+  confirmOpen,
+  onConfirmOpenChange,
+  confirmText,
+  onClear,
+}: {
+  clearing: boolean;
+  disabled: boolean;
+  confirmOpen: boolean;
+  onConfirmOpenChange: (open: boolean) => void;
+  confirmText: string;
+  onClear: () => void;
+}) {
+  return (
+    <Popover open={confirmOpen} onOpenChange={onConfirmOpenChange}>
+      <PopoverTrigger asChild>
+        <Button variant="secondary" size="sm" className="h-8 gap-1.5" disabled={disabled}>
+          <Trash2Icon className="size-3.5" />
+          {clearing ? "Clearing…" : "Clear"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-64 space-y-2 p-3">
+        <p className="text-sm">{confirmText}</p>
+        <div className="flex justify-end gap-2">
+          <Button size="sm" variant="ghost" onClick={() => onConfirmOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button size="sm" variant="destructive" onClick={onClear}>
+            Clear
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
 export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const { settings, update, exportTo, importFrom } = useSettingsStore();
   const favoriteEditor = findEditor(settings.favorite_editor);
+  const customEditorIcon = useCustomEditorIcon(
+    settings.favorite_editor === CUSTOM_EDITOR_ID ? settings.custom_editor_command : null,
+  );
   const [importExportError, setImportExportError] = useState<string | null>(null);
+  const [pendingCacheLevel, setPendingCacheLevel] = useState<CacheLevel | null>(null);
+  const [restarting, setRestarting] = useState(false);
+  const [repoCacheBytes, setRepoCacheBytes] = useState<number | null>(null);
+  const [avatarCacheBytes, setAvatarCacheBytes] = useState<number | null>(null);
+  const [clearingRepoCache, setClearingRepoCache] = useState(false);
+  const [clearingAvatarCache, setClearingAvatarCache] = useState(false);
+  const [confirmClearRepoCache, setConfirmClearRepoCache] = useState(false);
+  const [confirmClearAvatarCache, setConfirmClearAvatarCache] = useState(false);
   const clientId = useGitHubStore((s) => s.clientId);
   const setClientId = useGitHubStore((s) => s.setClientId);
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -115,7 +195,33 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         setGitEmail(email ?? "");
       });
     }
+    void api.getCacheSizes().then(({ repoBytes, avatarBytes }) => {
+      setRepoCacheBytes(repoBytes);
+      setAvatarCacheBytes(avatarBytes);
+    });
   }, [open, repoPath]);
+
+  const clearRepoCache = async () => {
+    setConfirmClearRepoCache(false);
+    setClearingRepoCache(true);
+    try {
+      await api.clearRepoCache();
+      setRepoCacheBytes((await api.getCacheSizes()).repoBytes);
+    } finally {
+      setClearingRepoCache(false);
+    }
+  };
+
+  const clearAvatarCache = async () => {
+    setConfirmClearAvatarCache(false);
+    setClearingAvatarCache(true);
+    try {
+      await api.clearAvatarCache();
+      setAvatarCacheBytes((await api.getCacheSizes()).avatarBytes);
+    } finally {
+      setClearingAvatarCache(false);
+    }
+  };
 
   const saveGitIdentity = async () => {
     if (!repoPath) return;
@@ -159,6 +265,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[75vh] w-[75vw] max-w-none flex-col">
         <DialogHeader>
@@ -210,12 +317,30 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     onCheckedChange={(checked) => void update({ auto_stage_new_changes: checked === true })}
                   />
                 </Row>
+                <div className="flex items-center justify-between gap-6 py-1.5">
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm text-muted-foreground">Memory usage</span>
+                    <span className="max-w-[40ch] text-xs text-muted-foreground/70">
+                      Lower uses less memory but refetches more often; higher keeps more in memory
+                      for snappier repo switching.
+                    </span>
+                  </div>
+                  <Slider
+                    className="flex-1"
+                    min={0}
+                    max={CACHE_LEVELS.length - 1}
+                    step={1}
+                    value={[CACHE_LEVELS.findIndex((l) => l.key === settings.cache_level)]}
+                    onValueChange={([index]) => setPendingCacheLevel(CACHE_LEVELS[index].key)}
+                    marks={CACHE_LEVELS.map((l, i) => ({ value: i, label: l.label, tooltip: l.tooltip }))}
+                  />
+                </div>
                 <Row label="Favorite editor">
                   <EditorPicker
-                    onSelect={(favorite_editor, customCommand) =>
+                    onSelect={(favorite_editor, customAppPath) =>
                       void update({
                         favorite_editor,
-                        custom_editor_command: favorite_editor === CUSTOM_EDITOR_ID ? (customCommand ?? null) : null,
+                        custom_editor_command: favorite_editor === CUSTOM_EDITOR_ID ? (customAppPath ?? null) : null,
                       })
                     }
                   >
@@ -225,8 +350,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                           <img src={favoriteEditor.icon} alt="" className="size-4 shrink-0" />
                           <span className="truncate">{favoriteEditor.name}</span>
                         </>
-                      ) : settings.favorite_editor === CUSTOM_EDITOR_ID ? (
-                        <span className="truncate font-mono text-xs">{settings.custom_editor_command}</span>
+                      ) : settings.favorite_editor === CUSTOM_EDITOR_ID && settings.custom_editor_command ? (
+                        <>
+                          {customEditorIcon ? (
+                            <img src={customEditorIcon} alt="" className="size-4 shrink-0" />
+                          ) : (
+                            <CodeIcon className="size-4 shrink-0" />
+                          )}
+                          <span className="truncate" title={settings.custom_editor_command}>
+                            {customEditorName(settings.custom_editor_command)}
+                          </span>
+                        </>
                       ) : (
                         <span className="text-muted-foreground">Choose an editor…</span>
                       )}
@@ -252,6 +386,59 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         </div>
                       </button>
                     ))}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 py-1.5">
+                  <div className="flex items-center justify-between gap-6">
+                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="text-sm text-muted-foreground">Local data</span>
+                      <span className="text-xs text-muted-foreground/70">
+                        Local mirror of pull requests, files, comments, checks, and avatars —
+                        kept on disk regardless of the memory setting above, for instant paint
+                        and offline viewing.
+                      </span>
+                    </div>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 shrink-0 gap-1.5"
+                      onClick={() => void api.getCacheDirPath().then((dir) => revealItemInDir(dir))}
+                    >
+                      <FolderOpenIcon className="size-3.5" />
+                      Open
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between gap-6 pl-3">
+                    <span className="text-sm text-muted-foreground">Cached repo data</span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {repoCacheBytes === null ? "…" : formatBytes(repoCacheBytes)}
+                      </span>
+                      <ClearCacheButton
+                        clearing={clearingRepoCache}
+                        disabled={clearingRepoCache || repoCacheBytes === 0}
+                        confirmOpen={confirmClearRepoCache}
+                        onConfirmOpenChange={setConfirmClearRepoCache}
+                        confirmText="Delete all cached PR data? It'll be re-fetched from GitHub as needed."
+                        onClear={() => void clearRepoCache()}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between gap-6 pl-3">
+                    <span className="text-sm text-muted-foreground">Cached user avatars</span>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-sm text-muted-foreground">
+                        {avatarCacheBytes === null ? "…" : formatBytes(avatarCacheBytes)}
+                      </span>
+                      <ClearCacheButton
+                        clearing={clearingAvatarCache}
+                        disabled={clearingAvatarCache || avatarCacheBytes === 0}
+                        confirmOpen={confirmClearAvatarCache}
+                        onConfirmOpenChange={setConfirmClearAvatarCache}
+                        confirmText="Delete all cached avatars? They'll be re-fetched as PRs load."
+                        onClear={() => void clearAvatarCache()}
+                      />
+                    </div>
                   </div>
                 </div>
               </>
@@ -420,5 +607,32 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         </div>
       </DialogContent>
     </Dialog>
+    <Dialog open={pendingCacheLevel !== null} onOpenChange={(o) => !o && setPendingCacheLevel(null)}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Restart required</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Changing memory usage takes effect on the next launch. Restart now to apply it, or
+          cancel to keep the current setting.
+        </p>
+        <DialogFooter>
+          <Button variant="ghost" disabled={restarting} onClick={() => setPendingCacheLevel(null)}>
+            Cancel
+          </Button>
+          <Button
+            disabled={restarting}
+            onClick={() => {
+              if (!pendingCacheLevel) return;
+              setRestarting(true);
+              void update({ cache_level: pendingCacheLevel }).then(() => relaunch());
+            }}
+          >
+            {restarting ? "Restarting…" : "Restart Now"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

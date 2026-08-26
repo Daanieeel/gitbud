@@ -3,11 +3,19 @@ import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 import { useSettingsStore } from "@/store/useSettingsStore";
 
-// Paths auto-staged at least once per repo — so a file the user deliberately unstages after
-// auto-stage picked it up doesn't just get re-staged on the next status refetch. Cleared for a
-// path once it drops out of `status.files` (committed/discarded), so a later, genuinely new
-// change to that same path is auto-staged again.
+// Paths auto-staged at least once per repo, so a file the user deliberately unstages *entirely*
+// after auto-stage picked it up doesn't just get re-staged on the next status refetch. Doesn't
+// apply to a partially-staged file (see the `partially_staged` check below), since that always
+// means new changes exist on top of whatever's staged. Cleared for a path once it drops out of
+// `status.files` (committed/discarded), so a later, genuinely new change to that same path is
+// auto-staged again.
 const autoStagedPaths = new Map<string, Set<string>>();
+
+/** Drops a removed repo's auto-stage bookkeeping so it doesn't linger for the rest of the
+ * app session. */
+export function clearAutoStagedPaths(repoPath: string) {
+  autoStagedPaths.delete(repoPath);
+}
 
 async function fetchStatus(repoPath: string) {
   let status = await api.getStatus(repoPath);
@@ -23,8 +31,13 @@ async function fetchStatus(repoPath: string) {
       if (!currentPaths.has(path)) seen.delete(path);
     }
 
+    // `seen` only suppresses re-staging a path that's back to *fully* unstaged (the user
+    // deliberately unstaged it). A `partially_staged` file always has new changes on top of
+    // whatever's already staged (by definition not what the user backed out of), so those
+    // must be staged regardless of `seen`, or edits made to an already-staged file would never
+    // get picked up.
     const toStage = status.files
-      .filter((f) => f.status !== "conflicted" && (!f.staged || f.partially_staged) && !seen.has(f.path))
+      .filter((f) => f.status !== "conflicted" && (f.partially_staged || (!f.staged && !seen.has(f.path))))
       .map((f) => f.path);
     if (toStage.length > 0) {
       await api.stagePaths(repoPath, toStage);
@@ -85,6 +98,22 @@ export function useAddToGitignore(repoPath: string | null) {
   const invalidate = useInvalidateStatus(repoPath);
   return useMutation({
     mutationFn: (paths: string[]) => api.addToGitignore(repoPath as string, paths),
+    onSuccess: invalidate,
+  });
+}
+
+export function useIgnoreFolder(repoPath: string | null) {
+  const invalidate = useInvalidateStatus(repoPath);
+  return useMutation({
+    mutationFn: (folderPath: string) => api.ignoreFolder(repoPath as string, folderPath),
+    onSuccess: invalidate,
+  });
+}
+
+export function useIgnoreExtension(repoPath: string | null) {
+  const invalidate = useInvalidateStatus(repoPath);
+  return useMutation({
+    mutationFn: (extension: string) => api.ignoreExtension(repoPath as string, extension),
     onSuccess: invalidate,
   });
 }

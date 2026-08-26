@@ -188,6 +188,8 @@ export interface AheadBehind {
   behind: number;
   /** False means the branch has never been pushed — no upstream on `origin` yet. */
   published: boolean;
+  /** Whether HEAD's commit already exists on some remote-tracking branch, published or not. */
+  head_on_remote: boolean;
 }
 
 export interface GitOutputLine {
@@ -213,6 +215,7 @@ export type DiffViewMode = "unified" | "split";
 export type DiffAlgorithm = "myers" | "minimal" | "patience";
 export type SidebarSort = "name" | "recent" | "group" | "manual";
 export type OpenPrAfterCreation = "in-app" | "provider";
+export type CacheLevel = "none" | "minimal" | "balanced" | "relaxed";
 
 export interface Settings {
   theme: ThemeMode;
@@ -235,6 +238,7 @@ export interface Settings {
   favorite_editor: string | null;
   custom_editor_command: string | null;
   open_pr_after_creation: OpenPrAfterCreation;
+  cache_level: CacheLevel;
 }
 
 // --- GitHub ---

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
+  CodeIcon,
   CopyIcon,
+  ExternalLinkIcon,
   FolderOpenIcon,
   MinusIcon,
   PanelLeftCloseIcon,
@@ -16,7 +19,7 @@ import {
   Trash2Icon,
   XIcon,
 } from "lucide-react";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { listen } from "@tauri-apps/api/event";
 import { Input } from "@/components/ui/input";
@@ -28,25 +31,38 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
+import { toast } from "sonner";
 import { AddRepoMenu } from "./AddRepoMenu";
 import { BatchSyncTrigger } from "./BatchSyncPanel";
 import { PinToSectionDialog } from "./PinToSectionDialog";
 import { WorkspacePicker } from "./WorkspacePicker";
 import { AccountBar } from "@/components/github/AccountBar";
+import { OfflineIndicator } from "@/components/layout/OfflineIndicator";
+import { GitHubMark } from "@/components/github/GitHubMark";
+import { GitLabMark } from "@/components/github/GitLabMark";
+import { BitbucketMark } from "@/components/github/BitbucketMark";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useSettingsStore } from "@/store/useSettingsStore";
+import { useNetworkStore } from "@/store/useNetworkStore";
 import { useWorkspaces } from "@/hooks/queries/useWorkspaces";
 import { useWorkspaceFilterStore } from "@/store/useWorkspaceFilterStore";
 import { useRepoSyncing } from "@/hooks/queries/useGitSync";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
+import { detectRemoteProvider, type RemoteProvider } from "@/lib/remote-provider";
+import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
+import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import type { AheadBehind, RepoEntry } from "@/lib/types";
+
+const DEFAULT_AHEAD_BEHIND: AheadBehind = { ahead: 0, behind: 0, published: true, head_on_remote: true };
 
 function groupRepos(repos: RepoEntry[]): Map<string, RepoEntry[]> {
   const groups = new Map<string, RepoEntry[]>();
@@ -83,6 +99,13 @@ function loadCollapsedSections(): Set<string> {
   }
 }
 
+const REMOTE_PROVIDER_LABEL: Record<RemoteProvider, string> = {
+  github: "Open on GitHub",
+  gitlab: "Open on GitLab",
+  bitbucket: "Open on Bitbucket",
+  unknown: "Open in Browser",
+};
+
 interface RepoRowProps {
   repo: RepoEntry;
   selected: boolean;
@@ -92,13 +115,14 @@ interface RepoRowProps {
   showAheadBehind: boolean;
   draggable: boolean;
   dragged: boolean;
-  confirmRemove: boolean;
   onSelect: () => void;
   onDragStart: () => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
   onDragEnd: () => void;
-  onConfirmRemoveChange: (open: boolean) => void;
+  /** Opens the confirm dialog (with the move-to-trash option) at the RepoSidebar level. */
+  onRequestRemove: () => void;
+  /** Instant, no-confirm removal — only wired to the context menu's "Remove from Sidebar". */
   onRemove: () => void;
   onPinToSection: () => void;
   /** Name of the pinned section this row is being rendered under, if any — enables the extra
@@ -116,20 +140,37 @@ function RepoRow({
   showAheadBehind,
   draggable,
   dragged,
-  confirmRemove,
   onSelect,
   onDragStart,
   onDragOver,
   onDrop,
   onDragEnd,
-  onConfirmRemoveChange,
+  onRequestRemove,
   onRemove,
   onPinToSection,
   sectionContext,
   onRemoveFromSection,
 }: RepoRowProps) {
+  const favoriteEditorId = useSettingsStore((s) => s.settings.favorite_editor);
+  const customEditorCommand = useSettingsStore((s) => s.settings.custom_editor_command);
+  const favoriteEditorOption = findEditor(favoriteEditorId);
+  const isCustomEditor = favoriteEditorId === CUSTOM_EDITOR_ID && !!customEditorCommand;
+  const customIcon = useCustomEditorIcon(isCustomEditor ? customEditorCommand : null);
+  const editorName = favoriteEditorOption?.name ?? (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
+  const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: ReturnType<typeof detectRemoteProvider> } | null>(null);
+
   return (
-    <ContextMenu>
+    <ContextMenu
+      onOpenChange={(open) => {
+        if (!open) return;
+        setRemoteInfo(null);
+        void api.remoteWebInfo(repo.path).then((info) => {
+          if (!info) return;
+          const [host, url] = info;
+          setRemoteInfo({ url, provider: detectRemoteProvider(host) });
+        });
+      }}
+    >
       <ContextMenuTrigger asChild>
         <div
           draggable={draggable}
@@ -188,49 +229,20 @@ function RepoRow({
                 <TooltipContent>{`Remove from "${sectionContext}"`}</TooltipContent>
               </Tooltip>
             )}
-            <Popover open={confirmRemove} onOpenChange={onConfirmRemoveChange}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <PopoverTrigger asChild>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onConfirmRemoveChange(true);
-                      }}
-                      className={cn(
-                        "aspect-square w-0 shrink-0 overflow-hidden rounded-md bg-destructive/10 p-1 text-destructive opacity-0 transition-all hover:bg-destructive/20 group-hover:w-5 group-hover:ml-1 group-hover:opacity-100 flex items-center justify-center",
-                        confirmRemove && "w-5 ml-1 opacity-100",
-                      )}
-                    >
-                      <XIcon className="size-3.5" />
-                    </button>
-                  </PopoverTrigger>
-                </TooltipTrigger>
-                <TooltipContent>Remove from GitBud</TooltipContent>
-              </Tooltip>
-              <PopoverContent
-                align="end"
-                className="w-56 space-y-2 bg-accent-blue/5 p-3"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <p className="text-sm">Remove "{repo.name}" from the list?</p>
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => onConfirmRemoveChange(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => {
-                      onConfirmRemoveChange(false);
-                      onRemove();
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRequestRemove();
+                  }}
+                  className="aspect-square w-0 shrink-0 overflow-hidden rounded-md bg-destructive/10 p-1 text-destructive opacity-0 transition-all hover:bg-destructive/20 group-hover:w-5 group-hover:ml-1 group-hover:opacity-100 flex items-center justify-center"
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Remove from GitBud</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </ContextMenuTrigger>
@@ -243,10 +255,46 @@ function RepoRow({
           <FolderOpenIcon className="size-3.5" />
           Open in Finder
         </ContextMenuItem>
+        {(favoriteEditorOption || isCustomEditor) && (
+          <ContextMenuItem
+            onSelect={() => {
+              if (!favoriteEditorId) return;
+              void api.openInEditor(repo.path, favoriteEditorId, customEditorCommand).catch((err) => toast.error(String(err)));
+            }}
+          >
+            {favoriteEditorOption ? (
+              <img
+                src={favoriteEditorOption.icon}
+                alt=""
+                className={favoriteEditorOption.id === "zed" ? "size-4" : "size-3.5"}
+              />
+            ) : customIcon ? (
+              <img src={customIcon} alt="" className="size-3.5" />
+            ) : (
+              <CodeIcon className="size-3.5" />
+            )}
+            Open in {editorName}
+          </ContextMenuItem>
+        )}
+        {remoteInfo && (
+          <ContextMenuItem onSelect={() => void openUrl(remoteInfo.url)}>
+            {remoteInfo.provider === "github" && <GitHubMark className="size-3.5" />}
+            {remoteInfo.provider === "gitlab" && <GitLabMark className="size-3.5" />}
+            {remoteInfo.provider === "bitbucket" && <BitbucketMark className="size-3.5" />}
+            {remoteInfo.provider === "unknown" && <ExternalLinkIcon className="size-3.5" />}
+            {REMOTE_PROVIDER_LABEL[remoteInfo.provider]}
+          </ContextMenuItem>
+        )}
+        <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => void copyToClipboard(repo.path)}>
           <CopyIcon className="size-3.5" />
           Copy Path
         </ContextMenuItem>
+        <ContextMenuItem onSelect={() => void copyToClipboard(repo.name)}>
+          <CopyIcon className="size-3.5" />
+          Copy Repo Name
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem onSelect={onPinToSection}>
           <PinIcon className="size-3.5" />
           Pin to Section…
@@ -269,6 +317,7 @@ export function RepoSidebar() {
   const addExistingRepo = useRepoStore((s) => s.addExistingRepo);
   const setReposLocal = useRepoStore.setState;
   const syncing = useRepoSyncing(selectedRepo);
+  const offline = useNetworkStore((s) => s.offline);
   const [dragOver, setDragOver] = useState(false);
   const sidebarSort = useSettingsStore((s) => s.settings.sidebar_sort);
   const showAheadBehind = useSettingsStore((s) => s.settings.show_ahead_behind);
@@ -278,10 +327,10 @@ export function RepoSidebar() {
 
   const { width, onPointerDown } = useResizableWidth("sidebar-width:repos", 256, 200, 480);
   const [filter, setFilter] = useState("");
-  const [dirty, setDirty] = useState<Record<string, boolean>>({});
-  const [aheadBehind, setAheadBehind] = useState<Record<string, AheadBehind>>({});
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
-  const [confirmRemovePath, setConfirmRemovePath] = useState<string | null>(null);
+  const [pendingRemoveRepo, setPendingRemoveRepo] = useState<RepoEntry | null>(null);
+  const [moveToTrash, setMoveToTrash] = useState(false);
+  const [removingRepo, setRemovingRepo] = useState(false);
   const [pinSectionRepo, setPinSectionRepo] = useState<RepoEntry | null>(null);
   const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem("sidebar-collapsed") === "1");
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => loadCollapsedSections());
@@ -334,43 +383,62 @@ export function RepoSidebar() {
     setConfirmRemoveSection(null);
   };
 
-  useEffect(() => {
-    let cancelled = false;
-    void Promise.all(
-      repos.map(async (r) => [r.path, await api.isDirty(r.path).catch(() => false)] as const),
-    ).then((results) => {
-      if (cancelled) return;
-      setDirty(Object.fromEntries(results));
-    });
-    void Promise.all(
-      repos.map(
-        async (r) =>
-          [r.path, await api.getAheadBehind(r.path).catch(() => ({ ahead: 0, behind: 0, published: true }))] as const,
-      ),
-    ).then((results) => {
-      if (cancelled) return;
-      setAheadBehind(Object.fromEntries(results));
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [repos]);
+  const confirmRemoveRepo = async () => {
+    if (!pendingRemoveRepo) return;
+    setRemovingRepo(true);
+    try {
+      if (moveToTrash) {
+        // Best-effort: a failed trash-move shouldn't block removing the repo from the list, it
+        // just means the folder is left behind — surface it and move on.
+        try {
+          await api.moveRepoToTrash(pendingRemoveRepo.path);
+        } catch (err) {
+          toast.error(String(err));
+        }
+      }
+      await removeRepo(pendingRemoveRepo.path);
+    } finally {
+      setRemovingRepo(false);
+      setPendingRemoveRepo(null);
+      setMoveToTrash(false);
+    }
+  };
 
-  // The effect above only recomputes dirty/aheadBehind when the repo *list* changes (add/remove),
-  // so a commit or other git activity in an already-listed repo never refreshed its dot here —
-  // unlike the Changes tab, which does subscribe to repo-changed (see useRepoStore). Refresh just
-  // the affected repo on each event instead of redoing the full list.
+  // Routed through TanStack Query (same query keys `useAheadBehind`/etc. use for the selected
+  // repo) instead of separate uncached `api.*` calls, so a repo-changed event for the selected
+  // repo doesn't trigger two independent fetches of the same data: one here, one in whichever
+  // tab is showing it.
+  const dirtyQueries = useQueries({
+    queries: repos.map((r) => ({
+      queryKey: queryKeys.dirty(r.path),
+      queryFn: () => api.isDirty(r.path).catch(() => false),
+    })),
+  });
+  const dirty = useMemo(
+    () => Object.fromEntries(repos.map((r, i) => [r.path, !!dirtyQueries[i]?.data])),
+    [repos, dirtyQueries],
+  );
+
+  const aheadBehindQueries = useQueries({
+    queries: repos.map((r) => ({
+      queryKey: queryKeys.aheadBehind(r.path),
+      queryFn: () => api.getAheadBehind(r.path).catch(() => DEFAULT_AHEAD_BEHIND),
+    })),
+  });
+  const aheadBehind = useMemo(
+    () => Object.fromEntries(repos.map((r, i) => [r.path, aheadBehindQueries[i]?.data])),
+    [repos, aheadBehindQueries],
+  ) as Record<string, AheadBehind>;
+
+  // `useRepoStore`'s own repo-changed listener already invalidates the *selected* repo's full
+  // query subtree (status/branches/aheadBehind/etc). This just extends that same invalidation
+  // to every other repo shown in the sidebar, scoped to the two cheap keys above rather than a
+  // full status refetch (which would also re-run auto-stage for repos the user isn't looking at).
   useEffect(() => {
     const unlisten = listen<string>("repo-changed", (event) => {
       const path = event.payload;
-      void api
-        .isDirty(path)
-        .catch(() => false)
-        .then((isDirty) => setDirty((prev) => ({ ...prev, [path]: isDirty })));
-      void api
-        .getAheadBehind(path)
-        .catch(() => ({ ahead: 0, behind: 0, published: true }))
-        .then((ab) => setAheadBehind((prev) => ({ ...prev, [path]: ab })));
+      void queryClient.invalidateQueries({ queryKey: queryKeys.dirty(path) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(path) });
     });
     return () => {
       void unlisten.then((f) => f());
@@ -537,6 +605,11 @@ export function RepoSidebar() {
               <BatchSyncTrigger repos={filtered} totalCount={repos.length} iconOnly />
             </div>
           )}
+          {offline && (
+            <div className="flex shrink-0 flex-col items-center gap-1.5 p-1.5 pt-0">
+              <OfflineIndicator iconOnly />
+            </div>
+          )}
           <AccountBar collapsed />
         </>
       ) : (
@@ -654,13 +727,12 @@ export function RepoSidebar() {
                   showAheadBehind={showAheadBehind}
                   draggable={false}
                   dragged={false}
-                  confirmRemove={confirmRemovePath === repo.path}
                   onSelect={() => void selectRepo(repo.path)}
                   onDragStart={() => {}}
                   onDragOver={() => {}}
                   onDrop={() => {}}
                   onDragEnd={() => {}}
-                  onConfirmRemoveChange={(open) => setConfirmRemovePath(open ? repo.path : null)}
+                  onRequestRemove={() => setPendingRemoveRepo(repo)}
                   onRemove={() => void removeRepo(repo.path)}
                   onPinToSection={() => setPinSectionRepo(repo)}
                   sectionContext={section}
@@ -716,7 +788,6 @@ export function RepoSidebar() {
                 showAheadBehind={showAheadBehind}
                 draggable={sidebarSort === "manual"}
                 dragged={draggedPath === repo.path}
-                confirmRemove={confirmRemovePath === repo.path}
                 onSelect={() => void selectRepo(repo.path)}
                 onDragStart={() => setDraggedPath(repo.path)}
                 onDragOver={(e) => {
@@ -728,7 +799,7 @@ export function RepoSidebar() {
                   setDraggedPath(null);
                 }}
                 onDragEnd={() => setDraggedPath(null)}
-                onConfirmRemoveChange={(open) => setConfirmRemovePath(open ? repo.path : null)}
+                onRequestRemove={() => setPendingRemoveRepo(repo)}
                 onRemove={() => void removeRepo(repo.path)}
                 onPinToSection={() => setPinSectionRepo(repo)}
               />
@@ -740,6 +811,11 @@ export function RepoSidebar() {
       {repos.length > 0 && (
         <div className="shrink-0 border-t border-border p-2">
           <BatchSyncTrigger repos={filtered} totalCount={repos.length} />
+        </div>
+      )}
+      {offline && (
+        <div className="shrink-0 px-2 pb-1.5">
+          <OfflineIndicator />
         </div>
       )}
       <AccountBar />
@@ -775,6 +851,48 @@ export function RepoSidebar() {
             onClick={() => confirmRemoveSection && void removeSectionEntirely(confirmRemoveSection)}
           >
             Remove Section
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    <Dialog
+      open={pendingRemoveRepo !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          setPendingRemoveRepo(null);
+          setMoveToTrash(false);
+        }
+      }}
+    >
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Remove "{pendingRemoveRepo?.name}"?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          It'll be removed from GitBud's list. The local folder is left untouched unless you
+          check the box below.
+        </p>
+        <CheckboxGroup
+          className="text-sm text-muted-foreground"
+          variant="destructive"
+          checked={moveToTrash}
+          disabled={removingRepo}
+          onCheckedChange={(checked) => setMoveToTrash(checked === true)}
+        >
+          Also move repo folder to Trash
+        </CheckboxGroup>
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setPendingRemoveRepo(null);
+              setMoveToTrash(false);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="destructive" disabled={removingRepo} onClick={() => void confirmRemoveRepo()}>
+            {removingRepo ? "Removing…" : "Remove"}
           </Button>
         </DialogFooter>
       </DialogContent>

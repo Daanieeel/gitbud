@@ -3,7 +3,7 @@ import { api } from "@/lib/tauri";
 import type { Settings } from "@/lib/types";
 
 const DEFAULT_SETTINGS: Settings = {
-  theme: "dark",
+  theme: "system",
   default_clone_dir: null,
   git_name: null,
   git_email: null,
@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS: Settings = {
   favorite_editor: null,
   custom_editor_command: null,
   open_pr_after_creation: "in-app",
+  cache_level: "balanced",
 };
 
 function applyTheme(theme: Settings["theme"]) {

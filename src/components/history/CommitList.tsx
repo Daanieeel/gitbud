@@ -3,6 +3,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { formatDistanceToNow } from "date-fns";
 import {
   CherryIcon,
+  CloudOffIcon,
   CopyIcon,
   ExternalLinkIcon,
   GitBranchPlusIcon,
@@ -213,6 +214,16 @@ export function CommitList({
                           {tag}
                         </span>
                       ))}
+                      {commit.unpushed && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="flex shrink-0 items-center justify-center rounded border border-muted-foreground bg-muted-foreground/20 p-0.5 text-white">
+                              <CloudOffIcon className="size-2.5" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>Not pushed</TooltipContent>
+                        </Tooltip>
+                      )}
                       <span className="truncate">{commit.summary}</span>
                     </div>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">

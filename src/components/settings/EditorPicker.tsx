@@ -1,22 +1,13 @@
 import { useMemo, useState } from "react";
+import { open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { PlusCircleIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { CUSTOM_EDITOR_ID, EDITORS, MANUFACTURER_ORDER } from "@/lib/editors";
-import { cn } from "@/lib/utils";
 
 interface EditorPickerProps {
-  /** Called with the chosen editor id, or `CUSTOM_EDITOR_ID` + the entered command template. */
-  onSelect: (editorId: string, customCommand?: string) => void;
+  /** Called with the chosen editor id, or `CUSTOM_EDITOR_ID` + the picked app's absolute path. */
+  onSelect: (editorId: string, customAppPath?: string) => void;
   children: React.ReactNode;
 }
 
@@ -26,8 +17,6 @@ interface EditorPickerProps {
 export function EditorPicker({ onSelect, children }: EditorPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [customOpen, setCustomOpen] = useState(false);
-  const [customCommand, setCustomCommand] = useState("");
 
   const groups = useMemo(() => {
     const needle = search.trim().toLowerCase();
@@ -42,6 +31,17 @@ export function EditorPicker({ onSelect, children }: EditorPickerProps) {
     onSelect(editorId);
     setOpen(false);
     setSearch("");
+  };
+
+  const pickCustom = async () => {
+    setOpen(false);
+    setSearch("");
+    const appPath = await openFileDialog({
+      title: "Choose Editor Application",
+      multiple: false,
+    });
+    if (typeof appPath !== "string") return;
+    onSelect(CUSTOM_EDITOR_ID, appPath);
   };
 
   return (
@@ -102,51 +102,14 @@ export function EditorPicker({ onSelect, children }: EditorPickerProps) {
             <button
               type="button"
               className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-              onClick={() => {
-                setOpen(false);
-                setCustomCommand("");
-                setCustomOpen(true);
-              }}
+              onClick={() => void pickCustom()}
             >
               <PlusCircleIcon className="size-4 shrink-0" />
-              Configure Custom Editor...
+              Choose Custom Editor App...
             </button>
           </div>
         </PopoverContent>
       </Popover>
-      <Dialog open={customOpen} onOpenChange={setCustomOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Configure Custom Editor</DialogTitle>
-            <DialogDescription>
-              A shell command to launch your editor. Use <code>{"{path}"}</code> as a placeholder
-              for the file's path.
-            </DialogDescription>
-          </DialogHeader>
-          <Input
-            autoFocus
-            placeholder="subl {path}"
-            value={customCommand}
-            onChange={(e) => setCustomCommand(e.target.value)}
-            className={cn("font-mono")}
-            autoComplete="off"
-          />
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setCustomOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!customCommand.trim()}
-              onClick={() => {
-                onSelect(CUSTOM_EDITOR_ID, customCommand.trim());
-                setCustomOpen(false);
-              }}
-            >
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </>
   );
 }

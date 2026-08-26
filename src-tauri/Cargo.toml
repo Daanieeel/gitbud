@@ -36,4 +36,8 @@ tauri-plugin-notification = "2.3.3"
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
 similar = "2"
+rusqlite = { version = "0.32", features = ["bundled"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.25"
+trash = "5"
 

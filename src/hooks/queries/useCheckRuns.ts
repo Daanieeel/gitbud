@@ -1,8 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
+import { useNetworkStore } from "@/store/useNetworkStore";
 import { useRepoStore } from "@/store/useRepoStore";
-import type { PullRequest } from "@/lib/types";
+import type { CheckRun, PullRequest } from "@/lib/types";
 
 // Check runs settle (queued -> in_progress -> completed) over minutes, so a short staleTime
 // is enough to dedupe the CI badge on a PR's list row and its merge dialog mounting/remounting
@@ -37,9 +38,38 @@ export function useCheckRuns(
   sha: string | null,
   pollIntervalMs: number | null,
 ) {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: queryKeys.checkRuns(repoPath ?? "", login ?? "", sha ?? ""),
-    queryFn: () => api.githubListCheckRuns(repoPath as string, login as string, sha as string),
+    queryFn: async () => {
+      if (repoPath && sha) {
+        try {
+          const cached = await api.getCachedCheckRuns(repoPath, sha);
+          if (cached) {
+            queryClient.setQueryData<CheckRun[]>(
+              queryKeys.checkRuns(repoPath, login ?? "", sha),
+              (old) => old ?? cached,
+            );
+          }
+        } catch {
+          // Local mirror unavailable, fall through to the live fetch below.
+        }
+      }
+      // Same centralized offline check as usePullRequestList (useNetworkStore) — skip straight
+      // to the error path instead of re-firing a network call that's just going to hang out to
+      // its connect timeout again, especially since this can poll every 10-60s.
+      if (useNetworkStore.getState().offline) {
+        throw new Error("Skipping GitHub request: already offline.");
+      }
+      try {
+        const runs = await api.githubListCheckRuns(repoPath as string, login as string, sha as string);
+        useNetworkStore.getState().noteSuccess();
+        return runs;
+      } catch (err) {
+        useNetworkStore.getState().noteError(String(err));
+        throw err;
+      }
+    },
     enabled: !!repoPath && !!login && !!sha,
     staleTime: CHECK_RUNS_STALE_MS,
     refetchInterval: pollIntervalMs ?? false,

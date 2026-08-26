@@ -1,14 +1,18 @@
 import { useState, useEffect } from "react";
-import { GitPullRequestCreateArrow, GitPullRequestArrowIcon, ExternalLinkIcon } from "lucide-react";
+import { GitPullRequestCreateArrow, GitPullRequestArrowIcon, ExternalLinkIcon, CodeIcon } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { toast } from "sonner";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { useCommitLog } from "@/hooks/queries/useCommitLog";
 import { usePullRequestList } from "@/hooks/queries/usePullRequests";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
 import { detectRemoteProvider } from "@/lib/remote-provider";
+import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
+import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
 import { GitHubMark } from "@/components/github/GitHubMark";
 import { GitLabMark } from "@/components/github/GitLabMark";
 import { BitbucketMark } from "@/components/github/BitbucketMark";
@@ -21,7 +25,6 @@ import { ReflogPanel } from "@/components/history/ReflogPanel";
 import { LfsPanel } from "@/components/repo/LfsPanel";
 import { SyncButton } from "@/components/repo/SyncButton";
 import { CreatePRDialog } from "@/components/pr/CreatePRDialog";
-import { OfflineIndicator } from "./OfflineIndicator";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -49,6 +52,12 @@ export function Toolbar() {
   const { pulls: openPulls } = usePullRequestList(repoPath, currentLogin, "open");
   const existingPrNumber = openPulls.find((p) => p.head_ref === branch)?.number ?? null;
   const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: ReturnType<typeof detectRemoteProvider> } | null>(null);
+  const favoriteEditorId = useSettingsStore((s) => s.settings.favorite_editor);
+  const customEditorCommand = useSettingsStore((s) => s.settings.custom_editor_command);
+  const favoriteEditorOption = findEditor(favoriteEditorId);
+  const isCustomEditor = favoriteEditorId === CUSTOM_EDITOR_ID && !!customEditorCommand;
+  const customIcon = useCustomEditorIcon(isCustomEditor ? customEditorCommand : null);
+  const editorName = favoriteEditorOption?.name ?? (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
 
   useEffect(() => {
     setRemoteInfo(null);
@@ -80,21 +89,49 @@ export function Toolbar() {
       <WorktreesPanel />
       <ReflogPanel />
       <LfsPanel />
-      {remoteInfo && (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" onClick={() => void openUrl(remoteInfo.url)}>
-              {remoteInfo.provider === "github" && <GitHubMark className="size-3.5" />}
-              {remoteInfo.provider === "gitlab" && <GitLabMark className="size-3.5" />}
-              {remoteInfo.provider === "bitbucket" && <BitbucketMark className="size-3.5" />}
-              {remoteInfo.provider === "unknown" && <ExternalLinkIcon className="size-3.5" />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>View repo on remote</TooltipContent>
-        </Tooltip>
-      )}
+      <div className="flex flex-row gap-0">
+        {remoteInfo && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={() => void openUrl(remoteInfo.url)}>
+                {remoteInfo.provider === "github" && <GitHubMark className="size-3.5" />}
+                {remoteInfo.provider === "gitlab" && <GitLabMark className="size-3.5" />}
+                {remoteInfo.provider === "bitbucket" && <BitbucketMark className="size-3.5" />}
+                {remoteInfo.provider === "unknown" && <ExternalLinkIcon className="size-3.5" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>View repo on remote</TooltipContent>
+          </Tooltip>
+        )}
+        {(favoriteEditorOption || isCustomEditor) && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  if (!repoPath || !favoriteEditorId) return;
+                  void api.openInEditor(repoPath, favoriteEditorId, customEditorCommand).catch((err) => toast.error(String(err)));
+                }}
+              >
+                {favoriteEditorOption ? (
+                  <img
+                    src={favoriteEditorOption.icon}
+                    alt=""
+                    className={favoriteEditorOption.id === "zed" ? "size-5" : "size-3.5"}
+                  />
+                ) : customIcon ? (
+                  <img src={customIcon} alt="" className="size-5" />
+                ) : (
+                  <CodeIcon className="size-3.5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Open in {editorName}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
       <div className="flex-1" />
-      <OfflineIndicator />
       {currentLogin && existingPrNumber != null && (
         <Tooltip>
           <TooltipTrigger asChild>

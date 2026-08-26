@@ -29,7 +29,7 @@ interface PRDetailProps {
 export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
   const selectedFilePath = usePRStore((s) => s.selectedFilePath);
   const selectFile = usePRStore((s) => s.selectFile);
-  const { data } = usePullRequestDetail(repoPath, login, pr.number);
+  const { data } = usePullRequestDetail(repoPath, login, pr.number, pr.head_sha);
   const files = data?.files ?? [];
   const comments = data?.comments ?? [];
   const addCommentMutation = useAddReviewComment(repoPath, login, pr.number);

@@ -6,6 +6,20 @@ use crate::image_diff::{is_image_path, mime_for, ImageDiff};
 
 const USER_AGENT: &str = "GitBud";
 
+/// Reqwest's default `Display` for connection-level failures is a nested chain like
+/// "error sending request for url (...): error trying to connect: dns error: ..." — readable to
+/// a developer, not a user. Collapse those into one plain sentence; anything else (a genuine
+/// non-connectivity failure, e.g. a body/decode error) falls back to the raw message.
+fn send_err(err: reqwest::Error) -> String {
+    if err.is_timeout() {
+        "GitHub request timed out, check your internet connection.".to_string()
+    } else if err.is_connect() {
+        "Couldn't connect to GitHub, check your internet connection.".to_string()
+    } else {
+        err.to_string()
+    }
+}
+
 /// A REST client bound to one GitHub host (github.com or a GHES instance) and one token.
 /// `get`/`post`/`put` take a path relative to the API base, e.g. "/repos/{owner}/{repo}/pulls".
 struct GhClient {
@@ -26,6 +40,11 @@ impl GhClient {
         headers.insert(UA, HeaderValue::from_static(USER_AGENT));
         let http = reqwest::Client::builder()
             .default_headers(headers)
+            // Unset by default, reqwest waits on the OS-level TCP timeout (often 20s+) before
+            // surfacing a connect failure — that's the delay behind a slow-to-appear offline
+            // banner on the very first request after losing connectivity.
+            .connect_timeout(std::time::Duration::from_secs(6))
+            .timeout(std::time::Duration::from_secs(20))
             .build()
             .map_err(|e| e.to_string())?;
         Ok(Self { http, base: api_base(host), graphql: graphql_base(host) })
@@ -156,6 +175,18 @@ fn github_noreply_username<'a>(email: &'a str, host: &str) -> Option<&'a str> {
 
 pub async fn find_user_avatar_by_email(host: &str, token: &str, email: &str) -> Result<Option<String>, String> {
     if let Some(username) = github_noreply_username(email, host) {
+        // The `{web_base}/{username}.png` redirect only exists for real user/org accounts — it
+        // 404s for a bot account (e.g. `github-actions[bot]`, whose noreply email is
+        // `41898282+github-actions[bot]@users.noreply.github.com`), since those aren't served by
+        // the same route. Bots are still directly, exactly addressable by login via the Users
+        // API though, so fetch that instead of falling through to the `/search/users` email
+        // search below (which, like the `.png` shortcut, excludes noreply addresses entirely).
+        if username.ends_with("[bot]") {
+            let gh = GhClient::new(host, token)?;
+            let res = check(gh.get(&format!("/users/{username}")).send().await.map_err(|e| e.to_string())?).await?;
+            let user: RawUser = res.json().await.map_err(|e| e.to_string())?;
+            return Ok(Some(user.avatar_url));
+        }
         return Ok(Some(format!("{}/{username}.png", web_base(host))));
     }
     let gh = GhClient::new(host, token)?;
@@ -240,7 +271,7 @@ pub async fn list_pull_requests(
 ) -> Result<Vec<PullRequest>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls?state={state}&per_page=50&page={page}");
-    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
     let raw: Vec<RawPullRequest> = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into_iter().map(PullRequest::from).collect())
 }
@@ -254,7 +285,7 @@ pub async fn get_pull_request(
 ) -> Result<PullRequest, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}");
-    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
     let raw: RawPullRequest = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into())
 }
@@ -385,7 +416,7 @@ pub async fn get_repo_merge_settings(
 ) -> Result<RepoMergeSettings, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}");
-    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
     let raw: RawRepo = res.json().await.map_err(|e| e.to_string())?;
     let linear_history = requires_linear_history(host, token, owner, repo, base_ref).await;
     let ruleset_methods = ruleset_allowed_merge_methods(host, token, owner, repo, base_ref).await;
@@ -471,7 +502,7 @@ pub struct Label {
 pub async fn list_labels(host: &str, token: &str, owner: &str, repo: &str) -> Result<Vec<Label>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/labels?per_page=100");
-    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
     res.json().await.map_err(|e| e.to_string())
 }
 
@@ -491,7 +522,7 @@ pub async fn list_assignable_users(
 ) -> Result<Vec<AssignableUser>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/assignees?per_page=100");
-    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
     res.json().await.map_err(|e| e.to_string())
 }
 
@@ -582,7 +613,7 @@ pub struct Milestone {
 pub async fn list_milestones(host: &str, token: &str, owner: &str, repo: &str) -> Result<Vec<Milestone>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/milestones?state=open&per_page=100");
-    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
     res.json().await.map_err(|e| e.to_string())
 }
 
@@ -757,7 +788,7 @@ pub async fn merge_pull_request(
 pub async fn delete_branch(host: &str, token: &str, owner: &str, repo: &str, branch: &str) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/git/refs/heads/{branch}");
-    let res = gh.delete(&path).send().await.map_err(|e| e.to_string())?;
+    let res = gh.delete(&path).send().await.map_err(send_err)?;
     if res.status() == reqwest::StatusCode::UNPROCESSABLE_ENTITY {
         return Ok(());
     }
@@ -783,7 +814,7 @@ pub async fn list_pull_request_files(
 ) -> Result<Vec<(String, String, FileDiff)>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/files?per_page=100");
-    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
     let raw: Vec<RawPullRequestFile> = res.json().await.map_err(|e| e.to_string())?;
 
     Ok(raw
@@ -971,7 +1002,7 @@ pub async fn list_review_comments(
 ) -> Result<Vec<ReviewComment>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/comments?per_page=100");
-    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
     let raw: Vec<RawReviewComment> = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into_iter().map(ReviewComment::from).collect())
 }
@@ -1038,7 +1069,7 @@ pub async fn list_check_runs(
 ) -> Result<Vec<CheckRun>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/commits/{sha}/check-runs?per_page=50");
-    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
     let parsed: CheckRunsResponse = res.json().await.map_err(|e| e.to_string())?;
     Ok(parsed.check_runs)
 }
@@ -1069,7 +1100,7 @@ pub async fn get_commit_verification(
 ) -> Result<CommitVerification, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/commits/{sha}");
-    let res = check(gh.get(&path).send().await.map_err(|e| e.to_string())?).await?;
+    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
     let parsed: CommitDetailResponse = res.json().await.map_err(|e| e.to_string())?;
     Ok(parsed.commit.verification)
 }
@@ -1089,7 +1120,7 @@ pub struct GitHubRepo {
 pub async fn list_user_repos(host: &str, token: &str) -> Result<Vec<GitHubRepo>, String> {
     let gh = GhClient::new(host, token)?;
     let path = "/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member";
-    let res = check(gh.get(path).send().await.map_err(|e| e.to_string())?).await?;
+    let res = check(gh.get(path).send().await.map_err(send_err)?).await?;
     res.json().await.map_err(|e| e.to_string())
 }
 

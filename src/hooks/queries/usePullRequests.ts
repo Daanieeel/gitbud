@@ -11,9 +11,33 @@ import type { BranchInfo, PullRequest, PullRequestFile, ReviewComment } from "@/
 const PR_PAGE_SIZE = 50;
 
 export function usePullRequestList(repoPath: string | null, login: string | null, filter: PRFilter) {
+  const queryClient = useQueryClient();
   const query = useInfiniteQuery({
     queryKey: queryKeys.prList(repoPath ?? "", login ?? "", filter),
     queryFn: async ({ pageParam }) => {
+      // Seed the first page from the local mirror for an instant paint (no spinner) while the
+      // live fetch below is still in flight, replaced once that resolves. A failure reading the
+      // mirror must never block attempting the live fetch below (e.g. this is what shows PRs at
+      // all while offline, for a repo/PR that WAS viewed online before).
+      if (pageParam === 1 && repoPath) {
+        try {
+          const cached = await api.getCachedPullRequests(repoPath, filter);
+          if (cached.length > 0) {
+            queryClient.setQueryData(queryKeys.prList(repoPath, login ?? "", filter), (old: unknown) =>
+              old ?? { pages: [cached], pageParams: [1] },
+            );
+          }
+        } catch {
+          // Local mirror unavailable, fall through to the live fetch below.
+        }
+      }
+      // Centralized offline flag (useNetworkStore) — skip straight to the error path instead of
+      // re-firing a network call that's just going to hang out to its connect timeout again. The
+      // `online` browser event (see App.tsx) and refetchOnReconnect are what clear `offline` and
+      // let the next call back through.
+      if (useNetworkStore.getState().offline) {
+        throw new Error("Skipping GitHub request: already offline.");
+      }
       try {
         const pulls = await api.githubListPullRequests(repoPath as string, login as string, filter, pageParam);
         useNetworkStore.getState().noteSuccess();
@@ -29,7 +53,11 @@ export function usePullRequestList(repoPath: string | null, login: string | null
     initialPageParam: 1,
     getNextPageParam: (lastPage, allPages) => (lastPage.length === PR_PAGE_SIZE ? allPages.length + 1 : undefined),
     enabled: !!repoPath && !!login,
-    retry: false,
+    // Not `false`: right as connectivity comes back (e.g. the `online` event firing before DNS
+    // is actually usable again), the first refetch attempt can still fail — one retry with the
+    // library's default backoff lets that self-heal instead of leaving a stale error on screen
+    // until the user manually switches tabs/repos.
+    retry: 1,
   });
   const pulls: PullRequest[] = query.data?.pages.flat() ?? [];
   return { ...query, pulls };
@@ -40,15 +68,48 @@ interface PullRequestDetail {
   comments: ReviewComment[];
 }
 
-export function usePullRequestDetail(repoPath: string | null, login: string | null, number: number | null) {
+export function usePullRequestDetail(
+  repoPath: string | null,
+  login: string | null,
+  number: number | null,
+  headSha: string | null,
+) {
+  const queryClient = useQueryClient();
   return useQuery({
     queryKey: queryKeys.prDetail(repoPath ?? "", login ?? "", number ?? -1),
     queryFn: async (): Promise<PullRequestDetail> => {
-      const [files, comments] = await Promise.all([
-        api.githubListPullRequestFiles(repoPath as string, login as string, number as number),
-        api.githubListReviewComments(repoPath as string, login as string, number as number),
-      ]);
-      return { files, comments };
+      // Seed from the local mirror for an instant paint (whatever's cached, even if stale) while
+      // the live fetch below (which itself skips re-fetching/re-parsing files when `headSha`
+      // still matches what's cached) is in flight. A failure reading the mirror must never
+      // block attempting the live fetch below (e.g. this is what shows a PR's files at all while
+      // offline, for one that WAS viewed online before).
+      if (repoPath && number !== null) {
+        try {
+          const cached = await api.getCachedPullRequestDetail(repoPath, number);
+          if (cached) {
+            queryClient.setQueryData(queryKeys.prDetail(repoPath, login ?? "", number), (old: unknown) => old ?? cached);
+          }
+        } catch {
+          // Local mirror unavailable, fall through to the live fetch below.
+        }
+      }
+      // Same centralized offline check as usePullRequestList (useNetworkStore) — skip straight
+      // to the error path instead of re-firing network calls that are just going to hang out to
+      // their connect timeout again.
+      if (useNetworkStore.getState().offline) {
+        throw new Error("Skipping GitHub request: already offline.");
+      }
+      try {
+        const [files, comments] = await Promise.all([
+          api.githubListPullRequestFiles(repoPath as string, login as string, number as number, headSha ?? ""),
+          api.githubListReviewComments(repoPath as string, login as string, number as number),
+        ]);
+        useNetworkStore.getState().noteSuccess();
+        return { files, comments };
+      } catch (err) {
+        useNetworkStore.getState().noteError(String(err));
+        throw err;
+      }
     },
     enabled: !!repoPath && !!login && number !== null,
   });

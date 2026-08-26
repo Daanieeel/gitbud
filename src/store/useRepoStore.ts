@@ -4,6 +4,7 @@ import { api } from "@/lib/tauri";
 import { queryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
 import { runGitSync } from "@/lib/gitSync";
+import { clearAutoStagedPaths } from "@/hooks/queries/useRepoStatus";
 import type { RepoEntry } from "@/lib/types";
 
 /** Restores the last-open repo across app restarts, so launching GitBud doesn't always land
@@ -71,7 +72,8 @@ function prefetchRepo(repoPath: string) {
     }),
     queryClient.prefetchQuery({
       queryKey: queryKeys.aheadBehind(repoPath),
-      queryFn: () => api.getAheadBehind(repoPath).catch(() => ({ ahead: 0, behind: 0, published: true })),
+      queryFn: () =>
+        api.getAheadBehind(repoPath).catch(() => ({ ahead: 0, behind: 0, published: true, head_on_remote: true })),
     }),
     queryClient.prefetchQuery({ queryKey: queryKeys.stashes(repoPath), queryFn: () => api.listStashes(repoPath) }),
     queryClient.prefetchInfiniteQuery({
@@ -167,9 +169,14 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   removeRepo: async (path) => {
     const repos = await api.removeRepo(path);
     set({ repos });
+    // Switch away from the removed repo BEFORE evicting its query cache: removeQueries on a
+    // still-actively-observed key transiently clears its data out from under whatever's reading
+    // it. Reassigning `selectedRepo` first unsubscribes those observers.
     if (get().selectedRepo === path) {
       set({ selectedRepo: null });
       if (repos.length > 0) await get().selectRepo(repos[0].path);
     }
+    queryClient.removeQueries({ queryKey: queryKeys.repo(path) });
+    clearAutoStagedPaths(path);
   },
 }));
