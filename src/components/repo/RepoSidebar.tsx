@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQueries } from "@tanstack/react-query";
 import {
+  BoxIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   ChevronsDownUpIcon,
@@ -58,6 +59,7 @@ import { copyToClipboard } from "@/lib/clipboard";
 import { detectRemoteProvider, type RemoteProvider } from "@/lib/remote-provider";
 import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
 import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
+import { useRepoIcon } from "@/hooks/queries/useRepoIcon";
 import { queryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
 import type { AheadBehind, RepoEntry } from "@/lib/types";
@@ -157,6 +159,7 @@ function RepoRow({
   const isCustomEditor = favoriteEditorId === CUSTOM_EDITOR_ID && !!customEditorCommand;
   const customIcon = useCustomEditorIcon(isCustomEditor ? customEditorCommand : null);
   const editorName = favoriteEditorOption?.name ?? (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
+  const repoIcon = useRepoIcon(repo.path);
   const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: ReturnType<typeof detectRemoteProvider> } | null>(null);
 
   return (
@@ -204,6 +207,11 @@ function RepoRow({
               </TooltipTrigger>
               <TooltipContent>{dirty ? "Uncommitted changes" : undefined}</TooltipContent>
             </Tooltip>
+          )}
+          {repoIcon ? (
+            <img src={repoIcon} alt="" className="size-3.5 shrink-0 rounded-[3px] object-contain" />
+          ) : (
+            <BoxIcon className="size-3.5 shrink-0 text-muted-foreground" />
           )}
           <span className="truncate flex-1">{repo.name}</span>
           <div className="flex shrink-0 items-center">
@@ -306,6 +314,41 @@ function RepoRow({
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
+  );
+}
+
+interface CollapsedRepoButtonProps {
+  repo: RepoEntry;
+  selected: boolean;
+  dirty: boolean;
+  syncing: boolean;
+  onSelect: () => void;
+}
+
+function CollapsedRepoButton({ repo, selected, dirty, syncing, onSelect }: CollapsedRepoButtonProps) {
+  const repoIcon = useRepoIcon(repo.path);
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          onClick={onSelect}
+          className={cn(
+            "relative flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-medium hover:bg-accent",
+            selected && "bg-accent",
+          )}
+        >
+          {repoIcon ? (
+            <img src={repoIcon} alt="" className="size-5 rounded-[3px] object-contain" />
+          ) : (
+            repo.name.slice(0, 2).toUpperCase()
+          )}
+          {dirty && <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary" />}
+          {syncing && <RefreshCwIcon className="absolute top-0.5 right-0.5 size-2.5 animate-spin text-primary" />}
+        </button>
+      </TooltipTrigger>
+      <TooltipContent>{repo.name}</TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -578,26 +621,14 @@ export function RepoSidebar() {
           </div>
           <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-auto p-1.5">
             {sorted.map((repo) => (
-              <Tooltip key={repo.path}>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={() => void selectRepo(repo.path)}
-                    className={cn(
-                      "relative flex size-9 shrink-0 items-center justify-center rounded-md text-xs font-medium hover:bg-accent",
-                      selectedRepo === repo.path && "bg-accent",
-                    )}
-                  >
-                    {repo.name.slice(0, 2).toUpperCase()}
-                    {dirty[repo.path] && (
-                      <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary" />
-                    )}
-                    {syncing && selectedRepo === repo.path && (
-                      <RefreshCwIcon className="absolute top-0.5 right-0.5 size-2.5 animate-spin text-primary" />
-                    )}
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{repo.name}</TooltipContent>
-              </Tooltip>
+              <CollapsedRepoButton
+                key={repo.path}
+                repo={repo}
+                selected={selectedRepo === repo.path}
+                dirty={!!dirty[repo.path]}
+                syncing={syncing && selectedRepo === repo.path}
+                onSelect={() => void selectRepo(repo.path)}
+              />
             ))}
           </div>
           {repos.length > 0 && (
