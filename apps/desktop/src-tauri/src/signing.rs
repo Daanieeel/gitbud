@@ -1,5 +1,21 @@
 use git2::{Config, Repository};
-use std::process::Command;
+use std::process::{Command, Output};
+
+/// Extracts an error message from a failed command's output, falling back to stdout when
+/// stderr is empty (some tools, like ssh-keygen's overwrite prompt, write there instead) and to
+/// a generic message when both are empty (e.g. the process was killed, or declined a prompt with
+/// no input attached and printed nothing at all).
+fn output_error(output: &Output) -> String {
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !stderr.is_empty() {
+        return stderr;
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if !stdout.is_empty() {
+        return stdout;
+    }
+    "command failed with no output".to_string()
+}
 
 /// Whether the `gpg` binary is available on PATH, for offering OpenPGP signing at all.
 pub fn has_gpg() -> bool {
@@ -22,7 +38,7 @@ pub fn install_gpg_via_brew() -> Result<(), String> {
         .output()
         .map_err(|e| format!("couldn't run brew: {e}"))?;
     if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        return Err(output_error(&output));
     }
     Ok(())
 }
@@ -68,7 +84,7 @@ pub fn generate_gpg_key(name: &str, email: &str) -> Result<String, String> {
     let _ = std::fs::remove_file(&batch_file);
     let output = output.map_err(|e| e.to_string())?;
     if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        return Err(output_error(&output));
     }
     // gpg reports the new key's id on stderr, e.g. "gpg: key ABCDEF1234567890 marked as ultimately trusted"
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -85,6 +101,14 @@ pub fn generate_gpg_key(name: &str, email: &str) -> Result<String, String> {
 
 /// Generates a new SSH signing keypair at `path` (no passphrase) and returns the public key.
 pub fn generate_ssh_signing_key(path: &str, email: &str) -> Result<String, String> {
+    // Bail out before invoking ssh-keygen at all if a key is already there: ssh-keygen's
+    // "Overwrite (y/n)?" prompt goes to stdout, and with no terminal attached it reads EOF,
+    // declines, and exits with an empty stderr — silently, from the caller's point of view.
+    if std::path::Path::new(path).exists() {
+        return Err(format!(
+            "A key already exists at {path}. Choose a different path or pick \"Choose existing key\" instead."
+        ));
+    }
     // ssh-keygen doesn't create missing parent directories itself (e.g. a fresh machine with
     // no ~/.ssh yet) — it just fails with "No such file or directory".
     if let Some(parent) = std::path::Path::new(path).parent() {
@@ -95,7 +119,7 @@ pub fn generate_ssh_signing_key(path: &str, email: &str) -> Result<String, Strin
         .output()
         .map_err(|e| e.to_string())?;
     if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        return Err(output_error(&output));
     }
     std::fs::read_to_string(format!("{path}.pub")).map_err(|e| e.to_string())
 }
@@ -108,7 +132,7 @@ pub fn export_gpg_public_key(key_id: &str) -> Result<String, String> {
         .output()
         .map_err(|e| e.to_string())?;
     if !output.status.success() {
-        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        return Err(output_error(&output));
     }
     let armored = String::from_utf8_lossy(&output.stdout).trim().to_string();
     if armored.is_empty() {
@@ -161,7 +185,7 @@ pub fn test_signing(format: &str, key: &str) -> Result<(), String> {
                 .output()
                 .map_err(|e| e.to_string())?;
             if !output.status.success() {
-                return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+                return Err(output_error(&output));
             }
             Ok(())
         })();
@@ -191,7 +215,7 @@ pub fn test_signing(format: &str, key: &str) -> Result<(), String> {
 
         let output = output.map_err(|e| e.to_string())?;
         if !output.status.success() {
-            return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+            return Err(output_error(&output));
         }
         Ok(())
     }
@@ -330,6 +354,27 @@ mod tests {
 
         assert!(pubkey.starts_with("ssh-ed25519 "));
         assert!(std::path::Path::new(&key_path).exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Regression test: ssh-keygen's overwrite prompt for an already-existing key goes to
+    /// stdout, and with no terminal attached it declines with an EMPTY stderr — which used to
+    /// surface as a blank, invisible error in the UI. Generation must fail with a clear message
+    /// instead of ever reaching ssh-keygen for a path that's already taken.
+    #[test]
+    fn generate_ssh_signing_key_rejects_an_existing_path_with_a_clear_message() {
+        let dir = std::env::temp_dir().join(format!(
+            "gitbud-test-signing-sshkey-exists-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        let key_path = dir.join("id_ed25519").to_string_lossy().to_string();
+        std::fs::write(&key_path, "not a real key").unwrap();
+
+        let err = generate_ssh_signing_key(&key_path, "test@example.com").unwrap_err();
+
+        assert!(!err.is_empty());
+        assert!(err.contains(&key_path));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
