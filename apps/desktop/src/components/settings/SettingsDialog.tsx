@@ -8,6 +8,8 @@ import {
   PanelLeftIcon,
   SaveIcon,
   SettingsIcon,
+  ShieldCheckIcon,
+  ShieldOffIcon,
   SlidersHorizontalIcon,
   Trash2Icon,
   UploadIcon,
@@ -22,7 +24,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { relaunch } from "@tauri-apps/plugin-process";
 import { GitHubMark } from "@/components/github/GitHubMark";
 import { UpdateChecker } from "./UpdateChecker";
-import { SigningWizard } from "./SigningWizard";
+import { SigningSetupDialog } from "./SigningSetupDialog";
 import { EditorPicker } from "./EditorPicker";
 import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
 import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
@@ -40,6 +42,7 @@ import type {
   OpenPrAfterCreation,
   PullStrategy,
   SidebarSort,
+  SigningStatus,
   ThemeMode,
 } from "@/lib/types";
 
@@ -183,6 +186,8 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [gitEmail, setGitEmail] = useState("");
   const [gitScope, setGitScope] = useState<"global" | "repo">("global");
   const [savingIdentity, setSavingIdentity] = useState(false);
+  const [signingStatus, setSigningStatus] = useState<SigningStatus | null>(null);
+  const [signingDialogOpen, setSigningDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -192,6 +197,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         setGitName(name ?? "");
         setGitEmail(email ?? "");
       });
+      void api.getSigningStatus(repoPath).then(setSigningStatus);
     }
     void api.getCacheSizes().then(({ repoBytes, avatarBytes }) => {
       setRepoCacheBytes(repoBytes);
@@ -492,14 +498,36 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       {savingIdentity ? "Saving…" : "Save Identity"}
                     </Button>
                   </div>
-                  <div className="py-2">
-                    <SigningWizard
-                      repoPath={repoPath}
-                      name={gitName}
-                      email={gitEmail}
-                      global={gitScope === "global"}
-                    />
-                  </div>
+                  <Row label="Commit signing">
+                    <div className="flex items-center gap-2">
+                      {signingStatus?.enabled ? (
+                        <ShieldCheckIcon className="size-4 text-accent-green" />
+                      ) : (
+                        <ShieldOffIcon className="size-4 text-muted-foreground" />
+                      )}
+                      <span className="text-xs text-muted-foreground">
+                        {signingStatus?.enabled ? `On (${signingStatus.format})` : "Off"}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => setSigningDialogOpen(true)}
+                      >
+                        {signingStatus?.enabled ? "Manage" : "Set Up"}
+                      </Button>
+                    </div>
+                  </Row>
+                  <SigningSetupDialog
+                    open={signingDialogOpen}
+                    onOpenChange={(next) => {
+                      setSigningDialogOpen(next);
+                      if (!next && repoPath)
+                        void api.getSigningStatus(repoPath).then(setSigningStatus);
+                    }}
+                    repoPath={repoPath}
+                    name={gitName}
+                    email={gitEmail}
+                  />
                   <Row label="Default branch name">
                     <Input
                       className="h-8 w-32"

@@ -80,6 +80,12 @@ export const api = {
   disableSigning: (repoPath: string, global: boolean) =>
     invoke<void>("disable_signing", { repoPath, global }),
   getSigningStatus: (repoPath: string) => invoke<SigningStatus>("get_signing_status", { repoPath }),
+  exportGpgPublicKey: (keyId: string) => invoke<string>("export_gpg_public_key", { keyId }),
+  testSigning: (format: string, key: string) => invoke<void>("test_signing", { format, key }),
+  githubHasSshSigningKey: (login: string, pubkey: string) =>
+    invoke<boolean>("github_has_ssh_signing_key", { login, pubkey }),
+  githubHasGpgKey: (login: string, keyId: string) =>
+    invoke<boolean>("github_has_gpg_key", { login, keyId }),
   readWorkingFile: (repoPath: string, path: string) =>
     invoke<string>("read_working_file", { repoPath, path }),
   stageHunk: (repoPath: string, path: string, hunkIndex: number) =>

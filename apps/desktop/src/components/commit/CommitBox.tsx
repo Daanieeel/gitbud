@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { GitCommitIcon, TriangleAlertIcon, Undo2Icon } from "lucide-react";
+import { GitCommitIcon, ShieldIcon, TriangleAlertIcon, Undo2Icon, XIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
 import { Textarea } from "@gitbud/ui/textarea";
@@ -16,6 +16,8 @@ import { cn } from "@gitbud/ui/utils";
 import { isProtectedBranch } from "@/lib/utils";
 import { notify } from "@/lib/notify";
 import { useBusyAction } from "@/hooks/useBusyAction";
+import { api } from "@/lib/tauri";
+import { SigningSetupDialog } from "@/components/settings/SigningSetupDialog";
 
 export function CommitBox() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -36,6 +38,13 @@ export function CommitBox() {
 
   const [committing, runCommit] = useBusyAction();
   const [undoing, runUndo] = useBusyAction();
+  const [signingEnabled, setSigningEnabled] = useState(true);
+  const [signingBannerDismissed, setSigningBannerDismissed] = useState(false);
+  const [signingDialogOpen, setSigningDialogOpen] = useState(false);
+  const [gitIdentity, setGitIdentity] = useState<{ name: string; email: string }>({
+    name: "",
+    email: "",
+  });
   const stagedFiles = status?.files.filter((f) => f.staged) ?? [];
   const hasStagedChanges = stagedFiles.length > 0;
   const lastCommit = commits[0];
@@ -54,6 +63,14 @@ export function CommitBox() {
     }
     // Only re-run when the staged set changes, not on every keystroke.
   }, [stagedFiles.map((f) => f.path).join("|")]);
+
+  useEffect(() => {
+    if (!repoPath) return;
+    void api.getSigningStatus(repoPath).then((s) => setSigningEnabled(s.enabled));
+    void api.getGitIdentity(repoPath).then(([name, email]) => {
+      setGitIdentity({ name: name ?? "", email: email ?? "" });
+    });
+  }, [repoPath]);
 
   const toggleAmend = (next: boolean) => {
     setAmending(next);
@@ -140,6 +157,35 @@ export function CommitBox() {
           You're committing directly to {branch}
         </div>
       )}
+      {!signingEnabled && !signingBannerDismissed && (
+        <div className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+          <ShieldIcon className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1">Commits aren't signed</span>
+          <button
+            className="shrink-0 font-medium text-foreground hover:underline"
+            onClick={() => setSigningDialogOpen(true)}
+          >
+            Set up
+          </button>
+          <button
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => setSigningBannerDismissed(true)}
+          >
+            <XIcon className="size-3.5" />
+          </button>
+        </div>
+      )}
+      <SigningSetupDialog
+        open={signingDialogOpen}
+        onOpenChange={(next) => {
+          setSigningDialogOpen(next);
+          if (!next && repoPath)
+            void api.getSigningStatus(repoPath).then((s) => setSigningEnabled(s.enabled));
+        }}
+        repoPath={repoPath}
+        name={gitIdentity.name}
+        email={gitIdentity.email}
+      />
       <Tooltip>
         <TooltipTrigger asChild>
           <Button

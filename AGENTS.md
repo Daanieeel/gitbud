@@ -15,3 +15,25 @@ const disabledReason = firstMatch([
   [!hasPushedCommit, "Need at least one pushed commit"],
 ]);
 ```
+
+No `switch`, no if-else chains, no ternary chains for value-per-case logic. Use a map, key = matched value:
+
+```ts
+type Status = "open" | "closed" | "merged";
+
+const labels: Record<Status, string> = { open: "Open", closed: "Closed", merged: "Merged" };
+const label = labels[status];
+```
+
+Same for behavior, map key to an inline function:
+
+```ts
+type Status = "open" | "closed" | "merged";
+
+const handlers: Record<Status, (item: PullRequest) => void> = {
+  open: (item: PullRequest) => openBranch(item),
+  closed: (item: PullRequest) => reopenIssue(item),
+  merged: (item: PullRequest) => showDiff(item),
+};
+handlers[status](item);
+```
