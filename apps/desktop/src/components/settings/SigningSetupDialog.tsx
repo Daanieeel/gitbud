@@ -271,7 +271,7 @@ export function SigningSetupDialog({
           </div>
         </div>
 
-        <div className="flex min-h-64 flex-col justify-center">
+        <div className="flex min-h-64 flex-col justify-start">
           {step === "intro" && (
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
