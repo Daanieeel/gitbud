@@ -4,6 +4,7 @@ import {
   CopyIcon,
   ExternalLinkIcon,
   FolderOpenIcon,
+  InfoIcon,
   KeyRoundIcon,
   Loader2Icon,
   ShieldCheckIcon,
@@ -15,14 +16,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { homeDir } from "@tauri-apps/api/path";
 import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@gitbud/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -211,10 +205,6 @@ export function SigningSetupDialog({
           <DialogTitle className="flex items-center gap-2">
             <ShieldCheckIcon className="size-4" /> Set Up Commit Signing
           </DialogTitle>
-          <DialogDescription>
-            Signed commits show a "Verified" badge on GitHub/GitLab/etc, proving they really came
-            from you. Takes about a minute — a key, a paste into your provider's settings, done.
-          </DialogDescription>
         </DialogHeader>
 
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -239,70 +229,63 @@ export function SigningSetupDialog({
         </div>
 
         {step === "intro" && (
-          <div className="flex flex-col gap-3">
-            <div className="flex gap-3 text-sm">
-              <label className="flex items-center gap-1.5">
-                <input type="radio" checked={format === "ssh"} onChange={() => setFormat("ssh")} />
-                SSH key (recommended)
-              </label>
-              <label className="flex items-center gap-1.5">
-                <input
-                  type="radio"
-                  checked={format === "openpgp"}
-                  onChange={() => setFormat("openpgp")}
-                  disabled={!gpgAvailable}
-                />
-                GPG {!gpgAvailable && "(gpg not found on PATH)"}
-              </label>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              SSH signing reuses the same key type as SSH auth and needs nothing installed beyond
-              what your OS already ships. GPG needs the <code>gpg</code> tool but is the older, more
-              widely recognized standard.
-            </p>
-            <label className="flex items-center gap-1.5 text-sm">
-              <input
-                type="checkbox"
-                checked={global}
-                onChange={(e) => setGlobal(e.target.checked)}
+          <div className="flex flex-col gap-4">
+            <Field
+              label="Key type"
+              hint="SSH needs nothing extra installed; GPG needs the gpg tool but is the older, more widely recognized standard."
+            >
+              <SegmentedControl
+                value={format}
+                onChange={setFormat}
+                options={[
+                  { value: "ssh", label: "SSH" },
+                  { value: "openpgp", label: "GPG", disabled: !gpgAvailable },
+                ]}
               />
-              Sign every commit, in every repo (uncheck to set up just this one)
-            </label>
+            </Field>
+            <Field
+              label="Scope"
+              hint="Global signs every commit in every repo on this machine. Repo-only signs just this one."
+            >
+              <SegmentedControl
+                value={global ? "global" : "repo"}
+                onChange={(v) => setGlobal(v === "global")}
+                options={[
+                  { value: "repo", label: "This repo" },
+                  { value: "global", label: "All repos" },
+                ]}
+              />
+            </Field>
           </div>
         )}
 
         {step === "key" && (
           <div className="flex flex-col gap-2">
             {format === "ssh" ? (
-              <>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="~/.ssh/gitbud_signing_ed25519"
-                    value={sshKeyPath}
-                    onChange={(e) => setSshKeyPath(e.target.value)}
-                    className="h-8"
+              <div className="flex gap-2">
+                <Input
+                  placeholder="~/.ssh/gitbud_signing_ed25519"
+                  value={sshKeyPath}
+                  onChange={(e) => setSshKeyPath(e.target.value)}
+                  className="h-8"
+                />
+                <Button size="sm" variant="secondary" onClick={() => void pickExistingSshKey()}>
+                  <FolderOpenIcon className="size-3.5" />
+                  Existing
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void generateSsh()}
+                >
+                  <SparklesIcon
+                    className={cn("size-3.5", busyKey === "generateSsh" && "animate-spin")}
                   />
-                  <Button size="sm" variant="secondary" onClick={() => void pickExistingSshKey()}>
-                    <FolderOpenIcon className="size-3.5" />
-                    Existing
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={() => void generateSsh()}
-                  >
-                    <SparklesIcon
-                      className={cn("size-3.5", busyKey === "generateSsh" && "animate-spin")}
-                    />
-                    {busyKey === "generateSsh" ? "Generating…" : "Generate"}
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  A generated key has no passphrase — GitBud signs silently on every commit, with
-                  nothing extra to type each time.
-                </p>
-              </>
+                  {busyKey === "generateSsh" ? "Generating…" : "Generate"}
+                </Button>
+                <InfoTooltip text="No passphrase — GitBud signs silently on every commit, nothing extra to type." />
+              </div>
             ) : (
               <div className="flex gap-2">
                 <select
@@ -336,13 +319,15 @@ export function SigningSetupDialog({
         {step === "provider" && (
           <div className="flex flex-col gap-2.5">
             {activePubkey && (
-              <div className="flex items-center gap-2 rounded-sm bg-muted/40 p-1.5 text-xs">
-                <span className="min-w-0 flex-1 truncate font-mono">{activePubkey}</span>
+              <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
+                <span className="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-xs">
+                  {activePubkey}
+                </span>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
                       onClick={() => void copyToClipboard(activePubkey)}
-                      className="shrink-0 text-muted-foreground hover:text-foreground"
+                      className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <CopyIcon className="size-3.5" />
                     </button>
@@ -351,8 +336,8 @@ export function SigningSetupDialog({
                 </Tooltip>
               </div>
             )}
-            {providerLink ? (
-              <>
+            <div className="flex items-center gap-1.5">
+              {providerLink ? (
                 <Button
                   size="sm"
                   variant="secondary"
@@ -362,15 +347,13 @@ export function SigningSetupDialog({
                   <ExternalLinkIcon className="size-3.5" />
                   Open signing key settings
                 </Button>
-                {providerLink.note && (
-                  <p className="text-xs text-muted-foreground">{providerLink.note}</p>
-                )}
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Paste this public key wherever your git provider manages signing keys.
-              </p>
-            )}
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Paste this key wherever your provider manages signing keys.
+                </p>
+              )}
+              {providerLink?.note && <InfoTooltip text={providerLink.note} />}
+            </div>
             <label className="flex items-center gap-1.5 text-sm">
               <input
                 type="checkbox"
@@ -387,21 +370,21 @@ export function SigningSetupDialog({
           <div className="flex flex-col gap-1.5 text-sm">
             <CheckRow label="Key ready" state="ok" />
             <CheckRow
-              label="Test signature created and verified locally"
+              label="Test signature verified locally"
               state={checks.testSigned === "pending" ? "checking" : checks.testSigned}
             />
             {checks.providerConfirmed !== "skipped" && (
               <CheckRow
-                label={`Key found on your GitHub account`}
+                label="Found on your GitHub account"
                 state={
                   checks.providerConfirmed === "checking" ? "checking" : checks.providerConfirmed
                 }
               />
             )}
             {done && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Signing is on{global ? " for every repo" : " for this repo"}. Close this and keep
-                working — every commit from now on is signed automatically.
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-accent-green">
+                <CheckIcon className="size-3.5" />
+                Signing is on. Every commit from here is signed automatically.
               </p>
             )}
             {error && <p className="text-xs text-destructive">{error}</p>}
@@ -434,6 +417,68 @@ export function SigningSetupDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+        {label}
+        {hint && <InfoTooltip text={hint} />}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function InfoTooltip({ text }: { text: string }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <InfoIcon className="size-3.5 shrink-0 text-muted-foreground" />
+      </TooltipTrigger>
+      <TooltipContent className="max-w-64">{text}</TooltipContent>
+    </Tooltip>
+  );
+}
+
+function SegmentedControl<T extends string>({
+  value,
+  onChange,
+  options,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: { value: T; label: string; disabled?: boolean }[];
+}) {
+  return (
+    <div className="inline-flex w-fit gap-0.5 rounded-md bg-muted/40 p-0.5">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          disabled={o.disabled}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "rounded-sm px-3 py-1 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40",
+            value === o.value
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
   );
 }
 
