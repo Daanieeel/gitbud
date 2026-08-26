@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { ImageDiff } from "@/lib/types";
+import type { ImageDiff } from "./types";
 
 interface ImageDiffViewProps {
   path: string;

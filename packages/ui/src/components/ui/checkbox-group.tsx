@@ -1,6 +1,6 @@
 import * as React from "react";
-import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
+import { Checkbox } from "./checkbox";
+import { cn } from "../../lib/utils";
 
 interface CheckboxGroupProps extends React.ComponentProps<typeof Checkbox> {
   children: React.ReactNode;

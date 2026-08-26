@@ -1,16 +1,16 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { ColumnsIcon, LinkIcon, MessageSquarePlusIcon, MinusIcon, PlusIcon, RowsIcon, Trash2Icon } from "lucide-react";
-import type { DiffHunk, DiffLine, FileDiff, ImageDiff, LineKind, ReviewComment } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import type { DiffHunk, DiffLine, FileDiff, ImageDiff, LineKind, ReviewComment } from "./types";
+import { cn } from "../../lib/utils";
 import { ImageDiffView } from "./ImageDiffView";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Avatar } from "@/components/ui/avatar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useSettingsStore } from "@/store/useSettingsStore";
-import { applyHighlightRanges, ensureLanguageLoaded, highlightLine, languageForPath } from "@/lib/highlight";
+import { Button } from "../ui/button";
+import { Textarea } from "../ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Avatar } from "../ui/avatar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
+import { useDiffSettings } from "../../lib/diff-settings";
+import { applyHighlightRanges, ensureLanguageLoaded, highlightLine, languageForPath } from "../../lib/highlight";
 
 interface HunkActions {
   /** Whether the diff being shown is the staged (HEAD->index) or unstaged (index->workdir) side. */
@@ -630,9 +630,7 @@ function DiffViewImpl({
   secondaryHunkActions,
 }: DiffViewProps) {
   const [composerKey, setComposerKey] = useState<string | null>(null);
-  const fontSize = useSettingsStore((s) => s.settings.diff_font_size);
-  const diffViewMode = useSettingsStore((s) => s.settings.diff_view);
-  const updateSettings = useSettingsStore((s) => s.update);
+  const { fontSize, diffViewMode, setDiffViewMode } = useDiffSettings();
   const language = useMemo(() => (diff ? languageForPath(diff.path) : undefined), [diff]);
   const scrollRef = useRef<HTMLDivElement>(null);
   // The language's grammar loads lazily on first use (see highlight.ts), so force a re-render once
@@ -648,7 +646,7 @@ function DiffViewImpl({
       <TooltipTrigger asChild>
         <button
           className="text-muted-foreground hover:text-foreground"
-          onClick={() => void updateSettings({ diff_view: diffViewMode === "split" ? "unified" : "split" })}
+          onClick={() => setDiffViewMode(diffViewMode === "split" ? "unified" : "split")}
         >
           {diffViewMode === "split" ? <RowsIcon className="size-3.5" /> : <ColumnsIcon className="size-3.5" />}
         </button>

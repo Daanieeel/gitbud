@@ -1,10 +1,7 @@
 import type * as React from "react";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
-import { useSettingsStore } from "@/store/useSettingsStore";
 
-function Toaster(props: ToasterProps) {
-  const theme = useSettingsStore((s) => s.settings.theme);
-
+function Toaster({ theme = "system", ...props }: ToasterProps) {
   return (
     <Sonner
       theme={theme}

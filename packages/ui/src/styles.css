@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+/* Explicit source: Tailwind's automatic content detection skips `node_modules`, and this
+ * package is consumed by other workspaces via a `node_modules` symlink, so its own component
+ * class usage would otherwise be missed. */
+@source "./components";
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {

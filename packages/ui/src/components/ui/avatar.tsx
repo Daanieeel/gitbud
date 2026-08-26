@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import { api } from "@/lib/tauri";
-import { cn } from "@/lib/utils";
+import { useAvatarCache } from "../../lib/avatar-cache";
+import { cn } from "../../lib/utils";
 
 interface AvatarProps {
   src: string | null | undefined;
@@ -14,16 +14,18 @@ interface AvatarProps {
  *
  * Opportunistically warms a local cache of the image (fire-and-forget, doesn't block the normal
  * network `<img>` load) and falls back to that cached copy if the live URL ever fails to load,
- * e.g. offline, after having seen this avatar at least once before. */
+ * e.g. offline, after having seen this avatar at least once before. See `AvatarCacheProvider` for
+ * plugging in the actual cache. */
 export function Avatar({ src, alt, className }: AvatarProps) {
+  const { cacheAvatar, getCachedAvatar } = useAvatarCache();
   const [fallbackSrc, setFallbackSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     setFallbackSrc(null);
     setFailed(false);
-    if (src) void api.cacheAvatar(src);
-  }, [src]);
+    if (src) cacheAvatar(src);
+  }, [src, cacheAvatar]);
 
   if (!src) return null;
 
@@ -35,7 +37,7 @@ export function Avatar({ src, alt, className }: AvatarProps) {
       onError={() => {
         if (failed) return;
         setFailed(true);
-        void api.getCachedAvatar(src).then((cached) => {
+        void getCachedAvatar(src).then((cached) => {
           if (cached) setFallbackSrc(cached);
         });
       }}
