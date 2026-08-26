@@ -10,10 +10,10 @@ export function NetlifyBadge() {
       href="https://www.netlify.com"
       target="_blank"
       rel="noopener noreferrer"
-      className="border-border bg-card text-muted-foreground hover:text-foreground fixed right-4 bottom-4 z-50 flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-colors"
+      className="border-border bg-card text-muted-foreground hover:text-foreground fixed right-4 bottom-4 z-50 flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium shadow-sm transition-colors"
     >
       {netlifyBadge.label}
-      <NetlifyMark className="size-3.5" />
+      <NetlifyMark className="size-5" />
       <span className="text-foreground">Netlify</span>
     </Link>
   );

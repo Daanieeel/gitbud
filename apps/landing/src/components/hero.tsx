@@ -14,12 +14,10 @@ export function Hero() {
   const { hero } = getMessages();
 
   return (
-    <section className="mx-auto max-w-6xl px-6 pt-20 pb-16 sm:pt-28">
-      <div className="grid gap-8 sm:grid-cols-2 sm:items-start">
+    <section className="mx-auto max-w-6xl px-6 pt-32 pb-16 sm:pt-36">
+      <div className="grid gap-8 sm:grid-cols-[1fr_auto] sm:items-start">
         <div>
-          <p className="text-muted-foreground text-xs font-medium tracking-widest uppercase">
-            {hero.eyebrow}
-          </p>
+          <p className="text-muted-foreground text-xs uppercase">{hero.eyebrow}</p>
           <h1 className="mt-4 text-5xl leading-[1.05] font-semibold tracking-tight sm:text-6xl">
             {hero.headline.map((line) => (
               <span key={line} className="block">
@@ -29,12 +27,12 @@ export function Hero() {
           </h1>
         </div>
         <div className="flex flex-col gap-6 sm:pt-2">
-          <p className="text-muted-foreground max-w-md text-base">{hero.description}</p>
+          <p className="text-muted-foreground max-w-sm text-base">{hero.description}</p>
           <div className="flex flex-wrap gap-3">
             <Button size="lg" asChild>
               <Link href="https://github.com/Daanieeel/gitbud/releases">{hero.primaryCta}</Link>
             </Button>
-            <Button size="lg" variant="outline" asChild>
+            <Button size="lg" variant="secondary" asChild>
               <Link
                 href="https://github.com/Daanieeel/gitbud"
                 target="_blank"
@@ -47,7 +45,7 @@ export function Hero() {
         </div>
       </div>
 
-      <div className="from-accent-blue/20 via-accent-purple/15 to-accent-pink/20 border-border mt-16 flex aspect-video items-center justify-center overflow-hidden rounded-2xl border bg-gradient-to-br">
+      <div className="from-accent-blue/20 via-accent-purple/15 to-accent-pink/20 border-border mt-16 flex aspect-video items-center justify-center overflow-hidden rounded-3xl border bg-gradient-to-br">
         <div className="text-muted-foreground flex flex-col items-center gap-3">
           <span className="border-border bg-card flex size-14 items-center justify-center rounded-full border">
             <PlayIcon />
