@@ -37,7 +37,10 @@ async function fetchStatus(repoPath: string) {
     // must be staged regardless of `seen`, or edits made to an already-staged file would never
     // get picked up.
     const toStage = status.files
-      .filter((f) => f.status !== "conflicted" && (f.partially_staged || (!f.staged && !seen.has(f.path))))
+      .filter(
+        (f) =>
+          f.status !== "conflicted" && (f.partially_staged || (!f.staged && !seen.has(f.path))),
+      )
       .map((f) => f.path);
     if (toStage.length > 0) {
       await api.stagePaths(repoPath, toStage);
@@ -51,7 +54,10 @@ async function fetchStatus(repoPath: string) {
 export function useStatus(repoPath: string | null) {
   return useQuery({
     queryKey: queryKeys.status(repoPath ?? ""),
-    queryFn: () => fetchStatus(repoPath as string),
+    queryFn: () => {
+      if (!repoPath) throw new Error("no repo selected");
+      return fetchStatus(repoPath);
+    },
     enabled: !!repoPath,
   });
 }
@@ -66,8 +72,10 @@ function useInvalidateStatus(repoPath: string | null) {
 export function useToggleStaged(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ paths, staged }: { paths: string[]; staged: boolean }) =>
-      staged ? api.stagePaths(repoPath as string, paths) : api.unstagePaths(repoPath as string, paths),
+    mutationFn: ({ paths, staged }: { paths: string[]; staged: boolean }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return staged ? api.stagePaths(repoPath, paths) : api.unstagePaths(repoPath, paths);
+    },
     onSuccess: (_, { paths }) => {
       if (!repoPath) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
@@ -81,7 +89,10 @@ export function useToggleStaged(repoPath: string | null) {
 export function useDiscardFile(repoPath: string | null) {
   const invalidate = useInvalidateStatus(repoPath);
   return useMutation({
-    mutationFn: (path: string) => api.discardFile(repoPath as string, path),
+    mutationFn: (path: string) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.discardFile(repoPath, path);
+    },
     onSuccess: invalidate,
   });
 }
@@ -89,7 +100,10 @@ export function useDiscardFile(repoPath: string | null) {
 export function useDiscardFiles(repoPath: string | null) {
   const invalidate = useInvalidateStatus(repoPath);
   return useMutation({
-    mutationFn: (paths: string[]) => Promise.all(paths.map((path) => api.discardFile(repoPath as string, path))),
+    mutationFn: (paths: string[]) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return Promise.all(paths.map((path) => api.discardFile(repoPath, path)));
+    },
     onSuccess: invalidate,
   });
 }
@@ -97,7 +111,10 @@ export function useDiscardFiles(repoPath: string | null) {
 export function useAddToGitignore(repoPath: string | null) {
   const invalidate = useInvalidateStatus(repoPath);
   return useMutation({
-    mutationFn: (paths: string[]) => api.addToGitignore(repoPath as string, paths),
+    mutationFn: (paths: string[]) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.addToGitignore(repoPath, paths);
+    },
     onSuccess: invalidate,
   });
 }
@@ -105,7 +122,10 @@ export function useAddToGitignore(repoPath: string | null) {
 export function useIgnoreFolder(repoPath: string | null) {
   const invalidate = useInvalidateStatus(repoPath);
   return useMutation({
-    mutationFn: (folderPath: string) => api.ignoreFolder(repoPath as string, folderPath),
+    mutationFn: (folderPath: string) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.ignoreFolder(repoPath, folderPath);
+    },
     onSuccess: invalidate,
   });
 }
@@ -113,7 +133,10 @@ export function useIgnoreFolder(repoPath: string | null) {
 export function useIgnoreExtension(repoPath: string | null) {
   const invalidate = useInvalidateStatus(repoPath);
   return useMutation({
-    mutationFn: (extension: string) => api.ignoreExtension(repoPath as string, extension),
+    mutationFn: (extension: string) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.ignoreExtension(repoPath, extension);
+    },
     onSuccess: invalidate,
   });
 }
@@ -121,10 +144,20 @@ export function useIgnoreExtension(repoPath: string | null) {
 export function useStageHunk(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ path, hunkIndex, lineIndices }: { path: string; hunkIndex: number; lineIndices?: number[] }) =>
-      lineIndices
-        ? api.stageHunkLines(repoPath as string, path, hunkIndex, lineIndices)
-        : api.stageHunk(repoPath as string, path, hunkIndex),
+    mutationFn: ({
+      path,
+      hunkIndex,
+      lineIndices,
+    }: {
+      path: string;
+      hunkIndex: number;
+      lineIndices?: number[];
+    }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return lineIndices
+        ? api.stageHunkLines(repoPath, path, hunkIndex, lineIndices)
+        : api.stageHunk(repoPath, path, hunkIndex);
+    },
     onSuccess: (_, { path }) => {
       if (!repoPath) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
@@ -136,10 +169,20 @@ export function useStageHunk(repoPath: string | null) {
 export function useUnstageHunk(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ path, hunkIndex, lineIndices }: { path: string; hunkIndex: number; lineIndices?: number[] }) =>
-      lineIndices
-        ? api.unstageHunkLines(repoPath as string, path, hunkIndex, lineIndices)
-        : api.unstageHunk(repoPath as string, path, hunkIndex),
+    mutationFn: ({
+      path,
+      hunkIndex,
+      lineIndices,
+    }: {
+      path: string;
+      hunkIndex: number;
+      lineIndices?: number[];
+    }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return lineIndices
+        ? api.unstageHunkLines(repoPath, path, hunkIndex, lineIndices)
+        : api.unstageHunk(repoPath, path, hunkIndex);
+    },
     onSuccess: (_, { path }) => {
       if (!repoPath) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
@@ -151,10 +194,20 @@ export function useUnstageHunk(repoPath: string | null) {
 export function useDiscardHunk(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ path, hunkIndex, lineIndices }: { path: string; hunkIndex: number; lineIndices?: number[] }) =>
-      lineIndices
-        ? api.discardHunkLines(repoPath as string, path, hunkIndex, lineIndices)
-        : api.discardHunk(repoPath as string, path, hunkIndex),
+    mutationFn: ({
+      path,
+      hunkIndex,
+      lineIndices,
+    }: {
+      path: string;
+      hunkIndex: number;
+      lineIndices?: number[];
+    }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return lineIndices
+        ? api.discardHunkLines(repoPath, path, hunkIndex, lineIndices)
+        : api.discardHunk(repoPath, path, hunkIndex);
+    },
     onSuccess: (_, { path }) => {
       if (!repoPath) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
@@ -166,8 +219,10 @@ export function useDiscardHunk(repoPath: string | null) {
 export function useResolveConflict(repoPath: string | null) {
   const invalidate = useInvalidateStatus(repoPath);
   return useMutation({
-    mutationFn: ({ path, side }: { path: string; side: "ours" | "theirs" }) =>
-      api.resolveConflict(repoPath as string, path, side),
+    mutationFn: ({ path, side }: { path: string; side: "ours" | "theirs" }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.resolveConflict(repoPath, path, side);
+    },
     onSuccess: invalidate,
   });
 }
@@ -175,8 +230,10 @@ export function useResolveConflict(repoPath: string | null) {
 export function useResolveConflictWithContent(repoPath: string | null) {
   const invalidate = useInvalidateStatus(repoPath);
   return useMutation({
-    mutationFn: ({ path, content }: { path: string; content: string }) =>
-      api.resolveConflictWithContent(repoPath as string, path, content),
+    mutationFn: ({ path, content }: { path: string; content: string }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.resolveConflictWithContent(repoPath, path, content);
+    },
     onSuccess: invalidate,
   });
 }

@@ -21,7 +21,8 @@ export function OfflineIndicator({ iconOnly }: { iconOnly?: boolean }) {
         )}
       </TooltipTrigger>
       <TooltipContent>
-        Can't reach the remote, so fetch, pull, push, and PR data may be stale until connectivity is back
+        Can't reach the remote, so fetch, pull, push, and PR data may be stale until connectivity is
+        back
       </TooltipContent>
     </Tooltip>
   );

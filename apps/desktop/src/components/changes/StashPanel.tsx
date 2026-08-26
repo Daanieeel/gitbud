@@ -33,7 +33,7 @@ interface StashPanelProps {
  * description parts, so the UI isn't just displaying a run-on string of words. `branch` is
  * null if the message doesn't match either shape (e.g. an older/foreign stash format), in
  * which case `description` is the raw message untouched. */
-function parseStashMessage(message: string): { branch: string | null; description: string } {
+function parseStashMessage(message: string) {
   const wip = message.match(/^WIP on (.+): [0-9a-f]{4,40} (.*)$/);
   if (wip) return { branch: wip[1], description: wip[2] };
   const labeled = message.match(/^On (.+): (.*)$/);
@@ -199,96 +199,122 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
             {stashes.map((s) => {
               const { branch, description } = parseStashMessage(s.message);
               return (
-              <div
-                key={s.index}
-                className="group flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-                onClick={() => {
-                  setDetailIndex(s.index);
-                  setDetailOpen(true);
-                  setOpen(false);
-                }}
-              >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="min-w-0 flex-1 truncate">
-                      {description}
-                      {branch && <span className="ml-1.5 text-xs text-muted-foreground">on {branch}</span>}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent>{s.message}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground disabled:opacity-50"
-                      disabled={busyKey !== null}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDetailIndex(s.index);
-                        setDetailOpen(true);
-                        setOpen(false);
-                      }}
-                    >
-                      <ExpandIcon className="size-3.5" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>View files & diff</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      className={cn(
-                        "text-muted-foreground hover:text-foreground disabled:opacity-50",
-                        busyKey === `${s.index}:apply` ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-                      )}
-                      disabled={busyKey !== null}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void runRowAction(`${s.index}:apply`, () => applyMutation.mutateAsync(s.index));
-                      }}
-                    >
-                      <Undo2Icon className={cn("size-3.5", busyKey === `${s.index}:apply` && "animate-spin")} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Apply (keep stash)</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      className={cn(
-                        "text-muted-foreground hover:text-foreground disabled:opacity-50",
-                        busyKey === `${s.index}:pop` ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-                      )}
-                      disabled={busyKey !== null}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void runRowAction(`${s.index}:pop`, () => popMutation.mutateAsync(s.index));
-                      }}
-                    >
-                      <ArchiveIcon className={cn("size-3.5", busyKey === `${s.index}:pop` && "animate-spin")} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Pop (apply and remove)</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      className={cn(
-                        "text-muted-foreground hover:text-destructive disabled:opacity-50",
-                        busyKey === `${s.index}:drop` ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-                      )}
-                      disabled={busyKey !== null}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void runRowAction(`${s.index}:drop`, () => dropMutation.mutateAsync(s.index));
-                      }}
-                    >
-                      <Trash2Icon className={cn("size-3.5", busyKey === `${s.index}:drop` && "animate-spin")} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Drop</TooltipContent>
-                </Tooltip>
-              </div>
+                <div
+                  key={s.index}
+                  className="group flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                  onClick={() => {
+                    setDetailIndex(s.index);
+                    setDetailOpen(true);
+                    setOpen(false);
+                  }}
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="min-w-0 flex-1 truncate">
+                        {description}
+                        {branch && (
+                          <span className="ml-1.5 text-xs text-muted-foreground">on {branch}</span>
+                        )}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>{s.message}</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground disabled:opacity-50"
+                        disabled={busyKey !== null}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDetailIndex(s.index);
+                          setDetailOpen(true);
+                          setOpen(false);
+                        }}
+                      >
+                        <ExpandIcon className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>View files & diff</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className={cn(
+                          "text-muted-foreground hover:text-foreground disabled:opacity-50",
+                          busyKey === `${s.index}:apply`
+                            ? "opacity-100"
+                            : "opacity-0 group-hover:opacity-100",
+                        )}
+                        disabled={busyKey !== null}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void runRowAction(`${s.index}:apply`, () =>
+                            applyMutation.mutateAsync(s.index),
+                          );
+                        }}
+                      >
+                        <Undo2Icon
+                          className={cn(
+                            "size-3.5",
+                            busyKey === `${s.index}:apply` && "animate-spin",
+                          )}
+                        />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Apply (keep stash)</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className={cn(
+                          "text-muted-foreground hover:text-foreground disabled:opacity-50",
+                          busyKey === `${s.index}:pop`
+                            ? "opacity-100"
+                            : "opacity-0 group-hover:opacity-100",
+                        )}
+                        disabled={busyKey !== null}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void runRowAction(`${s.index}:pop`, () =>
+                            popMutation.mutateAsync(s.index),
+                          );
+                        }}
+                      >
+                        <ArchiveIcon
+                          className={cn("size-3.5", busyKey === `${s.index}:pop` && "animate-spin")}
+                        />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Pop (apply and remove)</TooltipContent>
+                  </Tooltip>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className={cn(
+                          "text-muted-foreground hover:text-destructive disabled:opacity-50",
+                          busyKey === `${s.index}:drop`
+                            ? "opacity-100"
+                            : "opacity-0 group-hover:opacity-100",
+                        )}
+                        disabled={busyKey !== null}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void runRowAction(`${s.index}:drop`, () =>
+                            dropMutation.mutateAsync(s.index),
+                          );
+                        }}
+                      >
+                        <Trash2Icon
+                          className={cn(
+                            "size-3.5",
+                            busyKey === `${s.index}:drop` && "animate-spin",
+                          )}
+                        />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Drop</TooltipContent>
+                  </Tooltip>
+                </div>
               );
             })}
           </div>
@@ -300,16 +326,19 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
           <DialogHeader>
             <DialogTitle>
               {(() => {
-                const message = detailIndex !== null
-                  ? stashes.find((s) => s.index === detailIndex)?.message
-                  : null;
+                const message =
+                  detailIndex !== null
+                    ? stashes.find((s) => s.index === detailIndex)?.message
+                    : null;
                 if (!message) return "";
                 const { branch, description } = parseStashMessage(message);
                 return branch ? `${description} (stashed on ${branch})` : description;
               })()}
             </DialogTitle>
           </DialogHeader>
-          {repoPath && detailIndex !== null && <StashDetail repoPath={repoPath} index={detailIndex} />}
+          {repoPath && detailIndex !== null && (
+            <StashDetail repoPath={repoPath} index={detailIndex} />
+          )}
         </DialogContent>
       </Dialog>
     </>

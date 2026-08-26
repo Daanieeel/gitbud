@@ -35,11 +35,23 @@ export function LfsPanel() {
           objects on their own. Use these if a large file looks stuck as a pointer.
         </p>
         <div className="flex gap-2">
-          <Button size="sm" variant="secondary" className="flex-1" disabled={syncing} onClick={() => void pullLfs()}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="flex-1"
+            disabled={syncing}
+            onClick={() => void pullLfs()}
+          >
             <DownloadIcon className={cn("size-3.5", syncing && "animate-spin")} />
             {syncing ? "Working…" : "Pull LFS"}
           </Button>
-          <Button size="sm" variant="secondary" className="flex-1" disabled={syncing} onClick={() => void pushLfs()}>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="flex-1"
+            disabled={syncing}
+            onClick={() => void pushLfs()}
+          >
             <UploadIcon className={cn("size-3.5", syncing && "animate-spin")} />
             {syncing ? "Working…" : "Push LFS"}
           </Button>

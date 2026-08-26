@@ -37,8 +37,8 @@ export function ResolveDivergedPullDialog() {
         <DialogHeader>
           <DialogTitle>Branches have diverged</DialogTitle>
           <DialogDescription>
-            Your branch and origin both have commits the other doesn't, so a fast-forward pull
-            isn't possible. Choose how to reconcile them.
+            Your branch and origin both have commits the other doesn't, so a fast-forward pull isn't
+            possible. Choose how to reconcile them.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2">
@@ -50,8 +50,12 @@ export function ResolveDivergedPullDialog() {
           >
             <GitMergeIcon className="size-4 shrink-0" />
             <span className="flex flex-col">
-              <span className="text-sm font-medium">{resolving === "merge" ? "Merging…" : "Merge"}</span>
-              <span className="text-xs text-muted-foreground">Combine both histories with a merge commit</span>
+              <span className="text-sm font-medium">
+                {resolving === "merge" ? "Merging…" : "Merge"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Combine both histories with a merge commit
+              </span>
             </span>
           </Button>
           <Button
@@ -62,8 +66,12 @@ export function ResolveDivergedPullDialog() {
           >
             <ListOrderedIcon className="size-4 shrink-0" />
             <span className="flex flex-col">
-              <span className="text-sm font-medium">{resolving === "rebase" ? "Rebasing…" : "Rebase"}</span>
-              <span className="text-xs text-muted-foreground">Replay your local commits on top of origin</span>
+              <span className="text-sm font-medium">
+                {resolving === "rebase" ? "Rebasing…" : "Rebase"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Replay your local commits on top of origin
+              </span>
             </span>
           </Button>
         </div>

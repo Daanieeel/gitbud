@@ -3,7 +3,14 @@ import hljs from "highlight.js/lib/core";
 // Loaded on first use rather than all up front: most sessions only ever touch a handful of
 // these languages, and eagerly importing+registering all ~19 grammars costs real memory the
 // moment any diff renders, whether or not most of them are ever needed.
-const LANGUAGE_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
+/** Looks up an open string key against a known-literal lookup table without widening the
+ * table's own declared type — the table stays `satisfies`-checked against its value type, and
+ * only this generic boundary (not the table itself) admits an arbitrary `string` key. */
+function lookup<T>(map: Record<string, T>, key: string): T | undefined {
+  return Object.hasOwn(map, key) ? map[key] : undefined;
+}
+
+const LANGUAGE_LOADERS = {
   typescript: () => import("highlight.js/lib/languages/typescript"),
   javascript: () => import("highlight.js/lib/languages/javascript"),
   xml: () => import("highlight.js/lib/languages/xml"),
@@ -22,7 +29,7 @@ const LANGUAGE_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
   markdown: () => import("highlight.js/lib/languages/markdown"),
   sql: () => import("highlight.js/lib/languages/sql"),
   ini: () => import("highlight.js/lib/languages/ini"),
-};
+} satisfies Record<string, () => Promise<{ default: unknown }>>;
 
 const loadedLanguages = new Set<string>();
 const pendingLoads = new Map<string, Promise<void>>();
@@ -35,9 +42,11 @@ export function ensureLanguageLoaded(language: string | undefined): Promise<void
   if (!language || loadedLanguages.has(language)) return undefined;
   const existing = pendingLoads.get(language);
   if (existing) return existing;
-  const loader = LANGUAGE_LOADERS[language];
+  const loader = lookup(LANGUAGE_LOADERS, language);
   if (!loader) return undefined;
   const pending = loader().then((mod) => {
+    // SAFETY: every entry in LANGUAGE_LOADERS is a highlight.js language grammar module (see the
+    // list above) — hljs guarantees each one's `default` export is a LanguageFn.
     hljs.registerLanguage(language, mod.default as Parameters<typeof hljs.registerLanguage>[1]);
     loadedLanguages.add(language);
   });
@@ -45,7 +54,7 @@ export function ensureLanguageLoaded(language: string | undefined): Promise<void
   return pending;
 }
 
-const EXT_TO_LANG: Record<string, string> = {
+const EXT_TO_LANG = {
   ts: "typescript",
   tsx: "typescript",
   js: "javascript",
@@ -83,18 +92,15 @@ const EXT_TO_LANG: Record<string, string> = {
   toml: "ini",
   ini: "ini",
   cfg: "ini",
-};
+} satisfies Record<string, string>;
 
 export function languageForPath(path: string): string | undefined {
   const ext = path.split(".").pop()?.toLowerCase();
-  return ext ? EXT_TO_LANG[ext] : undefined;
+  return ext ? lookup(EXT_TO_LANG, ext) : undefined;
 }
 
 function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /** Highlights a single line in isolation — loses cross-line grammar state (e.g. mid
@@ -124,7 +130,11 @@ export function highlightLine(content: string, language: string | undefined): st
  * dropping the highlight for everything after it in that token. To avoid depending on that, we
  * never let our span cross a tag: it's closed right before any tag and reopened right after, if
  * the highlighted range continues past it. */
-export function applyHighlightRanges(html: string, ranges: [number, number][], className: string): string {
+export function applyHighlightRanges(
+  html: string,
+  ranges: [number, number][],
+  className: string,
+): string {
   if (ranges.length === 0) return html;
   const sorted = [...ranges].sort((a, b) => a[0] - b[0]);
 
@@ -136,7 +146,9 @@ export function applyHighlightRanges(html: string, ranges: [number, number][], c
 
   const isInRange = () => {
     while (rangeIdx < sorted.length && sorted[rangeIdx][1] <= textPos) rangeIdx++;
-    return rangeIdx < sorted.length && sorted[rangeIdx][0] <= textPos && textPos < sorted[rangeIdx][1];
+    return (
+      rangeIdx < sorted.length && sorted[rangeIdx][0] <= textPos && textPos < sorted[rangeIdx][1]
+    );
   };
 
   while (i < html.length) {

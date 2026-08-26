@@ -18,7 +18,8 @@ async function guarded(fn: () => Promise<void>) {
     await fn();
   } finally {
     const elapsed = Date.now() - startedAt;
-    if (elapsed < MIN_SYNCING_MS) await new Promise((resolve) => setTimeout(resolve, MIN_SYNCING_MS - elapsed));
+    if (elapsed < MIN_SYNCING_MS)
+      await new Promise((resolve) => setTimeout(resolve, MIN_SYNCING_MS - elapsed));
   }
 }
 
@@ -34,7 +35,11 @@ function syncMutationKey(repoPath: string) {
 /** Whether a fetch/pull/push/sync/LFS mutation is currently running for this repo — shared and
  * reactive across every component that calls it, not just the one that triggered the sync. */
 export function useRepoSyncing(repoPath: string | null) {
-  return useIsMutating({ mutationKey: repoPath ? syncMutationKey(repoPath) : ["repo-sync", "__none__"] }) > 0;
+  return (
+    useIsMutating({
+      mutationKey: repoPath ? syncMutationKey(repoPath) : ["repo-sync", "__none__"],
+    }) > 0
+  );
 }
 
 /** Fetch/pull/push/sync/LFS actions for a repo. `branch` is only used to word the progress
@@ -46,7 +51,7 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
 
   const invalidate = (keys: readonly (readonly (string | number)[])[]) => {
     if (!repoPath) return;
-    for (const key of keys) void queryClient.invalidateQueries({ queryKey: key as (string | number)[] });
+    for (const key of keys) void queryClient.invalidateQueries({ queryKey: key });
   };
 
   const fetchMutation = useMutation({
@@ -58,7 +63,11 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
           description: "Fetching origin…",
           doneMessage: "Fetched origin",
         });
-        invalidate([queryKeys.branches(repoPath), queryKeys.status(repoPath), queryKeys.aheadBehind(repoPath)]);
+        invalidate([
+          queryKeys.branches(repoPath),
+          queryKeys.status(repoPath),
+          queryKeys.aheadBehind(repoPath),
+        ]);
         void useRepoStore.getState().loadRepos();
       }),
   });
@@ -77,7 +86,11 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
             return true;
           },
         });
-        invalidate([queryKeys.status(repoPath), queryKeys.log(repoPath), queryKeys.aheadBehind(repoPath)]);
+        invalidate([
+          queryKeys.status(repoPath),
+          queryKeys.log(repoPath),
+          queryKeys.aheadBehind(repoPath),
+        ]);
       }),
   });
 
@@ -86,11 +99,17 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
     mutationFn: () =>
       guarded(async () => {
         if (!repoPath) return;
-        const aheadBehind = queryClient.getQueryData<{ published: boolean }>(queryKeys.aheadBehind(repoPath));
+        const aheadBehind = queryClient.getQueryData<{ published: boolean }>(
+          queryKeys.aheadBehind(repoPath),
+        );
         const publish = aheadBehind ? !aheadBehind.published : false;
         await runGitSync(repoPath, () => api.gitPush(repoPath), {
-          description: publish ? `Publishing ${branch ?? "current branch"} to origin…` : `Pushing ${branch ?? "current branch"} to origin…`,
-          doneMessage: publish ? `Published ${branch ?? "current branch"} to origin` : `Pushed ${branch ?? "current branch"} to origin`,
+          description: publish
+            ? `Publishing ${branch ?? "current branch"} to origin…`
+            : `Pushing ${branch ?? "current branch"} to origin…`,
+          doneMessage: publish
+            ? `Published ${branch ?? "current branch"} to origin`
+            : `Pushed ${branch ?? "current branch"} to origin`,
         });
         invalidate([queryKeys.aheadBehind(repoPath)]);
       }),
@@ -132,7 +151,11 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
             },
           },
         );
-        invalidate([queryKeys.status(repoPath), queryKeys.log(repoPath), queryKeys.aheadBehind(repoPath)]);
+        invalidate([
+          queryKeys.status(repoPath),
+          queryKeys.log(repoPath),
+          queryKeys.aheadBehind(repoPath),
+        ]);
       }),
   });
 

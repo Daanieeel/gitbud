@@ -8,6 +8,8 @@ export function isProtectedBranch(name: string): boolean {
  * an ordered list of (condition, value) rules instead of a nested/chained ternary — e.g. picking
  * the first applicable reason a button is disabled. `T` is inferred per call, so each value stays
  * its own literal type rather than widening to `string`. */
-export function firstMatch<T>(cases: ReadonlyArray<readonly [condition: boolean, value: T]>): T | null {
+export function firstMatch<T>(
+  cases: ReadonlyArray<readonly [condition: boolean, value: T]>,
+): T | null {
   return cases.find(([condition]) => condition)?.[1] ?? null;
 }

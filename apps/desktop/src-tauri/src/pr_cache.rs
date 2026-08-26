@@ -1,12 +1,12 @@
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::OptionalExtension;
 use rusqlite::params;
+use rusqlite::OptionalExtension;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
-use crate::diff::FileDiff;
+use crate::diff::PrFileEntry;
 use crate::github::api::{CheckRun, PullRequest, ReviewComment};
 
 /// Rows older than this are opportunistically pruned on each write, so a long-lived app session
@@ -149,7 +149,11 @@ pub fn upsert_pr(repo_key: &str, pr: &PullRequest) -> Result<(), String> {
 /// way, the caller should fetch fresh from GitHub. A cache hit means the diff is guaranteed
 /// unchanged (a PR's file diffs are immutable for a given commit), so callers can skip both the
 /// network request and re-parsing every changed line.
-pub fn get_cached_files(repo_key: &str, number: u64, head_sha: &str) -> Result<Option<Vec<(String, String, FileDiff)>>, String> {
+pub fn get_cached_files(
+    repo_key: &str,
+    number: u64,
+    head_sha: &str,
+) -> Result<Option<Vec<PrFileEntry>>, String> {
     let conn = conn()?;
     let result: Option<(String, String)> = conn
         .query_row(
@@ -170,7 +174,10 @@ pub fn get_cached_files(repo_key: &str, number: u64, head_sha: &str) -> Result<O
 /// Whatever's cached for this PR's files, regardless of whether `head_sha` is still current,
 /// for instant-paint seeding while a live (freshness-checked) fetch is in flight, not for
 /// deciding whether that fetch is needed.
-pub fn get_any_cached_files(repo_key: &str, number: u64) -> Result<Option<Vec<(String, String, FileDiff)>>, String> {
+pub fn get_any_cached_files(
+    repo_key: &str,
+    number: u64,
+) -> Result<Option<Vec<PrFileEntry>>, String> {
     let conn = conn()?;
     let files_json: Option<String> = conn
         .query_row(
@@ -180,10 +187,17 @@ pub fn get_any_cached_files(repo_key: &str, number: u64) -> Result<Option<Vec<(S
         )
         .optional()
         .map_err(|e| e.to_string())?;
-    files_json.map(|json| serde_json::from_str(&json).map_err(|e| e.to_string())).transpose()
+    files_json
+        .map(|json| serde_json::from_str(&json).map_err(|e| e.to_string()))
+        .transpose()
 }
 
-pub fn upsert_files(repo_key: &str, number: u64, head_sha: &str, files: &[(String, String, FileDiff)]) -> Result<(), String> {
+pub fn upsert_files(
+    repo_key: &str,
+    number: u64,
+    head_sha: &str,
+    files: &[PrFileEntry],
+) -> Result<(), String> {
     let conn = conn()?;
     let files_json = serde_json::to_string(files).map_err(|e| e.to_string())?;
     conn.execute(
@@ -196,7 +210,10 @@ pub fn upsert_files(repo_key: &str, number: u64, head_sha: &str, files: &[(Strin
     Ok(())
 }
 
-pub fn get_cached_comments(repo_key: &str, number: u64) -> Result<Option<Vec<ReviewComment>>, String> {
+pub fn get_cached_comments(
+    repo_key: &str,
+    number: u64,
+) -> Result<Option<Vec<ReviewComment>>, String> {
     let conn = conn()?;
     let result: Option<String> = conn
         .query_row(
@@ -206,10 +223,16 @@ pub fn get_cached_comments(repo_key: &str, number: u64) -> Result<Option<Vec<Rev
         )
         .optional()
         .map_err(|e| e.to_string())?;
-    result.map(|json| serde_json::from_str(&json).map_err(|e| e.to_string())).transpose()
+    result
+        .map(|json| serde_json::from_str(&json).map_err(|e| e.to_string()))
+        .transpose()
 }
 
-pub fn upsert_comments(repo_key: &str, number: u64, comments: &[ReviewComment]) -> Result<(), String> {
+pub fn upsert_comments(
+    repo_key: &str,
+    number: u64,
+    comments: &[ReviewComment],
+) -> Result<(), String> {
     let conn = conn()?;
     let comments_json = serde_json::to_string(comments).map_err(|e| e.to_string())?;
     conn.execute(
@@ -232,7 +255,9 @@ pub fn get_cached_check_runs(repo_key: &str, sha: &str) -> Result<Option<Vec<Che
         )
         .optional()
         .map_err(|e| e.to_string())?;
-    result.map(|json| serde_json::from_str(&json).map_err(|e| e.to_string())).transpose()
+    result
+        .map(|json| serde_json::from_str(&json).map_err(|e| e.to_string()))
+        .transpose()
 }
 
 pub fn upsert_check_runs(repo_key: &str, sha: &str, runs: &[CheckRun]) -> Result<(), String> {
@@ -256,9 +281,13 @@ pub fn upsert_check_runs(repo_key: &str, sha: &str, runs: &[CheckRun]) -> Result
 /// be wasted network traffic on an image that almost never changes.
 pub fn get_cached_avatar(url: &str) -> Result<Option<String>, String> {
     let conn = conn()?;
-    conn.query_row("SELECT data_uri FROM avatars WHERE url = ?1", params![url], |row| row.get(0))
-        .optional()
-        .map_err(|e| e.to_string())
+    conn.query_row(
+        "SELECT data_uri FROM avatars WHERE url = ?1",
+        params![url],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(|e| e.to_string())
 }
 
 pub fn upsert_avatar(url: &str, data_uri: &str) -> Result<(), String> {
@@ -298,7 +327,11 @@ pub fn cache_sizes() -> Result<(u64, u64), String> {
         )
         .map_err(|e| e.to_string())?;
     let avatar_bytes: i64 = conn
-        .query_row("SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name = 'avatars'", [], |row| row.get(0))
+        .query_row(
+            "SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name = 'avatars'",
+            [],
+            |row| row.get(0),
+        )
         .map_err(|e| e.to_string())?;
     Ok((repo_bytes as u64, avatar_bytes as u64))
 }

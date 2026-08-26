@@ -33,7 +33,8 @@ pub fn restore_to(repo_path: &str, oid: &str) -> Result<(), String> {
     let object = repo
         .find_object(target, Some(ObjectType::Commit))
         .map_err(|e| e.message().to_string())?;
-    repo.reset(&object, ResetType::Hard, None).map_err(|e| e.message().to_string())
+    repo.reset(&object, ResetType::Hard, None)
+        .map_err(|e| e.message().to_string())
 }
 
 #[cfg(test)]
@@ -49,7 +50,10 @@ mod tests {
         fn new(name: &str) -> Self {
             let path = std::env::temp_dir().join(format!(
                 "gitbud-test-reflog-{name}-{}",
-                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
             ));
             std::fs::create_dir_all(&path).unwrap();
             let repo = Repository::init(&path).unwrap();

@@ -1,6 +1,8 @@
 {
   "name": "@gitbud/config",
-  "private": true,
   "version": "0.0.0",
-  "files": ["tsconfig.base.json"]
+  "private": true,
+  "files": [
+    "tsconfig.base.json"
+  ]
 }

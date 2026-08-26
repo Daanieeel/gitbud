@@ -40,12 +40,14 @@ pub fn stash_save(repo_path: &str, message: &str, include_untracked: bool) -> Re
 
 pub fn stash_apply(repo_path: &str, index: usize) -> Result<(), String> {
     let mut repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
-    repo.stash_apply(index, None).map_err(|e| e.message().to_string())
+    repo.stash_apply(index, None)
+        .map_err(|e| e.message().to_string())
 }
 
 pub fn stash_pop(repo_path: &str, index: usize) -> Result<(), String> {
     let mut repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
-    repo.stash_pop(index, None).map_err(|e| e.message().to_string())
+    repo.stash_pop(index, None)
+        .map_err(|e| e.message().to_string())
 }
 
 pub fn stash_drop(repo_path: &str, index: usize) -> Result<(), String> {

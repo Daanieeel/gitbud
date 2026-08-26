@@ -2,7 +2,14 @@ import { create } from "zustand";
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
-type UpdateStatus = "idle" | "checking" | "up-to-date" | "available" | "installing" | "unconfigured" | "error";
+type UpdateStatus =
+  | "idle"
+  | "checking"
+  | "up-to-date"
+  | "available"
+  | "installing"
+  | "unconfigured"
+  | "error";
 
 interface UpdateState {
   status: UpdateStatus;
@@ -22,11 +29,17 @@ export const useUpdateStore = create<UpdateState>((set, get) => ({
     set({ status: "checking", error: null });
     try {
       const result = await check();
-      set(result ? { status: "available", update: result } : { status: "up-to-date", update: null });
+      set(
+        result ? { status: "available", update: result } : { status: "up-to-date", update: null },
+      );
     } catch (e) {
       const message = String(e);
       // The updater plugin has no endpoint/signing key configured for this build yet.
-      set(/endpoint|url/i.test(message) ? { status: "unconfigured" } : { status: "error", error: message });
+      set(
+        /endpoint|url/i.test(message)
+          ? { status: "unconfigured" }
+          : { status: "error", error: message },
+      );
     }
   },
 

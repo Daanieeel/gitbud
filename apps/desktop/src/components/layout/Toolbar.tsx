@@ -1,6 +1,12 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { GitPullRequestCreateArrow, GitPullRequestArrowIcon, ExternalLinkIcon, CodeIcon, ArrowUpIcon } from "lucide-react";
+import {
+  GitPullRequestCreateArrow,
+  GitPullRequestArrowIcon,
+  ExternalLinkIcon,
+  CodeIcon,
+  ArrowUpIcon,
+} from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
 import { useGitHubStore } from "@/store/useGitHubStore";
@@ -43,18 +49,27 @@ export function Toolbar() {
   const hasOtherBranch = localBranches.length > 0;
   // Mirrors CreatePRDialog's own default-base pick, so "commits to PR" means commits ahead of
   // the same base branch the dialog would diff against — not just "repo has commits somewhere".
-  const defaultBase = localBranches.find((b) => b.name === "main" || b.name === "master")?.name ?? localBranches[0]?.name ?? null;
+  const defaultBase =
+    localBranches.find((b) => b.name === "main" || b.name === "master")?.name ??
+    localBranches[0]?.name ??
+    null;
   const { data: aheadBehind = DEFAULT_AHEAD_BEHIND } = useAheadBehind(repoPath);
   const { data: branchCommits } = useQuery({
     queryKey: queryKeys.branchCommits(repoPath ?? "", defaultBase ?? "", branch ?? ""),
-    queryFn: () => api.getBranchCommits(repoPath as string, defaultBase as string, branch as string),
+    queryFn: () => {
+      if (!repoPath || !defaultBase || !branch)
+        throw new Error("Toolbar: query ran while disabled");
+      return api.getBranchCommits(repoPath, defaultBase, branch);
+    },
     enabled: !!repoPath && !!defaultBase && !!branch,
   });
   const hasCommits = (branchCommits?.length ?? 0) > 0;
   // Of the commits ahead of base, how many are actually on origin/branch — `ahead` is how many
   // aren't (only meaningful once `published`, since an unpublished branch reports `ahead: 0`
   // regardless of how many local commits it has).
-  const pushedCommitCount = aheadBehind.published ? Math.max(0, (branchCommits?.length ?? 0) - aheadBehind.ahead) : 0;
+  const pushedCommitCount = aheadBehind.published
+    ? Math.max(0, (branchCommits?.length ?? 0) - aheadBehind.ahead)
+    : 0;
   const hasPushedCommit = pushedCommitCount > 0;
   const hasUnpushedCommit = aheadBehind.published && aheadBehind.ahead > 0;
   const previewPrDisabledReason = firstMatch([
@@ -73,13 +88,18 @@ export function Toolbar() {
   // creating one in-app and after a teammate opens one, without its own separate fetch.
   const { pulls: openPulls } = usePullRequestList(repoPath, currentLogin, "open");
   const existingPrNumber = openPulls.find((p) => p.head_ref === branch)?.number ?? null;
-  const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: ReturnType<typeof detectRemoteProvider> } | null>(null);
+  const [remoteInfo, setRemoteInfo] = useState<{
+    url: string;
+    provider: ReturnType<typeof detectRemoteProvider>;
+  } | null>(null);
   const favoriteEditorId = useSettingsStore((s) => s.settings.favorite_editor);
   const customEditorCommand = useSettingsStore((s) => s.settings.custom_editor_command);
   const favoriteEditorOption = findEditor(favoriteEditorId);
   const isCustomEditor = favoriteEditorId === CUSTOM_EDITOR_ID && !!customEditorCommand;
   const customIcon = useCustomEditorIcon(isCustomEditor ? customEditorCommand : null);
-  const editorName = favoriteEditorOption?.name ?? (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
+  const editorName =
+    favoriteEditorOption?.name ??
+    (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
 
   useEffect(() => {
     setRemoteInfo(null);
@@ -121,7 +141,6 @@ export function Toolbar() {
     setPreviewPrOpen(true);
   };
 
-
   return (
     <header className="flex shrink-0 items-center gap-2 p-2">
       <BranchSwitcher />
@@ -153,7 +172,9 @@ export function Toolbar() {
                 size="icon"
                 onClick={() => {
                   if (!repoPath || !favoriteEditorId) return;
-                  void api.openInEditor(repoPath, favoriteEditorId, customEditorCommand).catch((err) => toast.error(String(err)));
+                  void api
+                    .openInEditor(repoPath, favoriteEditorId, customEditorCommand)
+                    .catch((err) => toast.error(String(err)));
                 }}
               >
                 {favoriteEditorOption ? (
@@ -205,7 +226,9 @@ export function Toolbar() {
                   variant="positive"
                   size="sm"
                   aria-disabled={previewPrDisabledReason != null}
-                  className={previewPrDisabledReason != null ? "cursor-not-allowed opacity-40" : undefined}
+                  className={
+                    previewPrDisabledReason != null ? "cursor-not-allowed opacity-40" : undefined
+                  }
                   onClick={handlePreviewPrClick}
                 >
                   <GitPullRequestCreateArrow className="size-3.5" />
@@ -213,17 +236,29 @@ export function Toolbar() {
                 </Button>
               </PopoverTrigger>
             </TooltipTrigger>
-            <TooltipContent>{previewPrDisabledReason ?? "Preview and open a pull request for this branch"}</TooltipContent>
+            <TooltipContent>
+              {previewPrDisabledReason ?? "Preview and open a pull request for this branch"}
+            </TooltipContent>
           </Tooltip>
           <PopoverContent className="w-fit space-y-3 p-3" align="center">
-            <p className="max-w-xs text-sm opacity-80">
-              This branch has unpushed commits.
-            </p>
+            <p className="max-w-xs text-sm opacity-80">This branch has unpushed commits.</p>
             <div className="flex gap-2">
-              <Button size="sm" variant="secondary" onClick={() => { setPushConfirmOpen(false); setPreviewPrOpen(true); }}>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setPushConfirmOpen(false);
+                  setPreviewPrOpen(true);
+                }}
+              >
                 Preview Without Pushing
               </Button>
-              <Button size="sm" variant="default" disabled={syncing} onClick={() => void handlePushThenPreview()}>
+              <Button
+                size="sm"
+                variant="default"
+                disabled={syncing}
+                onClick={() => void handlePushThenPreview()}
+              >
                 <ArrowUpIcon className="size-3.5" />
                 Push ({aheadBehind.ahead}) &amp; Preview
               </Button>

@@ -42,8 +42,8 @@ export function PinToSectionDialog({
           <DialogTitle>Pin "{repo?.name}" to Section</DialogTitle>
         </DialogHeader>
         <p className="text-xs text-muted-foreground">
-          A repository can be pinned to any number of sections for quick access. It still shows
-          up under its own organization, too.
+          A repository can be pinned to any number of sections for quick access. It still shows up
+          under its own organization, too.
         </p>
         <div className="flex max-h-48 flex-col gap-0.5 overflow-auto">
           {sections.length === 0 && (

@@ -4,11 +4,7 @@ import { useCheckRuns } from "@/hooks/queries/useCheckRuns";
 import { useNetworkStore } from "@/store/useNetworkStore";
 import { CheckRunsRefresh } from "./CheckRunsRefresh";
 import type { CheckRun } from "@/lib/types";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@gitbud/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 
 interface CIBadgeProps {
@@ -32,15 +28,23 @@ export function overallFrom(runs: CheckRun[]): Overall {
 }
 
 export function runIcon(run: CheckRun) {
-  if (run.status !== "completed") return <CircleDashedIcon className="size-3.5 shrink-0 text-accent-yellow" />;
+  if (run.status !== "completed")
+    return <CircleDashedIcon className="size-3.5 shrink-0 text-accent-yellow" />;
   if (run.conclusion && ["success", "neutral", "skipped"].includes(run.conclusion)) {
     return <CheckCircle2Icon className="size-3.5 shrink-0 text-accent-green" />;
   }
   return <XCircleIcon className="size-3.5 shrink-0 text-accent-pink" />;
 }
 
+/** Looks up an open string key against a known-literal lookup table without widening the
+ * table's own declared type — the table stays `satisfies`-checked against its value type, and
+ * only this generic boundary (not the table itself) admits an arbitrary `string` key. */
+function lookup<T>(map: Record<string, T>, key: string, fallback: T): T {
+  return Object.hasOwn(map, key) ? map[key] : fallback;
+}
+
 // GitHub's raw check-run status/conclusion enum values, mapped to human-readable labels.
-const RUN_STATUS_LABEL: Record<string, string> = {
+const RUN_STATUS_LABEL = {
   queued: "Queued",
   in_progress: "In progress",
   waiting: "Waiting",
@@ -55,26 +59,26 @@ const RUN_STATUS_LABEL: Record<string, string> = {
   neutral: "Neutral",
   stale: "Stale",
   startup_failure: "Startup failure",
-};
+} satisfies Record<string, string>;
 
 export function runStatusLabel(run: CheckRun): string {
   const raw = run.status === "completed" ? (run.conclusion ?? run.status) : run.status;
-  return RUN_STATUS_LABEL[raw] ?? raw.replace(/_/g, " ");
+  return lookup(RUN_STATUS_LABEL, raw, raw.replace(/_/g, " "));
 }
 
-const OVERALL_ICON: Record<Overall, typeof CheckCircle2Icon> = {
+const OVERALL_ICON = {
   passing: CheckCircle2Icon,
   failing: XCircleIcon,
   pending: CircleDashedIcon,
   none: CircleDashedIcon,
-};
+} satisfies Record<Overall, typeof CheckCircle2Icon>;
 
-const OVERALL_COLOR: Record<Overall, string> = {
+const OVERALL_COLOR = {
   passing: "text-accent-green",
   failing: "text-accent-pink",
   pending: "text-accent-yellow",
   none: "text-accent-yellow",
-};
+} satisfies Record<Overall, string>;
 
 export function CIBadge({ repoPath, login, sha, pollIntervalMs = null }: CIBadgeProps) {
   const {

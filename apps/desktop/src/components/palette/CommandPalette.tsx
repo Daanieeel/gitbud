@@ -48,7 +48,9 @@ export function CommandPalette({ open, onOpenChange, mode }: CommandPaletteProps
     }
     let cancelled = false;
     const timer = setTimeout(() => {
-      void api.searchCommits(selectedRepo, query.trim(), 15).then((r) => !cancelled && setCommitResults(r));
+      void api
+        .searchCommits(selectedRepo, query.trim(), 15)
+        .then((r) => !cancelled && setCommitResults(r));
     }, 150);
     return () => {
       cancelled = true;
@@ -68,7 +70,16 @@ export function CommandPalette({ open, onOpenChange, mode }: CommandPaletteProps
     for (const r of repos) {
       const score = fuzzyScore(needle, r.name);
       if (score !== null) {
-        scored.push({ score, entry: { kind: "repo", key: `repo:${r.path}`, label: r.name, sublabel: r.group, path: r.path } });
+        scored.push({
+          score,
+          entry: {
+            kind: "repo",
+            key: `repo:${r.path}`,
+            label: r.name,
+            sublabel: r.group,
+            path: r.path,
+          },
+        });
       }
     }
 
@@ -77,14 +88,32 @@ export function CommandPalette({ open, onOpenChange, mode }: CommandPaletteProps
         if (b.is_remote) continue;
         const score = fuzzyScore(needle, b.name);
         if (score !== null) {
-          scored.push({ score, entry: { kind: "branch", key: `branch:${b.name}`, label: b.name, sublabel: "branch", name: b.name } });
+          scored.push({
+            score,
+            entry: {
+              kind: "branch",
+              key: `branch:${b.name}`,
+              label: b.name,
+              sublabel: "branch",
+              name: b.name,
+            },
+          });
         }
       }
 
       for (const f of status?.files ?? []) {
         const score = fuzzyScore(needle, f.path);
         if (score !== null) {
-          scored.push({ score, entry: { kind: "file", key: `file:${f.path}`, label: f.path, sublabel: "changed file", path: f.path } });
+          scored.push({
+            score,
+            entry: {
+              kind: "file",
+              key: `file:${f.path}`,
+              label: f.path,
+              sublabel: "changed file",
+              path: f.path,
+            },
+          });
         }
       }
 
@@ -94,7 +123,13 @@ export function CommandPalette({ open, onOpenChange, mode }: CommandPaletteProps
       for (const c of commitResults) {
         scored.push({
           score: fuzzyScore(needle, c.summary) ?? 0,
-          entry: { kind: "commit", key: `commit:${c.oid}`, label: c.summary, sublabel: `${c.short_oid} · ${c.author_name}`, oid: c.oid },
+          entry: {
+            kind: "commit",
+            key: `commit:${c.oid}`,
+            label: c.summary,
+            sublabel: `${c.short_oid} · ${c.author_name}`,
+            oid: c.oid,
+          },
         });
       }
     }
@@ -140,7 +175,9 @@ export function CommandPalette({ open, onOpenChange, mode }: CommandPaletteProps
       <DialogContent className="max-w-lg gap-0 p-0">
         <Input
           autoFocus
-          placeholder={mode === "repos" ? "Switch repository…" : "Search branches, commits, changed files…"}
+          placeholder={
+            mode === "repos" ? "Switch repository…" : "Search branches, commits, changed files…"
+          }
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {

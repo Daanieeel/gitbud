@@ -9,9 +9,10 @@ export function useBranches(repoPath: string | null) {
   return useQuery({
     queryKey: queryKeys.branches(repoPath ?? ""),
     queryFn: async () => {
+      if (!repoPath) throw new Error("useBranches: query ran while disabled");
       const [branch, branches] = await Promise.all([
-        api.getCurrentBranch(repoPath as string),
-        api.listBranches(repoPath as string),
+        api.getCurrentBranch(repoPath),
+        api.listBranches(repoPath),
       ]);
       return { branch, branches };
     },
@@ -35,7 +36,10 @@ function useInvalidateAfterBranchChange(repoPath: string | null) {
 export function useCheckoutBranch(repoPath: string | null) {
   const invalidate = useInvalidateAfterBranchChange(repoPath);
   return useMutation({
-    mutationFn: (branch: string) => api.checkoutBranch(repoPath as string, branch),
+    mutationFn: (branch: string) => {
+      if (!repoPath) throw new Error("useCheckoutBranch: no repo selected");
+      return api.checkoutBranch(repoPath, branch);
+    },
     onSuccess: invalidate,
   });
 }
@@ -44,8 +48,10 @@ export function useCreateBranch(repoPath: string | null) {
   const invalidate = useInvalidateAfterBranchChange(repoPath);
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ name, checkout }: { name: string; checkout: boolean }) =>
-      api.createBranch(repoPath as string, name, checkout),
+    mutationFn: ({ name, checkout }: { name: string; checkout: boolean }) => {
+      if (!repoPath) throw new Error("useCreateBranch: no repo selected");
+      return api.createBranch(repoPath, name, checkout);
+    },
     onSuccess: (_, { checkout }) => {
       if (checkout) {
         invalidate();
@@ -61,7 +67,8 @@ export function useDeleteBranch(repoPath: string | null) {
   const invalidate = useInvalidateAfterBranchChange(repoPath);
   return useMutation({
     mutationFn: async ({ name, opts }: { name: string; opts?: { deleteRemote?: boolean } }) => {
-      const path = repoPath as string;
+      if (!repoPath) throw new Error("useDeleteBranch: no repo selected");
+      const path = repoPath;
       const current = queryClient.getQueryData<{ branch: string; branches: BranchInfo[] }>(
         queryKeys.branches(path),
       );
@@ -104,7 +111,8 @@ export function useRenameBranch(repoPath: string | null) {
       newName: string;
       alsoRenameRemote?: boolean;
     }) => {
-      const path = repoPath as string;
+      if (!repoPath) throw new Error("useRenameBranch: no repo selected");
+      const path = repoPath;
       try {
         await api.renameBranch(path, oldName, newName);
       } catch (err) {
@@ -122,7 +130,8 @@ export function useRenameBranch(repoPath: string | null) {
         // The push (with -u) already made the new name the upstream at the git level — refresh
         // immediately so the "published"/ahead-behind indicators reflect that right away instead
         // of waiting on the fs-watcher's debounce to notice.
-        if (repoPath) void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(repoPath) });
+        if (repoPath)
+          void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(repoPath) });
       } else {
         toast.success(`Renamed ${oldName} to ${newName}`);
       }
@@ -134,11 +143,11 @@ export function useRenameBranch(repoPath: string | null) {
 export function useMergeBranch(repoPath: string | null) {
   const invalidate = useInvalidateAfterBranchChange(repoPath);
   return useMutation({
-    mutationFn: (branchName: string): Promise<CherryPickResult> => api.mergeBranch(repoPath as string, branchName),
+    mutationFn: (branchName: string): Promise<CherryPickResult> => {
+      if (!repoPath) throw new Error("useMergeBranch: no repo selected");
+      return api.mergeBranch(repoPath, branchName);
+    },
     onSuccess: invalidate,
   });
 }
 
-// Fallback used by callers that don't already have a definite CherryPickResult to hand back
-// (e.g. no repo selected) — mirrors the old store's default return.
-export const EMPTY_CHERRY_PICK_RESULT: CherryPickResult = { conflicted: false, new_oid: null };

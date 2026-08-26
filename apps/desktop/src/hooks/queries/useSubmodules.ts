@@ -5,7 +5,10 @@ import { queryKeys } from "@/lib/queryKeys";
 export function useSubmodules(repoPath: string | null) {
   return useQuery({
     queryKey: queryKeys.submodules(repoPath ?? ""),
-    queryFn: () => api.listSubmodules(repoPath as string),
+    queryFn: () => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.listSubmodules(repoPath);
+    },
     enabled: !!repoPath,
     initialData: [],
   });
@@ -14,9 +17,13 @@ export function useSubmodules(repoPath: string | null) {
 export function useUpdateSubmodule(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (submodulePath: string) => api.updateSubmodule(repoPath as string, submodulePath),
+    mutationFn: (submodulePath: string) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.updateSubmodule(repoPath, submodulePath);
+    },
     onSuccess: () => {
-      if (repoPath) void queryClient.invalidateQueries({ queryKey: queryKeys.submodules(repoPath) });
+      if (repoPath)
+        void queryClient.invalidateQueries({ queryKey: queryKeys.submodules(repoPath) });
     },
   });
 }
@@ -24,9 +31,13 @@ export function useUpdateSubmodule(repoPath: string | null) {
 export function useUpdateAllSubmodules(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: () => api.updateAllSubmodules(repoPath as string),
+    mutationFn: () => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.updateAllSubmodules(repoPath);
+    },
     onSuccess: () => {
-      if (repoPath) void queryClient.invalidateQueries({ queryKey: queryKeys.submodules(repoPath) });
+      if (repoPath)
+        void queryClient.invalidateQueries({ queryKey: queryKeys.submodules(repoPath) });
     },
   });
 }

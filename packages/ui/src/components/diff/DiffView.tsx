@@ -1,6 +1,14 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ColumnsIcon, LinkIcon, MessageSquarePlusIcon, MinusIcon, PlusIcon, RowsIcon, Trash2Icon } from "lucide-react";
+import {
+  ColumnsIcon,
+  LinkIcon,
+  MessageSquarePlusIcon,
+  MinusIcon,
+  PlusIcon,
+  RowsIcon,
+  Trash2Icon,
+} from "lucide-react";
 import type { DiffHunk, DiffLine, FileDiff, ImageDiff, LineKind, ReviewComment } from "./types";
 import { cn } from "../../lib/utils";
 import { ImageDiffView } from "./ImageDiffView";
@@ -10,7 +18,12 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Avatar } from "../ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip";
 import { useDiffSettings } from "../../lib/diff-settings";
-import { applyHighlightRanges, ensureLanguageLoaded, highlightLine, languageForPath } from "../../lib/highlight";
+import {
+  applyHighlightRanges,
+  ensureLanguageLoaded,
+  highlightLine,
+  languageForPath,
+} from "../../lib/highlight";
 
 interface HunkActions {
   /** Whether the diff being shown is the staged (HEAD->index) or unstaged (index->workdir) side. */
@@ -43,11 +56,11 @@ interface DiffViewProps {
   secondaryHunkActions?: HunkActions;
 }
 
-const LINE_PREFIX: Record<LineKind, string> = {
+const LINE_PREFIX = {
   addition: "+",
   deletion: "-",
   context: " ",
-};
+} satisfies Record<LineKind, string>;
 
 /** Syntax-highlights a line, then overlays its intraline diff ranges (if any) on top so both
  * render together. */
@@ -152,13 +165,7 @@ function HunkHeader({ hunk, staged }: { hunk: DiffHunk; staged?: boolean }) {
  * scroll-transformed box, not the tall span a real vertical sticky needs to have room to stick
  * within. Horizontal stickiness (staying pinned to the right edge on a long, unwrapped line) is
  * unaffected by that and stays. */
-function HunkActionsRow({
-  hunkIdx,
-  hunkActions,
-}: {
-  hunkIdx: number;
-  hunkActions?: HunkActions;
-}) {
+function HunkActionsRow({ hunkIdx, hunkActions }: { hunkIdx: number; hunkActions?: HunkActions }) {
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   if (!hunkActions) return null;
   return (
@@ -177,9 +184,7 @@ function HunkActionsRow({
                     Unstage
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  Unstage just this chunk
-                </TooltipContent>
+                <TooltipContent>Unstage just this chunk</TooltipContent>
               </Tooltip>
             )
           : hunkActions.onStage && (
@@ -194,9 +199,7 @@ function HunkActionsRow({
                     Stage
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>
-                  Stage just this chunk
-                </TooltipContent>
+                <TooltipContent>Stage just this chunk</TooltipContent>
               </Tooltip>
             )}
         {!hunkActions.staged && hunkActions.onDiscard && (
@@ -265,7 +268,8 @@ function UnifiedLine({
 }) {
   const key = `${hunkIdx}:${lineIdx}`;
   const lineComments = commentsForLine(comments, line.old_lineno, line.new_lineno);
-  const canComment = Boolean(onAddComment) && line.new_lineno != null;
+  const newLineno = line.new_lineno;
+  const canComment = Boolean(onAddComment) && newLineno != null;
   return (
     <div>
       <div
@@ -293,9 +297,7 @@ function UnifiedLine({
         >
           {LINE_PREFIX[line.kind]}
         </span>
-        <span
-          dangerouslySetInnerHTML={{ __html: renderLineHtml(line, language) }}
-        />
+        <span dangerouslySetInnerHTML={{ __html: renderLineHtml(line, language) }} />
         {(onCopyPermalink || canComment || (line.kind !== "context" && hunkActions)) && (
           // One sticky group for every trailing action, pinned to the right edge of the
           // scrollport — a whitespace-pre line can be far wider than the viewport, so without
@@ -308,6 +310,8 @@ function UnifiedLine({
                 <TooltipTrigger asChild>
                   <button
                     className="text-muted-foreground hover:text-foreground"
+                    // SAFETY: this button only renders when `line.new_lineno != null` (see the
+                    // guard around this block above).
                     onClick={() => onCopyPermalink(line.new_lineno as number)}
                   >
                     <LinkIcon className="size-3.5" />
@@ -380,6 +384,8 @@ function UnifiedLine({
       {composerKey === key && onAddComment && (
         <AddCommentComposer
           onCancel={() => setComposerKey(null)}
+          // SAFETY: this composer only renders when `canComment` is true, which requires
+          // `line.new_lineno != null` (see its definition above).
           onSubmit={(body) => onAddComment(line.new_lineno as number, "RIGHT", body)}
         />
       )}
@@ -455,7 +461,8 @@ function buildDiffRows(hunks: DiffHunk[], mode: "unified" | "split"): DiffRow[] 
     rows.push({ kind: "header", hunkIdx });
     rows.push({ kind: "actions", hunkIdx });
     if (mode === "split") {
-      for (const { left, right } of toSplitRows(hunk)) rows.push({ kind: "split", hunkIdx, left, right });
+      for (const { left, right } of toSplitRows(hunk))
+        rows.push({ kind: "split", hunkIdx, left, right });
     } else {
       hunk.lines.forEach((_, lineIdx) => rows.push({ kind: "line", hunkIdx, lineIdx }));
     }
@@ -551,7 +558,10 @@ function DiffSection({
   scrollElementRef,
 }: DiffSectionProps) {
   const rows = useMemo(() => buildDiffRows(diff.hunks, diffViewMode), [diff, diffViewMode]);
-  const width = useMemo(() => contentWidthPx(diff.hunks, diffViewMode, fontSize), [diff, diffViewMode, fontSize]);
+  const width = useMemo(
+    () => contentWidthPx(diff.hunks, diffViewMode, fontSize),
+    [diff, diffViewMode, fontSize],
+  );
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollElementRef.current,
@@ -579,9 +589,17 @@ function DiffSection({
               key={vi.key}
               ref={virtualizer.measureElement}
               data-index={vi.index}
-              style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start}px)` }}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${vi.start}px)`,
+              }}
             >
-              {row.kind === "header" && <HunkHeader hunk={diff.hunks[row.hunkIdx]} staged={staged} />}
+              {row.kind === "header" && (
+                <HunkHeader hunk={diff.hunks[row.hunkIdx]} staged={staged} />
+              )}
               {row.kind === "actions" && (
                 <div className={tint}>
                   <HunkActionsRow hunkIdx={row.hunkIdx} hunkActions={hunkActions} />
@@ -648,10 +666,16 @@ function DiffViewImpl({
           className="text-muted-foreground hover:text-foreground"
           onClick={() => setDiffViewMode(diffViewMode === "split" ? "unified" : "split")}
         >
-          {diffViewMode === "split" ? <RowsIcon className="size-3.5" /> : <ColumnsIcon className="size-3.5" />}
+          {diffViewMode === "split" ? (
+            <RowsIcon className="size-3.5" />
+          ) : (
+            <ColumnsIcon className="size-3.5" />
+          )}
         </button>
       </TooltipTrigger>
-      <TooltipContent>{diffViewMode === "split" ? "Switch to unified view" : "Switch to split view"}</TooltipContent>
+      <TooltipContent>
+        {diffViewMode === "split" ? "Switch to unified view" : "Switch to split view"}
+      </TooltipContent>
     </Tooltip>
   );
 
@@ -695,7 +719,11 @@ function DiffViewImpl({
   }
 
   return (
-    <div ref={scrollRef} className="h-full overflow-auto font-mono" style={{ fontSize: `${fontSize}px` }}>
+    <div
+      ref={scrollRef}
+      className="h-full overflow-auto font-mono"
+      style={{ fontSize: `${fontSize}px` }}
+    >
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-3 py-1.5 text-xs font-medium">
         <span>{diff.path}</span>
         {ViewToggle}
@@ -706,7 +734,13 @@ function DiffViewImpl({
           hunkActions={hunkActions}
           language={language}
           diffViewMode={diffViewMode}
-          label={showSecondary ? (hunkActions?.staged ? "Staged changes" : "Unstaged changes") : undefined}
+          label={
+            showSecondary
+              ? hunkActions?.staged
+                ? "Staged changes"
+                : "Unstaged changes"
+              : undefined
+          }
           comments={comments}
           onAddComment={onAddComment}
           onCopyPermalink={onCopyPermalink}

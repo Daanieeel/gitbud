@@ -85,7 +85,11 @@ export function BranchPruner() {
               className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
               onClick={() => toggle(b.name)}
             >
-              <Checkbox checked={selected.has(b.name)} onClick={(e) => e.stopPropagation()} onCheckedChange={() => toggle(b.name)} />
+              <Checkbox
+                checked={selected.has(b.name)}
+                onClick={(e) => e.stopPropagation()}
+                onCheckedChange={() => toggle(b.name)}
+              />
               <span className="truncate">{b.name}</span>
             </div>
           ))}
@@ -99,7 +103,9 @@ export function BranchPruner() {
             onClick={() => void pruneSelected()}
           >
             <Trash2Icon className="size-3.5" />
-            {pruning ? "Pruning…" : `Prune ${selected.size || ""} Local Branch${selected.size === 1 ? "" : "es"}`}
+            {pruning
+              ? "Pruning…"
+              : `Prune ${selected.size || ""} Local Branch${selected.size === 1 ? "" : "es"}`}
           </Button>
         </div>
       </PopoverContent>

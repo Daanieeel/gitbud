@@ -4,11 +4,11 @@ import { queryKeys } from "@/lib/queryKeys";
 import type { Workspace } from "@/lib/types";
 
 export function useWorkspaces() {
-  return useQuery({
+  return useQuery<Workspace[]>({
     queryKey: queryKeys.workspaces,
     queryFn: () => api.listWorkspaces(),
     staleTime: 60_000,
-    initialData: [] as Workspace[],
+    initialData: [],
   });
 }
 

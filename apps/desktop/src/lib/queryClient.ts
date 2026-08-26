@@ -9,24 +9,24 @@ import type { CacheLevel } from "@/lib/types";
 // GitHub PR data (pr_cache.rs) and that data's own deliberate eviction on leaving a PR/tab/repo
 // (PRTab.tsx) are both a deliberate, separate, non-configurable cache layer, untouched by this
 // setting at every level including "none".
-export const GC_TIME_BY_CACHE_LEVEL: Record<CacheLevel, number> = {
+export const GC_TIME_BY_CACHE_LEVEL = {
   none: 0,
   minimal: 5_000,
   balanced: 30_000,
   relaxed: 120_000,
-};
+} satisfies Record<CacheLevel, number>;
 
 // staleTime governs a second, independent form of caching: whether data already in the cache is
 // served as-is (no refetch) or treated as stale. At every other level this stays fixed regardless
 // of gcTime (see below) — but "none" needs to mean *zero* caching, not just fast eviction once
 // unobserved, so it's the one level where staleTime also collapses to 0: every mount/refocus/
 // reconnect is treated as needing a genuinely fresh fetch, never served straight from cache.
-const STALE_TIME_BY_CACHE_LEVEL: Record<CacheLevel, number> = {
+const STALE_TIME_BY_CACHE_LEVEL = {
   none: 0,
   minimal: 30_000,
   balanced: 30_000,
   relaxed: 30_000,
-};
+} satisfies Record<CacheLevel, number>;
 
 // Desktop app, single window, backend reachable over IPC (not HTTP) for anything but GitHub
 // calls — most queries have nothing to gain from window-refocus/interval refetching, and
@@ -62,8 +62,8 @@ function buildDefaultOptions(cacheLevel: CacheLevel) {
     },
     mutations: {
       networkMode: "always" as const,
-      onError: (err: unknown) => {
-        useNetworkStore.getState().noteError(String(err));
+      onError: (cause: unknown) => {
+        useNetworkStore.getState().noteError(String(cause));
       },
     },
   };

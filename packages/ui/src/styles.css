@@ -160,7 +160,10 @@
 /* Subtle dot-grid texture for large empty-state areas, so they read as intentional
  * negative space rather than a blank/broken panel. Uses --border, no new colors. */
 .bg-dot-grid {
-  background-image: radial-gradient(color-mix(in srgb, var(--border) 70%, transparent) 1px, transparent 1px);
+  background-image: radial-gradient(
+    color-mix(in srgb, var(--border) 70%, transparent) 1px,
+    transparent 1px
+  );
   background-size: 16px 16px;
 }
 

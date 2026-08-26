@@ -1,4 +1,10 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+} from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
@@ -10,21 +16,28 @@ import type { BranchInfo, PullRequest, PullRequestFile, ReviewComment } from "@/
 
 const PR_PAGE_SIZE = 50;
 
-export function usePullRequestList(repoPath: string | null, login: string | null, filter: PRFilter) {
+export function usePullRequestList(
+  repoPath: string | null,
+  login: string | null,
+  filter: PRFilter,
+) {
   const queryClient = useQueryClient();
   const query = useInfiniteQuery({
     queryKey: queryKeys.prList(repoPath ?? "", login ?? "", filter),
     queryFn: async ({ pageParam }) => {
+      if (!repoPath || !login) throw new Error("usePullRequestList: query ran while disabled");
       // Seed the first page from the local mirror for an instant paint (no spinner) while the
       // live fetch below is still in flight, replaced once that resolves. A failure reading the
       // mirror must never block attempting the live fetch below (e.g. this is what shows PRs at
       // all while offline, for a repo/PR that WAS viewed online before).
-      if (pageParam === 1 && repoPath) {
+      if (pageParam === 1) {
         try {
           const cached = await api.getCachedPullRequests(repoPath, filter);
           if (cached.length > 0) {
-            queryClient.setQueryData(queryKeys.prList(repoPath, login ?? "", filter), (old: unknown) =>
-              old ?? { pages: [cached], pageParams: [1] },
+            queryClient.setQueryData(
+              queryKeys.prList(repoPath, login, filter),
+              (old: InfiniteData<PullRequest[], number> | undefined) =>
+                old ?? { pages: [cached], pageParams: [1] },
             );
           }
         } catch {
@@ -39,19 +52,20 @@ export function usePullRequestList(repoPath: string | null, login: string | null
         throw new Error("Skipping GitHub request: already offline.");
       }
       try {
-        const pulls = await api.githubListPullRequests(repoPath as string, login as string, filter, pageParam);
+        const pulls = await api.githubListPullRequests(repoPath, login, filter, pageParam);
         useNetworkStore.getState().noteSuccess();
         useGitHubStore.getState().setBrokenLogin(null);
         return pulls;
       } catch (err) {
         const message = String(err);
         useNetworkStore.getState().noteError(message);
-        if (isBrokenTokenError(message)) useGitHubStore.getState().setBrokenLogin(login as string);
+        if (isBrokenTokenError(message)) useGitHubStore.getState().setBrokenLogin(login);
         throw err;
       }
     },
     initialPageParam: 1,
-    getNextPageParam: (lastPage, allPages) => (lastPage.length === PR_PAGE_SIZE ? allPages.length + 1 : undefined),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.length === PR_PAGE_SIZE ? allPages.length + 1 : undefined,
     enabled: !!repoPath && !!login,
     // Not `false`: right as connectivity comes back (e.g. the `online` event firing before DNS
     // is actually usable again), the first refetch attempt can still fail — one retry with the
@@ -78,20 +92,23 @@ export function usePullRequestDetail(
   return useQuery({
     queryKey: queryKeys.prDetail(repoPath ?? "", login ?? "", number ?? -1),
     queryFn: async (): Promise<PullRequestDetail> => {
+      if (!repoPath || !login || number === null)
+        throw new Error("usePullRequestDetail: query ran while disabled");
       // Seed from the local mirror for an instant paint (whatever's cached, even if stale) while
       // the live fetch below (which itself skips re-fetching/re-parsing files when `headSha`
       // still matches what's cached) is in flight. A failure reading the mirror must never
       // block attempting the live fetch below (e.g. this is what shows a PR's files at all while
       // offline, for one that WAS viewed online before).
-      if (repoPath && number !== null) {
-        try {
-          const cached = await api.getCachedPullRequestDetail(repoPath, number);
-          if (cached) {
-            queryClient.setQueryData(queryKeys.prDetail(repoPath, login ?? "", number), (old: unknown) => old ?? cached);
-          }
-        } catch {
-          // Local mirror unavailable, fall through to the live fetch below.
+      try {
+        const cached = await api.getCachedPullRequestDetail(repoPath, number);
+        if (cached) {
+          queryClient.setQueryData(
+            queryKeys.prDetail(repoPath, login, number),
+            (old: PullRequestDetail | undefined) => old ?? cached,
+          );
         }
+      } catch {
+        // Local mirror unavailable, fall through to the live fetch below.
       }
       // Same centralized offline check as usePullRequestList (useNetworkStore) — skip straight
       // to the error path instead of re-firing network calls that are just going to hang out to
@@ -101,8 +118,8 @@ export function usePullRequestDetail(
       }
       try {
         const [files, comments] = await Promise.all([
-          api.githubListPullRequestFiles(repoPath as string, login as string, number as number, headSha ?? ""),
-          api.githubListReviewComments(repoPath as string, login as string, number as number),
+          api.githubListPullRequestFiles(repoPath, login, number, headSha ?? ""),
+          api.githubListReviewComments(repoPath, login, number),
         ]);
         useNetworkStore.getState().noteSuccess();
         return { files, comments };
@@ -137,22 +154,26 @@ export function useCreatePullRequest(repoPath: string | null, login: string | nu
       assignees: string[];
       reviewers: string[];
     }) => {
-      const pr = await api.githubCreatePullRequest(repoPath as string, login as string, title, head, base, body, draft);
+      if (!repoPath || !login) throw new Error("useCreatePullRequest: repoPath/login not set");
+      const pr = await api.githubCreatePullRequest(repoPath, login, title, head, base, body, draft);
       // Labels/assignees/reviewers can only be attached once the PR (and its number) exists —
       // skip calls with nothing selected rather than sending pointless empty-array requests.
       await Promise.all([
-        labels.length > 0 ? api.githubAddLabels(repoPath as string, login as string, pr.number, labels) : Promise.resolve(),
+        labels.length > 0
+          ? api.githubAddLabels(repoPath, login, pr.number, labels)
+          : Promise.resolve(),
         assignees.length > 0
-          ? api.githubAddAssignees(repoPath as string, login as string, pr.number, assignees)
+          ? api.githubAddAssignees(repoPath, login, pr.number, assignees)
           : Promise.resolve(),
         reviewers.length > 0
-          ? api.githubRequestReviewers(repoPath as string, login as string, pr.number, reviewers)
+          ? api.githubRequestReviewers(repoPath, login, pr.number, reviewers)
           : Promise.resolve(),
       ]);
       return pr;
     },
     onSuccess: () => {
-      if (repoPath && login) void queryClient.invalidateQueries({ queryKey: ["pr-list", repoPath, login] });
+      if (repoPath && login)
+        void queryClient.invalidateQueries({ queryKey: ["pr-list", repoPath, login] });
     },
   });
 }
@@ -179,10 +200,10 @@ export function useMergePullRequest(repoPath: string | null, login: string | nul
       headRef: string;
       baseRef: string;
     }) => {
-      const path = repoPath as string;
+      if (!repoPath || !login) throw new Error("useMergePullRequest: repoPath/login not set");
       await api.githubMergePullRequest(
-        path,
-        login as string,
+        repoPath,
+        login,
         number,
         method,
         commitTitle.trim() || null,
@@ -191,7 +212,7 @@ export function useMergePullRequest(repoPath: string | null, login: string | nul
       );
       if (deleteBranch) {
         try {
-          await api.githubDeleteRemoteBranch(path, login as string, headRef);
+          await api.githubDeleteRemoteBranch(repoPath, login, headRef);
         } catch (err) {
           toast.error(String(err));
         }
@@ -200,28 +221,33 @@ export function useMergePullRequest(repoPath: string | null, login: string | nul
         // switching to the PR's base branch first (falling back to any other local branch if the
         // base isn't checked out locally either), mirroring useDeleteBranch's fallback logic.
         const cached = queryClient.getQueryData<{ branch: string | null; branches: BranchInfo[] }>(
-          queryKeys.branches(path),
+          queryKeys.branches(repoPath),
         );
         if (cached?.branch === headRef) {
           const fallback =
             cached.branches.find((b) => !b.is_remote && b.name === baseRef) ??
             cached.branches.find((b) => !b.is_remote && b.name !== headRef);
-          if (fallback) await api.checkoutBranch(path, fallback.name).catch(() => {});
+          if (fallback) await api.checkoutBranch(repoPath, fallback.name).catch(() => {});
         }
-        await api.deleteBranch(path, headRef).catch(() => {});
-        void queryClient.invalidateQueries({ queryKey: queryKeys.branches(path) });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.status(path) });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.log(path) });
+        await api.deleteBranch(repoPath, headRef).catch(() => {});
+        void queryClient.invalidateQueries({ queryKey: queryKeys.branches(repoPath) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.log(repoPath) });
         void useRepoStore.getState().loadRepos();
       }
     },
     onSuccess: () => {
-      if (repoPath && login) void queryClient.invalidateQueries({ queryKey: ["pr-list", repoPath, login] });
+      if (repoPath && login)
+        void queryClient.invalidateQueries({ queryKey: ["pr-list", repoPath, login] });
     },
   });
 }
 
-export function useAddReviewComment(repoPath: string | null, login: string | null, number: number | null) {
+export function useAddReviewComment(
+  repoPath: string | null,
+  login: string | null,
+  number: number | null,
+) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({
@@ -236,8 +262,20 @@ export function useAddReviewComment(repoPath: string | null, login: string | nul
       line: number;
       side: "LEFT" | "RIGHT";
       body: string;
-    }) =>
-      api.githubCreateReviewComment(repoPath as string, login as string, number as number, commitId, path, line, side, body),
+    }) => {
+      if (!repoPath || !login || number === null)
+        throw new Error("useAddReviewComment: repoPath/login/number not set");
+      return api.githubCreateReviewComment(
+        repoPath,
+        login,
+        number,
+        commitId,
+        path,
+        line,
+        side,
+        body,
+      );
+    },
     onSuccess: (comment) => {
       if (!repoPath || !login || number === null) return;
       queryClient.setQueryData<PullRequestDetail | undefined>(

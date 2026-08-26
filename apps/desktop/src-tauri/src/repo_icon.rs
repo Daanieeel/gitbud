@@ -69,9 +69,13 @@ fn scan_dir(dir: &Path) -> (Option<(u8, PathBuf)>, Vec<PathBuf>) {
     let mut best: Option<(u8, PathBuf)> = None;
     let mut subdirs = Vec::new();
 
-    let Ok(entries) = std::fs::read_dir(dir) else { return (None, subdirs) };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return (None, subdirs);
+    };
     for entry in entries.flatten() {
-        let Ok(file_type) = entry.file_type() else { continue };
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
         let name = entry.file_name();
         let name = name.to_string_lossy();
 
@@ -82,11 +86,18 @@ fn scan_dir(dir: &Path) -> (Option<(u8, PathBuf)>, Vec<PathBuf>) {
             continue;
         }
 
-        let Some(rank) = priority(&name) else { continue };
-        if best.as_ref().is_some_and(|(best_rank, _)| rank >= *best_rank) {
+        let Some(rank) = priority(&name) else {
+            continue;
+        };
+        if best
+            .as_ref()
+            .is_some_and(|(best_rank, _)| rank >= *best_rank)
+        {
             continue;
         }
-        let Ok(metadata) = entry.metadata() else { continue };
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
         if metadata.len() == 0 || metadata.len() > MAX_ICON_BYTES {
             continue;
         }
@@ -134,7 +145,11 @@ pub fn get_repo_icon(repo_path: &str) -> Option<String> {
         if let Some((_, path)) = best {
             let bytes = std::fs::read(&path).ok()?;
             let filename = path.file_name()?.to_str()?;
-            return Some(format!("data:{};base64,{}", mime_for(filename), STANDARD.encode(bytes)));
+            return Some(format!(
+                "data:{};base64,{}",
+                mime_for(filename),
+                STANDARD.encode(bytes)
+            ));
         }
         current_level = next_level;
     }
@@ -146,7 +161,10 @@ mod tests {
     use super::*;
 
     fn temp_dir(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("gitbud-repo-icon-test-{name}-{:?}", std::thread::current().id()));
+        let dir = std::env::temp_dir().join(format!(
+            "gitbud-repo-icon-test-{name}-{:?}",
+            std::thread::current().id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         dir
@@ -158,7 +176,13 @@ mod tests {
         std::fs::write(dir.join("favicon.ico"), b"fake-ico-bytes").unwrap();
 
         let icon = get_repo_icon(dir.to_str().unwrap());
-        assert_eq!(icon, Some(format!("data:image/x-icon;base64,{}", STANDARD.encode(b"fake-ico-bytes"))));
+        assert_eq!(
+            icon,
+            Some(format!(
+                "data:image/x-icon;base64,{}",
+                STANDARD.encode(b"fake-ico-bytes")
+            ))
+        );
 
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -171,7 +195,13 @@ mod tests {
         std::fs::write(nested.join("favicon.ico"), b"nested-ico").unwrap();
 
         let icon = get_repo_icon(dir.to_str().unwrap());
-        assert_eq!(icon, Some(format!("data:image/x-icon;base64,{}", STANDARD.encode(b"nested-ico"))));
+        assert_eq!(
+            icon,
+            Some(format!(
+                "data:image/x-icon;base64,{}",
+                STANDARD.encode(b"nested-ico")
+            ))
+        );
 
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -197,7 +227,10 @@ mod tests {
         std::fs::write(nested.join("favicon.svg"), b"<svg/>").unwrap();
 
         let icon = get_repo_icon(dir.to_str().unwrap()).unwrap();
-        assert_eq!(icon, format!("data:image/x-icon;base64,{}", STANDARD.encode(b"root-ico")));
+        assert_eq!(
+            icon,
+            format!("data:image/x-icon;base64,{}", STANDARD.encode(b"root-ico"))
+        );
 
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -224,7 +257,11 @@ mod tests {
     #[test]
     fn skips_oversized_file() {
         let dir = temp_dir("big");
-        std::fs::write(dir.join("favicon.ico"), vec![0u8; (MAX_ICON_BYTES + 1) as usize]).unwrap();
+        std::fs::write(
+            dir.join("favicon.ico"),
+            vec![0u8; (MAX_ICON_BYTES + 1) as usize],
+        )
+        .unwrap();
         assert_eq!(get_repo_icon(dir.to_str().unwrap()), None);
         std::fs::remove_dir_all(&dir).unwrap();
     }

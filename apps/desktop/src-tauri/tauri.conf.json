@@ -4,7 +4,7 @@
   "version": "0.2.3",
   "identifier": "com.gitbud.app",
   "build": {
-    "beforeDevCommand": "bun run dev",
+    "beforeDevCommand": "bun run vite",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "bun run build",
     "frontendDist": "../dist"
@@ -42,9 +42,7 @@
   "plugins": {
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENGOTc1NjNEOEMyRTA0QzEKUldUQkJDNk1QVmFYejlsV2lTWmRpY3RXQzFXd3lnelcyWUpTYi8xdUhXY2tiNlQ5K3VqeXJGdHgK",
-      "endpoints": [
-        "https://github.com/Daanieeel/gitbud/releases/latest/download/latest.json"
-      ]
+      "endpoints": ["https://github.com/Daanieeel/gitbud/releases/latest/download/latest.json"]
     }
   }
 }

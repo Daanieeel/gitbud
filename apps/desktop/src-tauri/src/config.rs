@@ -45,12 +45,17 @@ fn repos_file() -> Result<PathBuf, String> {
 fn migrate_legacy_section(mut value: serde_json::Value) -> serde_json::Value {
     if let Some(repos) = value.get_mut("repos").and_then(|r| r.as_array_mut()) {
         for repo in repos {
-            let Some(obj) = repo.as_object_mut() else { continue };
+            let Some(obj) = repo.as_object_mut() else {
+                continue;
+            };
             let has_sections = obj.get("sections").is_some_and(|s| s.is_array());
             if has_sections {
                 continue;
             }
-            if let Some(section) = obj.remove("section").and_then(|s| s.as_str().map(str::to_string)) {
+            if let Some(section) = obj
+                .remove("section")
+                .and_then(|s| s.as_str().map(str::to_string))
+            {
                 obj.insert("sections".to_string(), serde_json::json!([section]));
             }
         }
@@ -94,10 +99,9 @@ fn parse_remote(url: &str) -> Option<(String, String, String)> {
         let after_scheme = &trimmed[idx + 3..];
         let mut parts = after_scheme.splitn(2, '/');
         (parts.next()?, parts.next()?)
-    } else if let Some(idx) = trimmed.find(':') {
-        (&trimmed[..idx], &trimmed[idx + 1..])
     } else {
-        return None;
+        let idx = trimmed.find(':')?;
+        (&trimmed[..idx], &trimmed[idx + 1..])
     };
     let host = clean_host(host_raw);
 
@@ -228,7 +232,10 @@ pub fn rename_section(old: &str, new: &str) -> Result<Vec<RepoEntry>, String> {
     Ok(repos)
 }
 
-pub fn set_repo_identity(path: &str, identity_id: Option<String>) -> Result<Vec<RepoEntry>, String> {
+pub fn set_repo_identity(
+    path: &str,
+    identity_id: Option<String>,
+) -> Result<Vec<RepoEntry>, String> {
     let mut repos = load_repos()?;
     if let Some(entry) = repos.iter_mut().find(|r| r.path == path) {
         entry.identity_id = identity_id.filter(|s| !s.trim().is_empty());
@@ -274,7 +281,11 @@ mod tests {
     fn parse_remote_ssh_form_captures_host() {
         assert_eq!(
             parse_remote("git@github.com:owner/repo.git"),
-            Some(("github.com".to_string(), "owner".to_string(), "repo".to_string()))
+            Some((
+                "github.com".to_string(),
+                "owner".to_string(),
+                "repo".to_string()
+            ))
         );
     }
 
@@ -282,7 +293,11 @@ mod tests {
     fn parse_remote_https_form_captures_host() {
         assert_eq!(
             parse_remote("https://gitlab.com/owner/repo.git"),
-            Some(("gitlab.com".to_string(), "owner".to_string(), "repo".to_string()))
+            Some((
+                "gitlab.com".to_string(),
+                "owner".to_string(),
+                "repo".to_string()
+            ))
         );
     }
 
@@ -290,7 +305,11 @@ mod tests {
     fn parse_remote_ssh_scheme_with_port_strips_user_and_port() {
         assert_eq!(
             parse_remote("ssh://git@example.com:2222/owner/repo.git"),
-            Some(("example.com".to_string(), "owner".to_string(), "repo".to_string()))
+            Some((
+                "example.com".to_string(),
+                "owner".to_string(),
+                "repo".to_string()
+            ))
         );
     }
 

@@ -80,8 +80,8 @@ export function WorkspaceDialog({ open, onOpenChange }: WorkspaceDialogProps) {
         <DialogHeader>
           <DialogTitle>Workspaces</DialogTitle>
           <DialogDescription>
-            Named groups of repos you can filter the sidebar to and batch-sync together,
-            independent of the auto-derived owner grouping or sidebar sections.
+            Named groups of repos you can filter the sidebar to and batch-sync together, independent
+            of the auto-derived owner grouping or sidebar sections.
           </DialogDescription>
         </DialogHeader>
         <div className="flex min-h-72 gap-4">

@@ -40,7 +40,10 @@ function formatGitError(message: string): string {
     return "Couldn't reach GitHub, check your internet connection.";
   }
   // Otherwise just collapse exact-duplicate lines, in case git repeated one for some other reason.
-  const lines = message.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  const lines = message
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
   return [...new Set(lines)].join("\n");
 }
 
@@ -78,16 +81,26 @@ export async function runGitSync(
   // our own Cancel action and looks like the obvious way to cancel, but it only dismisses the
   // toast client-side without calling cancelAction.onClick, leaving the caller's pending state
   // stuck forever.
-  toast.loading(label, { id: eventId, description: undefined, cancel: cancelAction, closeButton: false });
+  toast.loading(label, {
+    id: eventId,
+    description: undefined,
+    cancel: cancelAction,
+    closeButton: false,
+  });
 
   let unlisten: (() => void) | undefined;
   try {
     unlisten = await listen<GitOutputLine>(eventChannel(eventId), (event) => {
-      toast.loading(label, { id: eventId, description: event.payload.line, cancel: cancelAction, closeButton: false });
+      toast.loading(label, {
+        id: eventId,
+        description: event.payload.line,
+        cancel: cancelAction,
+        closeButton: false,
+      });
     });
     const settled = action().then(
       () => ({ ok: true as const }),
-      (err: unknown) => ({ ok: false as const, error: String(err) }),
+      (cause: unknown) => ({ ok: false as const, error: String(cause) }),
     );
     const timedOut = new Promise<"timeout">((resolve) => {
       setTimeout(() => resolve("timeout"), SYNC_TIMEOUT_MS);

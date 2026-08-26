@@ -9,7 +9,10 @@ import { queryKeys } from "@/lib/queryKeys";
 export function useRepoIcon(repoPath: string | null | undefined) {
   const { data } = useQuery({
     queryKey: queryKeys.repoIcon(repoPath ?? ""),
-    queryFn: () => api.getRepoIcon(repoPath as string),
+    queryFn: () => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.getRepoIcon(repoPath);
+    },
     enabled: !!repoPath,
     staleTime: Infinity,
     gcTime: Infinity,

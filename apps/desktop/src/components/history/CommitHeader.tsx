@@ -77,7 +77,11 @@ export function CommitHeader({ repoPath, oid }: CommitHeaderProps) {
           className="flex items-center gap-1 font-mono hover:text-foreground"
         >
           {detail.short_oid}
-          {copied ? <CheckIcon className="size-3 text-green-500" /> : <CopyIcon className="size-3" />}
+          {copied ? (
+            <CheckIcon className="size-3 text-green-500" />
+          ) : (
+            <CopyIcon className="size-3" />
+          )}
         </button>
         <span className="text-accent-green">+{detail.insertions}</span>
         <span className="text-accent-pink">-{detail.deletions}</span>

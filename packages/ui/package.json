@@ -1,11 +1,8 @@
 {
   "name": "@gitbud/ui",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
-  "scripts": {
-    "check": "tsc --noEmit"
-  },
   "exports": {
     "./avatar": "./src/components/ui/avatar.tsx",
     "./badge": "./src/components/ui/badge.tsx",
@@ -30,6 +27,9 @@
     "./diff-settings": "./src/lib/diff-settings.tsx",
     "./styles.css": "./src/styles.css"
   },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
   "dependencies": {
     "@radix-ui/react-checkbox": "catalog:",
     "@radix-ui/react-context-menu": "catalog:",
@@ -44,10 +44,10 @@
     "clsx": "catalog:",
     "highlight.js": "catalog:",
     "lucide-react": "catalog:",
-    "sonner": "catalog:",
-    "tailwind-merge": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "sonner": "catalog:",
+    "tailwind-merge": "catalog:"
   },
   "devDependencies": {
     "@gitbud/config": "workspace:*",

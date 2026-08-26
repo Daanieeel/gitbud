@@ -64,7 +64,11 @@ pub fn get_client_id() -> Result<Option<String>, String> {
     }
     let contents = fs::read_to_string(&file).map_err(|e| e.to_string())?;
     let trimmed = contents.trim().to_string();
-    Ok(Some(if trimmed.is_empty() { DEFAULT_CLIENT_ID.to_string() } else { trimmed }))
+    Ok(Some(if trimmed.is_empty() {
+        DEFAULT_CLIENT_ID.to_string()
+    } else {
+        trimmed
+    }))
 }
 
 pub fn set_client_id(client_id: &str) -> Result<(), String> {
@@ -83,11 +87,18 @@ pub fn get_host() -> Result<String, String> {
     }
     let contents = fs::read_to_string(&file).map_err(|e| e.to_string())?;
     let trimmed = contents.trim().to_string();
-    Ok(if trimmed.is_empty() { "github.com".to_string() } else { trimmed })
+    Ok(if trimmed.is_empty() {
+        "github.com".to_string()
+    } else {
+        trimmed
+    })
 }
 
 pub fn set_host(host: &str) -> Result<(), String> {
-    let trimmed = host.trim().trim_start_matches("https://").trim_start_matches("http://");
+    let trimmed = host
+        .trim()
+        .trim_start_matches("https://")
+        .trim_start_matches("http://");
     fs::write(host_file()?, trimmed).map_err(|e| e.to_string())
 }
 
@@ -233,9 +244,14 @@ pub async fn start_device_flow(host: &str, client_id: &str) -> Result<DeviceCode
         .map_err(|e| e.to_string())?;
 
     if !res.status().is_success() {
-        return Err(format!("GitHub device code request failed: {}", res.status()));
+        return Err(format!(
+            "GitHub device code request failed: {}",
+            res.status()
+        ));
     }
-    res.json::<DeviceCodeResponse>().await.map_err(|e| e.to_string())
+    res.json::<DeviceCodeResponse>()
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Deserialize)]
@@ -302,7 +318,10 @@ mod tests {
 
     #[test]
     fn api_base_uses_enterprise_v3_path() {
-        assert_eq!(api_base("git.company.com"), "https://git.company.com/api/v3");
+        assert_eq!(
+            api_base("git.company.com"),
+            "https://git.company.com/api/v3"
+        );
     }
 
     #[test]
@@ -318,7 +337,9 @@ mod tests {
 
     #[test]
     fn graphql_base_uses_enterprise_path() {
-        assert_eq!(graphql_base("git.company.com"), "https://git.company.com/api/graphql");
+        assert_eq!(
+            graphql_base("git.company.com"),
+            "https://git.company.com/api/graphql"
+        );
     }
 }
-

@@ -61,17 +61,13 @@ pub enum OpenPrAfterCreation {
 /// leaving a PR/tab/repo, neither of which is configurable.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum CacheLevel {
     None,
     Minimal,
+    #[default]
     Balanced,
     Relaxed,
-}
-
-impl Default for CacheLevel {
-    fn default() -> Self {
-        CacheLevel::Balanced
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -239,13 +235,21 @@ pub fn set_git_identity(
 ) -> Result<(), String> {
     if global {
         let mut config = git2::Config::open_default().map_err(|e| e.message().to_string())?;
-        config.set_str("user.name", name).map_err(|e| e.message().to_string())?;
-        config.set_str("user.email", email).map_err(|e| e.message().to_string())?;
+        config
+            .set_str("user.name", name)
+            .map_err(|e| e.message().to_string())?;
+        config
+            .set_str("user.email", email)
+            .map_err(|e| e.message().to_string())?;
     } else {
         let repo = git2::Repository::open(repo_path).map_err(|e| e.message().to_string())?;
         let mut config = repo.config().map_err(|e| e.message().to_string())?;
-        config.set_str("user.name", name).map_err(|e| e.message().to_string())?;
-        config.set_str("user.email", email).map_err(|e| e.message().to_string())?;
+        config
+            .set_str("user.name", name)
+            .map_err(|e| e.message().to_string())?;
+        config
+            .set_str("user.email", email)
+            .map_err(|e| e.message().to_string())?;
     }
     Ok(())
 }

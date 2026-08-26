@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRepoStore } from "@/store/useRepoStore";
-import { useStatus, useDiscardFiles, useStageHunk, useToggleStaged, useUnstageHunk, useDiscardHunk } from "@/hooks/queries/useRepoStatus";
+import {
+  useStatus,
+  useDiscardFiles,
+  useStageHunk,
+  useToggleStaged,
+  useUnstageHunk,
+  useDiscardHunk,
+} from "@/hooks/queries/useRepoStatus";
 import { useFileDiff } from "@/hooks/queries/useFileDiff";
 import { FileList } from "./FileList";
 import { ConflictResolutionPanel } from "./ConflictResolutionPanel";
@@ -80,7 +87,10 @@ export function ChangesTab() {
                   <Checkbox
                     checked={allStaged}
                     onCheckedChange={(checked) =>
-                      toggleStagedMutation.mutate({ paths: filtered.map((f) => f.path), staged: checked === true })
+                      toggleStagedMutation.mutate({
+                        paths: filtered.map((f) => f.path),
+                        staged: checked === true,
+                      })
                     }
                   />
                 </TooltipTrigger>
@@ -93,7 +103,12 @@ export function ChangesTab() {
                 className="h-8"
               />
             </div>
-            <div ref={fileListRef} tabIndex={0} onKeyDown={handleArrowNav} className="min-h-0 flex-1 outline-none">
+            <div
+              ref={fileListRef}
+              tabIndex={0}
+              onKeyDown={handleArrowNav}
+              className="min-h-0 flex-1 outline-none"
+            >
               <FileList
                 files={filtered}
                 selectedPath={selectedFilePath}
@@ -123,12 +138,22 @@ export function ChangesTab() {
               selectedFilePath
                 ? {
                     staged: false,
-                    onStage: (i) => stageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
-                    onDiscard: (i) => discardHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
+                    onStage: (i) =>
+                      stageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
+                    onDiscard: (i) =>
+                      discardHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
                     onStageLines: (i, lineIndices) =>
-                      stageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i, lineIndices }),
+                      stageHunkMutation.mutate({
+                        path: selectedFilePath,
+                        hunkIndex: i,
+                        lineIndices,
+                      }),
                     onDiscardLines: (i, lineIndices) =>
-                      discardHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i, lineIndices }),
+                      discardHunkMutation.mutate({
+                        path: selectedFilePath,
+                        hunkIndex: i,
+                        lineIndices,
+                      }),
                   }
                 : undefined
             }
@@ -136,9 +161,14 @@ export function ChangesTab() {
               selectedFilePath
                 ? {
                     staged: true,
-                    onUnstage: (i) => unstageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
+                    onUnstage: (i) =>
+                      unstageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i }),
                     onUnstageLines: (i, lineIndices) =>
-                      unstageHunkMutation.mutate({ path: selectedFilePath, hunkIndex: i, lineIndices }),
+                      unstageHunkMutation.mutate({
+                        path: selectedFilePath,
+                        hunkIndex: i,
+                        lineIndices,
+                      }),
                   }
                 : undefined
             }

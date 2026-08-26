@@ -7,7 +7,10 @@ import { queryClient } from "./lib/queryClient";
 
 import "@gitbud/ui/styles.css";
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+const rootElement = document.getElementById("root");
+if (!rootElement) throw new Error("#root element missing from index.html");
+
+ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>

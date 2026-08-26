@@ -66,7 +66,9 @@ export function PRTab() {
   useEffect(() => {
     return () => {
       if (!repoPath || selectedNumber === null) return;
-      queryClient.removeQueries({ queryKey: queryKeys.prDetail(repoPath, currentLogin ?? "", selectedNumber) });
+      queryClient.removeQueries({
+        queryKey: queryKeys.prDetail(repoPath, currentLogin ?? "", selectedNumber),
+      });
     };
   }, [selectedNumber, repoPath, currentLogin, queryClient]);
 
@@ -76,7 +78,9 @@ export function PRTab() {
   // "open" filter warm.
   useEffect(() => {
     if (repoPath && currentLogin) {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.prList(repoPath, currentLogin, filter) });
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.prList(repoPath, currentLogin, filter),
+      });
     }
   }, [repoPath, currentLogin, filter, queryClient]);
 
@@ -133,8 +137,6 @@ export function PRTab() {
       </div>
     );
   }
-
-
 
   if (hasRemote === false) {
     return (

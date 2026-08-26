@@ -11,7 +11,10 @@ const IMMUTABLE = { refetchOnMount: false as const, staleTime: Infinity };
 export function useCommitDetail(repoPath: string | null, oid: string | null) {
   return useQuery({
     queryKey: queryKeys.commitDetail(repoPath ?? "", oid ?? ""),
-    queryFn: () => api.getCommitDetail(repoPath as string, oid as string),
+    queryFn: () => {
+      if (!repoPath || !oid) throw new Error("useCommitDetail: query ran while disabled");
+      return api.getCommitDetail(repoPath, oid);
+    },
     enabled: !!repoPath && !!oid,
     ...IMMUTABLE,
   });
@@ -20,7 +23,10 @@ export function useCommitDetail(repoPath: string | null, oid: string | null) {
 export function useCommitFiles(repoPath: string | null, oid: string | null) {
   return useQuery({
     queryKey: queryKeys.commitFiles(repoPath ?? "", oid ?? ""),
-    queryFn: () => api.getCommitFiles(repoPath as string, oid as string),
+    queryFn: () => {
+      if (!repoPath || !oid) throw new Error("useCommitFiles: query ran while disabled");
+      return api.getCommitFiles(repoPath, oid);
+    },
     enabled: !!repoPath && !!oid,
     ...IMMUTABLE,
   });
@@ -31,14 +37,18 @@ interface CommitFileDiff {
   imageDiff: ImageDiff | null;
 }
 
-export function useCommitFileDiff(repoPath: string | null, oid: string | null, path: string | null) {
+export function useCommitFileDiff(
+  repoPath: string | null,
+  oid: string | null,
+  path: string | null,
+) {
   return useQuery({
     queryKey: queryKeys.commitFileDiff(repoPath ?? "", oid ?? "", path ?? ""),
     queryFn: async (): Promise<CommitFileDiff> => {
-      const diff = await api.getCommitFileDiff(repoPath as string, oid as string, path as string);
-      const imageDiff = diff.is_image
-        ? await api.getCommitImageDiff(repoPath as string, oid as string, path as string)
-        : null;
+      if (!repoPath || !oid || !path)
+        throw new Error("useCommitFileDiff: query ran while disabled");
+      const diff = await api.getCommitFileDiff(repoPath, oid, path);
+      const imageDiff = diff.is_image ? await api.getCommitImageDiff(repoPath, oid, path) : null;
       return { diff, imageDiff };
     },
     enabled: !!repoPath && !!oid && !!path,

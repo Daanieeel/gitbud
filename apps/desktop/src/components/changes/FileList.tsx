@@ -30,13 +30,7 @@ import {
   ContextMenuSubTrigger,
   ContextMenuTrigger,
 } from "@gitbud/ui/context-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@gitbud/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { cn } from "@gitbud/ui/utils";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -46,7 +40,12 @@ import { FileStatusIcon } from "@/lib/file-status";
 import { api } from "@/lib/tauri";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
-import { useAddToGitignore, useDiscardFile, useIgnoreExtension, useIgnoreFolder } from "@/hooks/queries/useRepoStatus";
+import {
+  useAddToGitignore,
+  useDiscardFile,
+  useIgnoreExtension,
+  useIgnoreFolder,
+} from "@/hooks/queries/useRepoStatus";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
 import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
@@ -57,12 +56,12 @@ import { BlameDialog } from "./BlameDialog";
 import { FilePathLabel } from "./FilePathLabel";
 import type { LfsFileInfo } from "@/lib/types";
 
-const REMOTE_PROVIDER_NAME: Record<RemoteProvider, string> = {
+const REMOTE_PROVIDER_NAME = {
   github: "GitHub",
   gitlab: "GitLab",
   bitbucket: "Bitbucket",
   unknown: "Remote",
-};
+} satisfies Record<RemoteProvider, string>;
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -101,7 +100,14 @@ interface FileListProps {
   onDiscardMany: (paths: string[]) => void;
 }
 
-export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany, onDiscardMany }: FileListProps) {
+export function FileList({
+  files,
+  selectedPath,
+  onSelect,
+  onToggle,
+  onToggleMany,
+  onDiscardMany,
+}: FileListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const { data: branchData } = useBranches(repoPath);
@@ -115,12 +121,16 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
   const favoriteEditorOption = findEditor(favoriteEditorId);
   const isCustomEditor = favoriteEditorId === CUSTOM_EDITOR_ID && !!customEditorCommand;
   const customIcon = useCustomEditorIcon(isCustomEditor ? customEditorCommand : null);
-  const editorName = favoriteEditorOption?.name ?? (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
+  const editorName =
+    favoriteEditorOption?.name ??
+    (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
   const [blamePath, setBlamePath] = useState<string | null>(null);
   const [confirmDiscardPath, setConfirmDiscardPath] = useState<string | null>(null);
   const [confirmDiscardBatch, setConfirmDiscardBatch] = useState(false);
   const [lfsInfo, setLfsInfo] = useState<Record<string, LfsFileInfo>>({});
-  const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: RemoteProvider } | null>(null);
+  const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: RemoteProvider } | null>(
+    null,
+  );
 
   useEffect(() => {
     setRemoteInfo(null);
@@ -158,10 +168,15 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
       return;
     }
     let cancelled = false;
-    void api.checkLfsFiles(repoPath, files.map((f) => f.path)).then((infos) => {
-      if (cancelled) return;
-      setLfsInfo(Object.fromEntries(infos.filter((i) => i.is_lfs).map((i) => [i.path, i])));
-    });
+    void api
+      .checkLfsFiles(
+        repoPath,
+        files.map((f) => f.path),
+      )
+      .then((infos) => {
+        if (cancelled) return;
+        setLfsInfo(Object.fromEntries(infos.filter((i) => i.is_lfs).map((i) => [i.path, i])));
+      });
     return () => {
       cancelled = true;
     };
@@ -221,7 +236,10 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
           const rowSelected = selectedPaths.has(file.path);
           const showBatchMenu = isBatch && rowSelected;
           return (
-            <ContextMenu key={file.path} onOpenChange={(open) => open && handleContextMenu(file.path, row.index)}>
+            <ContextMenu
+              key={file.path}
+              onOpenChange={(open) => open && handleContextMenu(file.path, row.index)}
+            >
               <ContextMenuTrigger asChild>
                 <div
                   style={{
@@ -265,13 +283,17 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span className="shrink-0 rounded-sm bg-muted px-1 text-[10px] font-medium text-muted-foreground">
-                          LFS{lfsInfo[file.path].size != null && ` · ${formatBytes(lfsInfo[file.path].size!)}`}
+                          LFS
+                          {lfsInfo[file.path].size != null &&
+                            ` · ${formatBytes(lfsInfo[file.path].size!)}`}
                         </span>
                       </TooltipTrigger>
                       <TooltipContent>Tracked by Git LFS</TooltipContent>
                     </Tooltip>
                   )}
-                  {file.status !== "conflicted" && <FileStatusIcon status={file.status} className="size-3.5" />}
+                  {file.status !== "conflicted" && (
+                    <FileStatusIcon status={file.status} className="size-3.5" />
+                  )}
                 </div>
               </ContextMenuTrigger>
               <ContextMenuContent>
@@ -294,7 +316,10 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                       Add {selectedList.length} Files to .gitignore
                     </ContextMenuItem>
                     <ContextMenuSeparator />
-                    <ContextMenuItem variant="destructive" onSelect={() => setConfirmDiscardBatch(true)}>
+                    <ContextMenuItem
+                      variant="destructive"
+                      onSelect={() => setConfirmDiscardBatch(true)}
+                    >
                       <Trash2Icon className="size-3.5" />
                       Discard {selectedList.length} Files
                     </ContextMenuItem>
@@ -324,7 +349,11 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                         onSelect={() => {
                           if (!repoPath || !favoriteEditorId) return;
                           void api
-                            .openInEditor(`${repoPath}/${file.path}`, favoriteEditorId, customEditorCommand)
+                            .openInEditor(
+                              `${repoPath}/${file.path}`,
+                              favoriteEditorId,
+                              customEditorCommand,
+                            )
                             .catch((err) => toast.error(String(err)));
                         }}
                       >
@@ -345,13 +374,19 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                     {branch && remoteInfo && (
                       <ContextMenuItem
                         onSelect={() => {
-                          void openUrl(remoteFileUrl(remoteInfo.url, remoteInfo.provider, branch, file.path));
+                          void openUrl(
+                            remoteFileUrl(remoteInfo.url, remoteInfo.provider, branch, file.path),
+                          );
                         }}
                       >
                         {remoteInfo.provider === "github" && <GitHubMark className="size-3.5" />}
                         {remoteInfo.provider === "gitlab" && <GitLabMark className="size-3.5" />}
-                        {remoteInfo.provider === "bitbucket" && <BitbucketMark className="size-3.5" />}
-                        {remoteInfo.provider === "unknown" && <ExternalLinkIcon className="size-3.5" />}
+                        {remoteInfo.provider === "bitbucket" && (
+                          <BitbucketMark className="size-3.5" />
+                        )}
+                        {remoteInfo.provider === "unknown" && (
+                          <ExternalLinkIcon className="size-3.5" />
+                        )}
                         View File on {REMOTE_PROVIDER_NAME[remoteInfo.provider]}
                       </ContextMenuItem>
                     )}
@@ -380,12 +415,17 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                           {ancestorFolders(file.path).map((folder, depth) => {
                             const name = folder.slice(folder.lastIndexOf("/") + 1);
                             return (
-                              <ContextMenuItem key={folder} onSelect={() => ignoreFolderMutation.mutate(folder)}>
+                              <ContextMenuItem
+                                key={folder}
+                                onSelect={() => ignoreFolderMutation.mutate(folder)}
+                              >
                                 <span
                                   className="truncate font-mono text-xs"
                                   style={{ paddingLeft: depth * 6 }}
                                 >
-                                  {depth > 0 && <span className="text-muted-foreground/60">└ </span>}
+                                  {depth > 0 && (
+                                    <span className="text-muted-foreground/60">└ </span>
+                                  )}
                                   {name}/
                                 </span>
                               </ContextMenuItem>
@@ -427,12 +467,17 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
           onOpenChange={(open) => !open && setBlamePath(null)}
         />
       )}
-      <Dialog open={confirmDiscardPath !== null} onOpenChange={(o) => !o && setConfirmDiscardPath(null)}>
+      <Dialog
+        open={confirmDiscardPath !== null}
+        onOpenChange={(o) => !o && setConfirmDiscardPath(null)}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Discard changes to "{confirmDiscardPath}"?</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">This permanently discards changes to this file. This can't be undone.</p>
+          <p className="text-sm text-muted-foreground">
+            This permanently discards changes to this file. This can't be undone.
+          </p>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setConfirmDiscardPath(null)}>
               Cancel

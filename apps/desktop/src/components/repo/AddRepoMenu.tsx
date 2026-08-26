@@ -11,6 +11,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { CloneDialog } from "./CloneDialog";
 import { useRepoStore } from "@/store/useRepoStore";
+import { isSinglePath } from "@/lib/dialogPaths";
 
 export function AddRepoMenu() {
   const [cloneOpen, setCloneOpen] = useState(false);
@@ -20,12 +21,15 @@ export function AddRepoMenu() {
 
   const addExisting = async () => {
     const dir = await open({ directory: true, title: "Add Existing Repository" });
-    if (typeof dir === "string") await addExistingRepo(dir);
+    if (isSinglePath(dir)) await addExistingRepo(dir);
   };
 
   const createNew = async () => {
-    const dir = await open({ directory: true, title: "Choose a folder to initialize as a repository" });
-    if (typeof dir === "string") await createNewRepo(dir);
+    const dir = await open({
+      directory: true,
+      title: "Choose a folder to initialize as a repository",
+    });
+    if (isSinglePath(dir)) await createNewRepo(dir);
   };
 
   return (

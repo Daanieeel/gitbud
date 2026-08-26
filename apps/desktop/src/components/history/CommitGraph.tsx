@@ -27,7 +27,13 @@ interface CommitGraphProps {
   compact?: boolean;
 }
 
-export function CommitGraph({ commit, prevActiveLanes, laneCount, rowHeight, compact }: CommitGraphProps) {
+export function CommitGraph({
+  commit,
+  prevActiveLanes,
+  laneCount,
+  rowHeight,
+  compact,
+}: CommitGraphProps) {
   const isMerge = commit.parent_ids.length > 1;
   const width = compact
     ? LANE_WIDTH + (isMerge ? MERGE_BUMP_WIDTH : 0)

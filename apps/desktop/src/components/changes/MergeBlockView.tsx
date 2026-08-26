@@ -48,8 +48,16 @@ export function MergeBlockView({ sides, block, pick, onPick }: MergeBlockViewPro
       </div>
       <div className="grid grid-cols-3 gap-2">
         <Column label="Base" lines={blockBaseLines(sides, block)} tone="text-muted-foreground" />
-        <Column label="Mine" lines={hunkSideLinesForDisplay(block.oursHunk)} tone="text-accent-green" />
-        <Column label="Theirs" lines={hunkSideLinesForDisplay(block.theirsHunk)} tone="text-accent-yellow" />
+        <Column
+          label="Mine"
+          lines={hunkSideLinesForDisplay(block.oursHunk)}
+          tone="text-accent-green"
+        />
+        <Column
+          label="Theirs"
+          lines={hunkSideLinesForDisplay(block.theirsHunk)}
+          tone="text-accent-yellow"
+        />
       </div>
       <div className="mt-1.5 flex gap-1">
         <Button

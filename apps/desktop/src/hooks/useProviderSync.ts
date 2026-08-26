@@ -22,7 +22,8 @@ const POLL_TIERS: { maxElapsedMs: number; intervalMs: number }[] = [
 const FETCH_INTERVAL_MS = 90_000;
 
 function isWindowVisible() {
-  return typeof document === "undefined" || document.visibilityState === "visible";
+  // Tauri's webview always has `document` — no SSR/non-browser context to guard against here.
+  return document.visibilityState === "visible";
 }
 
 /**

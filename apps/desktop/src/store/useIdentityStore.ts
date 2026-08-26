@@ -9,7 +9,14 @@ import type { SshIdentity } from "@/lib/types";
 // SSH-key-based identity (host + key, no hosted-provider API) used to authenticate git
 // operations. `id` is what's persisted as the per-repo override / global default.
 export type UnifiedIdentity =
-  | { id: string; kind: "github"; login: string; name: string | null; email: string; avatarUrl: string }
+  | {
+      id: string;
+      kind: "github";
+      login: string;
+      name: string | null;
+      email: string;
+      avatarUrl: string;
+    }
   | { id: string; kind: "ssh"; label: string; host: string; keyPath: string };
 
 export function githubIdentityId(login: string): string {
@@ -50,16 +57,14 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
   },
 
   list: () => {
-    const github: UnifiedIdentity[] = useGitHubStore
-      .getState()
-      .accounts.map((a) => ({
-        id: githubIdentityId(a.login),
-        kind: "github",
-        login: a.login,
-        name: a.name,
-        email: a.email,
-        avatarUrl: a.avatar_url,
-      }));
+    const github: UnifiedIdentity[] = useGitHubStore.getState().accounts.map((a) => ({
+      id: githubIdentityId(a.login),
+      kind: "github",
+      login: a.login,
+      name: a.name,
+      email: a.email,
+      avatarUrl: a.avatar_url,
+    }));
     const ssh: UnifiedIdentity[] = get().sshIdentities.map((i) => ({
       id: sshIdentityId(i.id),
       kind: "ssh",
@@ -109,7 +114,8 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
   },
 
   syncRepoIdentity: async (repoPath) => {
-    const override = useRepoStore.getState().repos.find((r) => r.path === repoPath)?.identity_id ?? null;
+    const override =
+      useRepoStore.getState().repos.find((r) => r.path === repoPath)?.identity_id ?? null;
     let identityId = override ?? useSettingsStore.getState().settings.default_identity_id;
     if (!identityId) {
       const currentLogin = useGitHubStore.getState().currentLogin;
@@ -117,7 +123,11 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
         identityId = githubIdentityId(currentLogin);
       }
     }
-    const identity = identityId ? get().list().find((i) => i.id === identityId) : undefined;
+    const identity = identityId
+      ? get()
+          .list()
+          .find((i) => i.id === identityId)
+      : undefined;
     if (identity?.kind === "ssh") {
       await api.applySshIdentityToRepo(repoPath, identity.keyPath);
     } else {
@@ -126,7 +136,12 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
     if (identity?.kind === "github") {
       // No per-repo override here means this identity is the global default, so it should
       // become the global git profile rather than just this one repo's local config.
-      await api.setGitIdentity(repoPath, identity.name ?? identity.login, githubEmail(identity), override === null);
+      await api.setGitIdentity(
+        repoPath,
+        identity.name ?? identity.login,
+        githubEmail(identity),
+        override === null,
+      );
     }
   },
 }));

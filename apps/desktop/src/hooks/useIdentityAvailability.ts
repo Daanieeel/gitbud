@@ -10,7 +10,7 @@ import { useGitHubStore } from "@/store/useGitHubStore";
  * operations run with GIT_TERMINAL_PROMPT=0 (see git_shell.rs), so without a matching identity
  * fetch/pull/push are guaranteed to fail rather than prompt.
  */
-export function useIdentityAvailability(): { available: boolean; reason: string | null } {
+export function useIdentityAvailability() {
   const selectedRepo = useRepoStore((s) => s.selectedRepo);
   const { data: remoteProvider } = useRemoteProvider(selectedRepo);
   const repoOverride = useRepoStore(

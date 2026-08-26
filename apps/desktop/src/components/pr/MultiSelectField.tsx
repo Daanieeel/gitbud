@@ -20,7 +20,13 @@ interface MultiSelectFieldProps {
 /** A filterable checkbox list behind a chip-showing trigger button — used for picking labels,
  * assignees, and reviewers, none of which have a native `<select>` equivalent since more than
  * one can be chosen at once. */
-export function MultiSelectField({ label, placeholder, options, selected, onChange }: MultiSelectFieldProps) {
+export function MultiSelectField({
+  label,
+  placeholder,
+  options,
+  selected,
+  onChange,
+}: MultiSelectFieldProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
 
@@ -73,7 +79,9 @@ export function MultiSelectField({ label, placeholder, options, selected, onChan
             className="mb-1 h-7"
           />
           <div className="max-h-48 overflow-auto">
-            {filtered.length === 0 && <div className="p-2 text-center text-xs text-muted-foreground">No matches</div>}
+            {filtered.length === 0 && (
+              <div className="p-2 text-center text-xs text-muted-foreground">No matches</div>
+            )}
             {filtered.map((o) => (
               <CheckboxGroup
                 key={o.key}

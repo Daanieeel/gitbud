@@ -10,6 +10,7 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { useAddWorktree, useRemoveWorktree, useWorktrees } from "@/hooks/queries/useWorktrees";
 import { queryKeys } from "@/lib/queryKeys";
+import { isSinglePath } from "@/lib/dialogPaths";
 import { cn } from "@gitbud/ui/utils";
 import type { WorktreeInfo } from "@/lib/types";
 
@@ -49,7 +50,7 @@ export function WorktreesPanel() {
 
   const pickFolder = async () => {
     const dir = await open({ directory: true, title: "Choose a folder for the new worktree" });
-    if (typeof dir === "string") setPath(dir);
+    if (isSinglePath(dir)) setPath(dir);
   };
 
   const create = async () => {
@@ -112,9 +113,7 @@ export function WorktreesPanel() {
             </Button>
           </PopoverTrigger>
         </TooltipTrigger>
-        <TooltipContent>
-          Check out another branch into its own folder
-        </TooltipContent>
+        <TooltipContent>Check out another branch into its own folder</TooltipContent>
       </Tooltip>
       <PopoverContent className="w-96 p-0" align="start">
         <div className="border-b border-border p-2 text-xs text-muted-foreground">
@@ -130,9 +129,7 @@ export function WorktreesPanel() {
                 <div className="truncate">{wt.branch ?? wt.name}</div>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {wt.path}
-                    </div>
+                    <div className="truncate text-xs text-muted-foreground">{wt.path}</div>
                   </TooltipTrigger>
                   <TooltipContent>{wt.path}</TooltipContent>
                 </Tooltip>
@@ -157,11 +154,15 @@ export function WorktreesPanel() {
                         disabled={busy || actionPath !== null}
                         onClick={() => void openWorktree(wt)}
                       >
-                        <FolderOpenIcon className={cn("size-3.5", actionPath === wt.path && "animate-spin")} />
+                        <FolderOpenIcon
+                          className={cn("size-3.5", actionPath === wt.path && "animate-spin")}
+                        />
                         {actionPath === wt.path ? "Opening…" : "Open"}
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Open this worktree as its own repo in the sidebar</TooltipContent>
+                    <TooltipContent>
+                      Open this worktree as its own repo in the sidebar
+                    </TooltipContent>
                   </Tooltip>
                   {confirmForcePath === wt.path ? (
                     <Tooltip>
@@ -175,7 +176,9 @@ export function WorktreesPanel() {
                           {actionPath === wt.path ? "Removing…" : "Force Remove"}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Discard uncommitted changes in this worktree and remove it anyway</TooltipContent>
+                      <TooltipContent>
+                        Discard uncommitted changes in this worktree and remove it anyway
+                      </TooltipContent>
                     </Tooltip>
                   ) : (
                     <Tooltip>
@@ -185,7 +188,9 @@ export function WorktreesPanel() {
                           disabled={busy || actionPath !== null}
                           onClick={() => void removeOne(wt, false)}
                         >
-                          <Trash2Icon className={cn("size-3.5", actionPath === wt.path && "animate-spin")} />
+                          <Trash2Icon
+                            className={cn("size-3.5", actionPath === wt.path && "animate-spin")}
+                          />
                         </button>
                       </TooltipTrigger>
                       <TooltipContent>Remove worktree</TooltipContent>
@@ -215,17 +220,18 @@ export function WorktreesPanel() {
                   onChange={(e) => setPath(e.target.value)}
                   className="h-7"
                 />
-                <Button type="button" size="sm" variant="secondary" onClick={() => void pickFolder()}>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void pickFolder()}
+                >
                   <FolderOpenIcon className="size-3.5" />
                 </Button>
               </div>
               <div className="flex gap-3 text-xs">
                 <label className="flex items-center gap-1">
-                  <input
-                    type="radio"
-                    checked={mode === "new"}
-                    onChange={() => setMode("new")}
-                  />
+                  <input type="radio" checked={mode === "new"} onChange={() => setMode("new")} />
                   New branch
                 </label>
                 <label className="flex items-center gap-1">

@@ -31,7 +31,11 @@ export function HistoryTab() {
 
   const { commits, fetchNextPage, hasNextPage, isFetchingNextPage } = useCommitLog(repoPath);
   const { data: selectedCommitFiles = [] } = useCommitFiles(repoPath, selectedCommitOid);
-  const { data: selectedCommitFileDiff } = useCommitFileDiff(repoPath, selectedCommitOid, selectedCommitFilePath);
+  const { data: selectedCommitFileDiff } = useCommitFileDiff(
+    repoPath,
+    selectedCommitOid,
+    selectedCommitFilePath,
+  );
   const queryClient = useQueryClient();
 
   // This tab only exists in the tree while it's the active one (App.tsx conditionally renders
@@ -60,8 +64,15 @@ export function HistoryTab() {
     localStorage.setItem("history:compact", String(compact));
   }, [compact]);
   const displayedCommits = compact ? toMainlineCommits(commits) : commits;
-  const commitFilePaths = useMemo(() => selectedCommitFiles.map(([path]) => path), [selectedCommitFiles]);
-  const handleFileArrowNav = useArrowKeyFileNav(commitFilePaths, selectedCommitFilePath, selectCommitFile);
+  const commitFilePaths = useMemo(
+    () => selectedCommitFiles.map(([path]) => path),
+    [selectedCommitFiles],
+  );
+  const handleFileArrowNav = useArrowKeyFileNav(
+    commitFilePaths,
+    selectedCommitFilePath,
+    selectCommitFile,
+  );
   const fileListRef = useRef<HTMLDivElement>(null);
 
   if (commits.length === 0) {
@@ -74,7 +85,10 @@ export function HistoryTab() {
 
   return (
     <div className="flex h-full min-w-0 flex-1">
-      <div style={{ width: commitList.width }} className="flex shrink-0 flex-col border-r border-border">
+      <div
+        style={{ width: commitList.width }}
+        className="flex shrink-0 flex-col border-r border-border"
+      >
         <div className="flex shrink-0 items-center justify-end border-b border-border px-2 py-1">
           <Tooltip>
             <TooltipTrigger asChild>
@@ -87,8 +101,8 @@ export function HistoryTab() {
               </CheckboxGroup>
             </TooltipTrigger>
             <TooltipContent>
-              Show only this branch's own history — merged-in branches collapse to a small bump
-              at the merge commit instead of their own lane
+              Show only this branch's own history — merged-in branches collapse to a small bump at
+              the merge commit instead of their own lane
             </TooltipContent>
           </Tooltip>
         </div>
@@ -152,7 +166,10 @@ export function HistoryTab() {
           </div>
         </div>
       </div>
-      <CreateBranchAtDialog oid={branchAtOid} onOpenChange={(open) => !open && setBranchAtOid(null)} />
+      <CreateBranchAtDialog
+        oid={branchAtOid}
+        onOpenChange={(open) => !open && setBranchAtOid(null)}
+      />
       <InteractiveRebaseDialog
         baseOid={rebaseBaseOid}
         onOpenChange={(open) => !open && setRebaseBaseOid(null)}

@@ -26,16 +26,26 @@ const EDITORS: &[(&str, &str, &str)] = &[
 /// Opens `path` in the user's chosen editor. `editor` is one of the ids in `EDITORS`, or
 /// `"custom"`, in which case `custom_app_path` is the absolute path to an app bundle (macOS
 /// `.app`) or executable (Windows `.exe`, Linux binary) the user picked via a file dialog.
-pub fn open_in_editor(path: &str, editor: &str, custom_app_path: Option<&str>) -> Result<(), String> {
+pub fn open_in_editor(
+    path: &str,
+    editor: &str,
+    custom_app_path: Option<&str>,
+) -> Result<(), String> {
     if editor == "custom" {
         let app_path = custom_app_path.ok_or("No custom editor configured")?;
         #[cfg(target_os = "macos")]
         {
-            Command::new("open").args(["-a", app_path, path]).spawn().map_err(|e| e.to_string())?;
+            Command::new("open")
+                .args(["-a", app_path, path])
+                .spawn()
+                .map_err(|e| e.to_string())?;
         }
         #[cfg(not(target_os = "macos"))]
         {
-            Command::new(app_path).arg(path).spawn().map_err(|e| e.to_string())?;
+            Command::new(app_path)
+                .arg(path)
+                .spawn()
+                .map_err(|e| e.to_string())?;
         }
         return Ok(());
     }
@@ -48,7 +58,10 @@ pub fn open_in_editor(path: &str, editor: &str, custom_app_path: Option<&str>) -
     #[cfg(target_os = "macos")]
     {
         let _ = cli_command;
-        Command::new("open").args(["-a", mac_app_name, path]).spawn().map_err(|e| e.to_string())?;
+        Command::new("open")
+            .args(["-a", mac_app_name, path])
+            .spawn()
+            .map_err(|e| e.to_string())?;
     }
     #[cfg(not(target_os = "macos"))]
     {
@@ -74,7 +87,11 @@ pub fn get_app_icon(app_path: &str) -> Option<String> {
         .ok()
         .filter(|o| o.status.success())
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())?;
-    let icon_file = if icon_file.ends_with(".icns") { icon_file } else { format!("{icon_file}.icns") };
+    let icon_file = if icon_file.ends_with(".icns") {
+        icon_file
+    } else {
+        format!("{icon_file}.icns")
+    };
     let icns_path = format!("{app_path}/Contents/Resources/{icon_file}");
     if !std::path::Path::new(&icns_path).exists() {
         return None;
@@ -82,7 +99,10 @@ pub fn get_app_icon(app_path: &str) -> Option<String> {
 
     let out_path = std::env::temp_dir().join(format!(
         "gitbud-editor-icon-{}.png",
-        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_nanos()
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()?
+            .as_nanos()
     ));
     let status = Command::new("sips")
         .args(["-s", "format", "png", &icns_path, "--out"])

@@ -61,9 +61,7 @@ export function SubmodulesPanel() {
             <div key={sub.path} className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <span className="min-w-0 flex-1 truncate">
-                    {sub.path}
-                  </span>
+                  <span className="min-w-0 flex-1 truncate">{sub.path}</span>
                 </TooltipTrigger>
                 <TooltipContent>{sub.url ?? undefined}</TooltipContent>
               </Tooltip>
@@ -81,13 +79,21 @@ export function SubmodulesPanel() {
                 onClick={() => void updateOne(sub.path)}
               >
                 {sub.initialized ? (
-                  <RefreshCwIcon className={cn("size-3.5", busyKey === sub.path && "animate-spin")} />
+                  <RefreshCwIcon
+                    className={cn("size-3.5", busyKey === sub.path && "animate-spin")}
+                  />
                 ) : (
-                  <DownloadIcon className={cn("size-3.5", busyKey === sub.path && "animate-spin")} />
+                  <DownloadIcon
+                    className={cn("size-3.5", busyKey === sub.path && "animate-spin")}
+                  />
                 )}
                 {busyKey === sub.path
-                  ? sub.initialized ? "Updating…" : "Initializing…"
-                  : sub.initialized ? "Update" : "Init"}
+                  ? sub.initialized
+                    ? "Updating…"
+                    : "Initializing…"
+                  : sub.initialized
+                    ? "Update"
+                    : "Init"}
               </Button>
             </div>
           ))}

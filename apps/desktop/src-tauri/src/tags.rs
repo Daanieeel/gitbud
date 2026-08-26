@@ -17,7 +17,9 @@ pub fn list_tags(repo_path: &str) -> Result<Vec<TagInfo>, String> {
         let reference = repo
             .find_reference(&format!("refs/tags/{name}"))
             .map_err(|e| e.message().to_string())?;
-        let target = reference.target().ok_or("tag reference has no direct target")?;
+        let target = reference
+            .target()
+            .ok_or("tag reference has no direct target")?;
 
         // Lightweight tags point straight at a commit; annotated tags point at a tag
         // object that itself points at the commit. Try the annotated case first.
@@ -29,7 +31,11 @@ pub fn list_tags(repo_path: &str) -> Result<Vec<TagInfo>, String> {
             Err(_) => (target.to_string(), None),
         };
 
-        tags.push(TagInfo { name: name.to_string(), oid, message });
+        tags.push(TagInfo {
+            name: name.to_string(),
+            oid,
+            message,
+        });
     }
     Ok(tags)
 }

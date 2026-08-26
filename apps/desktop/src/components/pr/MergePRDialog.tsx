@@ -8,13 +8,7 @@ import { Textarea } from "@gitbud/ui/textarea";
 import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { Skeleton } from "@gitbud/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@gitbud/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { useMergePullRequest } from "@/hooks/queries/usePullRequests";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { prPollIntervalMs, useCheckRuns, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
@@ -96,7 +90,10 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
   // Force a fresh check-runs fetch every time this dialog opens — you're about to merge, so a
   // 20s-stale CI result (the shared staleTime CIBadge also uses) isn't good enough here.
   useEffect(() => {
-    if (open) void queryClient.invalidateQueries({ queryKey: queryKeys.checkRuns(repoPath, login, pr.head_sha) });
+    if (open)
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.checkRuns(repoPath, login, pr.head_sha),
+      });
   }, [open, repoPath, login, pr.head_sha, queryClient]);
 
   // Reset per-open state right at the moment the dialog opens, mirroring CreatePRDialog.
@@ -123,15 +120,18 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     // Reuse a prefetch already in flight from the PR tab (see mergeSettingsPrefetch) if there is
     // one, instead of firing a redundant duplicate request — but this always consumes it rather
     // than caching by result, so the *next* open still fires a genuinely fresh request.
-    ((targetBase === pr.base_ref ? takePrefetchedMergeSettings(repoPath, login, targetBase) : null) ??
-      api.githubGetRepoMergeSettings(repoPath, login, targetBase)
+    (
+      (targetBase === pr.base_ref
+        ? takePrefetchedMergeSettings(repoPath, login, targetBase)
+        : null) ?? api.githubGetRepoMergeSettings(repoPath, login, targetBase)
     ).then(
       (settings) => {
         if (cancelled) return;
         setRepoSettings(settings);
         setDeleteBranch(settings.delete_branch_on_merge);
         setMethod((prev) => {
-          const isAllowed = (key: typeof prev) => settings[METHODS.find((m) => m.key === key)!.allowed];
+          const isAllowed = (key: typeof prev) =>
+            settings[METHODS.find((m) => m.key === key)!.allowed];
           return isAllowed(prev) ? prev : (METHODS.find((m) => settings[m.allowed])?.key ?? prev);
         });
       },
@@ -149,7 +149,12 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
   // we don't want to flash the confident "default" color before we actually know.
   const allChecksPassing =
     runs !== null &&
-    runs.every((r) => r.status === "completed" && r.conclusion && ["success", "neutral", "skipped"].includes(r.conclusion));
+    runs.every(
+      (r) =>
+        r.status === "completed" &&
+        r.conclusion &&
+        ["success", "neutral", "skipped"].includes(r.conclusion),
+    );
 
   const submit = async () => {
     setMerging(true);
@@ -254,9 +259,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
                     >
                       {runIcon(r)}
                       <span className="min-w-0 flex-1 truncate">{r.name}</span>
-                      <span className="shrink-0 text-muted-foreground">
-                        {runStatusLabel(r)}
-                      </span>
+                      <span className="shrink-0 text-muted-foreground">{runStatusLabel(r)}</span>
                       <ExternalLinkIcon className="size-3 shrink-0 text-muted-foreground" />
                     </a>
                   ))}
@@ -335,7 +338,11 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
           ) : (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="secondary" disabled={merging || !commitTitle.trim()} onClick={() => void submit()}>
+                <Button
+                  variant="secondary"
+                  disabled={merging || !commitTitle.trim()}
+                  onClick={() => void submit()}
+                >
                   <GitMergeIcon className="size-3.5" />
                   {merging ? "Merging…" : METHODS.find((m) => m.key === method)?.label}
                 </Button>

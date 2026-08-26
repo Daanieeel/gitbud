@@ -40,6 +40,9 @@ pub struct FileDiff {
     pub hunks: Vec<DiffHunk>,
 }
 
+/// A PR file's `(filename, status, diff)`, as returned by the GitHub API and cached as-is.
+pub type PrFileEntry = (String, String, FileDiff);
+
 fn build_file_diff(path: &str, old_path: Option<&str>, diff: &Diff) -> Result<FileDiff, String> {
     let is_binary = RefCell::new(false);
     let hunks: RefCell<Vec<DiffHunk>> = RefCell::new(Vec::new());
@@ -54,7 +57,9 @@ fn build_file_diff(path: &str, old_path: Option<&str>, diff: &Diff) -> Result<Fi
         None,
         Some(&mut |_delta, hunk| {
             hunks.borrow_mut().push(DiffHunk {
-                header: String::from_utf8_lossy(hunk.header()).trim_end().to_string(),
+                header: String::from_utf8_lossy(hunk.header())
+                    .trim_end()
+                    .to_string(),
                 lines: Vec::new(),
             });
             true
@@ -103,7 +108,10 @@ fn build_file_diff(path: &str, old_path: Option<&str>, diff: &Diff) -> Result<Fi
 /// `compute_new`), which a word-level diff would highlight in its entirety instead of just the
 /// `old`/`new` part that changed. Equal stretches are left unhighlighted so only the substantive
 /// change stands out.
-fn intraline_diff(old: &str, new: &str) -> (Vec<(u32, u32)>, Vec<(u32, u32)>) {
+/// [start, end) character ranges into a line's content that changed.
+type CharRanges = Vec<(u32, u32)>;
+
+fn intraline_diff(old: &str, new: &str) -> (CharRanges, CharRanges) {
     use similar::{ChangeTag, TextDiff};
 
     let diff = TextDiff::from_chars(old, new);
@@ -167,8 +175,10 @@ pub fn add_intraline_highlights(hunks: &mut [DiffHunk]) {
 
             let pair_count = (del_end - del_start).min(add_end - add_start);
             for offset in 0..pair_count {
-                let (old_ranges, new_ranges) =
-                    intraline_diff(&hunk.lines[del_start + offset].content, &hunk.lines[add_start + offset].content);
+                let (old_ranges, new_ranges) = intraline_diff(
+                    &hunk.lines[del_start + offset].content,
+                    &hunk.lines[add_start + offset].content,
+                );
                 if ranges_total_len(&old_ranges) > MAX_HIGHLIGHTED_CHANGE_LEN
                     || ranges_total_len(&new_ranges) > MAX_HIGHLIGHTED_CHANGE_LEN
                 {
@@ -272,12 +282,18 @@ mod tests {
         std::fs::write(scratch.path.join("hello.txt"), "line one\nline two\n").unwrap();
         let unstaged = get_file_diff(&repo_path, "hello.txt", false).unwrap();
         assert!(!unstaged.is_binary);
-        assert!(unstaged.hunks.iter().any(|h| h.lines.iter().any(|l| l.kind == LineKind::Addition)));
+        assert!(unstaged
+            .hunks
+            .iter()
+            .any(|h| h.lines.iter().any(|l| l.kind == LineKind::Addition)));
 
         // Staging moves the same change into the HEAD->index diff.
         repo::stage_paths(&repo_path, &["hello.txt".to_string()]).unwrap();
         let staged = get_file_diff(&repo_path, "hello.txt", true).unwrap();
-        assert!(staged.hunks.iter().any(|h| h.lines.iter().any(|l| l.kind == LineKind::Addition)));
+        assert!(staged
+            .hunks
+            .iter()
+            .any(|h| h.lines.iter().any(|l| l.kind == LineKind::Addition)));
 
         // The commit-diff path (used by History) sees the same content for the first commit.
         let files = get_commit_files(&repo_path, &oid).unwrap();
@@ -297,15 +313,27 @@ mod tests {
         std::fs::write(scratch.path.join("a.txt"), "a\nb\n").unwrap();
         repo::stage_paths(&repo_path, &["a.txt".to_string()]).unwrap();
         let staged_before = repo::get_status(&repo_path).unwrap();
-        assert!(staged_before.files.iter().any(|f| f.path == "a.txt" && f.staged));
+        assert!(staged_before
+            .files
+            .iter()
+            .any(|f| f.path == "a.txt" && f.staged));
 
         repo::unstage_paths(&repo_path, &["a.txt".to_string()]).unwrap();
         let staged_after = repo::get_status(&repo_path).unwrap();
-        assert!(staged_after.files.iter().any(|f| f.path == "a.txt" && !f.staged));
+        assert!(staged_after
+            .files
+            .iter()
+            .any(|f| f.path == "a.txt" && !f.staged));
     }
 
     fn line(kind: LineKind, content: &str) -> DiffLine {
-        DiffLine { kind, content: content.to_string(), old_lineno: None, new_lineno: None, highlight_ranges: Vec::new() }
+        DiffLine {
+            kind,
+            content: content.to_string(),
+            old_lineno: None,
+            new_lineno: None,
+            highlight_ranges: Vec::new(),
+        }
     }
 
     #[test]
@@ -369,8 +397,14 @@ mod tests {
         let mut hunks = vec![DiffHunk {
             header: String::new(),
             lines: vec![
-                line(LineKind::Deletion, "this whole first section is completely different, end"),
-                line(LineKind::Addition, "a totally rewritten opening passage right here, end"),
+                line(
+                    LineKind::Deletion,
+                    "this whole first section is completely different, end",
+                ),
+                line(
+                    LineKind::Addition,
+                    "a totally rewritten opening passage right here, end",
+                ),
             ],
         }];
         add_intraline_highlights(&mut hunks);
@@ -446,15 +480,27 @@ pub(crate) fn branch_diff_trees<'a>(
         .peel_to_commit()
         .map_err(|e| e.message().to_string())?
         .id();
-    let merge_base = repo.merge_base(base_oid, head_oid).map_err(|e| e.message().to_string())?;
-    let base_tree = repo.find_commit(merge_base).and_then(|c| c.tree()).map_err(|e| e.message().to_string())?;
-    let head_tree = repo.find_commit(head_oid).and_then(|c| c.tree()).map_err(|e| e.message().to_string())?;
+    let merge_base = repo
+        .merge_base(base_oid, head_oid)
+        .map_err(|e| e.message().to_string())?;
+    let base_tree = repo
+        .find_commit(merge_base)
+        .and_then(|c| c.tree())
+        .map_err(|e| e.message().to_string())?;
+    let head_tree = repo
+        .find_commit(head_oid)
+        .and_then(|c| c.tree())
+        .map_err(|e| e.message().to_string())?;
     Ok((base_tree, head_tree))
 }
 
 /// List the files a pull request from `head` into `base` would show, per the same
 /// merge-base comparison GitHub uses.
-pub fn get_branch_diff_files(repo_path: &str, base: &str, head: &str) -> Result<Vec<(String, String)>, String> {
+pub fn get_branch_diff_files(
+    repo_path: &str,
+    base: &str,
+    head: &str,
+) -> Result<Vec<(String, String)>, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let (base_tree, head_tree) = branch_diff_trees(&repo, base, head)?;
 
@@ -476,7 +522,12 @@ pub fn get_branch_diff_files(repo_path: &str, base: &str, head: &str) -> Result<
 }
 
 /// Diff a single file as part of a `base...head` branch comparison (see `get_branch_diff_files`).
-pub fn get_branch_diff_file(repo_path: &str, base: &str, head: &str, path: &str) -> Result<FileDiff, String> {
+pub fn get_branch_diff_file(
+    repo_path: &str,
+    base: &str,
+    head: &str,
+    path: &str,
+) -> Result<FileDiff, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let (base_tree, head_tree) = branch_diff_trees(&repo, base, head)?;
 

@@ -14,8 +14,10 @@ function useInvalidateAfterCommit(repoPath: string | null) {
 export function useCommit(repoPath: string | null) {
   const invalidate = useInvalidateAfterCommit(repoPath);
   return useMutation({
-    mutationFn: ({ summary, description }: { summary: string; description: string }) =>
-      api.commit(repoPath as string, summary, description),
+    mutationFn: ({ summary, description }: { summary: string; description: string }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.commit(repoPath, summary, description);
+    },
     onSuccess: invalidate,
   });
 }
@@ -23,8 +25,10 @@ export function useCommit(repoPath: string | null) {
 export function useAmendCommit(repoPath: string | null) {
   const invalidate = useInvalidateAfterCommit(repoPath);
   return useMutation({
-    mutationFn: ({ summary, description }: { summary: string; description: string }) =>
-      api.amendCommit(repoPath as string, summary, description),
+    mutationFn: ({ summary, description }: { summary: string; description: string }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.amendCommit(repoPath, summary, description);
+    },
     onSuccess: invalidate,
   });
 }
@@ -32,7 +36,10 @@ export function useAmendCommit(repoPath: string | null) {
 export function useUndoLastCommit(repoPath: string | null) {
   const invalidate = useInvalidateAfterCommit(repoPath);
   return useMutation({
-    mutationFn: () => api.undoLastCommit(repoPath as string),
+    mutationFn: () => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.undoLastCommit(repoPath);
+    },
     onSuccess: invalidate,
   });
 }

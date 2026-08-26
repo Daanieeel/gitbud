@@ -18,7 +18,12 @@ interface CheckRunsRefreshProps {
  * happening underneath isn't an invisible black box, and there's always a way to force a check
  * right now instead of waiting on it. The 1s countdown tick only runs while this is actually
  * mounted (the popover/dialog is open), not for every CI badge on screen. */
-export function CheckRunsRefresh({ dataUpdatedAt, isFetching, onRefresh, pollIntervalMs }: CheckRunsRefreshProps) {
+export function CheckRunsRefresh({
+  dataUpdatedAt,
+  isFetching,
+  onRefresh,
+  pollIntervalMs,
+}: CheckRunsRefreshProps) {
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -28,7 +33,9 @@ export function CheckRunsRefresh({ dataUpdatedAt, isFetching, onRefresh, pollInt
   }, [pollIntervalMs]);
 
   const secondsLeft =
-    pollIntervalMs !== null ? Math.max(0, Math.ceil((dataUpdatedAt + pollIntervalMs - now) / 1000)) : null;
+    pollIntervalMs !== null
+      ? Math.max(0, Math.ceil((dataUpdatedAt + pollIntervalMs - now) / 1000))
+      : null;
 
   return (
     <div className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">

@@ -51,29 +51,20 @@ function DialogContent({
 
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
-    <div
-      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
-      {...props}
-    />
+    <div className={cn("flex flex-col gap-2 text-center sm:text-left", className)} {...props} />
   );
 }
 
 function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
-      className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
-        className,
-      )}
+      className={cn("flex flex-col-reverse gap-2 sm:flex-row sm:justify-end", className)}
       {...props}
     />
   );
 }
 
-function DialogTitle({
-  className,
-  ...props
-}: React.ComponentProps<typeof DialogPrimitive.Title>) {
+function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
       className={cn("text-lg leading-none font-semibold", className)}

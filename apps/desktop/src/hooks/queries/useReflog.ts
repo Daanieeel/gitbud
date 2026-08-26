@@ -5,7 +5,10 @@ import { queryKeys } from "@/lib/queryKeys";
 export function useReflogEntries(repoPath: string | null, enabled: boolean) {
   return useQuery({
     queryKey: queryKeys.reflog(repoPath ?? ""),
-    queryFn: () => api.getReflog(repoPath as string),
+    queryFn: () => {
+      if (!repoPath) throw new Error("useReflogEntries: query ran while disabled");
+      return api.getReflog(repoPath);
+    },
     enabled: !!repoPath && enabled,
     initialData: [],
   });
@@ -14,7 +17,10 @@ export function useReflogEntries(repoPath: string | null, enabled: boolean) {
 export function useReflogRestore(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (oid: string) => api.reflogRestore(repoPath as string, oid),
+    mutationFn: (oid: string) => {
+      if (!repoPath) throw new Error("useReflogRestore: repoPath not set");
+      return api.reflogRestore(repoPath, oid);
+    },
     onSuccess: () => {
       if (!repoPath) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });

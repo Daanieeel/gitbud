@@ -2,7 +2,9 @@
  * top-level file) and filename, so the two can be styled/truncated differently. */
 export function splitPath(path: string): { dir: string; base: string } {
   const idx = path.lastIndexOf("/");
-  return idx === -1 ? { dir: "", base: path } : { dir: path.slice(0, idx), base: path.slice(idx + 1) };
+  return idx === -1
+    ? { dir: "", base: path }
+    : { dir: path.slice(0, idx), base: path.slice(idx + 1) };
 }
 
 /** Renders a file path with the directory dimmed and truncated from the left, while the

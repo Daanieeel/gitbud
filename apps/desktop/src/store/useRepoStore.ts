@@ -62,7 +62,10 @@ function invalidateRepo(repoPath: string) {
  * doesn't show a blank/loading flash for data that's cheap to have ready up front. */
 function prefetchRepo(repoPath: string) {
   return Promise.all([
-    queryClient.prefetchQuery({ queryKey: queryKeys.status(repoPath), queryFn: () => api.getStatus(repoPath) }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.status(repoPath),
+      queryFn: () => api.getStatus(repoPath),
+    }),
     queryClient.prefetchQuery({
       queryKey: queryKeys.branches(repoPath),
       queryFn: async () => ({
@@ -73,9 +76,14 @@ function prefetchRepo(repoPath: string) {
     queryClient.prefetchQuery({
       queryKey: queryKeys.aheadBehind(repoPath),
       queryFn: () =>
-        api.getAheadBehind(repoPath).catch(() => ({ ahead: 0, behind: 0, published: true, head_on_remote: true })),
+        api
+          .getAheadBehind(repoPath)
+          .catch(() => ({ ahead: 0, behind: 0, published: true, head_on_remote: true })),
     }),
-    queryClient.prefetchQuery({ queryKey: queryKeys.stashes(repoPath), queryFn: () => api.listStashes(repoPath) }),
+    queryClient.prefetchQuery({
+      queryKey: queryKeys.stashes(repoPath),
+      queryFn: () => api.listStashes(repoPath),
+    }),
     queryClient.prefetchInfiniteQuery({
       queryKey: queryKeys.log(repoPath),
       queryFn: ({ pageParam }: { pageParam: number }) => api.getLog(repoPath, 100, pageParam),

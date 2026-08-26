@@ -56,9 +56,12 @@ export const api = {
   unstagePaths: (repoPath: string, paths: string[]) =>
     invoke<void>("unstage_paths", { repoPath, paths }),
   discardFile: (repoPath: string, path: string) => invoke<void>("discard_file", { repoPath, path }),
-  addToGitignore: (repoPath: string, paths: string[]) => invoke<void>("add_to_gitignore", { repoPath, paths }),
-  ignoreFolder: (repoPath: string, folderPath: string) => invoke<void>("ignore_folder", { repoPath, folderPath }),
-  ignoreExtension: (repoPath: string, extension: string) => invoke<void>("ignore_extension", { repoPath, extension }),
+  addToGitignore: (repoPath: string, paths: string[]) =>
+    invoke<void>("add_to_gitignore", { repoPath, paths }),
+  ignoreFolder: (repoPath: string, folderPath: string) =>
+    invoke<void>("ignore_folder", { repoPath, folderPath }),
+  ignoreExtension: (repoPath: string, extension: string) =>
+    invoke<void>("ignore_extension", { repoPath, extension }),
   resolveConflict: (repoPath: string, path: string, side: "ours" | "theirs") =>
     invoke<void>("resolve_conflict", { repoPath, path, side }),
   getConflictSides: (repoPath: string, path: string) =>
@@ -68,12 +71,14 @@ export const api = {
 
   hasGpg: () => invoke<boolean>("has_gpg"),
   listGpgKeys: () => invoke<[string, string][]>("list_gpg_keys"),
-  generateGpgKey: (name: string, email: string) => invoke<string>("generate_gpg_key", { name, email }),
+  generateGpgKey: (name: string, email: string) =>
+    invoke<string>("generate_gpg_key", { name, email }),
   generateSshSigningKey: (path: string, email: string) =>
     invoke<string>("generate_ssh_signing_key", { path, email }),
   configureSigning: (repoPath: string, format: string, signingKey: string, global: boolean) =>
     invoke<void>("configure_signing", { repoPath, format, signingKey, global }),
-  disableSigning: (repoPath: string, global: boolean) => invoke<void>("disable_signing", { repoPath, global }),
+  disableSigning: (repoPath: string, global: boolean) =>
+    invoke<void>("disable_signing", { repoPath, global }),
   getSigningStatus: (repoPath: string) => invoke<SigningStatus>("get_signing_status", { repoPath }),
   readWorkingFile: (repoPath: string, path: string) =>
     invoke<string>("read_working_file", { repoPath, path }),
@@ -116,11 +121,11 @@ export const api = {
   listStashes: (repoPath: string) => invoke<StashEntry[]>("list_stashes", { repoPath }),
   stashSave: (repoPath: string, message: string, includeUntracked: boolean) =>
     invoke<void>("stash_save", { repoPath, message, includeUntracked }),
-  stashApply: (repoPath: string, index: number) =>
-    invoke<void>("stash_apply", { repoPath, index }),
+  stashApply: (repoPath: string, index: number) => invoke<void>("stash_apply", { repoPath, index }),
   stashPop: (repoPath: string, index: number) => invoke<void>("stash_pop", { repoPath, index }),
   stashDrop: (repoPath: string, index: number) => invoke<void>("stash_drop", { repoPath, index }),
-  getStashOid: (repoPath: string, index: number) => invoke<string>("get_stash_oid", { repoPath, index }),
+  getStashOid: (repoPath: string, index: number) =>
+    invoke<string>("get_stash_oid", { repoPath, index }),
   stashApplyFile: (repoPath: string, index: number, path: string) =>
     invoke<void>("stash_apply_file", { repoPath, index, path }),
 
@@ -165,8 +170,7 @@ export const api = {
   listSubmodules: (repoPath: string) => invoke<SubmoduleInfo[]>("list_submodules", { repoPath }),
   updateSubmodule: (repoPath: string, submodulePath: string) =>
     invoke<void>("update_submodule", { repoPath, submodulePath }),
-  updateAllSubmodules: (repoPath: string) =>
-    invoke<void>("update_all_submodules", { repoPath }),
+  updateAllSubmodules: (repoPath: string) => invoke<void>("update_all_submodules", { repoPath }),
 
   loadRepos: () => invoke<RepoEntry[]>("load_repos"),
   addRepo: (path: string) => invoke<RepoEntry[]>("add_repo", { path }),
@@ -204,7 +208,8 @@ export const api = {
   checkLfsFiles: (repoPath: string, paths: string[]) =>
     invoke<LfsFileInfo[]>("check_lfs_files", { repoPath, paths }),
   gitLfsPull: (repoPath: string) => invoke<void>("git_lfs_pull", { repoPath }),
-  gitLfsPush: (repoPath: string, branch: string) => invoke<void>("git_lfs_push", { repoPath, branch }),
+  gitLfsPush: (repoPath: string, branch: string) =>
+    invoke<void>("git_lfs_push", { repoPath, branch }),
   initRepo: (path: string) => invoke<void>("init_repo", { path }),
 
   listSshIdentities: () => invoke<SshIdentity[]>("list_ssh_identities"),
@@ -223,10 +228,12 @@ export const api = {
   gitAbortPull: (repoPath: string) => invoke<void>("git_abort_pull", { repoPath }),
   gitPush: (repoPath: string) => invoke<void>("git_push", { repoPath }),
   gitClone: (url: string, dest: string) => invoke<void>("git_clone", { url, dest }),
-  cancelGitOperation: (eventId: string) => invoke<void>("cancel_git_operation", { repoPath: eventId }),
+  cancelGitOperation: (eventId: string) =>
+    invoke<void>("cancel_git_operation", { repoPath: eventId }),
   getAheadBehind: (repoPath: string) => invoke<AheadBehind>("get_ahead_behind", { repoPath }),
   hasUpstreamRemote: (repoPath: string) => invoke<boolean>("has_upstream_remote", { repoPath }),
-  remoteWebInfo: (repoPath: string) => invoke<[string, string] | null>("remote_web_info", { repoPath }),
+  remoteWebInfo: (repoPath: string) =>
+    invoke<[string, string] | null>("remote_web_info", { repoPath }),
   getUpstreamAheadBehind: (repoPath: string, branch: string) =>
     invoke<AheadBehind | null>("get_upstream_ahead_behind", { repoPath, branch }),
   syncUpstream: (repoPath: string, branch: string) =>
@@ -266,8 +273,12 @@ export const api = {
     invoke<PollResult>("github_poll_device_flow", { clientId, deviceCode }),
   githubRemoteOwnerRepo: (repoPath: string) =>
     invoke<[string, string] | null>("github_remote_owner_repo", { repoPath }),
-  githubListPullRequests: (repoPath: string, login: string, state: "open" | "closed" | "all", page: number) =>
-    invoke<PullRequest[]>("github_list_pull_requests", { repoPath, login, state, page }),
+  githubListPullRequests: (
+    repoPath: string,
+    login: string,
+    state: "open" | "closed" | "all",
+    page: number,
+  ) => invoke<PullRequest[]>("github_list_pull_requests", { repoPath, login, state, page }),
   githubGetPullRequest: (repoPath: string, login: string, number: number) =>
     invoke<PullRequest>("github_get_pull_request", { repoPath, login, number }),
   githubCreatePullRequest: (
@@ -307,8 +318,12 @@ export const api = {
     invoke<void>("github_set_milestone", { repoPath, login, number, milestone }),
   githubListProjects: (repoPath: string, login: string) =>
     invoke<Project[]>("github_list_projects", { repoPath, login }),
-  githubAddPullRequestToProject: (repoPath: string, login: string, number: number, projectId: string) =>
-    invoke<void>("github_add_pull_request_to_project", { repoPath, login, number, projectId }),
+  githubAddPullRequestToProject: (
+    repoPath: string,
+    login: string,
+    number: number,
+    projectId: string,
+  ) => invoke<void>("github_add_pull_request_to_project", { repoPath, login, number, projectId }),
   githubMergePullRequest: (
     repoPath: string,
     login: string,
@@ -345,12 +360,18 @@ export const api = {
   getCachedPullRequests: (repoPath: string, state: "open" | "closed" | "all") =>
     invoke<PullRequest[]>("get_cached_pull_requests", { repoPath, state }),
   getCachedPullRequestDetail: (repoPath: string, number: number) =>
-    invoke<[[string, string, FileDiff][], ReviewComment[]] | null>("get_cached_pull_request_detail", {
-      repoPath,
-      number,
-    }).then((result) =>
+    invoke<[[string, string, FileDiff][], ReviewComment[]] | null>(
+      "get_cached_pull_request_detail",
+      {
+        repoPath,
+        number,
+      },
+    ).then((result) =>
       result
-        ? { files: result[0].map(([filename, status, diff]) => ({ filename, status, diff })), comments: result[1] }
+        ? {
+            files: result[0].map(([filename, status, diff]) => ({ filename, status, diff })),
+            comments: result[1],
+          }
         : null,
     ),
   getCachedCheckRuns: (repoPath: string, sha: string) =>
@@ -358,7 +379,10 @@ export const api = {
   cacheAvatar: (url: string) => invoke<string | null>("cache_avatar", { url }),
   getCachedAvatar: (url: string) => invoke<string | null>("get_cached_avatar", { url }),
   getCacheSizes: () =>
-    invoke<[number, number]>("get_cache_sizes").then(([repoBytes, avatarBytes]) => ({ repoBytes, avatarBytes })),
+    invoke<[number, number]>("get_cache_sizes").then(([repoBytes, avatarBytes]) => ({
+      repoBytes,
+      avatarBytes,
+    })),
   getCacheDirPath: () => invoke<string>("get_cache_dir_path"),
   clearRepoCache: () => invoke<void>("clear_repo_cache"),
   clearAvatarCache: () => invoke<void>("clear_avatar_cache"),
@@ -369,7 +393,13 @@ export const api = {
     baseSha: string,
     headSha: string,
   ) =>
-    invoke<ImageDiff>("github_get_pull_request_image_diff", { repoPath, login, path, baseSha, headSha }),
+    invoke<ImageDiff>("github_get_pull_request_image_diff", {
+      repoPath,
+      login,
+      path,
+      baseSha,
+      headSha,
+    }),
   githubListReviewComments: (repoPath: string, login: string, number: number) =>
     invoke<ReviewComment[]>("github_list_review_comments", { repoPath, login, number }),
   githubCreateReviewComment: (
@@ -396,6 +426,5 @@ export const api = {
     invoke<CheckRun[]>("github_list_check_runs", { repoPath, login, sha }),
   githubGetCommitVerification: (repoPath: string, login: string, sha: string) =>
     invoke<CommitVerification>("github_get_commit_verification", { repoPath, login, sha }),
-  githubListUserRepos: (login: string) =>
-    invoke<GitHubRepo[]>("github_list_user_repos", { login }),
+  githubListUserRepos: (login: string) => invoke<GitHubRepo[]>("github_list_user_repos", { login }),
 };

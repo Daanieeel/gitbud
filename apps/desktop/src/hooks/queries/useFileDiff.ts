@@ -15,14 +15,15 @@ export function useFileDiff(repoPath: string | null, path: string | null, entryS
   return useQuery({
     queryKey: queryKeys.fileDiff(repoPath ?? "", path ?? ""),
     queryFn: async (): Promise<WorkingFileDiff> => {
+      if (!repoPath || !path) throw new Error("no repo/file selected");
       const [staged, unstaged] = await Promise.all([
-        api.getFileDiff(repoPath as string, path as string, true),
-        api.getFileDiff(repoPath as string, path as string, false),
+        api.getFileDiff(repoPath, path, true),
+        api.getFileDiff(repoPath, path, false),
       ]);
       // Whole-file image diffs have no staged/unstaged hunk split to show side by side — just
       // show whichever side is actually fully staged.
       const imageDiff = unstaged.is_image
-        ? await api.getImageDiff(repoPath as string, path as string, entryStaged)
+        ? await api.getImageDiff(repoPath, path, entryStaged)
         : null;
       return { staged, unstaged, imageDiff };
     },

@@ -15,9 +15,10 @@ export function useArrowKeyFileNav(
     (e: React.KeyboardEvent) => {
       if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
-      const target = e.target as HTMLElement;
-      const tag = target.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable) return;
+      if (e.target instanceof HTMLElement) {
+        const tag = e.target.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
+      }
       if (paths.length === 0) return;
 
       e.preventDefault();

@@ -25,7 +25,8 @@ export function ReflogPanel() {
   // Force a fresh fetch every time this dialog opens — HEAD can have moved (commit, checkout,
   // another sync) since the last time it was open, well within staleTime's window.
   useEffect(() => {
-    if (open && repoPath) void queryClient.invalidateQueries({ queryKey: queryKeys.reflog(repoPath) });
+    if (open && repoPath)
+      void queryClient.invalidateQueries({ queryKey: queryKeys.reflog(repoPath) });
   }, [open, repoPath, queryClient]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -64,8 +65,8 @@ export function ReflogPanel() {
             <DialogTitle>Reflog</DialogTitle>
             <DialogDescription>
               Every place HEAD has pointed in this repo, most recent first. Restoring hard-resets
-              HEAD and the working tree to that point, but that too is recorded here, so it can
-              be undone the same way.
+              HEAD and the working tree to that point, but that too is recorded here, so it can be
+              undone the same way.
             </DialogDescription>
           </DialogHeader>
           {error && <p className="text-xs text-destructive">{error}</p>}

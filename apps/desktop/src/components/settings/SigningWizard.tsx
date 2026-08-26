@@ -7,6 +7,7 @@ import { Input } from "@gitbud/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { api } from "@/lib/tauri";
 import { copyToClipboard } from "@/lib/clipboard";
+import { isSinglePath } from "@/lib/dialogPaths";
 import { cn } from "@gitbud/ui/utils";
 import type { SigningStatus } from "@/lib/types";
 
@@ -70,7 +71,7 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
 
   const pickExistingSshKey = async () => {
     const file = await open({ title: "Choose an SSH public key (.pub)" });
-    if (typeof file === "string") setSshKeyPath(file);
+    if (isSinglePath(file)) setSshKeyPath(file);
   };
 
   const generateGpg = () =>
@@ -161,8 +162,15 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
                   <KeyRoundIcon className="size-3.5" />
                   Use Existing
                 </Button>
-                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void generateSsh()}>
-                  <PlusIcon className={cn("size-3.5", busyKey === "generateSsh" && "animate-spin")} />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void generateSsh()}
+                >
+                  <PlusIcon
+                    className={cn("size-3.5", busyKey === "generateSsh" && "animate-spin")}
+                  />
                   {busyKey === "generateSsh" ? "Generating…" : "Generate New"}
                 </Button>
               </div>
@@ -203,8 +211,15 @@ export function SigningWizard({ repoPath, name, email, global }: SigningWizardPr
                     </option>
                   ))}
                 </select>
-                <Button size="sm" variant="secondary" disabled={busy} onClick={() => void generateGpg()}>
-                  <PlusIcon className={cn("size-3.5", busyKey === "generateGpg" && "animate-spin")} />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={busy}
+                  onClick={() => void generateGpg()}
+                >
+                  <PlusIcon
+                    className={cn("size-3.5", busyKey === "generateGpg" && "animate-spin")}
+                  />
                   {busyKey === "generateGpg" ? "Generating…" : "Generate New"}
                 </Button>
               </div>

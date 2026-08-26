@@ -15,7 +15,13 @@ const AvatarCacheContext = createContext<AvatarCache>(noopCache);
 /** Wrap the app root with this to plug in a platform-specific local avatar cache (e.g. Tauri's
  * `cache_avatar`/`get_cached_avatar` commands). Without a provider, `Avatar` falls back to
  * loading straight from `src` with no offline fallback. */
-export function AvatarCacheProvider({ value, children }: { value: AvatarCache; children: ReactNode }) {
+export function AvatarCacheProvider({
+  value,
+  children,
+}: {
+  value: AvatarCache;
+  children: ReactNode;
+}) {
   return <AvatarCacheContext.Provider value={value}>{children}</AvatarCacheContext.Provider>;
 }
 

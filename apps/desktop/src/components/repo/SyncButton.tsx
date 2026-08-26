@@ -1,4 +1,10 @@
-import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, CloudUploadIcon, RefreshCwIcon } from "lucide-react";
+import {
+  ArrowDownIcon,
+  ArrowUpDownIcon,
+  ArrowUpIcon,
+  CloudUploadIcon,
+  RefreshCwIcon,
+} from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -12,7 +18,10 @@ export function SyncButton() {
   const selectedRepo = useRepoStore((s) => s.selectedRepo);
   const { data: branchData } = useBranches(selectedRepo);
   const { data: aheadBehind = DEFAULT_AHEAD_BEHIND } = useAheadBehind(selectedRepo);
-  const { syncing, fetch, pull, push, syncBranch } = useGitSync(selectedRepo, branchData?.branch ?? null);
+  const { syncing, fetch, pull, push, syncBranch } = useGitSync(
+    selectedRepo,
+    branchData?.branch ?? null,
+  );
   const { available, reason } = useIdentityAvailability();
 
   if (!selectedRepo) return null;
@@ -32,7 +41,8 @@ export function SyncButton() {
     label = `Sync (${aheadBehind.behind}↓ ${aheadBehind.ahead}↑)`;
     Icon = ArrowUpDownIcon;
     action = syncBranch;
-    title = "Pulls, then pushes. If the pull conflicts with your local commit(s), aborts and suggests a safer manual path instead of pushing";
+    title =
+      "Pulls, then pushes. If the pull conflicts with your local commit(s), aborts and suggests a safer manual path instead of pushing";
     variant = "default";
   } else if (aheadBehind.behind > 0) {
     label = `Pull origin (${aheadBehind.behind})`;
@@ -64,7 +74,11 @@ export function SyncButton() {
           {label}
         </Button>
       </TooltipTrigger>
-      <TooltipContent className={cn(!available && "border-destructive bg-destructive text-destructive-foreground")}>
+      <TooltipContent
+        className={cn(
+          !available && "border-destructive bg-destructive text-destructive-foreground",
+        )}
+      >
         {available ? title : reason}
       </TooltipContent>
     </Tooltip>

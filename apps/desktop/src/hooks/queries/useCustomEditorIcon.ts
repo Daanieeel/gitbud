@@ -7,7 +7,10 @@ import { queryKeys } from "@/lib/queryKeys";
 export function useCustomEditorIcon(appPath: string | null | undefined) {
   const { data } = useQuery({
     queryKey: queryKeys.customEditorIcon(appPath ?? ""),
-    queryFn: () => api.getAppIcon(appPath as string),
+    queryFn: () => {
+      if (!appPath) throw new Error("no app path");
+      return api.getAppIcon(appPath);
+    },
     enabled: !!appPath,
     staleTime: Infinity,
     gcTime: Infinity,

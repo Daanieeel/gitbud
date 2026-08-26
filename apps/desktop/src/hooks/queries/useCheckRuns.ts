@@ -61,8 +61,9 @@ export function useCheckRuns(
       if (useNetworkStore.getState().offline) {
         throw new Error("Skipping GitHub request: already offline.");
       }
+      if (!repoPath || !login || !sha) throw new Error("no repo/login/commit selected");
       try {
-        const runs = await api.githubListCheckRuns(repoPath as string, login as string, sha as string);
+        const runs = await api.githubListCheckRuns(repoPath, login, sha);
         useNetworkStore.getState().noteSuccess();
         return runs;
       } catch (err) {

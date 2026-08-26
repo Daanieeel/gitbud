@@ -36,7 +36,9 @@ fn diff_against_base(
         None,
         Some(&mut |_delta, hunk| {
             hunks.borrow_mut().push(DiffHunk {
-                header: String::from_utf8_lossy(hunk.header()).trim_end().to_string(),
+                header: String::from_utf8_lossy(hunk.header())
+                    .trim_end()
+                    .to_string(),
                 lines: Vec::new(),
             });
             true
@@ -47,7 +49,9 @@ fn diff_against_base(
                 '-' => LineKind::Deletion,
                 _ => LineKind::Context,
             };
-            let content = String::from_utf8_lossy(line.content()).trim_end_matches('\n').to_string();
+            let content = String::from_utf8_lossy(line.content())
+                .trim_end_matches('\n')
+                .to_string();
             let diff_line = DiffLine {
                 kind,
                 content,
@@ -81,9 +85,15 @@ pub fn get_conflict_sides(repo_path: &str, path: &str) -> Result<ConflictSides, 
     for conflict in index.conflicts().map_err(|e| e.message().to_string())? {
         let conflict = conflict.map_err(|e| e.message().to_string())?;
         let matches_path = |entry: &Option<git2::IndexEntry>| {
-            entry.as_ref().map(|e| e.path == path.as_bytes()).unwrap_or(false)
+            entry
+                .as_ref()
+                .map(|e| e.path == path.as_bytes())
+                .unwrap_or(false)
         };
-        if matches_path(&conflict.ancestor) || matches_path(&conflict.our) || matches_path(&conflict.their) {
+        if matches_path(&conflict.ancestor)
+            || matches_path(&conflict.our)
+            || matches_path(&conflict.their)
+        {
             if let Some(a) = &conflict.ancestor {
                 base_blob = repo.find_blob(a.id).ok();
             }
@@ -107,14 +117,24 @@ pub fn get_conflict_sides(repo_path: &str, path: &str) -> Result<ConflictSides, 
     Ok(ConflictSides {
         base_exists: base_blob.is_some(),
         base_text,
-        ours: ConflictSide { exists: ours_blob.is_some(), hunks: ours_hunks },
-        theirs: ConflictSide { exists: theirs_blob.is_some(), hunks: theirs_hunks },
+        ours: ConflictSide {
+            exists: ours_blob.is_some(),
+            hunks: ours_hunks,
+        },
+        theirs: ConflictSide {
+            exists: theirs_blob.is_some(),
+            hunks: theirs_hunks,
+        },
     })
 }
 
 /// Writes fully-resolved content for a conflicted path and stages it — used once the user has
 /// picked a side for every conflicting block in the 3-way merge view.
-pub fn resolve_conflict_with_content(repo_path: &str, path: &str, content: &str) -> Result<(), String> {
+pub fn resolve_conflict_with_content(
+    repo_path: &str,
+    path: &str,
+    content: &str,
+) -> Result<(), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut index = repo.index().map_err(|e| e.message().to_string())?;
     let target_path = std::path::Path::new(path);
@@ -122,8 +142,12 @@ pub fn resolve_conflict_with_content(repo_path: &str, path: &str, content: &str)
     let full_path = std::path::Path::new(repo_path).join(path);
     std::fs::write(&full_path, content).map_err(|e| e.to_string())?;
 
-    index.remove_path(target_path).map_err(|e| e.message().to_string())?;
-    index.add_path(target_path).map_err(|e| e.message().to_string())?;
+    index
+        .remove_path(target_path)
+        .map_err(|e| e.message().to_string())?;
+    index
+        .add_path(target_path)
+        .map_err(|e| e.message().to_string())?;
     index.write().map_err(|e| e.message().to_string())
 }
 
@@ -140,7 +164,10 @@ mod tests {
         fn new(name: &str) -> Self {
             let path = std::env::temp_dir().join(format!(
                 "gitbud-test-merge3-{name}-{}",
-                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
             ));
             std::fs::create_dir_all(&path).unwrap();
             let repo = Repository::init(&path).unwrap();
@@ -197,6 +224,10 @@ mod tests {
         resolve_conflict_with_content(&repo_path, "a.txt", "one\nOURS\nthree\n").unwrap();
         let contents = std::fs::read_to_string(scratch.path.join("a.txt")).unwrap();
         assert_eq!(contents, "one\nOURS\nthree\n");
-        assert!(!repo::get_status(&repo_path).unwrap().files.iter().any(|f| f.path == "a.txt" && !f.staged));
+        assert!(!repo::get_status(&repo_path)
+            .unwrap()
+            .files
+            .iter()
+            .any(|f| f.path == "a.txt" && !f.staged));
     }
 }

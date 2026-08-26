@@ -19,6 +19,8 @@ const packageJsonPath = path.join(root, "package.json");
 const cargoTomlPath = path.join(root, "src-tauri", "Cargo.toml");
 const tauriConfPath = path.join(root, "src-tauri", "tauri.conf.json");
 
+// SAFETY: package.json's "version" field is maintained by this same script and is always a
+// semver string; not worth a JSON schema validator for an internal build script.
 const currentVersion = JSON.parse(readFileSync(packageJsonPath, "utf8")).version as string;
 
 function bump(version: string, kind: string): string {
@@ -58,10 +60,15 @@ replaceJsonVersion(tauriConfPath);
 replaceCargoTomlVersion(cargoTomlPath);
 
 try {
-  execFileSync("cargo", ["check", "--quiet"], { cwd: path.join(root, "src-tauri"), stdio: "inherit" });
+  execFileSync("cargo", ["check", "--quiet"], {
+    cwd: path.join(root, "src-tauri"),
+    stdio: "inherit",
+  });
 } catch {
   console.warn("Warning: `cargo check` failed — Cargo.lock may be out of sync, fix manually.");
 }
 
 console.log(`Bumped version: ${currentVersion} -> ${nextVersion}`);
-console.log("Updated: package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml, src-tauri/Cargo.lock");
+console.log(
+  "Updated: package.json, src-tauri/tauri.conf.json, src-tauri/Cargo.toml, src-tauri/Cargo.lock",
+);

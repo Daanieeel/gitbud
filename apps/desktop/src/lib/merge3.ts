@@ -11,9 +11,7 @@ export interface MergeBlock {
 }
 
 function hunkBaseRange(hunk: DiffHunk): [number, number] {
-  const nums = hunk.lines
-    .filter((l) => l.old_lineno != null)
-    .map((l) => l.old_lineno as number);
+  const nums = hunk.lines.map((l) => l.old_lineno).filter((n): n is number => n != null);
   if (nums.length === 0) return [0, 0];
   return [Math.min(...nums), Math.max(...nums)];
 }

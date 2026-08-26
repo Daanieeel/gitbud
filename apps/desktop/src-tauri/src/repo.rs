@@ -108,24 +108,31 @@ pub fn get_status(repo_path: &str) -> Result<RepoStatus, String> {
         let (staged, partially_staged) = if status == ChangeKind::Conflicted {
             (false, false)
         } else {
-            (index_kind.is_some() && worktree_kind.is_none(), index_kind.is_some() && worktree_kind.is_some())
+            (
+                index_kind.is_some() && worktree_kind.is_none(),
+                index_kind.is_some() && worktree_kind.is_some(),
+            )
         };
 
-        let (path, old_path) = if let Some(diff) = entry.index_to_workdir().or(entry.head_to_index()) {
-            let new_path = diff
-                .new_file()
-                .path()
-                .map(|p| p.to_string_lossy().to_string())
-                .unwrap_or_default();
-            let old_path = diff.old_file().path().map(|p| p.to_string_lossy().to_string());
-            let old_path = match &old_path {
-                Some(op) if op != &new_path => old_path,
-                _ => None,
+        let (path, old_path) =
+            if let Some(diff) = entry.index_to_workdir().or(entry.head_to_index()) {
+                let new_path = diff
+                    .new_file()
+                    .path()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                let old_path = diff
+                    .old_file()
+                    .path()
+                    .map(|p| p.to_string_lossy().to_string());
+                let old_path = match &old_path {
+                    Some(op) if op != &new_path => old_path,
+                    _ => None,
+                };
+                (new_path, old_path)
+            } else {
+                (entry.path().unwrap_or_default().to_string(), None)
             };
-            (new_path, old_path)
-        } else {
-            (entry.path().unwrap_or_default().to_string(), None)
-        };
 
         files.push(FileEntry {
             path,
@@ -161,9 +168,7 @@ pub fn list_branches(repo_path: &str) -> Result<Vec<BranchInfo>, String> {
         .and_then(|h| h.shorthand().map(|s| s.to_string()));
 
     let mut result = Vec::new();
-    let branches = repo
-        .branches(None)
-        .map_err(|e| e.message().to_string())?;
+    let branches = repo.branches(None).map_err(|e| e.message().to_string())?;
     for branch in branches {
         let (branch, branch_type) = branch.map_err(|e| e.message().to_string())?;
         let name = match branch.name().map_err(|e| e.message().to_string())? {
@@ -237,11 +242,15 @@ fn find_index_to_workdir_rename_pairs(repo: &Repository) -> Result<Vec<(String, 
     opts.include_untracked(true)
         .recurse_untracked_dirs(true)
         .renames_index_to_workdir(true);
-    let statuses = repo.statuses(Some(&mut opts)).map_err(|e| e.message().to_string())?;
+    let statuses = repo
+        .statuses(Some(&mut opts))
+        .map_err(|e| e.message().to_string())?;
 
     let mut pairs = Vec::new();
     for entry in statuses.iter() {
-        let Some(diff) = entry.index_to_workdir() else { continue };
+        let Some(diff) = entry.index_to_workdir() else {
+            continue;
+        };
         let (Some(new_p), Some(old_p)) = (diff.new_file().path(), diff.old_file().path()) else {
             continue;
         };
@@ -258,11 +267,15 @@ fn find_index_to_workdir_rename_pairs(repo: &Repository) -> Result<Vec<(String, 
 fn find_head_to_index_rename_pairs(repo: &Repository) -> Result<Vec<(String, String)>, String> {
     let mut opts = StatusOptions::new();
     opts.renames_head_to_index(true);
-    let statuses = repo.statuses(Some(&mut opts)).map_err(|e| e.message().to_string())?;
+    let statuses = repo
+        .statuses(Some(&mut opts))
+        .map_err(|e| e.message().to_string())?;
 
     let mut pairs = Vec::new();
     for entry in statuses.iter() {
-        let Some(diff) = entry.head_to_index() else { continue };
+        let Some(diff) = entry.head_to_index() else {
+            continue;
+        };
         let (Some(new_p), Some(old_p)) = (diff.new_file().path(), diff.old_file().path()) else {
             continue;
         };
@@ -298,9 +311,13 @@ pub fn stage_paths(repo_path: &str, paths: &[String]) -> Result<(), String> {
     for path in &paths {
         let full = std::path::Path::new(repo_path).join(path);
         if full.exists() {
-            index.add_path(std::path::Path::new(path)).map_err(|e| e.message().to_string())?;
+            index
+                .add_path(std::path::Path::new(path))
+                .map_err(|e| e.message().to_string())?;
         } else {
-            index.remove_path(std::path::Path::new(path)).map_err(|e| e.message().to_string())?;
+            index
+                .remove_path(std::path::Path::new(path))
+                .map_err(|e| e.message().to_string())?;
         }
     }
     index.write().map_err(|e| e.message().to_string())
@@ -385,7 +402,10 @@ fn append_gitignore_entries(repo_path: &str, entries: &[String]) -> Result<(), S
     let mut content = std::fs::read_to_string(&gitignore_path).unwrap_or_default();
     let existing: std::collections::HashSet<&str> = content.lines().collect();
 
-    let to_add: Vec<&String> = entries.iter().filter(|entry| !existing.contains(entry.as_str())).collect();
+    let to_add: Vec<&String> = entries
+        .iter()
+        .filter(|entry| !existing.contains(entry.as_str()))
+        .collect();
     if to_add.is_empty() {
         return Ok(());
     }
@@ -431,7 +451,9 @@ pub fn resolve_conflict(repo_path: &str, path: &str, side: &str) -> Result<(), S
         .filter_map(|c| c.ok())
         .find(|c| {
             let candidate = c.our.as_ref().or(c.their.as_ref()).or(c.ancestor.as_ref());
-            candidate.map(|e| e.path == target_path.to_string_lossy().as_bytes()).unwrap_or(false)
+            candidate
+                .map(|e| e.path == target_path.to_string_lossy().as_bytes())
+                .unwrap_or(false)
         })
         .ok_or_else(|| format!("{path} is not conflicted"))?;
 
@@ -439,19 +461,25 @@ pub fn resolve_conflict(repo_path: &str, path: &str, side: &str) -> Result<(), S
         "ours" => conflict
             .our
             .ok_or("no 'ours' side for this conflict (e.g. the file was deleted on this branch)")?,
-        "theirs" => conflict
-            .their
-            .ok_or("no 'theirs' side for this conflict (e.g. the file was deleted on the other branch)")?,
+        "theirs" => conflict.their.ok_or(
+            "no 'theirs' side for this conflict (e.g. the file was deleted on the other branch)",
+        )?,
         other => return Err(format!("side must be 'ours' or 'theirs', got '{other}'")),
     };
 
-    let blob = repo.find_blob(entry.id).map_err(|e| e.message().to_string())?;
+    let blob = repo
+        .find_blob(entry.id)
+        .map_err(|e| e.message().to_string())?;
     let full_path = std::path::Path::new(repo_path).join(path);
     std::fs::write(&full_path, blob.content()).map_err(|e| e.to_string())?;
 
     // `remove_path` clears every stage (0 plus the 1/2/3 conflict stages) for this path.
-    index.remove_path(target_path).map_err(|e| e.message().to_string())?;
-    index.add_path(target_path).map_err(|e| e.message().to_string())?;
+    index
+        .remove_path(target_path)
+        .map_err(|e| e.message().to_string())?;
+    index
+        .add_path(target_path)
+        .map_err(|e| e.message().to_string())?;
     index.write().map_err(|e| e.message().to_string())
 }
 
@@ -488,13 +516,21 @@ mod tests {
             "hello world\nthis is a decently long file\nwith several lines\nso similarity detection works\n",
             "base",
         );
-        std::fs::rename(scratch.path.join("old_name.txt"), scratch.path.join("new_name.txt")).unwrap();
+        std::fs::rename(
+            scratch.path.join("old_name.txt"),
+            scratch.path.join("new_name.txt"),
+        )
+        .unwrap();
 
         // Staging only the new (added) half shouldn't leave the old half fully tracked and
         // unchanged in the index — that would split the rename back into an add + delete pair.
         stage_paths(&repo_path, &["new_name.txt".to_string()]).unwrap();
         let status = get_status(&repo_path).unwrap();
-        assert_eq!(status.files.len(), 1, "rename should stay a single entry: {status:?}");
+        assert_eq!(
+            status.files.len(),
+            1,
+            "rename should stay a single entry: {status:?}"
+        );
         assert_eq!(status.files[0].path, "new_name.txt");
         assert_eq!(status.files[0].old_path.as_deref(), Some("old_name.txt"));
         assert_eq!(status.files[0].status, ChangeKind::Renamed);
@@ -503,7 +539,11 @@ mod tests {
         // Unstaging it back should restore the single unstaged rename, not orphan either half.
         unstage_paths(&repo_path, &["new_name.txt".to_string()]).unwrap();
         let status = get_status(&repo_path).unwrap();
-        assert_eq!(status.files.len(), 1, "unstage should stay a single entry: {status:?}");
+        assert_eq!(
+            status.files.len(),
+            1,
+            "unstage should stay a single entry: {status:?}"
+        );
         assert_eq!(status.files[0].path, "new_name.txt");
         assert_eq!(status.files[0].old_path.as_deref(), Some("old_name.txt"));
         assert!(!status.files[0].staged);
@@ -565,7 +605,10 @@ mod tests {
         let current = get_current_branch(&repo_path).unwrap();
 
         let branches = list_branches(&repo_path).expect("branches should succeed");
-        let head_branch = branches.iter().find(|b| b.is_head).expect("a branch should be head");
+        let head_branch = branches
+            .iter()
+            .find(|b| b.is_head)
+            .expect("a branch should be head");
         assert_eq!(head_branch.name, current);
         assert!(!head_branch.is_remote);
     }
@@ -639,7 +682,9 @@ mod tests {
         scratch.write_and_commit("a.txt", "a\n", "base");
         create_branch(&repo_path, "feature", true).unwrap();
         scratch.write_and_commit("b.txt", "b\n", "feature work");
-        checkout_branch(&repo_path, "main").ok().or_else(|| checkout_branch(&repo_path, "master").ok());
+        checkout_branch(&repo_path, "main")
+            .ok()
+            .or_else(|| checkout_branch(&repo_path, "master").ok());
 
         // `feature` has a commit `main`/`master` doesn't — not merged yet.
         let default_branch = list_branches(&repo_path)
@@ -719,7 +764,9 @@ mod tests {
         let fixup_oid = create_fixup_commit(&repo_path, &target).unwrap();
 
         let repo = Repository::open(&repo_path).unwrap();
-        let commit = repo.find_commit(git2::Oid::from_str(&fixup_oid).unwrap()).unwrap();
+        let commit = repo
+            .find_commit(git2::Oid::from_str(&fixup_oid).unwrap())
+            .unwrap();
         assert_eq!(commit.summary(), Some("fixup! add a feature"));
     }
 }
@@ -728,7 +775,9 @@ pub fn commit(repo_path: &str, summary: &str, description: &str) -> Result<Strin
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut index = repo.index().map_err(|e| e.message().to_string())?;
     let tree_id = index.write_tree().map_err(|e| e.message().to_string())?;
-    let tree = repo.find_tree(tree_id).map_err(|e| e.message().to_string())?;
+    let tree = repo
+        .find_tree(tree_id)
+        .map_err(|e| e.message().to_string())?;
     let signature = repo.signature().map_err(|e| e.message().to_string())?;
 
     let message = if description.trim().is_empty() {
@@ -741,7 +790,14 @@ pub fn commit(repo_path: &str, summary: &str, description: &str) -> Result<Strin
     let parents: Vec<&git2::Commit> = parent_commit.iter().collect();
 
     let oid = repo
-        .commit(Some("HEAD"), &signature, &signature, &message, &tree, &parents)
+        .commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            &message,
+            &tree,
+            &parents,
+        )
         .map_err(|e| e.message().to_string())?;
 
     Ok(oid.to_string())
@@ -769,7 +825,9 @@ pub fn amend_commit(repo_path: &str, summary: &str, description: &str) -> Result
 
     let mut index = repo.index().map_err(|e| e.message().to_string())?;
     let tree_id = index.write_tree().map_err(|e| e.message().to_string())?;
-    let tree = repo.find_tree(tree_id).map_err(|e| e.message().to_string())?;
+    let tree = repo
+        .find_tree(tree_id)
+        .map_err(|e| e.message().to_string())?;
 
     let message = if description.trim().is_empty() {
         summary.to_string()
@@ -793,16 +851,22 @@ pub fn amend_commit(repo_path: &str, summary: &str, description: &str) -> Result
 /// `amend_commit` join them — so the caller can pre-fill the commit form with it.
 pub fn undo_last_commit(repo_path: &str) -> Result<(String, String), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
-    let head_commit = repo.head().and_then(|h| h.peel_to_commit()).map_err(|e| e.message().to_string())?;
+    let head_commit = repo
+        .head()
+        .and_then(|h| h.peel_to_commit())
+        .map_err(|e| e.message().to_string())?;
     let parent = head_commit
         .parent(0)
         .map_err(|_| "Can't undo the repository's initial commit".to_string())?;
     let message = head_commit.message().unwrap_or("").to_string();
 
-    repo.reset(parent.as_object(), ResetType::Soft, None).map_err(|e| e.message().to_string())?;
+    repo.reset(parent.as_object(), ResetType::Soft, None)
+        .map_err(|e| e.message().to_string())?;
 
     Ok(match message.split_once("\n\n") {
-        Some((summary, description)) => (summary.trim().to_string(), description.trim().to_string()),
+        Some((summary, description)) => {
+            (summary.trim().to_string(), description.trim().to_string())
+        }
         None => (message.trim().to_string(), String::new()),
     })
 }
@@ -816,17 +880,26 @@ pub fn cherry_pick(repo_path: &str, oid: &str) -> Result<CherryPickResult, Strin
         .find_commit(git2::Oid::from_str(oid).map_err(|e| e.message().to_string())?)
         .map_err(|e| e.message().to_string())?;
 
-    repo.cherrypick(&commit, None).map_err(|e| e.message().to_string())?;
+    repo.cherrypick(&commit, None)
+        .map_err(|e| e.message().to_string())?;
 
     let mut index = repo.index().map_err(|e| e.message().to_string())?;
     if index.has_conflicts() {
-        return Ok(CherryPickResult { conflicted: true, new_oid: None });
+        return Ok(CherryPickResult {
+            conflicted: true,
+            new_oid: None,
+        });
     }
 
     let tree_id = index.write_tree().map_err(|e| e.message().to_string())?;
-    let tree = repo.find_tree(tree_id).map_err(|e| e.message().to_string())?;
+    let tree = repo
+        .find_tree(tree_id)
+        .map_err(|e| e.message().to_string())?;
     let signature = repo.signature().map_err(|e| e.message().to_string())?;
-    let parent = repo.head().and_then(|h| h.peel_to_commit()).map_err(|e| e.message().to_string())?;
+    let parent = repo
+        .head()
+        .and_then(|h| h.peel_to_commit())
+        .map_err(|e| e.message().to_string())?;
 
     let new_oid = repo
         .commit(
@@ -840,7 +913,10 @@ pub fn cherry_pick(repo_path: &str, oid: &str) -> Result<CherryPickResult, Strin
         .map_err(|e| e.message().to_string())?;
 
     repo.cleanup_state().map_err(|e| e.message().to_string())?;
-    Ok(CherryPickResult { conflicted: false, new_oid: Some(new_oid.to_string()) })
+    Ok(CherryPickResult {
+        conflicted: false,
+        new_oid: Some(new_oid.to_string()),
+    })
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -857,17 +933,26 @@ pub fn revert_commit(repo_path: &str, oid: &str) -> Result<CherryPickResult, Str
         .find_commit(git2::Oid::from_str(oid).map_err(|e| e.message().to_string())?)
         .map_err(|e| e.message().to_string())?;
 
-    repo.revert(&commit, None).map_err(|e| e.message().to_string())?;
+    repo.revert(&commit, None)
+        .map_err(|e| e.message().to_string())?;
 
     let mut index = repo.index().map_err(|e| e.message().to_string())?;
     if index.has_conflicts() {
-        return Ok(CherryPickResult { conflicted: true, new_oid: None });
+        return Ok(CherryPickResult {
+            conflicted: true,
+            new_oid: None,
+        });
     }
 
     let tree_id = index.write_tree().map_err(|e| e.message().to_string())?;
-    let tree = repo.find_tree(tree_id).map_err(|e| e.message().to_string())?;
+    let tree = repo
+        .find_tree(tree_id)
+        .map_err(|e| e.message().to_string())?;
     let signature = repo.signature().map_err(|e| e.message().to_string())?;
-    let parent = repo.head().and_then(|h| h.peel_to_commit()).map_err(|e| e.message().to_string())?;
+    let parent = repo
+        .head()
+        .and_then(|h| h.peel_to_commit())
+        .map_err(|e| e.message().to_string())?;
 
     let summary = commit.summary().unwrap_or("");
     let message = format!(
@@ -876,11 +961,21 @@ pub fn revert_commit(repo_path: &str, oid: &str) -> Result<CherryPickResult, Str
     );
 
     let new_oid = repo
-        .commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&parent])
+        .commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            &message,
+            &tree,
+            &[&parent],
+        )
         .map_err(|e| e.message().to_string())?;
 
     repo.cleanup_state().map_err(|e| e.message().to_string())?;
-    Ok(CherryPickResult { conflicted: false, new_oid: Some(new_oid.to_string()) })
+    Ok(CherryPickResult {
+        conflicted: false,
+        new_oid: Some(new_oid.to_string()),
+    })
 }
 
 pub fn delete_branch(repo_path: &str, name: &str) -> Result<(), String> {
@@ -911,7 +1006,8 @@ pub fn is_branch_merged(repo_path: &str, branch: &str, target: &str) -> Result<b
     if branch_oid == target_oid {
         return Ok(true);
     }
-    repo.graph_descendant_of(target_oid, branch_oid).map_err(|e| e.message().to_string())
+    repo.graph_descendant_of(target_oid, branch_oid)
+        .map_err(|e| e.message().to_string())
 }
 
 /// On the case-insensitive-but-case-preserving filesystems most desktop OSes default to (APFS,
@@ -927,11 +1023,15 @@ pub fn rename_branch(repo_path: &str, old_name: &str, new_name: &str) -> Result<
         let mut branch = repo
             .find_branch(old_name, git2::BranchType::Local)
             .map_err(|e| e.message().to_string())?;
-        branch.rename(&tmp_name, false).map_err(|e| e.message().to_string())?;
+        branch
+            .rename(&tmp_name, false)
+            .map_err(|e| e.message().to_string())?;
         let mut branch = repo
             .find_branch(&tmp_name, git2::BranchType::Local)
             .map_err(|e| e.message().to_string())?;
-        branch.rename(new_name, false).map_err(|e| e.message().to_string())?;
+        branch
+            .rename(new_name, false)
+            .map_err(|e| e.message().to_string())?;
         return Ok(());
     }
 
@@ -951,15 +1051,23 @@ pub fn merge_branch(repo_path: &str, branch_name: &str) -> Result<CherryPickResu
     let branch = repo
         .find_branch(branch_name, git2::BranchType::Local)
         .map_err(|e| e.message().to_string())?;
-    let their_commit = branch.get().peel_to_commit().map_err(|e| e.message().to_string())?;
+    let their_commit = branch
+        .get()
+        .peel_to_commit()
+        .map_err(|e| e.message().to_string())?;
     let annotated = repo
         .find_annotated_commit(their_commit.id())
         .map_err(|e| e.message().to_string())?;
 
-    let (analysis, _) = repo.merge_analysis(&[&annotated]).map_err(|e| e.message().to_string())?;
+    let (analysis, _) = repo
+        .merge_analysis(&[&annotated])
+        .map_err(|e| e.message().to_string())?;
 
     if analysis.is_up_to_date() {
-        return Ok(CherryPickResult { conflicted: false, new_oid: None });
+        return Ok(CherryPickResult {
+            conflicted: false,
+            new_oid: None,
+        });
     }
 
     if analysis.is_fast_forward() {
@@ -971,27 +1079,50 @@ pub fn merge_branch(repo_path: &str, branch_name: &str) -> Result<CherryPickResu
         reference
             .set_target(their_commit.id(), "fast-forward merge")
             .map_err(|e| e.message().to_string())?;
-        repo.set_head(&ref_name).map_err(|e| e.message().to_string())?;
+        repo.set_head(&ref_name)
+            .map_err(|e| e.message().to_string())?;
         repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force()))
             .map_err(|e| e.message().to_string())?;
-        return Ok(CherryPickResult { conflicted: false, new_oid: Some(their_commit.id().to_string()) });
+        return Ok(CherryPickResult {
+            conflicted: false,
+            new_oid: Some(their_commit.id().to_string()),
+        });
     }
 
-    repo.merge(&[&annotated], None, None).map_err(|e| e.message().to_string())?;
+    repo.merge(&[&annotated], None, None)
+        .map_err(|e| e.message().to_string())?;
     let mut index = repo.index().map_err(|e| e.message().to_string())?;
     if index.has_conflicts() {
-        return Ok(CherryPickResult { conflicted: true, new_oid: None });
+        return Ok(CherryPickResult {
+            conflicted: true,
+            new_oid: None,
+        });
     }
 
     let tree_id = index.write_tree().map_err(|e| e.message().to_string())?;
-    let tree = repo.find_tree(tree_id).map_err(|e| e.message().to_string())?;
+    let tree = repo
+        .find_tree(tree_id)
+        .map_err(|e| e.message().to_string())?;
     let signature = repo.signature().map_err(|e| e.message().to_string())?;
-    let head_commit = repo.head().and_then(|h| h.peel_to_commit()).map_err(|e| e.message().to_string())?;
+    let head_commit = repo
+        .head()
+        .and_then(|h| h.peel_to_commit())
+        .map_err(|e| e.message().to_string())?;
 
     let message = format!("Merge branch '{branch_name}'");
     let new_oid = repo
-        .commit(Some("HEAD"), &signature, &signature, &message, &tree, &[&head_commit, &their_commit])
+        .commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            &message,
+            &tree,
+            &[&head_commit, &their_commit],
+        )
         .map_err(|e| e.message().to_string())?;
     repo.cleanup_state().map_err(|e| e.message().to_string())?;
-    Ok(CherryPickResult { conflicted: false, new_oid: Some(new_oid.to_string()) })
+    Ok(CherryPickResult {
+        conflicted: false,
+        new_oid: Some(new_oid.to_string()),
+    })
 }

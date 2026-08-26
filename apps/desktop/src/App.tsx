@@ -145,55 +145,57 @@ function App() {
 
   return (
     <TooltipProvider delayDuration={300}>
-    <AvatarCacheProvider
-      value={{
-        cacheAvatar: (src) => void api.cacheAvatar(src),
-        getCachedAvatar: (src) => api.getCachedAvatar(src),
-      }}
-    >
-    <DiffSettingsProvider
-      value={{
-        fontSize: diffFontSize,
-        diffViewMode,
-        setDiffViewMode: (mode) => void updateSettings({ diff_view: mode }),
-      }}
-    >
-    <div className="flex h-screen w-screen gap-3 bg-background p-3 text-foreground">
-      <RepoSidebar />
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
-        <div className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md">
-          <Toolbar />
-          {selectedRepo && branch && <UpstreamBanner repoPath={selectedRepo} branch={branch} />}
-        </div>
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-card shadow-md">
-          {selectedRepo ? (
-            <>
-              <TabBar />
-              <div className="min-h-0 flex-1">
-                {activeTab === "changes" && <ChangesTab />}
-                {activeTab === "history" && <HistoryTab />}
-                {activeTab === "pulls" && <PRTab />}
+      <AvatarCacheProvider
+        value={{
+          cacheAvatar: (src) => void api.cacheAvatar(src),
+          getCachedAvatar: (src) => api.getCachedAvatar(src),
+        }}
+      >
+        <DiffSettingsProvider
+          value={{
+            fontSize: diffFontSize,
+            diffViewMode,
+            setDiffViewMode: (mode) => void updateSettings({ diff_view: mode }),
+          }}
+        >
+          <div className="flex h-screen w-screen gap-3 bg-background p-3 text-foreground">
+            <RepoSidebar />
+            <div className="flex min-w-0 flex-1 flex-col gap-3">
+              <div className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md">
+                <Toolbar />
+                {selectedRepo && branch && (
+                  <UpstreamBanner repoPath={selectedRepo} branch={branch} />
+                )}
               </div>
-            </>
-          ) : (
-            <div className="flex flex-1 items-center justify-center bg-dot-grid text-sm text-muted-foreground">
-              {repos.length === 0
-                ? 'No repositories yet. Use the "+" button to add one'
-                : "Select a repository"}
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-card shadow-md">
+                {selectedRepo ? (
+                  <>
+                    <TabBar />
+                    <div className="min-h-0 flex-1">
+                      {activeTab === "changes" && <ChangesTab />}
+                      {activeTab === "history" && <HistoryTab />}
+                      {activeTab === "pulls" && <PRTab />}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-1 items-center justify-center bg-dot-grid text-sm text-muted-foreground">
+                    {repos.length === 0
+                      ? 'No repositories yet. Use the "+" button to add one'
+                      : "Select a repository"}
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </div>
-      </div>
-      <Toaster theme={theme} position="bottom-right" richColors closeButton />
-      <CommandPalette
-        open={palette.open}
-        mode={palette.mode}
-        onOpenChange={(open) => setPalette((p) => ({ ...p, open }))}
-      />
-      <ResolveDivergedPullDialog />
-    </div>
-    </DiffSettingsProvider>
-    </AvatarCacheProvider>
+            <Toaster theme={theme} position="bottom-right" richColors closeButton />
+            <CommandPalette
+              open={palette.open}
+              mode={palette.mode}
+              onOpenChange={(open) => setPalette((p) => ({ ...p, open }))}
+            />
+            <ResolveDivergedPullDialog />
+          </div>
+        </DiffSettingsProvider>
+      </AvatarCacheProvider>
     </TooltipProvider>
   );
 }

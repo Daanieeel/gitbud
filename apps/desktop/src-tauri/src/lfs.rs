@@ -71,8 +71,17 @@ pub fn check_lfs_files(repo_path: &str, paths: &[String]) -> Result<Vec<LfsFileI
         .iter()
         .map(|path| {
             let is_lfs = lfs_paths.contains(path);
-            let (oid, size) = if is_lfs { read_pointer(repo_path, path) } else { (None, None) };
-            LfsFileInfo { path: path.clone(), is_lfs, oid, size }
+            let (oid, size) = if is_lfs {
+                read_pointer(repo_path, path)
+            } else {
+                (None, None)
+            };
+            LfsFileInfo {
+                path: path.clone(),
+                is_lfs,
+                oid,
+                size,
+            }
         })
         .collect())
 }
@@ -89,7 +98,10 @@ mod tests {
         fn new(name: &str) -> Self {
             let path = std::env::temp_dir().join(format!(
                 "gitbud-test-lfs-{name}-{}",
-                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
             ));
             std::fs::create_dir_all(&path).unwrap();
             git2::Repository::init(&path).unwrap();
@@ -112,7 +124,11 @@ mod tests {
         let scratch = ScratchRepo::new("detect");
         assert!(!has_lfs(&scratch.path_str()));
 
-        std::fs::write(scratch.path.join(".gitattributes"), "*.bin filter=lfs diff=lfs merge=lfs -text\n").unwrap();
+        std::fs::write(
+            scratch.path.join(".gitattributes"),
+            "*.bin filter=lfs diff=lfs merge=lfs -text\n",
+        )
+        .unwrap();
         assert!(has_lfs(&scratch.path_str()));
     }
 
@@ -120,7 +136,11 @@ mod tests {
     fn check_lfs_files_parses_tracked_pointer_and_ignores_untracked() {
         let scratch = ScratchRepo::new("check-files");
         let repo_path = scratch.path_str();
-        std::fs::write(scratch.path.join(".gitattributes"), "*.bin filter=lfs diff=lfs merge=lfs -text\n").unwrap();
+        std::fs::write(
+            scratch.path.join(".gitattributes"),
+            "*.bin filter=lfs diff=lfs merge=lfs -text\n",
+        )
+        .unwrap();
         std::fs::write(
             scratch.path.join("big.bin"),
             "version https://git-lfs.github.com/spec/v1\noid sha256:abc123\nsize 4096\n",
@@ -128,7 +148,11 @@ mod tests {
         .unwrap();
         std::fs::write(scratch.path.join("normal.txt"), "just text\n").unwrap();
 
-        let results = check_lfs_files(&repo_path, &["big.bin".to_string(), "normal.txt".to_string()]).unwrap();
+        let results = check_lfs_files(
+            &repo_path,
+            &["big.bin".to_string(), "normal.txt".to_string()],
+        )
+        .unwrap();
 
         let big = results.iter().find(|f| f.path == "big.bin").unwrap();
         assert!(big.is_lfs);

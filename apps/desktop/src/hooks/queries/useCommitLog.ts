@@ -8,7 +8,10 @@ const LOG_PAGE_SIZE = 100;
 export function useCommitLog(repoPath: string | null) {
   const query = useInfiniteQuery({
     queryKey: queryKeys.log(repoPath ?? ""),
-    queryFn: ({ pageParam }) => api.getLog(repoPath as string, LOG_PAGE_SIZE, pageParam),
+    queryFn: ({ pageParam }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.getLog(repoPath, LOG_PAGE_SIZE, pageParam);
+    },
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) =>
       lastPage.length < LOG_PAGE_SIZE ? undefined : allPages.flat().length,
@@ -30,7 +33,10 @@ function useInvalidateAfterHistoryChange(repoPath: string | null) {
 export function useCherryPick(repoPath: string | null) {
   const invalidate = useInvalidateAfterHistoryChange(repoPath);
   return useMutation({
-    mutationFn: (oid: string): Promise<CherryPickResult> => api.cherryPick(repoPath as string, oid),
+    mutationFn: (oid: string): Promise<CherryPickResult> => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.cherryPick(repoPath, oid);
+    },
     onSuccess: invalidate,
   });
 }
@@ -38,7 +44,10 @@ export function useCherryPick(repoPath: string | null) {
 export function useRevertCommit(repoPath: string | null) {
   const invalidate = useInvalidateAfterHistoryChange(repoPath);
   return useMutation({
-    mutationFn: (oid: string): Promise<CherryPickResult> => api.revertCommit(repoPath as string, oid),
+    mutationFn: (oid: string): Promise<CherryPickResult> => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.revertCommit(repoPath, oid);
+    },
     onSuccess: invalidate,
   });
 }
@@ -46,7 +55,10 @@ export function useRevertCommit(repoPath: string | null) {
 export function useCreateFixupCommit(repoPath: string | null) {
   const invalidate = useInvalidateAfterHistoryChange(repoPath);
   return useMutation({
-    mutationFn: (targetOid: string) => api.createFixupCommit(repoPath as string, targetOid),
+    mutationFn: (targetOid: string) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.createFixupCommit(repoPath, targetOid);
+    },
     onSuccess: invalidate,
   });
 }
@@ -54,8 +66,10 @@ export function useCreateFixupCommit(repoPath: string | null) {
 export function useInteractiveRebase(repoPath: string | null) {
   const invalidate = useInvalidateAfterHistoryChange(repoPath);
   return useMutation({
-    mutationFn: ({ baseOid, todo }: { baseOid: string; todo: RebaseTodoItem[] }) =>
-      api.interactiveRebase(repoPath as string, baseOid, todo),
+    mutationFn: ({ baseOid, todo }: { baseOid: string; todo: RebaseTodoItem[] }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.interactiveRebase(repoPath, baseOid, todo);
+    },
     onSuccess: (result) => {
       if (result.success) invalidate();
     },

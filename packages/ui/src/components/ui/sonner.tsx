@@ -7,6 +7,8 @@ function Toaster({ theme = "system", ...props }: ToasterProps) {
       theme={theme}
       className="toaster group"
       style={
+        // SAFETY: these are CSS custom properties (not standard style props), which
+        // `React.CSSProperties` doesn't model; consumed via `var(...)` in styles.css.
         {
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",

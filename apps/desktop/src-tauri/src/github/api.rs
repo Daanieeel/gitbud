@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::auth::{api_base, graphql_base, web_base};
-use crate::diff::{DiffHunk, DiffLine, FileDiff, LineKind};
+use crate::diff::{DiffHunk, DiffLine, FileDiff, LineKind, PrFileEntry};
 use crate::image_diff::{is_image_path, mime_for, ImageDiff};
 
 const USER_AGENT: &str = "GitBud";
@@ -36,7 +36,10 @@ impl GhClient {
             AUTHORIZATION,
             HeaderValue::from_str(&format!("Bearer {token}")).map_err(|e| e.to_string())?,
         );
-        headers.insert(ACCEPT, HeaderValue::from_static("application/vnd.github+json"));
+        headers.insert(
+            ACCEPT,
+            HeaderValue::from_static("application/vnd.github+json"),
+        );
         headers.insert(UA, HeaderValue::from_static(USER_AGENT));
         let http = reqwest::Client::builder()
             .default_headers(headers)
@@ -47,7 +50,11 @@ impl GhClient {
             .timeout(std::time::Duration::from_secs(20))
             .build()
             .map_err(|e| e.to_string())?;
-        Ok(Self { http, base: api_base(host), graphql: graphql_base(host) })
+        Ok(Self {
+            http,
+            base: api_base(host),
+            graphql: graphql_base(host),
+        })
     }
 
     fn url(&self, path: &str) -> String {
@@ -112,7 +119,9 @@ impl GhClient {
             let messages: Vec<String> = parsed.errors.into_iter().map(|e| e.message).collect();
             return Err(messages.join("; "));
         }
-        parsed.data.ok_or_else(|| "GraphQL response had no data".to_string())
+        parsed
+            .data
+            .ok_or_else(|| "GraphQL response had no data".to_string())
     }
 }
 
@@ -173,7 +182,11 @@ fn github_noreply_username<'a>(email: &'a str, host: &str) -> Option<&'a str> {
     Some(local.rsplit('+').next().unwrap_or(local))
 }
 
-pub async fn find_user_avatar_by_email(host: &str, token: &str, email: &str) -> Result<Option<String>, String> {
+pub async fn find_user_avatar_by_email(
+    host: &str,
+    token: &str,
+    email: &str,
+) -> Result<Option<String>, String> {
     if let Some(username) = github_noreply_username(email, host) {
         // The `{web_base}/{username}.png` redirect only exists for real user/org accounts — it
         // 404s for a bot account (e.g. `github-actions[bot]`, whose noreply email is
@@ -183,7 +196,13 @@ pub async fn find_user_avatar_by_email(host: &str, token: &str, email: &str) -> 
         // search below (which, like the `.png` shortcut, excludes noreply addresses entirely).
         if username.ends_with("[bot]") {
             let gh = GhClient::new(host, token)?;
-            let res = check(gh.get(&format!("/users/{username}")).send().await.map_err(|e| e.to_string())?).await?;
+            let res = check(
+                gh.get(&format!("/users/{username}"))
+                    .send()
+                    .await
+                    .map_err(|e| e.to_string())?,
+            )
+            .await?;
             let user: RawUser = res.json().await.map_err(|e| e.to_string())?;
             return Ok(Some(user.avatar_url));
         }
@@ -332,14 +351,27 @@ struct RawBranchProtection {
 /// the repo itself allows them, since a merge commit isn't linear). Best-effort: an unprotected
 /// branch (404) or a token without permission to view protection settings (403) both just mean
 /// "no additional restriction visible to us", not an error worth surfacing.
-async fn requires_linear_history(host: &str, token: &str, owner: &str, repo: &str, branch: &str) -> bool {
-    let Ok(gh) = GhClient::new(host, token) else { return false };
+async fn requires_linear_history(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+) -> bool {
+    let Ok(gh) = GhClient::new(host, token) else {
+        return false;
+    };
     let path = format!("/repos/{owner}/{repo}/branches/{branch}/protection");
-    let Ok(res) = gh.get(&path).send().await else { return false };
+    let Ok(res) = gh.get(&path).send().await else {
+        return false;
+    };
     if !res.status().is_success() {
         return false;
     }
-    res.json::<RawBranchProtection>().await.map(|p| p.required_linear_history.enabled).unwrap_or(false)
+    res.json::<RawBranchProtection>()
+        .await
+        .map(|p| p.required_linear_history.enabled)
+        .unwrap_or(false)
 }
 
 #[derive(Deserialize)]
@@ -389,12 +421,17 @@ async fn ruleset_allowed_merge_methods(
         else {
             continue;
         };
-        let methods: Vec<String> =
-            methods.iter().filter_map(|v| v.as_str().map(str::to_string)).collect();
+        let methods: Vec<String> = methods
+            .iter()
+            .filter_map(|v| v.as_str().map(str::to_string))
+            .collect();
         result = Some(match result {
             // Multiple applicable rulesets each restricting methods: only what every one of
             // them allows is actually allowed.
-            Some(existing) => existing.into_iter().filter(|m| methods.contains(m)).collect(),
+            Some(existing) => existing
+                .into_iter()
+                .filter(|m| methods.contains(m))
+                .collect(),
             None => methods,
         });
     }
@@ -420,7 +457,11 @@ pub async fn get_repo_merge_settings(
     let raw: RawRepo = res.json().await.map_err(|e| e.to_string())?;
     let linear_history = requires_linear_history(host, token, owner, repo, base_ref).await;
     let ruleset_methods = ruleset_allowed_merge_methods(host, token, owner, repo, base_ref).await;
-    let ruleset_allows = |method: &str| ruleset_methods.as_ref().is_none_or(|m| m.iter().any(|s| s == method));
+    let ruleset_allows = |method: &str| {
+        ruleset_methods
+            .as_ref()
+            .is_none_or(|m| m.iter().any(|s| s == method))
+    };
     Ok(RepoMergeSettings {
         allow_merge_commit: raw.allow_merge_commit && !linear_history && ruleset_allows("merge"),
         allow_squash_merge: raw.allow_squash_merge && ruleset_allows("squash"),
@@ -454,7 +495,13 @@ pub async fn create_pull_request(
     let path = format!("/repos/{owner}/{repo}/pulls");
     let res = check(
         gh.post(&path)
-            .json(&CreatePrBody { title, head, base, body, draft })
+            .json(&CreatePrBody {
+                title,
+                head,
+                base,
+                body,
+                draft,
+            })
             .send()
             .await
             .map_err(|e| e.to_string())?,
@@ -499,7 +546,12 @@ pub struct Label {
     pub color: String,
 }
 
-pub async fn list_labels(host: &str, token: &str, owner: &str, repo: &str) -> Result<Vec<Label>, String> {
+pub async fn list_labels(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<Vec<Label>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/labels?per_page=100");
     let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
@@ -610,7 +662,12 @@ pub struct Milestone {
     pub title: String,
 }
 
-pub async fn list_milestones(host: &str, token: &str, owner: &str, repo: &str) -> Result<Vec<Milestone>, String> {
+pub async fn list_milestones(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<Vec<Milestone>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/milestones?state=open&per_page=100");
     let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
@@ -661,7 +718,12 @@ query($owner: String!, $repo: String!) {
 
 /// Lists the (Projects v2) projects linked to this repo — classic projects are deprecated
 /// GitHub-wide and have no v2 equivalent surface here.
-pub async fn list_projects(host: &str, token: &str, owner: &str, repo: &str) -> Result<Vec<Project>, String> {
+pub async fn list_projects(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<Vec<Project>, String> {
     #[derive(Deserialize)]
     struct Nodes {
         nodes: Vec<Project>,
@@ -678,7 +740,10 @@ pub async fn list_projects(host: &str, token: &str, owner: &str, repo: &str) -> 
 
     let gh = GhClient::new(host, token)?;
     let data: Data = gh
-        .graphql(LIST_PROJECTS_QUERY, serde_json::json!({ "owner": owner, "repo": repo }))
+        .graphql(
+            LIST_PROJECTS_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo }),
+        )
         .await?;
     Ok(data.repository.projects_v2.nodes)
 }
@@ -758,6 +823,10 @@ struct MergeBody<'a> {
     sha: Option<&'a str>,
 }
 
+// host/token/owner/repo is this file's consistent first-four-args calling convention (see
+// every other function below) — a one-off params struct for just this function would diverge
+// from that, not simplify it.
+#[allow(clippy::too_many_arguments)]
 pub async fn merge_pull_request(
     host: &str,
     token: &str,
@@ -773,7 +842,12 @@ pub async fn merge_pull_request(
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/merge");
     check(
         gh.put(&path)
-            .json(&MergeBody { merge_method, commit_title, commit_message, sha })
+            .json(&MergeBody {
+                merge_method,
+                commit_title,
+                commit_message,
+                sha,
+            })
             .send()
             .await
             .map_err(|e| e.to_string())?,
@@ -785,7 +859,13 @@ pub async fn merge_pull_request(
 /// Deletes `branch` on the remote — used for the merge dialog's "Delete branch after merge".
 /// A no-op-shaped 422 (branch already gone, e.g. GitHub's own auto-delete-branch repo setting
 /// beat us to it) is swallowed rather than surfaced as a merge failure.
-pub async fn delete_branch(host: &str, token: &str, owner: &str, repo: &str, branch: &str) -> Result<(), String> {
+pub async fn delete_branch(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/git/refs/heads/{branch}");
     let res = gh.delete(&path).send().await.map_err(send_err)?;
@@ -811,7 +891,7 @@ pub async fn list_pull_request_files(
     owner: &str,
     repo: &str,
     number: u64,
-) -> Result<Vec<(String, String, FileDiff)>, String> {
+) -> Result<Vec<PrFileEntry>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/files?per_page=100");
     let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
@@ -842,8 +922,15 @@ struct ContentsResponse {
 /// Fetches `path` as a `data:` URI at a specific commit via the Contents API, or `None` if it
 /// didn't exist there (a 404 — added or deleted files only have one real side) or GitHub
 /// returned something other than inline base64 (e.g. a file too large to inline).
-async fn fetch_file_as_data_uri(gh: &GhClient, owner: &str, repo: &str, path: &str, git_ref: &str) -> Option<String> {
-    let mut url = reqwest::Url::parse(&format!("{}/repos/{owner}/{repo}/contents/", gh.base)).ok()?;
+async fn fetch_file_as_data_uri(
+    gh: &GhClient,
+    owner: &str,
+    repo: &str,
+    path: &str,
+    git_ref: &str,
+) -> Option<String> {
+    let mut url =
+        reqwest::Url::parse(&format!("{}/repos/{owner}/{repo}/contents/", gh.base)).ok()?;
     {
         let mut segments = url.path_segments_mut().ok()?;
         for part in path.split('/') {
@@ -860,7 +947,11 @@ async fn fetch_file_as_data_uri(gh: &GhClient, owner: &str, repo: &str, path: &s
     if parsed.encoding != "base64" {
         return None;
     }
-    let cleaned: String = parsed.content.chars().filter(|c| !c.is_whitespace()).collect();
+    let cleaned: String = parsed
+        .content
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .collect();
     Some(format!("data:{};base64,{cleaned}", mime_for(path)))
 }
 
@@ -899,7 +990,9 @@ fn parse_patch(patch: &str) -> Vec<DiffHunk> {
             });
             continue;
         }
-        let Some(hunk) = hunks.last_mut() else { continue };
+        let Some(hunk) = hunks.last_mut() else {
+            continue;
+        };
         if let Some(content) = raw_line.strip_prefix('+') {
             hunk.lines.push(DiffLine {
                 kind: LineKind::Addition,
@@ -1033,7 +1126,13 @@ pub async fn create_review_comment(
     let url_path = format!("/repos/{owner}/{repo}/pulls/{number}/comments");
     let res = check(
         gh.post(&url_path)
-            .json(&CreateReviewCommentBody { body, commit_id, path, line, side })
+            .json(&CreateReviewCommentBody {
+                body,
+                commit_id,
+                path,
+                line,
+                side,
+            })
             .send()
             .await
             .map_err(|e| e.to_string())?,
@@ -1119,7 +1218,8 @@ pub struct GitHubRepo {
 /// backs the "browse your repos" clone picker.
 pub async fn list_user_repos(host: &str, token: &str) -> Result<Vec<GitHubRepo>, String> {
     let gh = GhClient::new(host, token)?;
-    let path = "/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member";
+    let path =
+        "/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member";
     let res = check(gh.get(path).send().await.map_err(send_err)?).await?;
     res.json().await.map_err(|e| e.to_string())
 }

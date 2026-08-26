@@ -7,13 +7,7 @@ import { Input } from "@gitbud/ui/input";
 import { Textarea } from "@gitbud/ui/textarea";
 import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@gitbud/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { DiffView } from "@gitbud/ui/diff-view";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
@@ -28,7 +22,15 @@ import { useSettingsStore } from "@/store/useSettingsStore";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@gitbud/ui/utils";
-import type { FileDiff, ImageDiff, Label, AssignableUser, Milestone, Project, CommitSearchResult } from "@/lib/types";
+import type {
+  FileDiff,
+  ImageDiff,
+  Label,
+  AssignableUser,
+  Milestone,
+  Project,
+  CommitSearchResult,
+} from "@/lib/types";
 
 interface CreatePRDialogProps {
   open: boolean;
@@ -37,7 +39,8 @@ interface CreatePRDialogProps {
 
 function branchNameToPrTitle(name: string): string {
   const slashIdx = name.indexOf("/");
-  const withColon = slashIdx === -1 ? name : `${name.slice(0, slashIdx)}: ${name.slice(slashIdx + 1)}`;
+  const withColon =
+    slashIdx === -1 ? name : `${name.slice(0, slashIdx)}: ${name.slice(slashIdx + 1)}`;
   return withColon.replace(/-/g, " ");
 }
 
@@ -57,7 +60,10 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
     () => branches.filter((b) => !b.is_remote && b.name !== branch),
     [branches, branch],
   );
-  const defaultBase = localBranches.find((b) => b.name === "main" || b.name === "master")?.name ?? localBranches[0]?.name ?? "main";
+  const defaultBase =
+    localBranches.find((b) => b.name === "main" || b.name === "master")?.name ??
+    localBranches[0]?.name ??
+    "main";
   const [base, setBase] = useState(defaultBase);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -111,15 +117,24 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
 
   useEffect(() => {
     if (!open || !repoPath || !currentLogin) return;
-    void api.githubListLabels(repoPath, currentLogin).then(setLabels).catch(() => setLabels([]));
+    void api
+      .githubListLabels(repoPath, currentLogin)
+      .then(setLabels)
+      .catch(() => setLabels([]));
     void api
       .githubListAssignableUsers(repoPath, currentLogin)
       .then(setAssignableUsers)
       .catch(() => setAssignableUsers([]));
-    void api.githubListMilestones(repoPath, currentLogin).then(setMilestones).catch(() => setMilestones([]));
+    void api
+      .githubListMilestones(repoPath, currentLogin)
+      .then(setMilestones)
+      .catch(() => setMilestones([]));
     // Projects (v2) is GraphQL-only and errors on repos it isn't enabled for — swallow rather
     // than blocking the rest of the dialog on a feature most repos won't have configured.
-    void api.githubListProjects(repoPath, currentLogin).then(setProjects).catch(() => setProjects([]));
+    void api
+      .githubListProjects(repoPath, currentLogin)
+      .then(setProjects)
+      .catch(() => setProjects([]));
   }, [open, repoPath, currentLogin]);
 
   useEffect(() => {
@@ -151,7 +166,9 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
     void api.getBranchDiffFile(repoPath, base, branch, selectedFilePath).then((diff) => {
       setSelectedDiff(diff);
       if (diff.is_image) {
-        void api.getBranchImageDiff(repoPath, base, branch, selectedFilePath).then(setSelectedImageDiff);
+        void api
+          .getBranchImageDiff(repoPath, base, branch, selectedFilePath)
+          .then(setSelectedImageDiff);
       }
     });
   }, [repoPath, branch, base, selectedFilePath]);
@@ -240,7 +257,12 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
               <span className="text-muted-foreground">←</span>
               <span className="font-mono">{branch}</span>
             </div>
-            <Input placeholder="Title" value={title} onChange={(e) => setTitle(e.target.value)} className="shrink-0" />
+            <Input
+              placeholder="Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="shrink-0"
+            />
             <Textarea
               placeholder="Description"
               value={body}
@@ -304,7 +326,11 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
                   )}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <DiffView path={selectedFilePath} diff={selectedDiff} imageDiff={selectedImageDiff} />
+                  <DiffView
+                    path={selectedFilePath}
+                    diff={selectedDiff}
+                    imageDiff={selectedImageDiff}
+                  />
                 </div>
               </div>
             ) : (
@@ -322,9 +348,13 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
                       className="flex items-center gap-2 border-b border-border/50 px-2 py-1.5 text-sm last:border-b-0"
                     >
                       <span className="min-w-0 flex-1 truncate">{commit.summary}</span>
-                      <span className="shrink-0 text-xs text-muted-foreground">{commit.author_name}</span>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatDistanceToNow(new Date(commit.timestamp * 1000), { addSuffix: true })}
+                        {commit.author_name}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        {formatDistanceToNow(new Date(commit.timestamp * 1000), {
+                          addSuffix: true,
+                        })}
                       </span>
                       <span className="shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-secondary-foreground">
                         {commit.short_oid}
@@ -343,7 +373,10 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
                 key: l.name,
                 label: (
                   <span className="flex items-center gap-1.5">
-                    <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: `#${l.color}` }} />
+                    <span
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: `#${l.color}` }}
+                    />
                     {l.name}
                   </span>
                 ),
@@ -407,7 +440,11 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
             onClick={() => void submit()}
             variant={draft ? "neutral" : "positive"}
           >
-            {draft ? <GitPullRequestDraftIcon className="size-3.5" /> : <GitPullRequestCreateArrow className="size-3.5" />}
+            {draft ? (
+              <GitPullRequestDraftIcon className="size-3.5" />
+            ) : (
+              <GitPullRequestCreateArrow className="size-3.5" />
+            )}
             {submitting ? "Creating…" : draft ? "Create Draft Pull Request" : "Create Pull Request"}
           </Button>
         </DialogFooter>

@@ -60,7 +60,9 @@ export function BlameDialog({ repoPath, path, onOpenChange }: BlameDialogProps) 
                 <span className="mr-2 shrink-0 select-none px-1 text-muted-foreground/60">
                   {line.line_no}
                 </span>
-                <span className="min-w-0 flex-1 whitespace-pre">{content[line.line_no - 1] ?? ""}</span>
+                <span className="min-w-0 flex-1 whitespace-pre">
+                  {content[line.line_no - 1] ?? ""}
+                </span>
               </div>
             ))
           )}

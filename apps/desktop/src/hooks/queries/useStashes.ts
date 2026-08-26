@@ -5,7 +5,10 @@ import { queryKeys } from "@/lib/queryKeys";
 export function useStashes(repoPath: string | null) {
   return useQuery({
     queryKey: queryKeys.stashes(repoPath ?? ""),
-    queryFn: () => api.listStashes(repoPath as string),
+    queryFn: () => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.listStashes(repoPath);
+    },
     enabled: !!repoPath,
     initialData: [],
   });
@@ -23,8 +26,10 @@ function useInvalidateStashes(repoPath: string | null) {
 export function useStashSave(repoPath: string | null) {
   const invalidate = useInvalidateStashes(repoPath);
   return useMutation({
-    mutationFn: ({ message, includeUntracked }: { message: string; includeUntracked: boolean }) =>
-      api.stashSave(repoPath as string, message, includeUntracked),
+    mutationFn: ({ message, includeUntracked }: { message: string; includeUntracked: boolean }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.stashSave(repoPath, message, includeUntracked);
+    },
     onSuccess: invalidate,
   });
 }
@@ -32,7 +37,10 @@ export function useStashSave(repoPath: string | null) {
 export function useStashApply(repoPath: string | null) {
   const invalidate = useInvalidateStashes(repoPath);
   return useMutation({
-    mutationFn: (index: number) => api.stashApply(repoPath as string, index),
+    mutationFn: (index: number) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.stashApply(repoPath, index);
+    },
     onSuccess: invalidate,
   });
 }
@@ -40,7 +48,10 @@ export function useStashApply(repoPath: string | null) {
 export function useStashPop(repoPath: string | null) {
   const invalidate = useInvalidateStashes(repoPath);
   return useMutation({
-    mutationFn: (index: number) => api.stashPop(repoPath as string, index),
+    mutationFn: (index: number) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.stashPop(repoPath, index);
+    },
     onSuccess: invalidate,
   });
 }
@@ -48,7 +59,10 @@ export function useStashPop(repoPath: string | null) {
 export function useStashDrop(repoPath: string | null) {
   const invalidate = useInvalidateStashes(repoPath);
   return useMutation({
-    mutationFn: (index: number) => api.stashDrop(repoPath as string, index),
+    mutationFn: (index: number) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.stashDrop(repoPath, index);
+    },
     onSuccess: invalidate,
   });
 }
@@ -56,8 +70,10 @@ export function useStashDrop(repoPath: string | null) {
 export function useStashApplyFile(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ index, path }: { index: number; path: string }) =>
-      api.stashApplyFile(repoPath as string, index, path),
+    mutationFn: ({ index, path }: { index: number; path: string }) => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.stashApplyFile(repoPath, index, path);
+    },
     onSuccess: () => {
       if (repoPath) void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
     },
@@ -70,18 +86,27 @@ export function useStashApplyFile(repoPath: string | null) {
 export function useStashFiles(repoPath: string | null, index: number | null) {
   return useQuery({
     queryKey: queryKeys.stashFiles(repoPath ?? "", index ?? -1),
-    queryFn: () => api.getStashOid(repoPath as string, index as number).then((oid) => api.getCommitFiles(repoPath as string, oid)),
+    queryFn: () => {
+      if (!repoPath || index === null) throw new Error("no repo/stash selected");
+      return api.getStashOid(repoPath, index).then((oid) => api.getCommitFiles(repoPath, oid));
+    },
     enabled: !!repoPath && index !== null,
   });
 }
 
-export function useStashFileDiff(repoPath: string | null, index: number | null, path: string | null) {
+export function useStashFileDiff(
+  repoPath: string | null,
+  index: number | null,
+  path: string | null,
+) {
   return useQuery({
     queryKey: queryKeys.stashFileDiff(repoPath ?? "", index ?? -1, path ?? ""),
-    queryFn: () =>
-      api
-        .getStashOid(repoPath as string, index as number)
-        .then((oid) => api.getCommitFileDiff(repoPath as string, oid, path as string)),
+    queryFn: () => {
+      if (!repoPath || index === null || !path) throw new Error("no repo/stash/path selected");
+      return api
+        .getStashOid(repoPath, index)
+        .then((oid) => api.getCommitFileDiff(repoPath, oid, path));
+    },
     enabled: !!repoPath && index !== null && !!path,
   });
 }

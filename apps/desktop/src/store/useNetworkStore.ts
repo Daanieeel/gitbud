@@ -17,7 +17,8 @@ interface NetworkState {
 }
 
 export const useNetworkStore = create<NetworkState>((set) => ({
-  offline: typeof navigator !== "undefined" ? !navigator.onLine : false,
+  // Tauri's webview always has `navigator` — no SSR/non-browser context to guard against here.
+  offline: !navigator.onLine,
 
   setOffline: (offline) => set({ offline }),
 

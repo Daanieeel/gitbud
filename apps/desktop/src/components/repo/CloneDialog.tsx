@@ -23,7 +23,10 @@ interface CloneDialogProps {
 }
 
 function repoNameFromUrl(url: string): string {
-  const trimmed = url.trim().replace(/\.git$/, "").replace(/\/+$/, "");
+  const trimmed = url
+    .trim()
+    .replace(/\.git$/, "")
+    .replace(/\/+$/, "");
   const segment = trimmed.split(/[/:]/).pop();
   return segment || "repository";
 }
@@ -53,7 +56,7 @@ export function CloneDialog({ open: isOpen, onOpenChange, onClone }: CloneDialog
 
   const pickParentDir = async () => {
     const dir = await open({ directory: true, title: "Choose a folder to clone into" });
-    if (typeof dir === "string") setParentDir(dir);
+    if (dir) setParentDir(dir);
   };
 
   const submit = async () => {
@@ -75,7 +78,9 @@ export function CloneDialog({ open: isOpen, onOpenChange, onClone }: CloneDialog
         <DialogHeader>
           <DialogTitle>Clone Repository</DialogTitle>
           <DialogDescription>
-            {currentLogin ? "Pick one of your repos, or paste a URL." : "Clone a repository from a URL."}
+            {currentLogin
+              ? "Pick one of your repos, or paste a URL."
+              : "Clone a repository from a URL."}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">

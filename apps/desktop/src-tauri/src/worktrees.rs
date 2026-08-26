@@ -15,10 +15,16 @@ pub fn list_worktrees(repo_path: &str) -> Result<Vec<WorktreeInfo>, String> {
 
     let mut result = Vec::new();
     if let Some(main_path) = repo.workdir() {
-        let branch = repo.head().ok().and_then(|h| h.shorthand().map(|s| s.to_string()));
+        let branch = repo
+            .head()
+            .ok()
+            .and_then(|h| h.shorthand().map(|s| s.to_string()));
         result.push(WorktreeInfo {
             name: "(main)".to_string(),
-            path: main_path.to_string_lossy().trim_end_matches('/').to_string(),
+            path: main_path
+                .to_string_lossy()
+                .trim_end_matches('/')
+                .to_string(),
             branch,
             is_locked: false,
             is_main: true,
@@ -27,12 +33,16 @@ pub fn list_worktrees(repo_path: &str) -> Result<Vec<WorktreeInfo>, String> {
 
     let names = repo.worktrees().map_err(|e| e.message().to_string())?;
     for name in names.iter().flatten() {
-        let wt = repo.find_worktree(name).map_err(|e| e.message().to_string())?;
+        let wt = repo
+            .find_worktree(name)
+            .map_err(|e| e.message().to_string())?;
         let path = wt.path().to_string_lossy().to_string();
         let is_locked = matches!(wt.is_locked(), Ok(WorktreeLockStatus::Locked(_)));
-        let branch = Repository::open(&path)
-            .ok()
-            .and_then(|r| r.head().ok().and_then(|h| h.shorthand().map(|s| s.to_string())));
+        let branch = Repository::open(&path).ok().and_then(|r| {
+            r.head()
+                .ok()
+                .and_then(|h| h.shorthand().map(|s| s.to_string()))
+        });
         result.push(WorktreeInfo {
             name: name.to_string(),
             path,
@@ -47,7 +57,12 @@ pub fn list_worktrees(repo_path: &str) -> Result<Vec<WorktreeInfo>, String> {
 /// Adds a worktree at `path`. When `create_branch` is set, `branch` is created fresh (off the
 /// current HEAD); otherwise `branch` must already exist and is checked out into the new
 /// worktree.
-pub fn add_worktree(repo_path: &str, path: &str, branch: &str, create_branch: bool) -> Result<(), String> {
+pub fn add_worktree(
+    repo_path: &str,
+    path: &str,
+    branch: &str,
+    create_branch: bool,
+) -> Result<(), String> {
     let mut command = std::process::Command::new(crate::settings::git_binary());
     command.current_dir(repo_path);
     if create_branch {
@@ -95,7 +110,10 @@ mod tests {
         fn new(name: &str) -> Self {
             let path = std::env::temp_dir().join(format!(
                 "gitbud-test-worktrees-{name}-{}",
-                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
             ));
             std::fs::create_dir_all(&path).unwrap();
             let repo = Repository::init(&path).unwrap();

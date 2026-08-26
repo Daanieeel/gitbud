@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { CheckIcon, CopyIcon, ExternalLinkIcon, Loader2Icon, TriangleAlertIcon } from "lucide-react";
+import {
+  CheckIcon,
+  CopyIcon,
+  ExternalLinkIcon,
+  Loader2Icon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Dialog,
@@ -43,7 +49,9 @@ export function DeviceFlowDialog() {
         {deviceFlow && (
           <div className="flex flex-col items-center gap-4 py-2">
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-4 py-3">
-              <span className="font-mono text-2xl tracking-[0.2em]">{deviceFlow.code.user_code}</span>
+              <span className="font-mono text-2xl tracking-[0.2em]">
+                {deviceFlow.code.user_code}
+              </span>
               <button
                 type="button"
                 onClick={() => {

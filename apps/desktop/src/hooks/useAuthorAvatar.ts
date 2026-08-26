@@ -11,7 +11,11 @@ const inFlight = new Map<string, Promise<string | null>>();
  * not guaranteed (only matches accounts with that email public/verified). Returns null while
  * unresolved or unavailable; `repoPath`/`login` null skips the lookup entirely (e.g. no GitHub
  * account signed in, or the repo has no GitHub remote). */
-export function useAuthorAvatar(repoPath: string | null, login: string | null, email: string): string | null {
+export function useAuthorAvatar(
+  repoPath: string | null,
+  login: string | null,
+  email: string,
+): string | null {
   const key = email.trim().toLowerCase();
   const [avatar, setAvatar] = useState<string | null>(() => avatarCache.get(key) ?? null);
 

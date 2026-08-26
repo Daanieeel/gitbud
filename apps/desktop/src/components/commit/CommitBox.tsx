@@ -75,17 +75,26 @@ export function CommitBox() {
       const trimmedSummary = summary.trim();
       const trimmedDescription = description.trim();
       if (amending) {
-        await amendCommitMutation.mutateAsync({ summary: trimmedSummary, description: trimmedDescription });
+        await amendCommitMutation.mutateAsync({
+          summary: trimmedSummary,
+          description: trimmedDescription,
+        });
         setSummary("");
         setDescription("");
         setAmending(false);
         void notify(`Amended commit on ${branch ?? "current branch"}`, trimmedSummary);
       } else {
-        await commitMutation.mutateAsync({ summary: trimmedSummary, description: trimmedDescription });
+        await commitMutation.mutateAsync({
+          summary: trimmedSummary,
+          description: trimmedDescription,
+        });
         const fileWord = stagedFiles.length === 1 ? "file" : "files";
         setSummary("");
         setDescription("");
-        void notify(`Committed ${stagedFiles.length} ${fileWord} to ${branch ?? "current branch"}`, trimmedSummary);
+        void notify(
+          `Committed ${stagedFiles.length} ${fileWord} to ${branch ?? "current branch"}`,
+          trimmedSummary,
+        );
       }
     });
   };
@@ -133,7 +142,11 @@ export function CommitBox() {
       )}
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button className="w-full" disabled={disabled || committing} onClick={() => void submit()}>
+          <Button
+            className="w-full"
+            disabled={disabled || committing}
+            onClick={() => void submit()}
+          >
             <GitCommitIcon className={cn("size-3.5", committing && "animate-spin")} />
             <span className="min-w-0 truncate">
               {committing
@@ -147,7 +160,9 @@ export function CommitBox() {
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          {amending ? "Rewrite the last commit with this message and any staged changes" : "Cmd+Enter"}
+          {amending
+            ? "Rewrite the last commit with this message and any staged changes"
+            : "Cmd+Enter"}
         </TooltipContent>
       </Tooltip>
       {hasUnpushedCommit && (
@@ -165,7 +180,8 @@ export function CommitBox() {
               void runUndo(async () => {
                 let restoredSummary: string, restoredDescription: string;
                 try {
-                  [restoredSummary, restoredDescription] = await undoLastCommitMutation.mutateAsync();
+                  [restoredSummary, restoredDescription] =
+                    await undoLastCommitMutation.mutateAsync();
                 } catch (err) {
                   toast.error(String(err));
                   return;

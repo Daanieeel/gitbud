@@ -16,7 +16,9 @@ function Checkbox({
   checked,
   variant = "default",
   ...props
-}: React.ComponentProps<typeof CheckboxPrimitive.Root> & { variant?: keyof typeof CHECKED_VARIANT_CLASSES }) {
+}: React.ComponentProps<typeof CheckboxPrimitive.Root> & {
+  variant?: keyof typeof CHECKED_VARIANT_CLASSES;
+}) {
   return (
     <CheckboxPrimitive.Root
       data-slot="checkbox"

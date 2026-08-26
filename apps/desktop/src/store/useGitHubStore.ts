@@ -76,7 +76,7 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
       clientId,
       currentLogin: accounts.some((a) => a.login === get().currentLogin)
         ? get().currentLogin
-        : accounts[0]?.login ?? null,
+        : (accounts[0]?.login ?? null),
     });
   },
 
@@ -117,7 +117,10 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
         if (get().pollGeneration !== generation) return;
         if (result.status === "success") {
           set((s) => ({
-            accounts: [...s.accounts.filter((a) => a.login !== result.account.login), result.account],
+            accounts: [
+              ...s.accounts.filter((a) => a.login !== result.account.login),
+              result.account,
+            ],
             currentLogin: result.account.login,
             deviceFlow: null,
           }));

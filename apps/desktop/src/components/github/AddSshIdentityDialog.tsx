@@ -17,6 +17,7 @@ import { useIdentityStore } from "@/store/useIdentityStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@gitbud/ui/utils";
 import { copyToClipboard } from "@/lib/clipboard";
+import { isSinglePath } from "@/lib/dialogPaths";
 
 interface AddSshIdentityDialogProps {
   open: boolean;
@@ -44,9 +45,15 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
   };
 
   const pickKey = async () => {
-    const defaultDir = await homeDir().then((h) => `${h}/.ssh`).catch(() => undefined);
-    const file = await open({ title: "Choose an SSH private key", defaultPath: defaultDir, multiple: false });
-    if (typeof file === "string") setKeyPath(file);
+    const defaultDir = await homeDir()
+      .then((h) => `${h}/.ssh`)
+      .catch(() => undefined);
+    const file = await open({
+      title: "Choose an SSH private key",
+      defaultPath: defaultDir,
+      multiple: false,
+    });
+    if (isSinglePath(file)) setKeyPath(file);
   };
 
   const generateKey = async () => {
@@ -55,7 +62,10 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
     setError(null);
     try {
       const dir = await homeDir();
-      const slug = host.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_");
+      const slug = host
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "_");
       const path = `${dir}/.ssh/gitbud_${slug}_ed25519`;
       const pub = await api.generateSshSigningKey(path, label.trim() || host.trim());
       setKeyPath(path);
@@ -123,11 +133,19 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
         <div className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
             Label (optional)
-            <Input placeholder="Work GitLab" value={label} onChange={(e) => setLabel(e.target.value)} />
+            <Input
+              placeholder="Work GitLab"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+            />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             Host
-            <Input placeholder="gitlab.company.com" value={host} onChange={(e) => setHost(e.target.value)} />
+            <Input
+              placeholder="gitlab.company.com"
+              value={host}
+              onChange={(e) => setHost(e.target.value)}
+            />
           </label>
           {mode === "quick" ? (
             <div className="flex flex-col gap-2">

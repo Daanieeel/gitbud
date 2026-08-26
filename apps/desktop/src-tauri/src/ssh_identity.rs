@@ -50,8 +50,17 @@ pub fn add(label: &str, host: &str, key_path: &str) -> Result<Vec<SshIdentity>, 
 
     let mut identities = list()?;
     let id = format!("{host}-{}", chrono::Utc::now().timestamp_millis());
-    let label = if label.trim().is_empty() { host.clone() } else { label.trim().to_string() };
-    identities.push(SshIdentity { id, label, host, key_path });
+    let label = if label.trim().is_empty() {
+        host.clone()
+    } else {
+        label.trim().to_string()
+    };
+    identities.push(SshIdentity {
+        id,
+        label,
+        host,
+        key_path,
+    });
     save(&identities)?;
     Ok(identities)
 }
@@ -71,7 +80,9 @@ pub fn apply_to_repo(repo_path: &str, key_path: &str) -> Result<(), String> {
     let mut config = repo.config().map_err(|e| e.message().to_string())?;
     let escaped = key_path.replace('\'', "'\\''");
     let command = format!("ssh -i '{escaped}' -o IdentitiesOnly=yes");
-    config.set_str("core.sshCommand", &command).map_err(|e| e.message().to_string())
+    config
+        .set_str("core.sshCommand", &command)
+        .map_err(|e| e.message().to_string())
 }
 
 /// Removes any repo-local `core.sshCommand` override, restoring the user's default SSH setup.
@@ -100,7 +111,10 @@ mod tests {
         fn new(name: &str) -> Self {
             let path = std::env::temp_dir().join(format!(
                 "gitbud-test-ssh-identity-{name}-{}",
-                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
             ));
             std::fs::create_dir_all(&path).unwrap();
             git2::Repository::init(&path).unwrap();
@@ -133,7 +147,11 @@ mod tests {
 
         clear_from_repo(&repo_path).unwrap();
         let repo = git2::Repository::open(&repo_path).unwrap();
-        assert!(repo.config().unwrap().get_string("core.sshCommand").is_err());
+        assert!(repo
+            .config()
+            .unwrap()
+            .get_string("core.sshCommand")
+            .is_err());
     }
 
     #[test]
@@ -143,8 +161,15 @@ mod tests {
 
         apply_to_repo(&repo_path, "/tmp/it's a key").unwrap();
         let repo = git2::Repository::open(&repo_path).unwrap();
-        let command = repo.config().unwrap().get_string("core.sshCommand").unwrap();
-        assert_eq!(command, "ssh -i '/tmp/it'\\''s a key' -o IdentitiesOnly=yes");
+        let command = repo
+            .config()
+            .unwrap()
+            .get_string("core.sshCommand")
+            .unwrap();
+        assert_eq!(
+            command,
+            "ssh -i '/tmp/it'\\''s a key' -o IdentitiesOnly=yes"
+        );
     }
 
     #[test]

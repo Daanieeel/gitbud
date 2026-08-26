@@ -59,12 +59,20 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
       return;
     }
     void api
-      .githubGetPullRequestImageDiff(repoPath, login, selectedFile.filename, pr.base_sha, pr.head_sha)
+      .githubGetPullRequestImageDiff(
+        repoPath,
+        login,
+        selectedFile.filename,
+        pr.base_sha,
+        pr.head_sha,
+      )
       .then(setSelectedImageDiff);
   }, [repoPath, login, selectedFile, pr.base_sha, pr.head_sha]);
 
   const filePaths = useMemo(() => files.map((f) => f.filename), [files]);
-  const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, (path) => selectFile(path));
+  const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, (path) =>
+    selectFile(path),
+  );
   const fileListRef = useRef<HTMLDivElement>(null);
   const { width, onPointerDown } = useResizableWidth("panel-width:pr-files", 224, 160, 560);
 
@@ -167,12 +175,24 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
             comments={fileComments}
             onAddComment={(line, side, body) => {
               if (!selectedFilePath) return;
-              addCommentMutation.mutate({ commitId: pr.head_sha, path: selectedFilePath, line, side, body });
+              addCommentMutation.mutate({
+                commitId: pr.head_sha,
+                path: selectedFilePath,
+                line,
+                side,
+                body,
+              });
             }}
           />
         </div>
       </div>
-      <MergePRDialog open={mergeOpen} onOpenChange={setMergeOpen} repoPath={repoPath} login={login} pr={pr} />
+      <MergePRDialog
+        open={mergeOpen}
+        onOpenChange={setMergeOpen}
+        repoPath={repoPath}
+        login={login}
+        pr={pr}
+      />
     </div>
   );
 }

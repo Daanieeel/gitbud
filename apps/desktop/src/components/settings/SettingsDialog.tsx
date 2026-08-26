@@ -18,13 +18,7 @@ import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
 import { Checkbox } from "@gitbud/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@gitbud/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { GitHubMark } from "@/components/github/GitHubMark";
 import { UpdateChecker } from "./UpdateChecker";
@@ -38,6 +32,7 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@gitbud/ui/utils";
 import { Slider } from "@gitbud/ui/slider";
+import { isSinglePath } from "@/lib/dialogPaths";
 import type {
   CacheLevel,
   DiffAlgorithm,
@@ -108,7 +103,10 @@ function Select<T extends string>({
   return (
     <select
       value={value}
-      onChange={(e) => onChange(e.target.value as T)}
+      onChange={(e) => {
+        const next = options.find((o) => o === e.target.value);
+        if (next !== undefined) onChange(next);
+      }}
       className="h-8 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       {options.map((o) => (
@@ -258,7 +256,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
         multiple: false,
         filters: [{ name: "JSON", extensions: ["json"] }],
       });
-      if (typeof src === "string") await importFrom(src);
+      if (isSinglePath(src)) await importFrom(src);
     } catch (e) {
       setImportExportError(String(e));
     }
@@ -266,373 +264,417 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
 
   return (
     <>
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[75vh] w-[75vw] max-w-none flex-col">
-        <DialogHeader>
-          <DialogTitle>Settings</DialogTitle>
-        </DialogHeader>
-        <div className="flex min-h-0 flex-1 gap-4">
-          <div className="flex w-32 shrink-0 flex-col gap-0.5">
-            {SECTIONS.map((s) => (
-              <button
-                key={s.key}
-                onClick={() => setSection(s.key)}
-                className={cn(
-                  "flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent",
-                  section === s.key && "bg-accent font-medium",
-                )}
-              >
-                <s.icon className="size-3.5 shrink-0" />
-                {s.key}
-              </button>
-            ))}
-          </div>
-          <div className="min-w-0 flex-1 divide-y divide-border overflow-auto">
-            {section === "General" && (
-              <>
-                <Row label="Theme">
-                  <Select
-                    value={settings.theme}
-                    options={["dark", "light", "system"] as ThemeMode[]}
-                    onChange={(theme) => void update({ theme })}
-                  />
-                </Row>
-                <Row label="Default clone directory">
-                  <Input
-                    className="h-8 w-56"
-                    placeholder="~/Developer"
-                    value={settings.default_clone_dir ?? ""}
-                    onChange={(e) => void update({ default_clone_dir: e.target.value || null })}
-                  />
-                </Row>
-                <Row label="Desktop notifications">
-                  <Checkbox
-                    checked={settings.desktop_notifications}
-                    onCheckedChange={(checked) => void update({ desktop_notifications: checked === true })}
-                  />
-                </Row>
-                <Row label="Auto-stage new changes">
-                  <Checkbox
-                    checked={settings.auto_stage_new_changes}
-                    onCheckedChange={(checked) => void update({ auto_stage_new_changes: checked === true })}
-                  />
-                </Row>
-                <div className="flex items-center justify-between gap-6 py-1.5">
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-sm text-muted-foreground">Memory usage</span>
-                    <span className="max-w-[40ch] text-xs text-muted-foreground/70">
-                      Lower uses less memory but refetches more often; higher keeps more in memory
-                      for snappier repo switching.
-                    </span>
-                  </div>
-                  <Slider
-                    className="flex-1"
-                    min={0}
-                    max={CACHE_LEVELS.length - 1}
-                    step={1}
-                    value={[CACHE_LEVELS.findIndex((l) => l.key === settings.cache_level)]}
-                    onValueChange={([index]) => setPendingCacheLevel(CACHE_LEVELS[index].key)}
-                    marks={CACHE_LEVELS.map((l, i) => ({ value: i, label: l.label, tooltip: l.tooltip }))}
-                  />
-                </div>
-                <Row label="Favorite editor">
-                  <EditorPicker
-                    onSelect={(favorite_editor, customAppPath) =>
-                      void update({
-                        favorite_editor,
-                        custom_editor_command: favorite_editor === CUSTOM_EDITOR_ID ? (customAppPath ?? null) : null,
-                      })
-                    }
-                  >
-                    <Button variant="secondary" size="sm" className="h-8 w-56 justify-start gap-2">
-                      {favoriteEditor ? (
-                        <>
-                          <img src={favoriteEditor.icon} alt="" className="size-4 shrink-0" />
-                          <span className="truncate">{favoriteEditor.name}</span>
-                        </>
-                      ) : settings.favorite_editor === CUSTOM_EDITOR_ID && settings.custom_editor_command ? (
-                        <>
-                          {customEditorIcon ? (
-                            <img src={customEditorIcon} alt="" className="size-4 shrink-0" />
-                          ) : (
-                            <CodeIcon className="size-4 shrink-0" />
-                          )}
-                          <span className="truncate" title={settings.custom_editor_command}>
-                            {customEditorName(settings.custom_editor_command)}
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">Choose an editor…</span>
-                      )}
-                    </Button>
-                  </EditorPicker>
-                </Row>
-                <div className="flex flex-col gap-1.5 py-1.5">
-                  <span className="text-sm text-muted-foreground">Open PR after creation</span>
-                  <div className="flex gap-2">
-                    {OPEN_PR_OPTIONS.map((o) => (
-                      <button
-                        key={o.key}
-                        type="button"
-                        onClick={() => void update({ open_pr_after_creation: o.key })}
-                        className={cn(
-                          "flex-1 rounded-md border border-border p-2 text-left",
-                          settings.open_pr_after_creation === o.key && "border-2 border-primary bg-primary/10 p-[7px]",
-                        )}
-                      >
-                        <div className="flex flex-col gap-1">
-                          <div className="text-sm font-medium">{o.label}</div>
-                          <div className="text-xs text-muted-foreground">{o.description}</div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2 py-1.5">
-                  <div className="flex items-center justify-between gap-6">
-                    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="text-sm text-muted-foreground">Local data</span>
-                      <span className="text-xs text-muted-foreground/70">
-                        Local mirror of pull requests, files, comments, checks, and avatars —
-                        kept on disk regardless of the memory setting above, for instant paint
-                        and offline viewing.
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="flex h-[75vh] w-[75vw] max-w-none flex-col">
+          <DialogHeader>
+            <DialogTitle>Settings</DialogTitle>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-1 gap-4">
+            <div className="flex w-32 shrink-0 flex-col gap-0.5">
+              {SECTIONS.map((s) => (
+                <button
+                  key={s.key}
+                  onClick={() => setSection(s.key)}
+                  className={cn(
+                    "flex items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent",
+                    section === s.key && "bg-accent font-medium",
+                  )}
+                >
+                  <s.icon className="size-3.5 shrink-0" />
+                  {s.key}
+                </button>
+              ))}
+            </div>
+            <div className="min-w-0 flex-1 divide-y divide-border overflow-auto">
+              {section === "General" && (
+                <>
+                  <Row label="Theme">
+                    <Select
+                      value={settings.theme}
+                      options={["dark", "light", "system"] satisfies ThemeMode[]}
+                      onChange={(theme) => void update({ theme })}
+                    />
+                  </Row>
+                  <Row label="Default clone directory">
+                    <Input
+                      className="h-8 w-56"
+                      placeholder="~/Developer"
+                      value={settings.default_clone_dir ?? ""}
+                      onChange={(e) => void update({ default_clone_dir: e.target.value || null })}
+                    />
+                  </Row>
+                  <Row label="Desktop notifications">
+                    <Checkbox
+                      checked={settings.desktop_notifications}
+                      onCheckedChange={(checked) =>
+                        void update({ desktop_notifications: checked === true })
+                      }
+                    />
+                  </Row>
+                  <Row label="Auto-stage new changes">
+                    <Checkbox
+                      checked={settings.auto_stage_new_changes}
+                      onCheckedChange={(checked) =>
+                        void update({ auto_stage_new_changes: checked === true })
+                      }
+                    />
+                  </Row>
+                  <div className="flex items-center justify-between gap-6 py-1.5">
+                    <div className="flex flex-col gap-0.5">
+                      <span className="text-sm text-muted-foreground">Memory usage</span>
+                      <span className="max-w-[40ch] text-xs text-muted-foreground/70">
+                        Lower uses less memory but refetches more often; higher keeps more in memory
+                        for snappier repo switching.
                       </span>
                     </div>
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      className="h-8 shrink-0 gap-1.5"
-                      onClick={() => void api.getCacheDirPath().then((dir) => revealItemInDir(dir))}
+                    <Slider
+                      className="flex-1"
+                      min={0}
+                      max={CACHE_LEVELS.length - 1}
+                      step={1}
+                      value={[CACHE_LEVELS.findIndex((l) => l.key === settings.cache_level)]}
+                      onValueChange={([index]) => setPendingCacheLevel(CACHE_LEVELS[index].key)}
+                      marks={CACHE_LEVELS.map((l, i) => ({
+                        value: i,
+                        label: l.label,
+                        tooltip: l.tooltip,
+                      }))}
+                    />
+                  </div>
+                  <Row label="Favorite editor">
+                    <EditorPicker
+                      onSelect={(favorite_editor, customAppPath) =>
+                        void update({
+                          favorite_editor,
+                          custom_editor_command:
+                            favorite_editor === CUSTOM_EDITOR_ID ? (customAppPath ?? null) : null,
+                        })
+                      }
                     >
-                      <FolderOpenIcon className="size-3.5" />
-                      Open
-                    </Button>
-                  </div>
-                  <div className="flex items-center justify-between gap-6 pl-3">
-                    <span className="text-sm text-muted-foreground">Cached repo data</span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-sm text-muted-foreground">
-                        {repoCacheBytes === null ? "…" : formatBytes(repoCacheBytes)}
-                      </span>
-                      <ClearCacheButton
-                        clearing={clearingRepoCache}
-                        disabled={clearingRepoCache || repoCacheBytes === 0}
-                        confirmOpen={confirmClearRepoCache}
-                        onConfirmOpenChange={setConfirmClearRepoCache}
-                        confirmText="Delete all cached PR data? It'll be re-fetched from GitHub as needed."
-                        onClear={() => void clearRepoCache()}
-                      />
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-8 w-56 justify-start gap-2"
+                      >
+                        {favoriteEditor ? (
+                          <>
+                            <img src={favoriteEditor.icon} alt="" className="size-4 shrink-0" />
+                            <span className="truncate">{favoriteEditor.name}</span>
+                          </>
+                        ) : settings.favorite_editor === CUSTOM_EDITOR_ID &&
+                          settings.custom_editor_command ? (
+                          <>
+                            {customEditorIcon ? (
+                              <img src={customEditorIcon} alt="" className="size-4 shrink-0" />
+                            ) : (
+                              <CodeIcon className="size-4 shrink-0" />
+                            )}
+                            <span className="truncate" title={settings.custom_editor_command}>
+                              {customEditorName(settings.custom_editor_command)}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-muted-foreground">Choose an editor…</span>
+                        )}
+                      </Button>
+                    </EditorPicker>
+                  </Row>
+                  <div className="flex flex-col gap-1.5 py-1.5">
+                    <span className="text-sm text-muted-foreground">Open PR after creation</span>
+                    <div className="flex gap-2">
+                      {OPEN_PR_OPTIONS.map((o) => (
+                        <button
+                          key={o.key}
+                          type="button"
+                          onClick={() => void update({ open_pr_after_creation: o.key })}
+                          className={cn(
+                            "flex-1 rounded-md border border-border p-2 text-left",
+                            settings.open_pr_after_creation === o.key &&
+                              "border-2 border-primary bg-primary/10 p-[7px]",
+                          )}
+                        >
+                          <div className="flex flex-col gap-1">
+                            <div className="text-sm font-medium">{o.label}</div>
+                            <div className="text-xs text-muted-foreground">{o.description}</div>
+                          </div>
+                        </button>
+                      ))}
                     </div>
                   </div>
-                  <div className="flex items-center justify-between gap-6 pl-3">
-                    <span className="text-sm text-muted-foreground">Cached user avatars</span>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <span className="text-sm text-muted-foreground">
-                        {avatarCacheBytes === null ? "…" : formatBytes(avatarCacheBytes)}
-                      </span>
-                      <ClearCacheButton
-                        clearing={clearingAvatarCache}
-                        disabled={clearingAvatarCache || avatarCacheBytes === 0}
-                        confirmOpen={confirmClearAvatarCache}
-                        onConfirmOpenChange={setConfirmClearAvatarCache}
-                        confirmText="Delete all cached avatars? They'll be re-fetched as PRs load."
-                        onClear={() => void clearAvatarCache()}
-                      />
+                  <div className="flex flex-col gap-2 py-1.5">
+                    <div className="flex items-center justify-between gap-6">
+                      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="text-sm text-muted-foreground">Local data</span>
+                        <span className="text-xs text-muted-foreground/70">
+                          Local mirror of pull requests, files, comments, checks, and avatars — kept
+                          on disk regardless of the memory setting above, for instant paint and
+                          offline viewing.
+                        </span>
+                      </div>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-8 shrink-0 gap-1.5"
+                        onClick={() =>
+                          void api.getCacheDirPath().then((dir) => revealItemInDir(dir))
+                        }
+                      >
+                        <FolderOpenIcon className="size-3.5" />
+                        Open
+                      </Button>
+                    </div>
+                    <div className="flex items-center justify-between gap-6 pl-3">
+                      <span className="text-sm text-muted-foreground">Cached repo data</span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          {repoCacheBytes === null ? "…" : formatBytes(repoCacheBytes)}
+                        </span>
+                        <ClearCacheButton
+                          clearing={clearingRepoCache}
+                          disabled={clearingRepoCache || repoCacheBytes === 0}
+                          confirmOpen={confirmClearRepoCache}
+                          onConfirmOpenChange={setConfirmClearRepoCache}
+                          confirmText="Delete all cached PR data? It'll be re-fetched from GitHub as needed."
+                          onClear={() => void clearRepoCache()}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between gap-6 pl-3">
+                      <span className="text-sm text-muted-foreground">Cached user avatars</span>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="text-sm text-muted-foreground">
+                          {avatarCacheBytes === null ? "…" : formatBytes(avatarCacheBytes)}
+                        </span>
+                        <ClearCacheButton
+                          clearing={clearingAvatarCache}
+                          disabled={clearingAvatarCache || avatarCacheBytes === 0}
+                          confirmOpen={confirmClearAvatarCache}
+                          onConfirmOpenChange={setConfirmClearAvatarCache}
+                          confirmText="Delete all cached avatars? They'll be re-fetched as PRs load."
+                          onClear={() => void clearAvatarCache()}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-              </>
-            )}
+                </>
+              )}
 
-            {section === "Git" && (
-              <>
-                <Row label="Name">
-                  <Input className="h-8 w-56" value={gitName} onChange={(e) => setGitName(e.target.value)} />
-                </Row>
-                <Row label="Email">
-                  <Input className="h-8 w-56" value={gitEmail} onChange={(e) => setGitEmail(e.target.value)} />
-                </Row>
-                <Row label="Apply to">
-                  <Select
-                    value={gitScope}
-                    options={["global", "repo"] as const}
-                    onChange={setGitScope}
-                  />
-                </Row>
-                <div className="flex justify-end py-2">
-                  <Button size="sm" disabled={savingIdentity} onClick={() => void saveGitIdentity()}>
-                    <SaveIcon className={cn("size-3.5", savingIdentity && "animate-spin")} />
-                    {savingIdentity ? "Saving…" : "Save Identity"}
-                  </Button>
-                </div>
-                <div className="py-2">
-                  <SigningWizard
-                    repoPath={repoPath}
-                    name={gitName}
-                    email={gitEmail}
-                    global={gitScope === "global"}
-                  />
-                </div>
-                <Row label="Default branch name">
-                  <Input
-                    className="h-8 w-32"
-                    value={settings.default_branch_name}
-                    onChange={(e) => void update({ default_branch_name: e.target.value })}
-                  />
-                </Row>
-                <Row label="Pull strategy">
-                  <Select
-                    value={settings.pull_strategy}
-                    options={["merge", "rebase", "ff-only"] as PullStrategy[]}
-                    onChange={(pull_strategy) => void update({ pull_strategy })}
-                  />
-                </Row>
-              </>
-            )}
-
-            {section === "Diff" && (
-              <>
-                <Row label="View">
-                  <Select
-                    value={settings.diff_view}
-                    options={["unified", "split"] as DiffViewMode[]}
-                    onChange={(diff_view) => void update({ diff_view })}
-                  />
-                </Row>
-                <Row label="Ignore whitespace">
-                  <Checkbox
-                    checked={settings.ignore_whitespace}
-                    onCheckedChange={(checked) => void update({ ignore_whitespace: checked === true })}
-                  />
-                </Row>
-                <Row label="Diff algorithm">
-                  <Select
-                    value={settings.diff_algorithm}
-                    options={["myers", "minimal", "patience"] as DiffAlgorithm[]}
-                    onChange={(diff_algorithm) => void update({ diff_algorithm })}
-                  />
-                </Row>
-                <Row label="Font size">
-                  <Input
-                    type="number"
-                    className="h-8 w-20"
-                    value={settings.diff_font_size}
-                    onChange={(e) => void update({ diff_font_size: Number(e.target.value) || 12 })}
-                  />
-                </Row>
-              </>
-            )}
-
-            {section === "Sidebar" && (
-              <>
-                <Row label="Show ahead/behind badges">
-                  <Checkbox
-                    checked={settings.show_ahead_behind}
-                    onCheckedChange={(checked) => void update({ show_ahead_behind: checked === true })}
-                  />
-                </Row>
-                <Row label="Sort repos by">
-                  <Select
-                    value={settings.sidebar_sort}
-                    options={["group", "name", "recent", "manual"] as SidebarSort[]}
-                    onChange={(sidebar_sort) => void update({ sidebar_sort })}
-                  />
-                </Row>
-              </>
-            )}
-
-            {section === "GitHub" && (
-              <>
-                <Row label="Host">
-                  <Input
-                    className="h-8 w-56"
-                    placeholder="github.com"
-                    value={host}
-                    onChange={(e) => setHost(e.target.value)}
-                    onBlur={() => void api.githubSetHost(host || "github.com")}
-                  />
-                </Row>
-                <Row label="OAuth Client ID">
-                  <Input
-                    className="h-8 w-56"
-                    placeholder="(none set)"
-                    value={clientId ?? ""}
-                    onChange={(e) => void setClientId(e.target.value)}
-                  />
-                </Row>
-                <p className="pt-2 text-xs text-muted-foreground">
-                  For GitHub Enterprise Server, set Host to your GHES domain (e.g.
-                  github.example.com). API and web links adjust automatically.
-                </p>
-              </>
-            )}
-
-            {section === "Advanced" && (
-              <>
-                <Row label="Git binary path">
-                  <Input
-                    className="h-8 w-56"
-                    placeholder="git"
-                    value={settings.git_binary_path ?? ""}
-                    onChange={(e) => void update({ git_binary_path: e.target.value || null })}
-                  />
-                </Row>
-                <Row label="Filesystem watch">
-                  <Checkbox
-                    checked={settings.fs_watch_enabled}
-                    onCheckedChange={(checked) => void update({ fs_watch_enabled: checked === true })}
-                  />
-                </Row>
-                <Row label="Settings backup">
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="secondary" onClick={() => void exportSettings()}>
-                      <DownloadIcon className="size-3.5" />
-                      Export…
-                    </Button>
-                    <Button size="sm" variant="secondary" onClick={() => void importSettings()}>
-                      <UploadIcon className="size-3.5" />
-                      Import…
+              {section === "Git" && (
+                <>
+                  <Row label="Name">
+                    <Input
+                      className="h-8 w-56"
+                      value={gitName}
+                      onChange={(e) => setGitName(e.target.value)}
+                    />
+                  </Row>
+                  <Row label="Email">
+                    <Input
+                      className="h-8 w-56"
+                      value={gitEmail}
+                      onChange={(e) => setGitEmail(e.target.value)}
+                    />
+                  </Row>
+                  <Row label="Apply to">
+                    <Select
+                      value={gitScope}
+                      options={["global", "repo"] as const}
+                      onChange={setGitScope}
+                    />
+                  </Row>
+                  <div className="flex justify-end py-2">
+                    <Button
+                      size="sm"
+                      disabled={savingIdentity}
+                      onClick={() => void saveGitIdentity()}
+                    >
+                      <SaveIcon className={cn("size-3.5", savingIdentity && "animate-spin")} />
+                      {savingIdentity ? "Saving…" : "Save Identity"}
                     </Button>
                   </div>
-                </Row>
-                {importExportError && (
-                  <p className="text-xs text-destructive">{importExportError}</p>
-                )}
-                <Row label="Updates">
-                  <UpdateChecker />
-                </Row>
-              </>
-            )}
+                  <div className="py-2">
+                    <SigningWizard
+                      repoPath={repoPath}
+                      name={gitName}
+                      email={gitEmail}
+                      global={gitScope === "global"}
+                    />
+                  </div>
+                  <Row label="Default branch name">
+                    <Input
+                      className="h-8 w-32"
+                      value={settings.default_branch_name}
+                      onChange={(e) => void update({ default_branch_name: e.target.value })}
+                    />
+                  </Row>
+                  <Row label="Pull strategy">
+                    <Select
+                      value={settings.pull_strategy}
+                      options={["merge", "rebase", "ff-only"] satisfies PullStrategy[]}
+                      onChange={(pull_strategy) => void update({ pull_strategy })}
+                    />
+                  </Row>
+                </>
+              )}
+
+              {section === "Diff" && (
+                <>
+                  <Row label="View">
+                    <Select
+                      value={settings.diff_view}
+                      options={["unified", "split"] satisfies DiffViewMode[]}
+                      onChange={(diff_view) => void update({ diff_view })}
+                    />
+                  </Row>
+                  <Row label="Ignore whitespace">
+                    <Checkbox
+                      checked={settings.ignore_whitespace}
+                      onCheckedChange={(checked) =>
+                        void update({ ignore_whitespace: checked === true })
+                      }
+                    />
+                  </Row>
+                  <Row label="Diff algorithm">
+                    <Select
+                      value={settings.diff_algorithm}
+                      options={["myers", "minimal", "patience"] satisfies DiffAlgorithm[]}
+                      onChange={(diff_algorithm) => void update({ diff_algorithm })}
+                    />
+                  </Row>
+                  <Row label="Font size">
+                    <Input
+                      type="number"
+                      className="h-8 w-20"
+                      value={settings.diff_font_size}
+                      onChange={(e) =>
+                        void update({ diff_font_size: Number(e.target.value) || 12 })
+                      }
+                    />
+                  </Row>
+                </>
+              )}
+
+              {section === "Sidebar" && (
+                <>
+                  <Row label="Show ahead/behind badges">
+                    <Checkbox
+                      checked={settings.show_ahead_behind}
+                      onCheckedChange={(checked) =>
+                        void update({ show_ahead_behind: checked === true })
+                      }
+                    />
+                  </Row>
+                  <Row label="Sort repos by">
+                    <Select
+                      value={settings.sidebar_sort}
+                      options={["group", "name", "recent", "manual"] satisfies SidebarSort[]}
+                      onChange={(sidebar_sort) => void update({ sidebar_sort })}
+                    />
+                  </Row>
+                </>
+              )}
+
+              {section === "GitHub" && (
+                <>
+                  <Row label="Host">
+                    <Input
+                      className="h-8 w-56"
+                      placeholder="github.com"
+                      value={host}
+                      onChange={(e) => setHost(e.target.value)}
+                      onBlur={() => void api.githubSetHost(host || "github.com")}
+                    />
+                  </Row>
+                  <Row label="OAuth Client ID">
+                    <Input
+                      className="h-8 w-56"
+                      placeholder="(none set)"
+                      value={clientId ?? ""}
+                      onChange={(e) => void setClientId(e.target.value)}
+                    />
+                  </Row>
+                  <p className="pt-2 text-xs text-muted-foreground">
+                    For GitHub Enterprise Server, set Host to your GHES domain (e.g.
+                    github.example.com). API and web links adjust automatically.
+                  </p>
+                </>
+              )}
+
+              {section === "Advanced" && (
+                <>
+                  <Row label="Git binary path">
+                    <Input
+                      className="h-8 w-56"
+                      placeholder="git"
+                      value={settings.git_binary_path ?? ""}
+                      onChange={(e) => void update({ git_binary_path: e.target.value || null })}
+                    />
+                  </Row>
+                  <Row label="Filesystem watch">
+                    <Checkbox
+                      checked={settings.fs_watch_enabled}
+                      onCheckedChange={(checked) =>
+                        void update({ fs_watch_enabled: checked === true })
+                      }
+                    />
+                  </Row>
+                  <Row label="Settings backup">
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="secondary" onClick={() => void exportSettings()}>
+                        <DownloadIcon className="size-3.5" />
+                        Export…
+                      </Button>
+                      <Button size="sm" variant="secondary" onClick={() => void importSettings()}>
+                        <UploadIcon className="size-3.5" />
+                        Import…
+                      </Button>
+                    </div>
+                  </Row>
+                  {importExportError && (
+                    <p className="text-xs text-destructive">{importExportError}</p>
+                  )}
+                  <Row label="Updates">
+                    <UpdateChecker />
+                  </Row>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
-    <Dialog open={pendingCacheLevel !== null} onOpenChange={(o) => !o && setPendingCacheLevel(null)}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Restart required</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          Changing memory usage takes effect on the next launch. Restart now to apply it, or
-          cancel to keep the current setting.
-        </p>
-        <DialogFooter>
-          <Button variant="ghost" disabled={restarting} onClick={() => setPendingCacheLevel(null)}>
-            Cancel
-          </Button>
-          <Button
-            disabled={restarting}
-            onClick={() => {
-              if (!pendingCacheLevel) return;
-              setRestarting(true);
-              void update({ cache_level: pendingCacheLevel }).then(() => relaunch());
-            }}
-          >
-            {restarting ? "Restarting…" : "Restart Now"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={pendingCacheLevel !== null}
+        onOpenChange={(o) => !o && setPendingCacheLevel(null)}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Restart required</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Changing memory usage takes effect on the next launch. Restart now to apply it, or
+            cancel to keep the current setting.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              disabled={restarting}
+              onClick={() => setPendingCacheLevel(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={restarting}
+              onClick={() => {
+                if (!pendingCacheLevel) return;
+                setRestarting(true);
+                void update({ cache_level: pendingCacheLevel }).then(() => relaunch());
+              }}
+            >
+              {restarting ? "Restarting…" : "Restart Now"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

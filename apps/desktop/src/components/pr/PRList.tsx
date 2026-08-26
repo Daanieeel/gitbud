@@ -24,19 +24,19 @@ function prStatus(pr: PullRequest): PRStatus {
   return "open";
 }
 
-const PR_STATUS_ICON: Record<PRStatus, typeof GitPullRequestIcon> = {
+const PR_STATUS_ICON = {
   merged: GitPullRequestIcon,
   draft: GitPullRequestDraftIcon,
   closed: GitPullRequestClosedIcon,
   open: GitPullRequestArrowIcon,
-};
+} satisfies Record<PRStatus, typeof GitPullRequestIcon>;
 
-const PR_STATUS_COLOR: Record<PRStatus, string> = {
+const PR_STATUS_COLOR = {
   merged: "text-accent-purple",
   draft: "text-muted-foreground",
   closed: "text-destructive",
   open: "text-accent-green",
-};
+} satisfies Record<PRStatus, string>;
 
 // Just a starting guess (see `measureElement` below) — most rows are this tall, but one with
 // labels wraps a second line of pills underneath and grows.
@@ -54,7 +54,17 @@ interface PRListProps {
   onSelect: (number: number) => void;
 }
 
-export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMore, loadingMore, onLoadMore, onSelect }: PRListProps) {
+export function PRList({
+  loading,
+  repoPath,
+  login,
+  pulls,
+  selectedNumber,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  onSelect,
+}: PRListProps) {
   const [filter, setFilter] = useState("");
   const isPrTabActive = useIsPrTabActive();
 
@@ -134,7 +144,9 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
             ))}
           </div>
         ) : filtered.length === 0 ? (
-          <div className="p-4 text-center text-sm text-muted-foreground">No pull requests found</div>
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            No pull requests found
+          </div>
         ) : (
           <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
             {items.map((vi) => {
@@ -146,7 +158,13 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
                   key={vi.key}
                   ref={virtualizer.measureElement}
                   data-index={vi.index}
-                  style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start}px)` }}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    transform: `translateY(${vi.start}px)`,
+                  }}
                 >
                   <div
                     className={cn(
@@ -159,7 +177,11 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
                     <div className="min-w-0 flex-1">
                       <div className="truncate">{pr.title}</div>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Avatar src={pr.author_avatar_url} alt={pr.author_login} className="size-3.5" />
+                        <Avatar
+                          src={pr.author_avatar_url}
+                          alt={pr.author_login}
+                          className="size-3.5"
+                        />
                         <span>
                           #{pr.number} by {pr.author_login}
                         </span>
@@ -167,10 +189,16 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
                           repoPath={repoPath}
                           login={login}
                           sha={pr.head_sha}
-                          pollIntervalMs={prPollIntervalMs(pr, isPrTabActive, pr.number === selectedNumber)}
+                          pollIntervalMs={prPollIntervalMs(
+                            pr,
+                            isPrTabActive,
+                            pr.number === selectedNumber,
+                          )}
                         />
                         {pr.merged && (
-                          <span className="rounded bg-accent-purple/20 px-1 text-accent-purple">merged</span>
+                          <span className="rounded bg-accent-purple/20 px-1 text-accent-purple">
+                            merged
+                          </span>
                         )}
                       </div>
                       {pr.labels.length > 0 && (

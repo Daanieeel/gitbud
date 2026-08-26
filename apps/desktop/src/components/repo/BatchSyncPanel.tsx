@@ -1,5 +1,11 @@
 import { useEffect } from "react";
-import { ArrowDownToLineIcon, CheckIcon, CircleIcon, RefreshCwIcon, XCircleIcon } from "lucide-react";
+import {
+  ArrowDownToLineIcon,
+  CheckIcon,
+  CircleIcon,
+  RefreshCwIcon,
+  XCircleIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@gitbud/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
@@ -64,7 +70,13 @@ export function BatchSyncTrigger({
     <div className="flex gap-2">
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="secondary" size="sm" className="flex-1" disabled={running} onClick={run("fetch")}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="flex-1"
+            disabled={running}
+            onClick={run("fetch")}
+          >
             <RefreshCwIcon className={cn("size-3.5", running && "animate-spin")} />
             {`Fetch${suffix}`}
           </Button>
@@ -73,7 +85,13 @@ export function BatchSyncTrigger({
       </Tooltip>
       <Tooltip>
         <TooltipTrigger asChild>
-          <Button variant="secondary" size="sm" className="flex-1" disabled={running} onClick={run("pull")}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="flex-1"
+            disabled={running}
+            onClick={run("pull")}
+          >
             <ArrowDownToLineIcon className={cn("size-3.5", running && "animate-pulse")} />
             {`Pull${suffix}`}
           </Button>
@@ -109,7 +127,9 @@ function BatchSyncToastContent({ toastId }: { toastId: string | number }) {
   return (
     <div className="flex w-[22rem] flex-col gap-1.5 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg">
       <div className="flex items-center justify-between text-sm font-medium">
-        <span>{kind === "fetch" ? "Fetch All" : "Pull All"}: {running ? "running…" : "done"}</span>
+        <span>
+          {kind === "fetch" ? "Fetch All" : "Pull All"}: {running ? "running…" : "done"}
+        </span>
         <span className="text-xs text-muted-foreground">
           {doneCount}/{entries.length}
           {errorCount > 0 && ` (${errorCount} failed)`}
@@ -122,10 +142,16 @@ function BatchSyncToastContent({ toastId }: { toastId: string | number }) {
             <Tooltip key={path}>
               <TooltipTrigger asChild>
                 <div className="flex items-center gap-2 py-0.5 text-xs">
-                  {status === "pending" && <CircleIcon className="size-3 shrink-0 text-muted-foreground" />}
-                  {status === "running" && <RefreshCwIcon className="size-3 shrink-0 animate-spin text-primary" />}
+                  {status === "pending" && (
+                    <CircleIcon className="size-3 shrink-0 text-muted-foreground" />
+                  )}
+                  {status === "running" && (
+                    <RefreshCwIcon className="size-3 shrink-0 animate-spin text-primary" />
+                  )}
                   {status === "done" && <CheckIcon className="size-3 shrink-0 text-accent-green" />}
-                  {status === "error" && <XCircleIcon className="size-3 shrink-0 text-destructive" />}
+                  {status === "error" && (
+                    <XCircleIcon className="size-3 shrink-0 text-destructive" />
+                  )}
                   <span className="min-w-0 flex-1 truncate">{repo?.name ?? path}</span>
                 </div>
               </TooltipTrigger>

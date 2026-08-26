@@ -3,13 +3,7 @@ import { GitBranchPlusIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
 import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@gitbud/ui/dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { api } from "@/lib/tauri";
 import { useQueryClient } from "@tanstack/react-query";
 import { useRepoStore } from "@/store/useRepoStore";

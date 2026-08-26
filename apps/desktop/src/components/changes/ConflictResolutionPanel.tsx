@@ -3,7 +3,11 @@ import { openPath } from "@tauri-apps/plugin-opener";
 import { CheckIcon, PencilIcon, UserIcon, UsersIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { api } from "@/lib/tauri";
-import { useResolveConflict, useResolveConflictWithContent, useToggleStaged } from "@/hooks/queries/useRepoStatus";
+import {
+  useResolveConflict,
+  useResolveConflictWithContent,
+  useToggleStaged,
+} from "@/hooks/queries/useRepoStatus";
 import { buildMergeBlocks, reconstructFile, type Pick } from "@/lib/merge3";
 import type { ConflictSides } from "@/lib/types";
 import { MergeBlockView } from "./MergeBlockView";
@@ -85,7 +89,9 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
   return (
     <div className="flex h-full flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-card px-3 py-2">
-        <span className="mr-2 truncate text-sm font-medium text-destructive">{path}, conflicted</span>
+        <span className="mr-2 truncate text-sm font-medium text-destructive">
+          {path}, conflicted
+        </span>
         <div className="flex rounded-md border border-input p-0.5 text-xs">
           <button
             className={cn("rounded-sm px-2 py-0.5", view === "merge" && "bg-accent")}
@@ -100,11 +106,21 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
             Raw
           </button>
         </div>
-        <Button size="sm" variant="secondary" disabled={resolving} onClick={() => void useSide("ours")}>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={resolving}
+          onClick={() => void useSide("ours")}
+        >
           <UserIcon className="size-3.5" />
           Use Mine (whole file)
         </Button>
-        <Button size="sm" variant="secondary" disabled={resolving} onClick={() => void useSide("theirs")}>
+        <Button
+          size="sm"
+          variant="secondary"
+          disabled={resolving}
+          onClick={() => void useSide("theirs")}
+        >
           <UsersIcon className="size-3.5" />
           Use Theirs (whole file)
         </Button>
@@ -128,8 +144,8 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
         </pre>
       ) : blocks.length === 0 ? (
         <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-          No line-level differences found vs. the common ancestor. Use one of the whole-file
-          actions above, or switch to Raw.
+          No line-level differences found vs. the common ancestor. Use one of the whole-file actions
+          above, or switch to Raw.
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 flex-col overflow-auto">
@@ -143,7 +159,11 @@ export function ConflictResolutionPanel({ repoPath, path }: ConflictResolutionPa
             />
           ))}
           <div className="flex items-center gap-2 p-2">
-            <Button size="sm" disabled={!allPicked || resolving} onClick={() => void saveMergeResolution()}>
+            <Button
+              size="sm"
+              disabled={!allPicked || resolving}
+              onClick={() => void saveMergeResolution()}
+            >
               <CheckIcon className="size-3.5" />
               Save Resolution
             </Button>

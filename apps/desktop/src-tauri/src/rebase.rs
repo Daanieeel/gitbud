@@ -35,16 +35,16 @@ pub fn interactive_rebase(
 
     let head_ref = repo.head().map_err(|e| e.message().to_string())?;
     let branch_ref_name = head_ref.name().ok_or("HEAD has no ref name")?.to_string();
-    let original_head_oid = head_ref
-        .target()
-        .ok_or("HEAD has no direct target")?;
+    let original_head_oid = head_ref.target().ok_or("HEAD has no direct target")?;
 
     let base_commit = repo
         .find_commit(Oid::from_str(base_oid).map_err(|e| e.message().to_string())?)
         .map_err(|e| e.message().to_string())?;
 
     let rollback = |repo: &Repository| -> Result<(), String> {
-        let original = repo.find_commit(original_head_oid).map_err(|e| e.message().to_string())?;
+        let original = repo
+            .find_commit(original_head_oid)
+            .map_err(|e| e.message().to_string())?;
         repo.reset(original.as_object(), ResetType::Hard, None)
             .map_err(|e| e.message().to_string())?;
         repo.cleanup_state().map_err(|e| e.message().to_string())?;
@@ -83,20 +83,31 @@ pub fn interactive_rebase(
         }
 
         let tree_id = index.write_tree().map_err(|e| e.message().to_string())?;
-        let tree = repo.find_tree(tree_id).map_err(|e| e.message().to_string())?;
+        let tree = repo
+            .find_tree(tree_id)
+            .map_err(|e| e.message().to_string())?;
 
         if item.action == "squash" || item.action == "fixup" {
             let Some(prev_oid) = previous_commit_for_squash else {
                 rollback(&repo)?;
-                return Err(format!("cannot {}: no preceding commit to combine into", item.action));
+                return Err(format!(
+                    "cannot {}: no preceding commit to combine into",
+                    item.action
+                ));
             };
-            let prev_commit = repo.find_commit(prev_oid).map_err(|e| e.message().to_string())?;
+            let prev_commit = repo
+                .find_commit(prev_oid)
+                .map_err(|e| e.message().to_string())?;
             // "squash" combines both messages (like `git commit --squash`, editable at the end);
             // "fixup" keeps only the target's message and discards this commit's, matching
             // `git commit --fixup`'s whole point — the fixup commit's own message is usually
             // just "fixup! <target>" and not worth keeping.
             let combined_message = if item.action == "squash" {
-                format!("{}\n\n{}", prev_commit.message().unwrap_or(""), commit.message().unwrap_or(""))
+                format!(
+                    "{}\n\n{}",
+                    prev_commit.message().unwrap_or(""),
+                    commit.message().unwrap_or("")
+                )
             } else {
                 prev_commit.message().unwrap_or("").to_string()
             };
@@ -134,14 +145,23 @@ pub fn interactive_rebase(
 
     // No picks at all (e.g. every item dropped) — branch ref still needs to land on base.
     if previous_commit_for_squash.is_none() {
-        repo.reference(&branch_ref_name, base_commit.id(), true, "interactive rebase: all dropped")
-            .map_err(|e| e.message().to_string())?;
+        repo.reference(
+            &branch_ref_name,
+            base_commit.id(),
+            true,
+            "interactive rebase: all dropped",
+        )
+        .map_err(|e| e.message().to_string())?;
     }
 
     repo.checkout_head(Some(git2::build::CheckoutBuilder::new().force()))
         .map_err(|e| e.message().to_string())?;
 
-    Ok(RebaseResult { success: true, conflicted_oid: None, conflicted_summary: None })
+    Ok(RebaseResult {
+        success: true,
+        conflicted_oid: None,
+        conflicted_summary: None,
+    })
 }
 
 #[cfg(test)]
@@ -197,8 +217,14 @@ mod tests {
         let drop_me = scratch.write_and_commit("b.txt", "b\n", "add b");
 
         let todo = vec![
-            RebaseTodoItem { oid: keep.clone(), action: "pick".to_string() },
-            RebaseTodoItem { oid: drop_me, action: "drop".to_string() },
+            RebaseTodoItem {
+                oid: keep.clone(),
+                action: "pick".to_string(),
+            },
+            RebaseTodoItem {
+                oid: drop_me,
+                action: "drop".to_string(),
+            },
         ];
         let result = interactive_rebase(&repo_path, &base, &todo).unwrap();
         assert!(result.success);
@@ -219,8 +245,14 @@ mod tests {
 
         // Reverse the order: "add b" should now come before "add a" in history.
         let todo = vec![
-            RebaseTodoItem { oid: second, action: "pick".to_string() },
-            RebaseTodoItem { oid: first, action: "pick".to_string() },
+            RebaseTodoItem {
+                oid: second,
+                action: "pick".to_string(),
+            },
+            RebaseTodoItem {
+                oid: first,
+                action: "pick".to_string(),
+            },
         ];
         let result = interactive_rebase(&repo_path, &base, &todo).unwrap();
         assert!(result.success);
@@ -239,8 +271,14 @@ mod tests {
         let second = scratch.write_and_commit("b.txt", "b\n", "fixup a");
 
         let todo = vec![
-            RebaseTodoItem { oid: first, action: "pick".to_string() },
-            RebaseTodoItem { oid: second, action: "squash".to_string() },
+            RebaseTodoItem {
+                oid: first,
+                action: "pick".to_string(),
+            },
+            RebaseTodoItem {
+                oid: second,
+                action: "squash".to_string(),
+            },
         ];
         let result = interactive_rebase(&repo_path, &base, &todo).unwrap();
         assert!(result.success);
@@ -266,8 +304,14 @@ mod tests {
         assert_eq!(entries[0].summary, "fixup! add a");
 
         let todo = vec![
-            RebaseTodoItem { oid: first, action: "pick".to_string() },
-            RebaseTodoItem { oid: second, action: "fixup".to_string() },
+            RebaseTodoItem {
+                oid: first,
+                action: "pick".to_string(),
+            },
+            RebaseTodoItem {
+                oid: second,
+                action: "fixup".to_string(),
+            },
         ];
         let result = interactive_rebase(&repo_path, &base, &todo).unwrap();
         assert!(result.success);
@@ -288,9 +332,13 @@ mod tests {
         // expects A's content as context, not base's original line 2.
         let base = scratch.write_and_commit("a.txt", "line1\nline2\nline3\n", "base");
         scratch.write_and_commit("a.txt", "line1\nCHANGED_A\nline3\n", "change by A");
-        let conflicting = scratch.write_and_commit("a.txt", "line1\nCHANGED_B\nline3\n", "change by B");
+        let conflicting =
+            scratch.write_and_commit("a.txt", "line1\nCHANGED_B\nline3\n", "change by B");
 
-        let todo = vec![RebaseTodoItem { oid: conflicting.clone(), action: "pick".to_string() }];
+        let todo = vec![RebaseTodoItem {
+            oid: conflicting.clone(),
+            action: "pick".to_string(),
+        }];
         let result = interactive_rebase(&repo_path, &base, &todo).unwrap();
 
         assert!(!result.success);

@@ -18,11 +18,13 @@ export const queryKeys = {
   remoteProvider: (repoPath: string) => ["repo", repoPath, "remote-provider"] as const,
   log: (repoPath: string) => ["repo", repoPath, "log"] as const,
   stashes: (repoPath: string) => ["repo", repoPath, "stashes"] as const,
-  stashFiles: (repoPath: string, index: number) => ["repo", repoPath, "stash-files", index] as const,
+  stashFiles: (repoPath: string, index: number) =>
+    ["repo", repoPath, "stash-files", index] as const,
   stashFileDiff: (repoPath: string, index: number, path: string) =>
     ["repo", repoPath, "stash-file-diff", index, path] as const,
   fileDiff: (repoPath: string, path: string) => ["repo", repoPath, "file-diff", path] as const,
-  commitDetail: (repoPath: string, oid: string) => ["repo", repoPath, "commit-detail", oid] as const,
+  commitDetail: (repoPath: string, oid: string) =>
+    ["repo", repoPath, "commit-detail", oid] as const,
   commitFiles: (repoPath: string, oid: string) => ["repo", repoPath, "commit-files", oid] as const,
   commitFileDiff: (repoPath: string, oid: string, path: string) =>
     ["repo", repoPath, "commit-file-diff", oid, path] as const,
@@ -34,7 +36,10 @@ export const queryKeys = {
 
   // GitHub/PR domain — keyed by (repoPath, login) rather than nested under "repo" since login
   // also varies independently (switching accounts on the same repo).
-  prList: (repoPath: string, login: string, filter: string) => ["pr-list", repoPath, login, filter] as const,
-  prDetail: (repoPath: string, login: string, number: number) => ["pr-detail", repoPath, login, number] as const,
-  checkRuns: (repoPath: string, login: string, sha: string) => ["check-runs", repoPath, login, sha] as const,
+  prList: (repoPath: string, login: string, filter: string) =>
+    ["pr-list", repoPath, login, filter] as const,
+  prDetail: (repoPath: string, login: string, number: number) =>
+    ["pr-detail", repoPath, login, number] as const,
+  checkRuns: (repoPath: string, login: string, sha: string) =>
+    ["check-runs", repoPath, login, sha] as const,
 };

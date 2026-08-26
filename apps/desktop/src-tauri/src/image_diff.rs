@@ -84,7 +84,12 @@ pub fn get_image_diff(repo_path: &str, path: &str, staged: bool) -> Result<Image
 
 /// Image diff for a file as part of a `base...head` branch comparison (see
 /// `diff::get_branch_diff_files`) — the same merge-base comparison GitHub's PR diff uses.
-pub fn get_branch_image_diff(repo_path: &str, base: &str, head: &str, path: &str) -> Result<ImageDiff, String> {
+pub fn get_branch_image_diff(
+    repo_path: &str,
+    base: &str,
+    head: &str,
+    path: &str,
+) -> Result<ImageDiff, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let (base_tree, head_tree) = crate::diff::branch_diff_trees(&repo, base, head)?;
     Ok(ImageDiff {

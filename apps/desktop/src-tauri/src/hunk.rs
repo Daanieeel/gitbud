@@ -24,15 +24,21 @@ fn hunk_patch_text(
     reverse: bool,
     selected_lines: Option<&std::collections::HashSet<usize>>,
 ) -> Result<String, String> {
-    let (hunk, lines_in_hunk) = patch.hunk(hunk_index).map_err(|e| e.message().to_string())?;
+    let (hunk, lines_in_hunk) = patch
+        .hunk(hunk_index)
+        .map_err(|e| e.message().to_string())?;
 
     // Collect (origin, content) for every line first, applying both the reverse flip and the
     // line-selection filter, so the header's counts can be computed from what's actually going
     // to be written rather than assumed from the unfiltered hunk.
     let mut lines: Vec<(char, String)> = Vec::with_capacity(lines_in_hunk);
     for i in 0..lines_in_hunk {
-        let line = patch.line_in_hunk(hunk_index, i).map_err(|e| e.message().to_string())?;
-        let content = std::str::from_utf8(line.content()).map_err(|e| e.to_string())?.to_string();
+        let line = patch
+            .line_in_hunk(hunk_index, i)
+            .map_err(|e| e.message().to_string())?;
+        let content = std::str::from_utf8(line.content())
+            .map_err(|e| e.to_string())?
+            .to_string();
         let origin = match line.origin() {
             '+' if reverse => '-',
             '-' if reverse => '+',
@@ -74,7 +80,9 @@ fn hunk_patch_text(
     } else {
         (hunk.old_start(), hunk.new_start())
     };
-    text.push_str(&format!("@@ -{old_start},{old_lines_count} +{new_start},{new_lines_count} @@\n"));
+    text.push_str(&format!(
+        "@@ -{old_start},{old_lines_count} +{new_start},{new_lines_count} @@\n"
+    ));
 
     for (origin, content) in &lines {
         text.push(*origin);
@@ -107,7 +115,9 @@ fn single_file_patch<'a>(diff: &'a git2::Diff<'a>) -> Result<(Patch<'a>, Delta),
 pub fn stage_hunk(repo_path: &str, path: &str, hunk_index: usize) -> Result<(), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut opts = DiffOptions::new();
-    opts.pathspec(path).include_untracked(true).recurse_untracked_dirs(true);
+    opts.pathspec(path)
+        .include_untracked(true)
+        .recurse_untracked_dirs(true);
     apply_diff_settings(&mut opts);
     let diff = repo
         .diff_index_to_workdir(None, Some(&mut opts))
@@ -115,17 +125,25 @@ pub fn stage_hunk(repo_path: &str, path: &str, hunk_index: usize) -> Result<(), 
 
     let (patch, delta) = single_file_patch(&diff)?;
     let text = hunk_patch_text(&patch, hunk_index, path, path, delta, false, None)?;
-    let patch_diff = git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
+    let patch_diff =
+        git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
     repo.apply(&patch_diff, ApplyLocation::Index, None)
         .map_err(|e| e.message().to_string())
 }
 
 /// Stages only `line_indices` within a single hunk (by index into the file's *unstaged* diff),
 /// leaving the rest of the hunk's lines — and the rest of the file — untouched.
-pub fn stage_hunk_lines(repo_path: &str, path: &str, hunk_index: usize, line_indices: &[usize]) -> Result<(), String> {
+pub fn stage_hunk_lines(
+    repo_path: &str,
+    path: &str,
+    hunk_index: usize,
+    line_indices: &[usize],
+) -> Result<(), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut opts = DiffOptions::new();
-    opts.pathspec(path).include_untracked(true).recurse_untracked_dirs(true);
+    opts.pathspec(path)
+        .include_untracked(true)
+        .recurse_untracked_dirs(true);
     apply_diff_settings(&mut opts);
     let diff = repo
         .diff_index_to_workdir(None, Some(&mut opts))
@@ -133,8 +151,17 @@ pub fn stage_hunk_lines(repo_path: &str, path: &str, hunk_index: usize, line_ind
 
     let (patch, delta) = single_file_patch(&diff)?;
     let selected: std::collections::HashSet<usize> = line_indices.iter().copied().collect();
-    let text = hunk_patch_text(&patch, hunk_index, path, path, delta, false, Some(&selected))?;
-    let patch_diff = git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
+    let text = hunk_patch_text(
+        &patch,
+        hunk_index,
+        path,
+        path,
+        delta,
+        false,
+        Some(&selected),
+    )?;
+    let patch_diff =
+        git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
     repo.apply(&patch_diff, ApplyLocation::Index, None)
         .map_err(|e| e.message().to_string())
 }
@@ -153,14 +180,20 @@ pub fn unstage_hunk(repo_path: &str, path: &str, hunk_index: usize) -> Result<()
 
     let (patch, delta) = single_file_patch(&diff)?;
     let text = hunk_patch_text(&patch, hunk_index, path, path, delta, true, None)?;
-    let patch_diff = git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
+    let patch_diff =
+        git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
     repo.apply(&patch_diff, ApplyLocation::Index, None)
         .map_err(|e| e.message().to_string())
 }
 
 /// Unstages only `line_indices` within a single hunk (by index into the file's *staged* diff),
 /// leaving the rest of the hunk's staged lines untouched.
-pub fn unstage_hunk_lines(repo_path: &str, path: &str, hunk_index: usize, line_indices: &[usize]) -> Result<(), String> {
+pub fn unstage_hunk_lines(
+    repo_path: &str,
+    path: &str,
+    hunk_index: usize,
+    line_indices: &[usize],
+) -> Result<(), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut opts = DiffOptions::new();
     opts.pathspec(path);
@@ -173,7 +206,8 @@ pub fn unstage_hunk_lines(repo_path: &str, path: &str, hunk_index: usize, line_i
     let (patch, delta) = single_file_patch(&diff)?;
     let selected: std::collections::HashSet<usize> = line_indices.iter().copied().collect();
     let text = hunk_patch_text(&patch, hunk_index, path, path, delta, true, Some(&selected))?;
-    let patch_diff = git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
+    let patch_diff =
+        git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
     repo.apply(&patch_diff, ApplyLocation::Index, None)
         .map_err(|e| e.message().to_string())
 }
@@ -183,7 +217,9 @@ pub fn unstage_hunk_lines(repo_path: &str, path: &str, hunk_index: usize, line_i
 pub fn discard_hunk(repo_path: &str, path: &str, hunk_index: usize) -> Result<(), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut opts = DiffOptions::new();
-    opts.pathspec(path).include_untracked(true).recurse_untracked_dirs(true);
+    opts.pathspec(path)
+        .include_untracked(true)
+        .recurse_untracked_dirs(true);
     apply_diff_settings(&mut opts);
     let diff = repo
         .diff_index_to_workdir(None, Some(&mut opts))
@@ -191,17 +227,25 @@ pub fn discard_hunk(repo_path: &str, path: &str, hunk_index: usize) -> Result<()
 
     let (patch, delta) = single_file_patch(&diff)?;
     let text = hunk_patch_text(&patch, hunk_index, path, path, delta, true, None)?;
-    let patch_diff = git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
+    let patch_diff =
+        git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
     repo.apply(&patch_diff, ApplyLocation::WorkDir, None)
         .map_err(|e| e.message().to_string())
 }
 
 /// Discards only `line_indices` within a single hunk from the working tree (by index into the
 /// file's *unstaged* diff), leaving the rest of the hunk's lines and the rest of the file intact.
-pub fn discard_hunk_lines(repo_path: &str, path: &str, hunk_index: usize, line_indices: &[usize]) -> Result<(), String> {
+pub fn discard_hunk_lines(
+    repo_path: &str,
+    path: &str,
+    hunk_index: usize,
+    line_indices: &[usize],
+) -> Result<(), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut opts = DiffOptions::new();
-    opts.pathspec(path).include_untracked(true).recurse_untracked_dirs(true);
+    opts.pathspec(path)
+        .include_untracked(true)
+        .recurse_untracked_dirs(true);
     apply_diff_settings(&mut opts);
     let diff = repo
         .diff_index_to_workdir(None, Some(&mut opts))
@@ -210,7 +254,8 @@ pub fn discard_hunk_lines(repo_path: &str, path: &str, hunk_index: usize, line_i
     let (patch, delta) = single_file_patch(&diff)?;
     let selected: std::collections::HashSet<usize> = line_indices.iter().copied().collect();
     let text = hunk_patch_text(&patch, hunk_index, path, path, delta, true, Some(&selected))?;
-    let patch_diff = git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
+    let patch_diff =
+        git2::Diff::from_buffer(text.as_bytes()).map_err(|e| e.message().to_string())?;
     repo.apply(&patch_diff, ApplyLocation::WorkDir, None)
         .map_err(|e| e.message().to_string())
 }
@@ -285,16 +330,16 @@ mod tests {
             .hunks
             .iter()
             .any(|h| h.lines.iter().any(|l| l.content.contains("line 2 CHANGED"))));
-        assert!(!staged_diff
-            .hunks
+        assert!(!staged_diff.hunks.iter().any(|h| h
+            .lines
             .iter()
-            .any(|h| h.lines.iter().any(|l| l.content.contains("line 18 CHANGED"))));
+            .any(|l| l.content.contains("line 18 CHANGED"))));
 
         let unstaged_diff = crate::diff::get_file_diff(&repo_path, "f.txt", false).unwrap();
-        assert!(unstaged_diff
-            .hunks
+        assert!(unstaged_diff.hunks.iter().any(|h| h
+            .lines
             .iter()
-            .any(|h| h.lines.iter().any(|l| l.content.contains("line 18 CHANGED"))));
+            .any(|l| l.content.contains("line 18 CHANGED"))));
     }
 
     #[test]
@@ -320,10 +365,10 @@ mod tests {
             .hunks
             .iter()
             .any(|h| h.lines.iter().any(|l| l.content.contains("line 2 CHANGED"))));
-        assert!(staged_diff
-            .hunks
+        assert!(staged_diff.hunks.iter().any(|h| h
+            .lines
             .iter()
-            .any(|h| h.lines.iter().any(|l| l.content.contains("line 18 CHANGED"))));
+            .any(|l| l.content.contains("line 18 CHANGED"))));
     }
 
     #[test]
@@ -367,8 +412,16 @@ mod tests {
         let diff = crate::diff::get_file_diff(&repo_path, "f.txt", false).unwrap();
         assert_eq!(diff.hunks.len(), 1, "both edits should land in one hunk");
         let hunk = &diff.hunks[0];
-        let del_index = hunk.lines.iter().position(|l| l.content == "line 5").unwrap();
-        let add_index = hunk.lines.iter().position(|l| l.content == "line 5 CHANGED").unwrap();
+        let del_index = hunk
+            .lines
+            .iter()
+            .position(|l| l.content == "line 5")
+            .unwrap();
+        let add_index = hunk
+            .lines
+            .iter()
+            .position(|l| l.content == "line 5 CHANGED")
+            .unwrap();
         (del_index, add_index)
     }
 
@@ -412,8 +465,16 @@ mod tests {
         // indices for this same content don't need to match the unstaged diff's.
         let staged_diff = crate::diff::get_file_diff(&repo_path, "f.txt", true).unwrap();
         let hunk = &staged_diff.hunks[0];
-        let staged_del = hunk.lines.iter().position(|l| l.content == "line 5").unwrap();
-        let staged_add = hunk.lines.iter().position(|l| l.content == "line 5 CHANGED").unwrap();
+        let staged_del = hunk
+            .lines
+            .iter()
+            .position(|l| l.content == "line 5")
+            .unwrap();
+        let staged_add = hunk
+            .lines
+            .iter()
+            .position(|l| l.content == "line 5 CHANGED")
+            .unwrap();
 
         unstage_hunk_lines(&repo_path, "f.txt", 0, &[staged_del, staged_add]).unwrap();
 

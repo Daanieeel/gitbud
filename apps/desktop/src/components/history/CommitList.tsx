@@ -48,7 +48,15 @@ interface CommitListProps {
   compact?: boolean;
 }
 
-function VerificationBadge({ repoPath, login, sha }: { repoPath: string; login: string; sha: string }) {
+function VerificationBadge({
+  repoPath,
+  login,
+  sha,
+}: {
+  repoPath: string;
+  login: string;
+  sha: string;
+}) {
   const [verified, setVerified] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -165,7 +173,12 @@ export function CommitList({
   }, [selectedOid, commits, virtualizer]);
 
   return (
-    <div ref={parentRef} tabIndex={0} onKeyDown={handleArrowNav} className="h-full overflow-auto outline-none">
+    <div
+      ref={parentRef}
+      tabIndex={0}
+      onKeyDown={handleArrowNav}
+      className="h-full overflow-auto outline-none"
+    >
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {items.map((row) => {
           const commit = commits[row.index];
@@ -228,12 +241,18 @@ export function CommitList({
                     </div>
                     <div className="flex items-center gap-1 text-xs text-muted-foreground">
                       <span className="truncate">
-                        {formatDistanceToNow(new Date(commit.timestamp * 1000), { addSuffix: true })}
+                        {formatDistanceToNow(new Date(commit.timestamp * 1000), {
+                          addSuffix: true,
+                        })}
                       </span>
                       {repoPath && currentLogin && (
                         <>
                           <CIBadge repoPath={repoPath} login={currentLogin} sha={commit.oid} />
-                          <VerificationBadge repoPath={repoPath} login={currentLogin} sha={commit.oid} />
+                          <VerificationBadge
+                            repoPath={repoPath}
+                            login={currentLogin}
+                            sha={commit.oid}
+                          />
                         </>
                       )}
                     </div>

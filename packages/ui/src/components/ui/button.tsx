@@ -10,13 +10,16 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive/10 text-destructive border border-destructive hover:bg-destructive/30",
+        destructive:
+          "bg-destructive/10 text-destructive border border-destructive hover:bg-destructive/30",
         warning: "bg-warning text-warning-foreground hover:bg-warning/90",
-        caution: "bg-accent-yellow/10 border border-accent-yellow text-white hover:bg-accent-yellow/30",
-        outline:
-          "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground",
-        positive: "bg-accent-green/10 border border-accent-green text-accent-green hover:bg-accent-green/30",
-        neutral: "bg-muted-foreground/20 border border-muted-foreground text-white hover:bg-muted-foreground/40",
+        caution:
+          "bg-accent-yellow/10 border border-accent-yellow text-white hover:bg-accent-yellow/30",
+        outline: "border border-input bg-transparent hover:bg-accent hover:text-accent-foreground",
+        positive:
+          "bg-accent-green/10 border border-accent-green text-accent-green hover:bg-accent-green/30",
+        neutral:
+          "bg-muted-foreground/20 border border-muted-foreground text-white hover:bg-muted-foreground/40",
         secondary: "border border-input bg-accent hover:bg-accent/80 hover:text-accent-foreground",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
@@ -41,8 +44,7 @@ function Button({
   size,
   asChild = false,
   ...props
-}: React.ComponentProps<"button"> &
-  VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
+}: React.ComponentProps<"button"> & VariantProps<typeof buttonVariants> & { asChild?: boolean }) {
   const Comp = asChild ? Slot : "button";
   return (
     <Comp

@@ -64,7 +64,12 @@ import { queryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
 import type { AheadBehind, RepoEntry } from "@/lib/types";
 
-const DEFAULT_AHEAD_BEHIND: AheadBehind = { ahead: 0, behind: 0, published: true, head_on_remote: true };
+const DEFAULT_AHEAD_BEHIND: AheadBehind = {
+  ahead: 0,
+  behind: 0,
+  published: true,
+  head_on_remote: true,
+};
 
 function groupRepos(repos: RepoEntry[]): Map<string, RepoEntry[]> {
   const groups = new Map<string, RepoEntry[]>();
@@ -95,18 +100,22 @@ function pinnedGroups(repos: RepoEntry[]): Map<string, RepoEntry[]> {
 function loadCollapsedSections(): Set<string> {
   try {
     const raw = window.localStorage.getItem("sidebar-collapsed-sections");
-    return new Set(raw ? (JSON.parse(raw) as string[]) : []);
+    if (!raw) return new Set();
+    const parsed: unknown = JSON.parse(raw);
+    return new Set(
+      Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [],
+    );
   } catch {
     return new Set();
   }
 }
 
-const REMOTE_PROVIDER_LABEL: Record<RemoteProvider, string> = {
+const REMOTE_PROVIDER_LABEL = {
   github: "Open on GitHub",
   gitlab: "Open on GitLab",
   bitbucket: "Open on Bitbucket",
   unknown: "Open in Browser",
-};
+} satisfies Record<RemoteProvider, string>;
 
 interface RepoRowProps {
   repo: RepoEntry;
@@ -158,9 +167,14 @@ function RepoRow({
   const favoriteEditorOption = findEditor(favoriteEditorId);
   const isCustomEditor = favoriteEditorId === CUSTOM_EDITOR_ID && !!customEditorCommand;
   const customIcon = useCustomEditorIcon(isCustomEditor ? customEditorCommand : null);
-  const editorName = favoriteEditorOption?.name ?? (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
+  const editorName =
+    favoriteEditorOption?.name ??
+    (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
   const repoIcon = useRepoIcon(repo.path);
-  const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: ReturnType<typeof detectRemoteProvider> } | null>(null);
+  const [remoteInfo, setRemoteInfo] = useState<{
+    url: string;
+    provider: ReturnType<typeof detectRemoteProvider>;
+  } | null>(null);
 
   return (
     <ContextMenu
@@ -202,7 +216,10 @@ function RepoRow({
             <Tooltip>
               <TooltipTrigger asChild>
                 <span
-                  className={cn("size-1.5 shrink-0 rounded-full", dirty ? "bg-primary" : "bg-transparent")}
+                  className={cn(
+                    "size-1.5 shrink-0 rounded-full",
+                    dirty ? "bg-primary" : "bg-transparent",
+                  )}
                 />
               </TooltipTrigger>
               <TooltipContent>{dirty ? "Uncommitted changes" : undefined}</TooltipContent>
@@ -267,7 +284,9 @@ function RepoRow({
           <ContextMenuItem
             onSelect={() => {
               if (!favoriteEditorId) return;
-              void api.openInEditor(repo.path, favoriteEditorId, customEditorCommand).catch((err) => toast.error(String(err)));
+              void api
+                .openInEditor(repo.path, favoriteEditorId, customEditorCommand)
+                .catch((err) => toast.error(String(err)));
             }}
           >
             {favoriteEditorOption ? (
@@ -325,7 +344,13 @@ interface CollapsedRepoButtonProps {
   onSelect: () => void;
 }
 
-function CollapsedRepoButton({ repo, selected, dirty, syncing, onSelect }: CollapsedRepoButtonProps) {
+function CollapsedRepoButton({
+  repo,
+  selected,
+  dirty,
+  syncing,
+  onSelect,
+}: CollapsedRepoButtonProps) {
   const repoIcon = useRepoIcon(repo.path);
 
   return (
@@ -343,8 +368,12 @@ function CollapsedRepoButton({ repo, selected, dirty, syncing, onSelect }: Colla
           ) : (
             repo.name.slice(0, 2).toUpperCase()
           )}
-          {dirty && <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary" />}
-          {syncing && <RefreshCwIcon className="absolute top-0.5 right-0.5 size-2.5 animate-spin text-primary" />}
+          {dirty && (
+            <span className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-primary" />
+          )}
+          {syncing && (
+            <RefreshCwIcon className="absolute top-0.5 right-0.5 size-2.5 animate-spin text-primary" />
+          )}
         </button>
       </TooltipTrigger>
       <TooltipContent>{repo.name}</TooltipContent>
@@ -375,8 +404,12 @@ export function RepoSidebar() {
   const [moveToTrash, setMoveToTrash] = useState(false);
   const [removingRepo, setRemovingRepo] = useState(false);
   const [pinSectionRepo, setPinSectionRepo] = useState<RepoEntry | null>(null);
-  const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem("sidebar-collapsed") === "1");
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => loadCollapsedSections());
+  const [collapsed, setCollapsed] = useState(
+    () => window.localStorage.getItem("sidebar-collapsed") === "1",
+  );
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() =>
+    loadCollapsedSections(),
+  );
   const [renamingSection, setRenamingSection] = useState<string | null>(null);
   const [renameSectionValue, setRenameSectionValue] = useState("");
   const [confirmRemoveSection, setConfirmRemoveSection] = useState<string | null>(null);
@@ -386,7 +419,10 @@ export function RepoSidebar() {
   }, [collapsed]);
 
   useEffect(() => {
-    window.localStorage.setItem("sidebar-collapsed-sections", JSON.stringify([...collapsedSections]));
+    window.localStorage.setItem(
+      "sidebar-collapsed-sections",
+      JSON.stringify([...collapsedSections]),
+    );
   }, [collapsedSections]);
 
   const toggleSectionCollapsed = (section: string) => {
@@ -469,9 +505,15 @@ export function RepoSidebar() {
     })),
   });
   const aheadBehind = useMemo(
-    () => Object.fromEntries(repos.map((r, i) => [r.path, aheadBehindQueries[i]?.data])),
+    () =>
+      Object.fromEntries(
+        repos.map((r, i): [string, AheadBehind | undefined] => [
+          r.path,
+          aheadBehindQueries[i]?.data,
+        ]),
+      ),
     [repos, aheadBehindQueries],
-  ) as Record<string, AheadBehind>;
+  );
 
   // `useRepoStore`'s own repo-changed listener already invalidates the *selected* repo's full
   // query subtree (status/branches/aheadBehind/etc). This just extends that same invalidation
@@ -573,7 +615,9 @@ export function RepoSidebar() {
     const updated = await api.addRepoSection(targetPath, section);
     setReposLocal({ repos: updated });
     setPinSectionRepo((current) =>
-      current?.path === targetPath ? updated.find((r) => r.path === targetPath) ?? current : current,
+      current?.path === targetPath
+        ? (updated.find((r) => r.path === targetPath) ?? current)
+        : current,
     );
   };
 
@@ -581,7 +625,7 @@ export function RepoSidebar() {
     const updated = await api.removeRepoSection(path, section);
     setReposLocal({ repos: updated });
     setPinSectionRepo((current) =>
-      current?.path === path ? updated.find((r) => r.path === path) ?? current : current,
+      current?.path === path ? (updated.find((r) => r.path === path) ?? current) : current,
     );
   };
 
@@ -599,335 +643,353 @@ export function RepoSidebar() {
 
   return (
     <div className="flex h-full shrink-0">
-    <aside
-      style={{ width: collapsed ? 48 : width }}
-      className={cn(
-        "flex h-full shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md transition-[width] duration-150 ease-in-out",
-        dragOver && "ring-2 ring-inset ring-primary",
-      )}
-    >
-      {collapsed ? (
-        <>
-          <div className="flex shrink-0 flex-col items-center gap-2 border-b border-border p-1.5">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={() => setCollapsed(false)}>
-                  <PanelLeftOpenIcon className="size-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Expand sidebar</TooltipContent>
-            </Tooltip>
-            <AddRepoMenu />
-          </div>
-          <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-auto p-1.5">
-            {sorted.map((repo) => (
-              <CollapsedRepoButton
-                key={repo.path}
-                repo={repo}
-                selected={selectedRepo === repo.path}
-                dirty={!!dirty[repo.path]}
-                syncing={syncing && selectedRepo === repo.path}
-                onSelect={() => void selectRepo(repo.path)}
-              />
-            ))}
-          </div>
-          {repos.length > 0 && (
-            <div className="flex shrink-0 flex-col items-center gap-1 border-t border-border p-1.5">
-              <BatchSyncTrigger repos={filtered} totalCount={repos.length} iconOnly />
-            </div>
-          )}
-          {offline && (
-            <div className="flex shrink-0 flex-col items-center gap-1.5 p-1.5 pt-0">
-              <OfflineIndicator iconOnly />
-            </div>
-          )}
-          <AccountBar collapsed />
-        </>
-      ) : (
-        <>
-      <div className="flex shrink-0 flex-col gap-2 border-b border-border p-2">
-        <div className="flex items-center justify-between gap-2">
-          <AddRepoMenu />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon" onClick={() => setCollapsed(true)}>
-                <PanelLeftCloseIcon className="size-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Collapse sidebar</TooltipContent>
-          </Tooltip>
-        </div>
-        <div className="flex items-center justify-between gap-2">
-          <WorkspacePicker />
-        </div>
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="Filter repositories"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="h-9"
-          />
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button variant="secondary" size="icon" className="shrink-0" onClick={toggleAllSections}>
-                {allSectionsCollapsed ? (
-                  <ChevronsUpDownIcon className="size-4" />
-                ) : (
-                  <ChevronsDownUpIcon className="size-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{allSectionsCollapsed ? "Expand all sections" : "Collapse all sections"}</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-      <div className="min-h-0 flex-1 overflow-auto p-1">
-        {filtered.length === 0 && (
-          <div className="p-3 text-center text-sm text-muted-foreground">
-            {repos.length === 0 ? 'Use "+" to add a repository' : "No matches"}
-          </div>
+      <aside
+        style={{ width: collapsed ? 48 : width }}
+        className={cn(
+          "flex h-full shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md transition-[width] duration-150 ease-in-out",
+          dragOver && "ring-2 ring-inset ring-primary",
         )}
-        {[...pinned.entries()].map(([section, sectionRepos]) => {
-          const collapseKey = `pin:${section}`;
-          const isCollapsed = collapsedSections.has(collapseKey);
-          const visibleRepos = sectionRepos.filter(
-            (repo) => !isCollapsed || repo.path === selectedRepo,
-          );
-          return (
-            <div key={collapseKey}>
-              {renamingSection === section ? (
-                <div className="flex items-center gap-1 px-2 pt-2 pb-1">
-                  <PinIcon className="size-3 shrink-0 text-muted-foreground" />
-                  <Input
-                    autoFocus
-                    value={renameSectionValue}
-                    onChange={(e) => setRenameSectionValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void commitRenameSection();
-                      if (e.key === "Escape") setRenamingSection(null);
-                    }}
-                    onBlur={() => void commitRenameSection()}
-                    className="h-6 text-xs"
-                  />
-                </div>
-              ) : (
-                <ContextMenu>
-                  <ContextMenuTrigger asChild>
-                    <button
-                      className="flex w-full items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-                      onClick={() => toggleSectionCollapsed(collapseKey)}
-                    >
-                      {isCollapsed ? (
-                        <ChevronRightIcon className="size-3 shrink-0" />
-                      ) : (
-                        <ChevronDownIcon className="size-3 shrink-0" />
-                      )}
-                      <PinIcon className="size-3 shrink-0" />
-                      <span className="truncate">{section}</span>
-                    </button>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <ContextMenuItem onSelect={() => toggleSectionCollapsed(collapseKey)}>
-                      {isCollapsed ? (
-                        <ChevronRightIcon className="size-3.5" />
-                      ) : (
-                        <ChevronDownIcon className="size-3.5" />
-                      )}
-                      {isCollapsed ? "Expand" : "Collapse"}
-                    </ContextMenuItem>
-                    <ContextMenuItem onSelect={() => startRenameSection(section)}>
-                      <PencilIcon className="size-3.5" />
-                      Rename Section…
-                    </ContextMenuItem>
-                    <ContextMenuSeparator />
-                    <ContextMenuItem variant="destructive" onSelect={() => setConfirmRemoveSection(section)}>
-                      <Trash2Icon className="size-3.5" />
-                      Remove Section
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              )}
-              {visibleRepos.map((repo) => (
-                <RepoRow
+      >
+        {collapsed ? (
+          <>
+            <div className="flex shrink-0 flex-col items-center gap-2 border-b border-border p-1.5">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="ghost" size="icon" onClick={() => setCollapsed(false)}>
+                    <PanelLeftOpenIcon className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Expand sidebar</TooltipContent>
+              </Tooltip>
+              <AddRepoMenu />
+            </div>
+            <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-auto p-1.5">
+              {sorted.map((repo) => (
+                <CollapsedRepoButton
                   key={repo.path}
                   repo={repo}
                   selected={selectedRepo === repo.path}
-                  syncingHere={syncing && selectedRepo === repo.path}
                   dirty={!!dirty[repo.path]}
-                  ab={aheadBehind[repo.path]}
-                  showAheadBehind={showAheadBehind}
-                  draggable={false}
-                  dragged={false}
+                  syncing={syncing && selectedRepo === repo.path}
                   onSelect={() => void selectRepo(repo.path)}
-                  onDragStart={() => {}}
-                  onDragOver={() => {}}
-                  onDrop={() => {}}
-                  onDragEnd={() => {}}
-                  onRequestRemove={() => setPendingRemoveRepo(repo)}
-                  onRemove={() => void removeRepo(repo.path)}
-                  onPinToSection={() => setPinSectionRepo(repo)}
-                  sectionContext={section}
-                  onRemoveFromSection={() => void removeSection(repo.path, section)}
                 />
               ))}
             </div>
-          );
-        })}
-        {[...grouped.entries()].map(([group, groupRepos]) => {
-          const collapseKey = `grp:${group}`;
-          const isCollapsed = group !== "" && collapsedSections.has(collapseKey);
-          const visibleRepos = groupRepos.filter(
-            (repo) => !isCollapsed || repo.path === selectedRepo,
-          );
-          return (
-            <div key={group}>
-              {group && (
-                <ContextMenu>
-                  <ContextMenuTrigger asChild>
-                    <button
-                      className="flex w-full items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
-                      onClick={() => toggleSectionCollapsed(collapseKey)}
+            {repos.length > 0 && (
+              <div className="flex shrink-0 flex-col items-center gap-1 border-t border-border p-1.5">
+                <BatchSyncTrigger repos={filtered} totalCount={repos.length} iconOnly />
+              </div>
+            )}
+            {offline && (
+              <div className="flex shrink-0 flex-col items-center gap-1.5 p-1.5 pt-0">
+                <OfflineIndicator iconOnly />
+              </div>
+            )}
+            <AccountBar collapsed />
+          </>
+        ) : (
+          <>
+            <div className="flex shrink-0 flex-col gap-2 border-b border-border p-2">
+              <div className="flex items-center justify-between gap-2">
+                <AddRepoMenu />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" onClick={() => setCollapsed(true)}>
+                      <PanelLeftCloseIcon className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Collapse sidebar</TooltipContent>
+                </Tooltip>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <WorkspacePicker />
+              </div>
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Filter repositories"
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                  className="h-9"
+                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="shrink-0"
+                      onClick={toggleAllSections}
                     >
-                      {isCollapsed ? (
-                        <ChevronRightIcon className="size-3 shrink-0" />
+                      {allSectionsCollapsed ? (
+                        <ChevronsUpDownIcon className="size-4" />
                       ) : (
-                        <ChevronDownIcon className="size-3 shrink-0" />
+                        <ChevronsDownUpIcon className="size-4" />
                       )}
-                      <span className="truncate">{group}</span>
-                    </button>
-                  </ContextMenuTrigger>
-                  <ContextMenuContent>
-                    <ContextMenuItem onSelect={() => toggleSectionCollapsed(collapseKey)}>
-                      {isCollapsed ? (
-                        <ChevronRightIcon className="size-3.5" />
-                      ) : (
-                        <ChevronDownIcon className="size-3.5" />
-                      )}
-                      {isCollapsed ? "Expand" : "Collapse"}
-                    </ContextMenuItem>
-                  </ContextMenuContent>
-                </ContextMenu>
-              )}
-              {visibleRepos.map((repo) => (
-              <RepoRow
-                key={repo.path}
-                repo={repo}
-                selected={selectedRepo === repo.path}
-                syncingHere={syncing && selectedRepo === repo.path}
-                dirty={!!dirty[repo.path]}
-                ab={aheadBehind[repo.path]}
-                showAheadBehind={showAheadBehind}
-                draggable={sidebarSort === "manual"}
-                dragged={draggedPath === repo.path}
-                onSelect={() => void selectRepo(repo.path)}
-                onDragStart={() => setDraggedPath(repo.path)}
-                onDragOver={(e) => {
-                  if (sidebarSort === "manual") e.preventDefault();
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  void reorder(repo.path);
-                  setDraggedPath(null);
-                }}
-                onDragEnd={() => setDraggedPath(null)}
-                onRequestRemove={() => setPendingRemoveRepo(repo)}
-                onRemove={() => void removeRepo(repo.path)}
-                onPinToSection={() => setPinSectionRepo(repo)}
-              />
-              ))}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {allSectionsCollapsed ? "Expand all sections" : "Collapse all sections"}
+                  </TooltipContent>
+                </Tooltip>
+              </div>
             </div>
-          );
-        })}
-      </div>
-      {repos.length > 0 && (
-        <div className="shrink-0 border-t border-border p-2">
-          <BatchSyncTrigger repos={filtered} totalCount={repos.length} />
-        </div>
-      )}
-      {offline && (
-        <div className="shrink-0 px-2 pb-1.5">
-          <OfflineIndicator />
-        </div>
-      )}
-      <AccountBar />
-        </>
-      )}
-    </aside>
-    {!collapsed && <ResizeHandle onPointerDown={onPointerDown} />}
-    <PinToSectionDialog
-      repo={pinSectionRepo}
-      sections={knownSections}
-      onOpenChange={(open) => !open && setPinSectionRepo(null)}
-      onAddSection={(section) => void addSection(section)}
-      onRemoveSection={(section) => pinSectionRepo && void removeSection(pinSectionRepo.path, section)}
-    />
-    <Dialog
-      open={confirmRemoveSection !== null}
-      onOpenChange={(open) => !open && setConfirmRemoveSection(null)}
-    >
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Remove Section</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          Remove "{confirmRemoveSection}"? Every repo pinned to it will be unpinned; nothing else
-          about them changes.
-        </p>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => setConfirmRemoveSection(null)}>
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => confirmRemoveSection && void removeSectionEntirely(confirmRemoveSection)}
-          >
-            Remove Section
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-    <Dialog
-      open={pendingRemoveRepo !== null}
-      onOpenChange={(open) => {
-        if (!open) {
-          setPendingRemoveRepo(null);
-          setMoveToTrash(false);
+            <div className="min-h-0 flex-1 overflow-auto p-1">
+              {filtered.length === 0 && (
+                <div className="p-3 text-center text-sm text-muted-foreground">
+                  {repos.length === 0 ? 'Use "+" to add a repository' : "No matches"}
+                </div>
+              )}
+              {[...pinned.entries()].map(([section, sectionRepos]) => {
+                const collapseKey = `pin:${section}`;
+                const isCollapsed = collapsedSections.has(collapseKey);
+                const visibleRepos = sectionRepos.filter(
+                  (repo) => !isCollapsed || repo.path === selectedRepo,
+                );
+                return (
+                  <div key={collapseKey}>
+                    {renamingSection === section ? (
+                      <div className="flex items-center gap-1 px-2 pt-2 pb-1">
+                        <PinIcon className="size-3 shrink-0 text-muted-foreground" />
+                        <Input
+                          autoFocus
+                          value={renameSectionValue}
+                          onChange={(e) => setRenameSectionValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") void commitRenameSection();
+                            if (e.key === "Escape") setRenamingSection(null);
+                          }}
+                          onBlur={() => void commitRenameSection()}
+                          className="h-6 text-xs"
+                        />
+                      </div>
+                    ) : (
+                      <ContextMenu>
+                        <ContextMenuTrigger asChild>
+                          <button
+                            className="flex w-full items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                            onClick={() => toggleSectionCollapsed(collapseKey)}
+                          >
+                            {isCollapsed ? (
+                              <ChevronRightIcon className="size-3 shrink-0" />
+                            ) : (
+                              <ChevronDownIcon className="size-3 shrink-0" />
+                            )}
+                            <PinIcon className="size-3 shrink-0" />
+                            <span className="truncate">{section}</span>
+                          </button>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuItem onSelect={() => toggleSectionCollapsed(collapseKey)}>
+                            {isCollapsed ? (
+                              <ChevronRightIcon className="size-3.5" />
+                            ) : (
+                              <ChevronDownIcon className="size-3.5" />
+                            )}
+                            {isCollapsed ? "Expand" : "Collapse"}
+                          </ContextMenuItem>
+                          <ContextMenuItem onSelect={() => startRenameSection(section)}>
+                            <PencilIcon className="size-3.5" />
+                            Rename Section…
+                          </ContextMenuItem>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem
+                            variant="destructive"
+                            onSelect={() => setConfirmRemoveSection(section)}
+                          >
+                            <Trash2Icon className="size-3.5" />
+                            Remove Section
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    )}
+                    {visibleRepos.map((repo) => (
+                      <RepoRow
+                        key={repo.path}
+                        repo={repo}
+                        selected={selectedRepo === repo.path}
+                        syncingHere={syncing && selectedRepo === repo.path}
+                        dirty={!!dirty[repo.path]}
+                        ab={aheadBehind[repo.path]}
+                        showAheadBehind={showAheadBehind}
+                        draggable={false}
+                        dragged={false}
+                        onSelect={() => void selectRepo(repo.path)}
+                        onDragStart={() => {}}
+                        onDragOver={() => {}}
+                        onDrop={() => {}}
+                        onDragEnd={() => {}}
+                        onRequestRemove={() => setPendingRemoveRepo(repo)}
+                        onRemove={() => void removeRepo(repo.path)}
+                        onPinToSection={() => setPinSectionRepo(repo)}
+                        sectionContext={section}
+                        onRemoveFromSection={() => void removeSection(repo.path, section)}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+              {[...grouped.entries()].map(([group, groupRepos]) => {
+                const collapseKey = `grp:${group}`;
+                const isCollapsed = group !== "" && collapsedSections.has(collapseKey);
+                const visibleRepos = groupRepos.filter(
+                  (repo) => !isCollapsed || repo.path === selectedRepo,
+                );
+                return (
+                  <div key={group}>
+                    {group && (
+                      <ContextMenu>
+                        <ContextMenuTrigger asChild>
+                          <button
+                            className="flex w-full items-center gap-1 px-2 pt-2 pb-1 text-xs font-medium text-muted-foreground hover:text-foreground"
+                            onClick={() => toggleSectionCollapsed(collapseKey)}
+                          >
+                            {isCollapsed ? (
+                              <ChevronRightIcon className="size-3 shrink-0" />
+                            ) : (
+                              <ChevronDownIcon className="size-3 shrink-0" />
+                            )}
+                            <span className="truncate">{group}</span>
+                          </button>
+                        </ContextMenuTrigger>
+                        <ContextMenuContent>
+                          <ContextMenuItem onSelect={() => toggleSectionCollapsed(collapseKey)}>
+                            {isCollapsed ? (
+                              <ChevronRightIcon className="size-3.5" />
+                            ) : (
+                              <ChevronDownIcon className="size-3.5" />
+                            )}
+                            {isCollapsed ? "Expand" : "Collapse"}
+                          </ContextMenuItem>
+                        </ContextMenuContent>
+                      </ContextMenu>
+                    )}
+                    {visibleRepos.map((repo) => (
+                      <RepoRow
+                        key={repo.path}
+                        repo={repo}
+                        selected={selectedRepo === repo.path}
+                        syncingHere={syncing && selectedRepo === repo.path}
+                        dirty={!!dirty[repo.path]}
+                        ab={aheadBehind[repo.path]}
+                        showAheadBehind={showAheadBehind}
+                        draggable={sidebarSort === "manual"}
+                        dragged={draggedPath === repo.path}
+                        onSelect={() => void selectRepo(repo.path)}
+                        onDragStart={() => setDraggedPath(repo.path)}
+                        onDragOver={(e) => {
+                          if (sidebarSort === "manual") e.preventDefault();
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          void reorder(repo.path);
+                          setDraggedPath(null);
+                        }}
+                        onDragEnd={() => setDraggedPath(null)}
+                        onRequestRemove={() => setPendingRemoveRepo(repo)}
+                        onRemove={() => void removeRepo(repo.path)}
+                        onPinToSection={() => setPinSectionRepo(repo)}
+                      />
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+            {repos.length > 0 && (
+              <div className="shrink-0 border-t border-border p-2">
+                <BatchSyncTrigger repos={filtered} totalCount={repos.length} />
+              </div>
+            )}
+            {offline && (
+              <div className="shrink-0 px-2 pb-1.5">
+                <OfflineIndicator />
+              </div>
+            )}
+            <AccountBar />
+          </>
+        )}
+      </aside>
+      {!collapsed && <ResizeHandle onPointerDown={onPointerDown} />}
+      <PinToSectionDialog
+        repo={pinSectionRepo}
+        sections={knownSections}
+        onOpenChange={(open) => !open && setPinSectionRepo(null)}
+        onAddSection={(section) => void addSection(section)}
+        onRemoveSection={(section) =>
+          pinSectionRepo && void removeSection(pinSectionRepo.path, section)
         }
-      }}
-    >
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>Remove "{pendingRemoveRepo?.name}"?</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          It'll be removed from GitBud's list. The local folder is left untouched unless you
-          check the box below.
-        </p>
-        <CheckboxGroup
-          className="text-sm text-muted-foreground"
-          variant="destructive"
-          checked={moveToTrash}
-          disabled={removingRepo}
-          onCheckedChange={(checked) => setMoveToTrash(checked === true)}
-        >
-          Also move repo folder to Trash
-        </CheckboxGroup>
-        <DialogFooter>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setPendingRemoveRepo(null);
-              setMoveToTrash(false);
-            }}
+      />
+      <Dialog
+        open={confirmRemoveSection !== null}
+        onOpenChange={(open) => !open && setConfirmRemoveSection(null)}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Remove Section</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Remove "{confirmRemoveSection}"? Every repo pinned to it will be unpinned; nothing else
+            about them changes.
+          </p>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setConfirmRemoveSection(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() =>
+                confirmRemoveSection && void removeSectionEntirely(confirmRemoveSection)
+              }
+            >
+              Remove Section
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={pendingRemoveRepo !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingRemoveRepo(null);
+            setMoveToTrash(false);
+          }
+        }}
+      >
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Remove "{pendingRemoveRepo?.name}"?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            It'll be removed from GitBud's list. The local folder is left untouched unless you check
+            the box below.
+          </p>
+          <CheckboxGroup
+            className="text-sm text-muted-foreground"
+            variant="destructive"
+            checked={moveToTrash}
+            disabled={removingRepo}
+            onCheckedChange={(checked) => setMoveToTrash(checked === true)}
           >
-            Cancel
-          </Button>
-          <Button variant="destructive" disabled={removingRepo} onClick={() => void confirmRemoveRepo()}>
-            {removingRepo ? "Removing…" : "Remove"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            Move repo folder to Trash
+          </CheckboxGroup>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setPendingRemoveRepo(null);
+                setMoveToTrash(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={removingRepo}
+              onClick={() => void confirmRemoveRepo()}
+            >
+              {removingRepo ? "Removing…" : "Remove"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

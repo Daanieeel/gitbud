@@ -19,7 +19,11 @@ interface BatchSyncState {
   dismiss: () => void;
 }
 
-async function runPool(paths: string[], concurrency: number, task: (path: string) => Promise<void>) {
+async function runPool(
+  paths: string[],
+  concurrency: number,
+  task: (path: string) => Promise<void>,
+) {
   let cursor = 0;
   const workers = Array.from({ length: Math.min(concurrency, paths.length) }, async () => {
     while (cursor < paths.length) {
@@ -41,7 +45,7 @@ function run(
     set({
       running: true,
       kind,
-      outcomes: Object.fromEntries(repoPaths.map((p) => [p, "pending" as RepoOutcome])),
+      outcomes: Object.fromEntries(repoPaths.map((p): [string, RepoOutcome] => [p, "pending"])),
       errors: {},
     });
     await runPool(repoPaths, CONCURRENCY, async (path) => {

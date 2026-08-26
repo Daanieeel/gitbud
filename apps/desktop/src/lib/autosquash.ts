@@ -10,7 +10,9 @@ interface AutosquashRow<T extends AutosquashCommit> {
   action: RebaseAction;
 }
 
-function parseAutosquashPrefix(summary: string): { action: "fixup" | "squash"; target: string } | null {
+function parseAutosquashPrefix(
+  summary: string,
+): { action: "fixup" | "squash"; target: string } | null {
   const fixup = summary.match(/^fixup!\s+(.+)$/);
   if (fixup) return { action: "fixup", target: fixup[1] };
   const squash = summary.match(/^squash!\s+(.+)$/);
@@ -24,7 +26,9 @@ function parseAutosquashPrefix(summary: string): { action: "fixup" | "squash"; t
  * with the matching action, instead of staying a separate `pick` wherever it happened to land
  * in history. A fixup/squash commit with no match in `rows` (its target isn't part of this
  * rebase) is left alone as a plain pick, same as real git. */
-export function applyAutosquash<T extends AutosquashCommit>(rows: AutosquashRow<T>[]): AutosquashRow<T>[] {
+export function applyAutosquash<T extends AutosquashCommit>(
+  rows: AutosquashRow<T>[],
+): AutosquashRow<T>[] {
   const result: AutosquashRow<T>[] = [];
 
   for (const row of rows) {
@@ -41,7 +45,10 @@ export function applyAutosquash<T extends AutosquashCommit>(rows: AutosquashRow<
     // Stack after any fixups/squashes already placed on this same target, so a target with
     // multiple fixups keeps them in their original relative order.
     let insertAt = targetIndex + 1;
-    while (insertAt < result.length && parseAutosquashPrefix(result[insertAt].commit.summary)?.target === parsed.target) {
+    while (
+      insertAt < result.length &&
+      parseAutosquashPrefix(result[insertAt].commit.summary)?.target === parsed.target
+    ) {
       insertAt++;
     }
     result.splice(insertAt, 0, { commit: row.commit, action: parsed.action });

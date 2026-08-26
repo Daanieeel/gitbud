@@ -3,7 +3,11 @@ use std::process::Command;
 
 /// Whether the `gpg` binary is available on PATH, for offering OpenPGP signing at all.
 pub fn has_gpg() -> bool {
-    Command::new("gpg").arg("--version").output().map(|o| o.status.success()).unwrap_or(false)
+    Command::new("gpg")
+        .arg("--version")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
 /// Lists this machine's GPG secret keys as (key id, user id) pairs, for "import an existing key".
@@ -37,7 +41,8 @@ pub fn generate_gpg_key(name: &str, email: &str) -> Result<String, String> {
     let batch = format!(
         "%no-protection\nKey-Type: EDDSA\nKey-Curve: ed25519\nSubkey-Type: ECDH\nSubkey-Curve: cv25519\nName-Real: {name}\nName-Email: {email}\nExpire-Date: 0\n%commit\n"
     );
-    let batch_file = std::env::temp_dir().join(format!("gitbud-gpg-batch-{}.txt", std::process::id()));
+    let batch_file =
+        std::env::temp_dir().join(format!("gitbud-gpg-batch-{}.txt", std::process::id()));
     std::fs::write(&batch_file, &batch).map_err(|e| e.to_string())?;
     let output = Command::new("gpg")
         .args(["--batch", "--generate-key"])
@@ -52,7 +57,11 @@ pub fn generate_gpg_key(name: &str, email: &str) -> Result<String, String> {
     let stderr = String::from_utf8_lossy(&output.stderr);
     stderr
         .lines()
-        .find_map(|l| l.trim().strip_prefix("gpg: key ").and_then(|rest| rest.split_whitespace().next()))
+        .find_map(|l| {
+            l.trim()
+                .strip_prefix("gpg: key ")
+                .and_then(|rest| rest.split_whitespace().next())
+        })
         .map(|s| s.to_string())
         .ok_or_else(|| "Generated the key but couldn't parse its id from gpg's output".to_string())
 }
@@ -82,16 +91,29 @@ fn open_config(repo_path: &str, global: bool) -> Result<Config, String> {
 
 /// Wires commit signing into git config: `gpg.format`, `user.signingkey`, `commit.gpgsign`.
 /// `format` is `"ssh"` or `"openpgp"`; `signing_key` is a pubkey file path (ssh) or key id (gpg).
-pub fn configure_signing(repo_path: &str, format: &str, signing_key: &str, global: bool) -> Result<(), String> {
+pub fn configure_signing(
+    repo_path: &str,
+    format: &str,
+    signing_key: &str,
+    global: bool,
+) -> Result<(), String> {
     let mut config = open_config(repo_path, global)?;
-    config.set_str("gpg.format", format).map_err(|e| e.message().to_string())?;
-    config.set_str("user.signingkey", signing_key).map_err(|e| e.message().to_string())?;
-    config.set_bool("commit.gpgsign", true).map_err(|e| e.message().to_string())
+    config
+        .set_str("gpg.format", format)
+        .map_err(|e| e.message().to_string())?;
+    config
+        .set_str("user.signingkey", signing_key)
+        .map_err(|e| e.message().to_string())?;
+    config
+        .set_bool("commit.gpgsign", true)
+        .map_err(|e| e.message().to_string())
 }
 
 pub fn disable_signing(repo_path: &str, global: bool) -> Result<(), String> {
     let mut config = open_config(repo_path, global)?;
-    config.set_bool("commit.gpgsign", false).map_err(|e| e.message().to_string())
+    config
+        .set_bool("commit.gpgsign", false)
+        .map_err(|e| e.message().to_string())
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -129,7 +151,10 @@ mod tests {
         fn new(name: &str) -> Self {
             let path = std::env::temp_dir().join(format!(
                 "gitbud-test-signing-{name}-{}",
-                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
             ));
             std::fs::create_dir_all(&path).unwrap();
             Repository::init(&path).unwrap();
@@ -159,19 +184,26 @@ mod tests {
         let status = get_signing_status(&repo_path).unwrap();
         assert!(status.enabled);
         assert_eq!(status.format.as_deref(), Some("ssh"));
-        assert_eq!(status.signing_key.as_deref(), Some("/home/user/.ssh/signing.pub"));
+        assert_eq!(
+            status.signing_key.as_deref(),
+            Some("/home/user/.ssh/signing.pub")
+        );
 
         disable_signing(&repo_path, false).unwrap();
         let status = get_signing_status(&repo_path).unwrap();
         assert!(!status.enabled);
         // Disabling only flips commit.gpgsign back off — it deliberately leaves the key
         // configured so re-enabling doesn't require picking a key again.
-        assert_eq!(status.signing_key.as_deref(), Some("/home/user/.ssh/signing.pub"));
+        assert_eq!(
+            status.signing_key.as_deref(),
+            Some("/home/user/.ssh/signing.pub")
+        );
     }
 
     #[test]
     fn generate_ssh_signing_key_writes_a_usable_keypair() {
-        let dir = std::env::temp_dir().join(format!("gitbud-test-signing-sshkey-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("gitbud-test-signing-sshkey-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let key_path = dir.join("id_ed25519").to_string_lossy().to_string();
 

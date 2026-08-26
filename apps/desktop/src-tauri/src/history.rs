@@ -32,7 +32,10 @@ fn assign_lanes(commits: &mut [CommitEntry]) {
     let mut lanes: Vec<Option<String>> = Vec::new();
 
     for commit in commits.iter_mut() {
-        let lane = match lanes.iter().position(|l| l.as_deref() == Some(commit.oid.as_str())) {
+        let lane = match lanes
+            .iter()
+            .position(|l| l.as_deref() == Some(commit.oid.as_str()))
+        {
             Some(i) => i,
             None => match lanes.iter().position(|l| l.is_none()) {
                 Some(i) => i,
@@ -50,7 +53,9 @@ fn assign_lanes(commits: &mut [CommitEntry]) {
                 parent_lanes.push(lane);
                 continue;
             }
-            let existing = lanes.iter().position(|l| l.as_deref() == Some(parent.as_str()));
+            let existing = lanes
+                .iter()
+                .position(|l| l.as_deref() == Some(parent.as_str()));
             let parent_lane = match existing {
                 Some(i) => i,
                 None => match lanes.iter().position(|l| l.is_none()) {
@@ -97,7 +102,11 @@ pub struct CommitSearchResult {
 /// Searches the full commit history (not just what's paginated into the frontend's `commits`
 /// list) for a case-insensitive substring match against summary, author name, or full/short
 /// oid — backs the command palette's commit search.
-pub fn search_commits(repo_path: &str, query: &str, limit: usize) -> Result<Vec<CommitSearchResult>, String> {
+pub fn search_commits(
+    repo_path: &str,
+    query: &str,
+    limit: usize,
+) -> Result<Vec<CommitSearchResult>, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let mut revwalk = repo.revwalk().map_err(|e| e.message().to_string())?;
     revwalk.push_head().map_err(|e| e.message().to_string())?;
@@ -137,7 +146,11 @@ pub fn search_commits(repo_path: &str, query: &str, limit: usize) -> Result<Vec<
 /// Lists commits reachable from `head` but not from `base` (`git log base..head`) — the same
 /// two-dot comparison GitHub's PR "Commits" tab shows, newest first. No lane/graph info since
 /// this is a flat linear list, not the full-history graph view.
-pub fn get_branch_commits(repo_path: &str, base: &str, head: &str) -> Result<Vec<CommitSearchResult>, String> {
+pub fn get_branch_commits(
+    repo_path: &str,
+    base: &str,
+    head: &str,
+) -> Result<Vec<CommitSearchResult>, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let base_oid = repo
         .revparse_single(base)
@@ -153,8 +166,12 @@ pub fn get_branch_commits(repo_path: &str, base: &str, head: &str) -> Result<Vec
         .id();
 
     let mut revwalk = repo.revwalk().map_err(|e| e.message().to_string())?;
-    revwalk.push(head_oid).map_err(|e| e.message().to_string())?;
-    revwalk.hide(base_oid).map_err(|e| e.message().to_string())?;
+    revwalk
+        .push(head_oid)
+        .map_err(|e| e.message().to_string())?;
+    revwalk
+        .hide(base_oid)
+        .map_err(|e| e.message().to_string())?;
     revwalk
         .set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)
         .map_err(|e| e.message().to_string())?;
@@ -201,7 +218,9 @@ pub struct CommitDetail {
 pub fn get_commit_detail(repo_path: &str, oid: &str) -> Result<CommitDetail, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
     let commit_oid = git2::Oid::from_str(oid).map_err(|e| e.message().to_string())?;
-    let commit = repo.find_commit(commit_oid).map_err(|e| e.message().to_string())?;
+    let commit = repo
+        .find_commit(commit_oid)
+        .map_err(|e| e.message().to_string())?;
 
     let summary = commit.summary().unwrap_or("").to_string();
     let message = commit.message().unwrap_or("").to_string();
@@ -259,7 +278,9 @@ pub fn get_commit_detail(repo_path: &str, oid: &str) -> Result<CommitDetail, Str
 fn unpushed_oids(repo: &Repository) -> std::collections::HashSet<git2::Oid> {
     (|| -> Result<_, git2::Error> {
         let head = repo.head()?;
-        let head_oid = head.target().ok_or_else(|| git2::Error::from_str("HEAD has no target"))?;
+        let head_oid = head
+            .target()
+            .ok_or_else(|| git2::Error::from_str("HEAD has no target"))?;
         let branch_name = head
             .shorthand()
             .ok_or_else(|| git2::Error::from_str("HEAD has no shorthand"))?;

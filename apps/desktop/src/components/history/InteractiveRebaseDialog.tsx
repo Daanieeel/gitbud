@@ -36,7 +36,9 @@ export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRe
   const { commits } = useCommitLog(repoPath);
   const rebaseMutation = useInteractiveRebase(repoPath);
 
-  const [autosquash, setAutosquash] = useState(() => localStorage.getItem("rebase:autosquash") !== "false");
+  const [autosquash, setAutosquash] = useState(
+    () => localStorage.getItem("rebase:autosquash") !== "false",
+  );
   useEffect(() => {
     localStorage.setItem("rebase:autosquash", String(autosquash));
   }, [autosquash]);
@@ -49,7 +51,7 @@ export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRe
     return commits
       .slice(0, baseIndex)
       .reverse()
-      .map((commit) => ({ commit, action: "pick" as Action }));
+      .map((commit) => ({ commit, action: "pick" satisfies Action }));
   }, [baseOid, commits]);
   const initialRows = useMemo(
     () => (autosquash ? applyAutosquash(pickRows) : pickRows),
@@ -74,7 +76,9 @@ export function InteractiveRebaseDialog({ baseOid, onOpenChange }: InteractiveRe
   const cycleAction = (index: number) => {
     setRows((prev) =>
       prev.map((row, i) =>
-        i === index ? { ...row, action: ACTIONS[(ACTIONS.indexOf(row.action) + 1) % ACTIONS.length] } : row,
+        i === index
+          ? { ...row, action: ACTIONS[(ACTIONS.indexOf(row.action) + 1) % ACTIONS.length] }
+          : row,
       ),
     );
   };

@@ -28,7 +28,14 @@ export interface BranchInfo {
 }
 
 import type { DiffHunk, FileDiff } from "@gitbud/ui/diff-types";
-export type { LineKind, DiffLine, DiffHunk, FileDiff, ImageDiff, ReviewComment } from "@gitbud/ui/diff-types";
+export type {
+  LineKind,
+  DiffLine,
+  DiffHunk,
+  FileDiff,
+  ImageDiff,
+  ReviewComment,
+} from "@gitbud/ui/diff-types";
 
 export interface CommitEntry {
   oid: string;

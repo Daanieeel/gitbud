@@ -33,17 +33,17 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 
 ## Roadmap
 
-- [X] Auto-updater
-- [X] Bring uncommitted changes to other branch feature
-- [X] PR quick link on current branch
-- [X] GitHub profile pictures in commit history
-- [X] Delete branch on remote feature
+- [x] Auto-updater
+- [x] Bring uncommitted changes to other branch feature
+- [x] PR quick link on current branch
+- [x] GitHub profile pictures in commit history
+- [x] Delete branch on remote feature
 - [ ] Pop-out merge conflict resolution editor
 - [ ] Settings redesign
-- [X] Open File in Editor
+- [x] Open File in Editor
 - [ ] Better PR viewer (comments, files, commits) like on GitHub
-- [X] Move to TanStack Query
-- [X] Live-syncing with git provider (PRs, commits etc)
+- [x] Move to TanStack Query
+- [x] Live-syncing with git provider (PRs, commits etc)
 - [ ] Improve git blame view
 - [ ] View releases in-app
 - [ ] Commit sigining setup wizard
@@ -127,7 +127,7 @@ Issues and PRs welcome. This is early enough that a well-argued PR can genuinely
 
 1. **RAM and cold-start numbers are acceptance criteria, not vibes.** If a change adds meaningful idle memory or startup time, it needs a reason.
 2. **Local state stays event-driven.** Anything backed by the local `.git` (status, log, branches) should update from the filesystem watcher or Tauri events, not a timer. Remote-facing data (PRs, CI checks, background fetch) already polls on a backoff schedule since GitHub gives us no push channel for it; reuse that schedule instead of adding another timer.
-3. **Auth stays out of Rust.** Anything that needs a user's GitHub credentials for git operations (fetch/pull/push/clone) shells out to system `git`; only the GitHub *API* (PRs, checks, comments) talks HTTP directly, using tokens from Device Flow or `gh`.
+3. **Auth stays out of Rust.** Anything that needs a user's GitHub credentials for git operations (fetch/pull/push/clone) shells out to system `git`; only the GitHub _API_ (PRs, checks, comments) talks HTTP directly, using tokens from Device Flow or `gh`.
 4. **Keep the frontend dumb.** Git logic belongs in `apps/desktop/src-tauri/`, not in a Zustand store.
 
 Every push and PR runs through [CI](.github/workflows/ci.yml): `cargo check` + `cargo test` on macOS, Windows, and Linux, plus a frontend typecheck, build, lint, and format check. Keep it green.

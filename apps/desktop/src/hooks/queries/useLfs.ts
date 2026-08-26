@@ -7,7 +7,10 @@ import { queryKeys } from "@/lib/queryKeys";
 export function useHasLfs(repoPath: string | null) {
   return useQuery({
     queryKey: queryKeys.hasLfs(repoPath ?? ""),
-    queryFn: () => api.hasLfs(repoPath as string),
+    queryFn: () => {
+      if (!repoPath) throw new Error("no repo selected");
+      return api.hasLfs(repoPath);
+    },
     enabled: !!repoPath,
     staleTime: 10 * 60_000,
     initialData: false,

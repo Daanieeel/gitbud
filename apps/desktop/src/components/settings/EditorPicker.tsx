@@ -4,6 +4,7 @@ import { PlusCircleIcon } from "lucide-react";
 import { Input } from "@gitbud/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
 import { CUSTOM_EDITOR_ID, EDITORS, MANUFACTURER_ORDER } from "@/lib/editors";
+import { isSinglePath } from "@/lib/dialogPaths";
 
 interface EditorPickerProps {
   /** Called with the chosen editor id, or `CUSTOM_EDITOR_ID` + the picked app's absolute path. */
@@ -40,7 +41,7 @@ export function EditorPicker({ onSelect, children }: EditorPickerProps) {
       title: "Choose Editor Application",
       multiple: false,
     });
-    if (typeof appPath !== "string") return;
+    if (!isSinglePath(appPath)) return;
     onSelect(CUSTOM_EDITOR_ID, appPath);
   };
 

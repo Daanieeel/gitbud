@@ -86,7 +86,8 @@ export function BranchSwitcher() {
   }, []);
 
   const local = useMemo(
-    () => branches.filter((b) => !b.is_remote && b.name.toLowerCase().includes(filter.toLowerCase())),
+    () =>
+      branches.filter((b) => !b.is_remote && b.name.toLowerCase().includes(filter.toLowerCase())),
     [branches, filter],
   );
   // Typing (or reopening) resets the keyboard highlight back to the top of the list rather
@@ -129,7 +130,11 @@ export function BranchSwitcher() {
     }
     setRenameBusy(true);
     try {
-      await renameBranchMutation.mutateAsync({ oldName: renaming, newName: renameValue.trim(), alsoRenameRemote: renameRemote });
+      await renameBranchMutation.mutateAsync({
+        oldName: renaming,
+        newName: renameValue.trim(),
+        alsoRenameRemote: renameRemote,
+      });
     } finally {
       setRenameBusy(false);
       setRenaming(null);
@@ -172,7 +177,10 @@ export function BranchSwitcher() {
     setSwitching(true);
     const startedAt = Date.now();
     try {
-      await stashSaveMutation.mutateAsync({ message: `WIP on ${branch} before switching to ${target}`, includeUntracked: true });
+      await stashSaveMutation.mutateAsync({
+        message: `WIP on ${branch} before switching to ${target}`,
+        includeUntracked: true,
+      });
       await checkoutBranchMutation.mutateAsync(target);
       if (bringChanges) await stashPopMutation.mutateAsync(0);
     } catch (err) {
@@ -195,11 +203,13 @@ export function BranchSwitcher() {
     const published = !isLocalOnly(name);
     const uncommitted = name === branch && (status?.files.length ?? 0) > 0;
     const target =
-      allLocalBranches.find((b) => b.name !== name && (b.name === "main" || b.name === "master"))?.name ??
-      allLocalBranches.find((b) => b.name !== name)?.name;
+      allLocalBranches.find((b) => b.name !== name && (b.name === "main" || b.name === "master"))
+        ?.name ?? allLocalBranches.find((b) => b.name !== name)?.name;
     // No other branch to compare against shouldn't happen (delete is disabled when this is the
     // only local branch) — but if it somehow does, err conservative and treat as unmerged.
-    const unmerged = !target || !(selectedRepo && (await api.isBranchMerged(selectedRepo, name, target).catch(() => false)));
+    const unmerged =
+      !target ||
+      !(selectedRepo && (await api.isBranchMerged(selectedRepo, name, target).catch(() => false)));
 
     if (!published && !uncommitted && !unmerged) {
       deleteBranchMutation.mutate({ name });
@@ -239,69 +249,74 @@ export function BranchSwitcher() {
 
   return (
     <>
-    <Popover open={open} onOpenChange={setOpen}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <Button variant="secondary" size="sm" className="w-48 justify-between" disabled={switching}>
-              <span className="flex min-w-0 items-center gap-2">
-                <GitBranchIcon className={cn("size-4 shrink-0", switching && "animate-spin")} />
-                <span className="truncate">{branch ?? "…"}</span>
-                {branch && isProtectedBranch(branch) && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <TriangleAlertIcon className="size-3.5 shrink-0 text-accent-yellow" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{`${branch} is a protected default branch`}</TooltipContent>
-                  </Tooltip>
-                )}
-                {branch && isLocalOnly(branch) && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <CloudUploadIcon className="size-3.5 shrink-0 text-accent-blue" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>{`${branch} has never been pushed`}</TooltipContent>
-                  </Tooltip>
-                )}
-              </span>
-              <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>Switch or create a branch</TooltipContent>
-      </Tooltip>
-      <PopoverContent className="w-64 p-0">
-        <div className="border-b border-border p-2">
-          <Input
-            autoFocus
-            autoComplete="off"
-            placeholder="Find or create branch"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value.replace(/\s/g, "-"))}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                e.preventDefault();
-                const lastIndex = local.length - 1;
-                if (lastIndex < 0) return;
-                setHighlightedIndex((i) =>
-                  e.key === "ArrowDown" ? Math.min(i + 1, lastIndex) : Math.max(i - 1, 0),
-                );
-                return;
-              }
-              if (e.key !== "Enter") return;
-              const highlighted = local[highlightedIndex];
-              if (highlighted) void doCheckout(highlighted.name);
-              else if (canCreate) void doCreate(filter.trim());
-            }}
-            className="h-7"
-          />
-        </div>
-        <div className="flex max-h-64 flex-col gap-1 overflow-auto p-1">
-          {local.map((b, index) => (
+      <Popover open={open} onOpenChange={setOpen}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <PopoverTrigger asChild>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-48 justify-between"
+                disabled={switching}
+              >
+                <span className="flex min-w-0 items-center gap-2">
+                  <GitBranchIcon className={cn("size-4 shrink-0", switching && "animate-spin")} />
+                  <span className="truncate">{branch ?? "…"}</span>
+                  {branch && isProtectedBranch(branch) && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <TriangleAlertIcon className="size-3.5 shrink-0 text-accent-yellow" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{`${branch} is a protected default branch`}</TooltipContent>
+                    </Tooltip>
+                  )}
+                  {branch && isLocalOnly(branch) && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <CloudUploadIcon className="size-3.5 shrink-0 text-accent-blue" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{`${branch} has never been pushed`}</TooltipContent>
+                    </Tooltip>
+                  )}
+                </span>
+                <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+          </TooltipTrigger>
+          <TooltipContent>Switch or create a branch</TooltipContent>
+        </Tooltip>
+        <PopoverContent className="w-64 p-0">
+          <div className="border-b border-border p-2">
+            <Input
+              autoFocus
+              autoComplete="off"
+              placeholder="Find or create branch"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value.replace(/\s/g, "-"))}
+              onKeyDown={(e) => {
+                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                  e.preventDefault();
+                  const lastIndex = local.length - 1;
+                  if (lastIndex < 0) return;
+                  setHighlightedIndex((i) =>
+                    e.key === "ArrowDown" ? Math.min(i + 1, lastIndex) : Math.max(i - 1, 0),
+                  );
+                  return;
+                }
+                if (e.key !== "Enter") return;
+                const highlighted = local[highlightedIndex];
+                if (highlighted) void doCheckout(highlighted.name);
+                else if (canCreate) void doCreate(filter.trim());
+              }}
+              className="h-7"
+            />
+          </div>
+          <div className="flex max-h-64 flex-col gap-1 overflow-auto p-1">
+            {local.map((b, index) => (
               <ContextMenu key={b.name}>
                 <ContextMenuTrigger asChild>
                   <div
@@ -373,19 +388,19 @@ export function BranchSwitcher() {
                   </ContextMenuItem>
                 </ContextMenuContent>
               </ContextMenu>
-          ))}
-          {canCreate && (
-            <div
-              className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
-              onClick={() => void doCreate(filter.trim())}
-            >
-              <PlusIcon className="size-3.5" />
-              <span className="truncate">Create branch "{filter.trim()}"</span>
-            </div>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+            ))}
+            {canCreate && (
+              <div
+                className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
+                onClick={() => void doCreate(filter.trim())}
+              >
+                <PlusIcon className="size-3.5" />
+                <span className="truncate">Create branch "{filter.trim()}"</span>
+              </div>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
       <Dialog
         open={renaming !== null}
         onOpenChange={(isOpen) => {
@@ -422,7 +437,10 @@ export function BranchSwitcher() {
             <Button variant="ghost" onClick={() => setRenaming(null)}>
               Cancel
             </Button>
-            <Button disabled={renameBusy || !renameValue.trim()} onClick={() => void commitRename()}>
+            <Button
+              disabled={renameBusy || !renameValue.trim()}
+              onClick={() => void commitRename()}
+            >
               Rename
             </Button>
           </DialogFooter>

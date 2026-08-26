@@ -17,7 +17,8 @@ export const useDivergedPullStore = create<DivergedPullState>((set) => ({
 // Git's own hint text for a `--ff-only` pull that can't fast-forward — stable across the git
 // versions likely in use: older git omits the "Diverging branches..." hint (advice.diverging
 // postdates it) but always includes "Not possible to fast-forward" in the fatal line either way.
-const DIVERGED_PULL_PATTERN = /diverging branches can't be fast-forwarded|not possible to fast-forward/i;
+const DIVERGED_PULL_PATTERN =
+  /diverging branches can't be fast-forwarded|not possible to fast-forward/i;
 
 export function isDivergedPullError(message: string): boolean {
   return DIVERGED_PULL_PATTERN.test(message);

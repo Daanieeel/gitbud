@@ -43,14 +43,21 @@ pub fn create(name: &str, repo_paths: Vec<String>) -> Result<Vec<Workspace>, Str
     }
     let mut workspaces = list()?;
     let id = format!("{name}-{}", chrono::Utc::now().timestamp_millis());
-    workspaces.push(Workspace { id, name: name.to_string(), repo_paths });
+    workspaces.push(Workspace {
+        id,
+        name: name.to_string(),
+        repo_paths,
+    });
     save_all(&workspaces)?;
     Ok(workspaces)
 }
 
 pub fn update(id: &str, name: &str, repo_paths: Vec<String>) -> Result<Vec<Workspace>, String> {
     let mut workspaces = list()?;
-    let workspace = workspaces.iter_mut().find(|w| w.id == id).ok_or("Workspace not found")?;
+    let workspace = workspaces
+        .iter_mut()
+        .find(|w| w.id == id)
+        .ok_or("Workspace not found")?;
     workspace.name = name.trim().to_string();
     workspace.repo_paths = repo_paths;
     save_all(&workspaces)?;
