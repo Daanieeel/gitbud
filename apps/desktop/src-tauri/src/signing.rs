@@ -17,9 +17,36 @@ fn output_error(output: &Output) -> String {
     "command failed with no output".to_string()
 }
 
+/// Extra directories where Homebrew (and Linuxbrew) install binaries. GUI apps launched from
+/// Finder/Dock/systemd — unlike a shell — never source `.zprofile`/`.bashrc`, so they inherit
+/// the OS's bare-bones default PATH, which doesn't include Homebrew's prefix. That's why `brew`
+/// and anything it installed (like `gnupg`) can be "not found" here even though a Terminal on
+/// the same machine finds them fine. Appended, never prepended, so a PATH entry already present
+/// still wins.
+fn augmented_path() -> std::ffi::OsString {
+    let extra: &[&str] = if cfg!(target_os = "macos") {
+        &["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin", "/usr/local/sbin"]
+    } else {
+        &["/home/linuxbrew/.linuxbrew/bin", "/home/linuxbrew/.linuxbrew/sbin", "/usr/local/bin"]
+    };
+    match std::env::var_os("PATH") {
+        Some(path) => std::env::join_paths(std::env::split_paths(&path).chain(extra.iter().map(std::path::PathBuf::from)))
+            .unwrap_or(path),
+        None => extra.join(":").into(),
+    }
+}
+
+/// `Command::new`, but with `augmented_path` merged into the child's `PATH` so it can find
+/// Homebrew-installed tools regardless of how GitBud itself was launched.
+pub(crate) fn command_with_path(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    cmd.env("PATH", augmented_path());
+    cmd
+}
+
 /// Whether the `gpg` binary is available on PATH, for offering OpenPGP signing at all.
 pub fn has_gpg() -> bool {
-    Command::new("gpg")
+    command_with_path("gpg")
         .arg("--version")
         .output()
         .map(|o| o.status.success())
@@ -33,7 +60,7 @@ pub fn has_gpg() -> bool {
 /// alone — a nonzero exit here doesn't necessarily mean gpg is still missing (e.g. "already
 /// installed" isn't a hard failure worth surfacing).
 pub fn install_gpg_via_brew() -> Result<(), String> {
-    let output = Command::new("brew")
+    let output = command_with_path("brew")
         .args(["install", "gnupg"])
         .output()
         .map_err(|e| format!("couldn't run brew: {e}"))?;
@@ -45,7 +72,7 @@ pub fn install_gpg_via_brew() -> Result<(), String> {
 
 /// Lists this machine's GPG secret keys as (key id, user id) pairs, for "import an existing key".
 pub fn list_gpg_keys() -> Result<Vec<(String, String)>, String> {
-    let output = Command::new("gpg")
+    let output = command_with_path("gpg")
         .args(["--list-secret-keys", "--with-colons"])
         .output()
         .map_err(|e| e.to_string())?;
@@ -77,7 +104,7 @@ pub fn generate_gpg_key(name: &str, email: &str) -> Result<String, String> {
     let batch_file =
         std::env::temp_dir().join(format!("gitbud-gpg-batch-{}.txt", std::process::id()));
     std::fs::write(&batch_file, &batch).map_err(|e| e.to_string())?;
-    let output = Command::new("gpg")
+    let output = command_with_path("gpg")
         .args(["--batch", "--status-fd", "1", "--generate-key"])
         .arg(&batch_file)
         .output();
@@ -113,7 +140,7 @@ pub fn generate_ssh_signing_key(path: &str, email: &str) -> Result<String, Strin
     // attached — reads EOF, declines, and exits with an empty stderr, hiding the failure entirely.
     let _ = std::fs::remove_file(path);
     let _ = std::fs::remove_file(format!("{path}.pub"));
-    let output = Command::new("ssh-keygen")
+    let output = command_with_path("ssh-keygen")
         .args(["-t", "ed25519", "-f", path, "-N", "", "-C", email])
         .output()
         .map_err(|e| e.to_string())?;
@@ -132,7 +159,7 @@ pub fn read_ssh_public_key(pub_key_path: &str) -> Result<String, String> {
 /// Exports an OpenPGP key's public key in the armored form providers expect pasted into a
 /// "New GPG key" field.
 pub fn export_gpg_public_key(key_id: &str) -> Result<String, String> {
-    let output = Command::new("gpg")
+    let output = command_with_path("gpg")
         .args(["--armor", "--export", key_id])
         .output()
         .map_err(|e| e.to_string())?;
@@ -173,7 +200,7 @@ pub fn test_signing(format: &str, key: &str) -> Result<(), String> {
 
         let result = (|| {
             let file = std::fs::File::open(&payload_path).map_err(|e| e.to_string())?;
-            let output = Command::new("ssh-keygen")
+            let output = command_with_path("ssh-keygen")
                 .args([
                     "-Y",
                     "verify",
@@ -209,7 +236,7 @@ pub fn test_signing(format: &str, key: &str) -> Result<(), String> {
         std::fs::write(&payload_path, PAYLOAD).map_err(|e| e.to_string())?;
         std::fs::write(&sig_path, &signature).map_err(|e| e.to_string())?;
 
-        let output = Command::new("gpg")
+        let output = command_with_path("gpg")
             .args(["--verify"])
             .arg(&sig_path)
             .arg(&payload_path)
@@ -317,6 +344,53 @@ mod tests {
     impl Drop for ScratchRepo {
         fn drop(&mut self) {
             let _ = std::fs::remove_dir_all(&self.path);
+        }
+    }
+
+    #[test]
+    fn command_with_path_augments_path_with_homebrew_dirs() {
+        // Regression test: GUI-launched apps (Finder/Dock/systemd, unlike a shell) inherit a
+        // bare-bones PATH that skips Homebrew's prefix entirely, which used to make `has_gpg`
+        // report gpg as missing and `install_gpg_via_brew` fail with "couldn't run brew: No
+        // such file or directory" even when both were installed and working fine from a
+        // Terminal on the same machine.
+        let cmd = command_with_path("gpg");
+        let path_value = cmd
+            .get_envs()
+            .find(|(k, _)| *k == std::ffi::OsStr::new("PATH"))
+            .and_then(|(_, v)| v)
+            .expect("command_with_path must set a PATH env override")
+            .to_string_lossy()
+            .to_string();
+
+        if cfg!(target_os = "macos") {
+            assert!(path_value.contains("/opt/homebrew/bin"));
+            assert!(path_value.contains("/usr/local/bin"));
+        } else {
+            assert!(path_value.contains("linuxbrew"));
+        }
+    }
+
+    #[test]
+    fn command_with_path_preserves_the_inherited_path() {
+        // The augmented PATH must only append, never replace, whatever PATH the process
+        // already had — otherwise tools resolved via an explicit PATH entry (e.g. a
+        // user-configured git) would stop being found.
+        let inherited = std::env::var_os("PATH").unwrap_or_default();
+        let cmd = command_with_path("gpg");
+        let augmented = cmd
+            .get_envs()
+            .find(|(k, _)| *k == std::ffi::OsStr::new("PATH"))
+            .and_then(|(_, v)| v)
+            .unwrap()
+            .to_string_lossy()
+            .to_string();
+
+        for dir in std::env::split_paths(&inherited) {
+            assert!(
+                augmented.contains(dir.to_string_lossy().as_ref()),
+                "augmented PATH lost an inherited entry: {dir:?}"
+            );
         }
     }
 
