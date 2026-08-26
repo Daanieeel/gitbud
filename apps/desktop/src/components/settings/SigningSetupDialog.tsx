@@ -216,25 +216,27 @@ export function SigningSetupDialog({
           </DialogTitle>
         </DialogHeader>
 
-        {/* `minmax(0, 1fr)` columns (what Tailwind's grid-cols-4 generates) are immune to a
-         * long label like "Add to provider" pushing the layout around — a plain flex-1 column
-         * would size itself off its content's min-width first, throwing the rest out of
-         * alignment. Each connector belongs to the step it leads INTO (index i, i>=1) and
-         * spans from the previous circle's center to this one's, via left:-50%/w-full — that
-         * also fixes the color rule: a segment is only "traveled" once you've reached the step
-         * at its far end (stepIndex >= i), not just because you're still on the step before it. */}
-        <div className="grid w-full grid-cols-4 pt-4 text-xs text-muted-foreground">
-          {STEP_ORDER.map((s, i) => (
-            <div key={s} className="relative flex flex-col items-center gap-2">
-              {i > 0 && (
-                <div
-                  className={cn(
-                    "absolute top-3.5 -left-1/2 -z-10 h-px w-full",
-                    stepIndex >= i ? "bg-primary" : "bg-border",
-                  )}
-                />
-              )}
+        {/* Circles are laid out with `justify-between` so they sit flush against the dialog's
+         * left/right edges instead of centered inside an equal-width column (which left visible
+         * dead space at both ends). The track and its colored progress overlay are separate
+         * absolute layers inset by the circle radius (3.5 = size-7 / 2) so they start and end
+         * exactly at the first/last circle's center. Labels live in their own row below, aligned
+         * left/right at the ends so a long one like "Add to provider" can't push anything. */}
+        <div className="w-full pt-4 text-xs text-muted-foreground">
+          <div className="relative flex items-center justify-between">
+            <div className="absolute inset-x-3.5 top-1/2 -z-10 h-px -translate-y-1/2 bg-border" />
+            <div
+              className="absolute top-1/2 left-3.5 -z-10 h-px -translate-y-1/2 bg-primary transition-all"
+              style={{
+                width:
+                  stepIndex === 0
+                    ? "0px"
+                    : `calc((100% - 1.75rem) * ${stepIndex / (STEP_ORDER.length - 1)})`,
+              }}
+            />
+            {STEP_ORDER.map((s, i) => (
               <div
+                key={s}
                 className={cn(
                   "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium",
                   i <= stepIndex
@@ -244,11 +246,25 @@ export function SigningSetupDialog({
               >
                 {i < stepIndex ? <CheckIcon className="size-3.5" /> : i + 1}
               </div>
-              <span className={cn("text-center", i === stepIndex && "font-medium text-foreground")}>
+            ))}
+          </div>
+          <div className="mt-2 grid grid-cols-4">
+            {STEP_ORDER.map((s, i) => (
+              <span
+                key={s}
+                className={cn(
+                  i === 0
+                    ? "text-left"
+                    : i === STEP_ORDER.length - 1
+                      ? "text-right"
+                      : "text-center",
+                  i === stepIndex && "font-medium text-foreground",
+                )}
+              >
                 {STEP_LABEL[s]}
               </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
         <div className="flex min-h-64 flex-col justify-center">
@@ -277,7 +293,11 @@ export function SigningSetupDialog({
                 <div className="flex flex-col gap-1.5 rounded-md border border-border p-2 text-xs text-muted-foreground">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <InfoIcon className="size-3.5 shrink-0" />
+                      {gpgAvailable ? (
+                        <CheckIcon className="size-3.5 shrink-0" />
+                      ) : (
+                        <InfoIcon className="size-3.5 shrink-0" />
+                      )}
                       <span>
                         {gpgAvailable ? "GPG installed and available" : "GPG not installed."}
                       </span>
