@@ -9,6 +9,7 @@ import {
   Loader2Icon,
   ShieldCheckIcon,
   SparklesIcon,
+  SquareArrowOutUpRightIcon,
   XIcon,
 } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -289,8 +290,8 @@ export function SigningSetupDialog({
                           className="h-6 px-2 text-xs"
                           onClick={() => void openUrl("https://gnupg.org/download/")}
                         >
+                          <SquareArrowOutUpRightIcon className="size-3.5" />
                           Download
-                          <ExternalLinkIcon className="size-3.5" />
                         </Button>
                         <Button
                           size="sm"
