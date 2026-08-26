@@ -45,10 +45,10 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [x] Move to TanStack Query
 - [x] Live-syncing with git provider (PRs, commits etc)
 - [ ] Improve git blame view
-- [ ] View releases in-app
+- [ ] View releases in-app (Releases Tab next to Changes, History and Pull Requests)
 - [ ] Commit sigining setup wizard
 - [ ] Full screen reclone/relocate/remove from gitbud prompt for repo paths that the app cant find anymroe (moved/deleted)
-- [ ] .gitignore tab for managing gitignore rules in an interactive UI
+- [ ] .gitignore tab for managing gitignore rules in an interactive UI (Gitignore Tab next to Changes, History and Pull Requests)
 - [ ] ...and more to come
 
 ## Features
