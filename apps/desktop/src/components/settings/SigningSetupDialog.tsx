@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
   CheckIcon,
   CopyIcon,
@@ -25,6 +25,7 @@ import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
 import { api } from "@/lib/tauri";
 import { copyToClipboard } from "@/lib/clipboard";
 import { isSinglePath } from "@/lib/dialogPaths";
+import { firstMatch } from "@/lib/utils";
 import {
   detectRemoteProvider,
   signingKeySettingsUrl,
@@ -302,14 +303,17 @@ export function SigningSetupDialog({
                   i === stepIndex && "font-medium text-foreground",
                 )}
                 style={
-                  i === 0
-                    ? { left: 0 }
-                    : i === STEP_ORDER.length - 1
-                      ? { right: 0 }
-                      : {
-                          left: `calc(0.875rem + ${i / (STEP_ORDER.length - 1)} * (100% - 1.75rem))`,
-                          transform: "translateX(-50%)",
-                        }
+                  firstMatch<CSSProperties>([
+                    [i === 0, { left: 0 }],
+                    [i === STEP_ORDER.length - 1, { right: 0 }],
+                    [
+                      true,
+                      {
+                        left: `calc(0.875rem + ${i / (STEP_ORDER.length - 1)} * (100% - 1.75rem))`,
+                        transform: "translateX(-50%)",
+                      },
+                    ],
+                  ]) ?? undefined
                 }
               >
                 {STEP_LABEL[s]}

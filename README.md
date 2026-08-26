@@ -38,6 +38,7 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [x] PR quick link on current branch
 - [x] GitHub profile pictures in commit history
 - [x] Delete branch on remote feature
+- [ ] GitLab and Bitbucket support
 - [ ] Pop-out merge conflict resolution editor
 - [ ] Settings redesign
 - [x] Open File in Editor
