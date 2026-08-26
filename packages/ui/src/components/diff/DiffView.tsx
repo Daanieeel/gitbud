@@ -730,6 +730,7 @@ function DiffViewImpl({
       </div>
       <div className="w-max min-w-full">
         <DiffSection
+          key={`${path}:primary`}
           diff={diff}
           hunkActions={hunkActions}
           language={language}
@@ -751,6 +752,7 @@ function DiffViewImpl({
         />
         {secondaryDiff && (
           <DiffSection
+            key={`${path}:secondary`}
             diff={secondaryDiff}
             hunkActions={secondaryHunkActions}
             language={language}
