@@ -229,33 +229,43 @@ export function SigningSetupDialog({
         </div>
 
         {step === "intro" && (
-          <div className="flex flex-col gap-4">
-            <Field
-              label="Key type"
-              hint="SSH needs nothing extra installed; GPG needs the gpg tool but is the older, more widely recognized standard."
-            >
-              <SegmentedControl
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Key type</span>
+              <CardPicker
                 value={format}
                 onChange={setFormat}
                 options={[
-                  { value: "ssh", label: "SSH" },
-                  { value: "openpgp", label: "GPG", disabled: !gpgAvailable },
+                  {
+                    value: "ssh",
+                    label: "SSH",
+                    description: "Recommended — nothing extra to install",
+                  },
+                  {
+                    value: "openpgp",
+                    label: "GPG",
+                    description: "Older, widely recognized standard",
+                    disabled: !gpgAvailable,
+                    disabledReason: "gpg not found on PATH",
+                  },
                 ]}
               />
-            </Field>
-            <Field
-              label="Scope"
-              hint="Global signs every commit in every repo on this machine. Repo-only signs just this one."
-            >
-              <SegmentedControl
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Scope</span>
+              <CardPicker
                 value={global ? "global" : "repo"}
                 onChange={(v) => setGlobal(v === "global")}
                 options={[
-                  { value: "repo", label: "This repo" },
-                  { value: "global", label: "All repos" },
+                  { value: "repo", label: "This repo", description: "Just the current repository" },
+                  {
+                    value: "global",
+                    label: "All repos",
+                    description: "Every repo on this machine",
+                  },
                 ]}
               />
-            </Field>
+            </div>
           </div>
         )}
 
@@ -284,7 +294,6 @@ export function SigningSetupDialog({
                   />
                   {busyKey === "generateSsh" ? "Generating…" : "Generate"}
                 </Button>
-                <InfoTooltip text="No passphrase — GitBud signs silently on every commit, nothing extra to type." />
               </div>
             ) : (
               <div className="flex gap-2">
@@ -313,6 +322,10 @@ export function SigningSetupDialog({
                 </Button>
               </div>
             )}
+            <p className="text-xs text-muted-foreground">
+              A generated key has no passphrase. GitBud signs silently on every commit, with nothing
+              extra to type each time.
+            </p>
           </div>
         )}
 
@@ -420,26 +433,6 @@ export function SigningSetupDialog({
   );
 }
 
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-        {label}
-        {hint && <InfoTooltip text={hint} />}
-      </div>
-      {children}
-    </div>
-  );
-}
-
 function InfoTooltip({ text }: { text: string }) {
   return (
     <Tooltip>
@@ -451,33 +444,55 @@ function InfoTooltip({ text }: { text: string }) {
   );
 }
 
-function SegmentedControl<T extends string>({
+/** Same selectable-card pattern as MergePRDialog's merge-method picker: a short title, a
+ * one-line description, a primary-tinted border when selected — and, when disabled, a tooltip
+ * explaining why instead of the option just vanishing. */
+function CardPicker<T extends string>({
   value,
   onChange,
   options,
 }: {
   value: T;
   onChange: (v: T) => void;
-  options: { value: T; label: string; disabled?: boolean }[];
+  options: {
+    value: T;
+    label: string;
+    description: string;
+    disabled?: boolean;
+    disabledReason?: string;
+  }[];
 }) {
   return (
-    <div className="inline-flex w-fit gap-0.5 rounded-md bg-muted/40 p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          disabled={o.disabled}
-          onClick={() => onChange(o.value)}
-          className={cn(
-            "rounded-sm px-3 py-1 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-40",
-            value === o.value
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div className="flex gap-2">
+      {options.map((o) => {
+        const card = (
+          <button
+            key={o.value}
+            type="button"
+            // Not a real `disabled` attribute: that would block pointer events in most
+            // browsers, silently preventing the tooltip below from ever showing on hover.
+            aria-disabled={o.disabled}
+            className={cn(
+              "flex-1 rounded-md border border-border p-2 text-left",
+              o.disabled && "cursor-not-allowed opacity-40",
+              value === o.value && "border-2 border-primary bg-primary/10 p-[7px]",
+            )}
+            onClick={() => !o.disabled && onChange(o.value)}
+          >
+            <div className="flex flex-col gap-1">
+              <div className="text-sm font-medium">{o.label}</div>
+              <div className="text-xs text-muted-foreground">{o.description}</div>
+            </div>
+          </button>
+        );
+        if (!o.disabled || !o.disabledReason) return card;
+        return (
+          <Tooltip key={o.value}>
+            <TooltipTrigger asChild>{card}</TooltipTrigger>
+            <TooltipContent>{o.disabledReason}</TooltipContent>
+          </Tooltip>
+        );
+      })}
     </div>
   );
 }

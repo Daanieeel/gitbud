@@ -157,24 +157,6 @@ export function CommitBox() {
           You're committing directly to {branch}
         </div>
       )}
-      {!signingEnabled && !signingBannerDismissed && (
-        <div className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
-          <ShieldIcon className="size-3.5 shrink-0" />
-          <span className="min-w-0 flex-1">Commits aren't signed</span>
-          <button
-            className="shrink-0 font-medium text-foreground hover:underline"
-            onClick={() => setSigningDialogOpen(true)}
-          >
-            Set up
-          </button>
-          <button
-            className="shrink-0 text-muted-foreground hover:text-foreground"
-            onClick={() => setSigningBannerDismissed(true)}
-          >
-            <XIcon className="size-3.5" />
-          </button>
-        </div>
-      )}
       <SigningSetupDialog
         open={signingDialogOpen}
         onOpenChange={(next) => {
@@ -211,6 +193,24 @@ export function CommitBox() {
             : "Cmd+Enter"}
         </TooltipContent>
       </Tooltip>
+      {!signingEnabled && !signingBannerDismissed && (
+        <div className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+          <ShieldIcon className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1">Commits aren't signed</span>
+          <button
+            className="shrink-0 font-medium text-foreground hover:underline"
+            onClick={() => setSigningDialogOpen(true)}
+          >
+            Set up
+          </button>
+          <button
+            className="shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => setSigningBannerDismissed(true)}
+          >
+            <XIcon className="size-3.5" />
+          </button>
+        </div>
+      )}
       {hasUnpushedCommit && (
         <div className="flex items-center gap-1.5 px-2 text-xs text-muted-foreground">
           <GitCommitIcon className="size-3.5 shrink-0" />
