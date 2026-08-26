@@ -66,6 +66,8 @@ export function SigningSetupDialog({
   const [step, setStep] = useState<Step>("intro");
   const [format, setFormat] = useState<Format>("ssh");
   const [global, setGlobal] = useState(true);
+  const [keyMode, setKeyMode] = useState<"generate" | "existing">("generate");
+  const [defaultDir, setDefaultDir] = useState("");
   const [gpgAvailable, setGpgAvailable] = useState(false);
   const [gpgKeys, setGpgKeys] = useState<[string, string][]>([]);
   const [selectedGpgKey, setSelectedGpgKey] = useState("");
@@ -85,6 +87,7 @@ export function SigningSetupDialog({
 
   useEffect(() => {
     if (!isOpen) return;
+    void homeDir().then(setDefaultDir);
     void api.hasGpg().then((available) => {
       setGpgAvailable(available);
       if (available) void api.listGpgKeys().then(setGpgKeys);
@@ -95,6 +98,8 @@ export function SigningSetupDialog({
 
   const reset = () => {
     setStep("intro");
+    setKeyMode("generate");
+    setSshKeyPath("");
     setPubkey(null);
     setGpgPubkey(null);
     setSelectedGpgKey("");
@@ -111,7 +116,6 @@ export function SigningSetupDialog({
 
   const generateSsh = () =>
     runBusy("generateSsh", async () => {
-      const defaultDir = await homeDir();
       const path = sshKeyPath.trim() || `${defaultDir}/.ssh/gitbud_signing_ed25519`;
       const pub = await api.generateSshSigningKey(path, email);
       setSshKeyPath(path);
@@ -202,6 +206,7 @@ export function SigningSetupDialog({
   if (!repoPath) return null;
 
   const hasKey = format === "ssh" ? sshKeyPath.trim().length > 0 : selectedGpgKey.length > 0;
+  const sshDefaultPath = defaultDir ? `${defaultDir}/.ssh/gitbud_signing_ed25519` : "";
   const activePubkey = format === "ssh" ? pubkey : gpgPubkey;
   const provider = providerHost ? detectRemoteProvider(providerHost) : "unknown";
   const providerLink = providerHost ? signingKeySettingsUrl(providerHost, provider, format) : null;
@@ -355,61 +360,95 @@ export function SigningSetupDialog({
 
           {step === "key" && (
             <div className="flex flex-col gap-2">
+              <CardPicker
+                value={keyMode}
+                onChange={setKeyMode}
+                options={[
+                  {
+                    value: "generate",
+                    label: "Generate new key",
+                    description:
+                      format === "ssh"
+                        ? "Creates a new ed25519 key just for signing"
+                        : "Creates a new GPG key just for signing",
+                  },
+                  {
+                    value: "existing",
+                    label: "Choose existing key",
+                    description:
+                      format === "ssh"
+                        ? "Use an SSH key you already have"
+                        : "Pick a key already in your keyring",
+                  },
+                ]}
+              />
               {format === "ssh" ? (
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="~/.ssh/gitbud_signing_ed25519"
-                    value={sshKeyPath}
-                    onChange={(e) => setSshKeyPath(e.target.value)}
-                    className="h-8"
+                keyMode === "generate" ? (
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={sshKeyPath || sshDefaultPath}
+                      className="h-8 font-mono text-xs"
+                    />
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      disabled={busy}
+                      onClick={() => void generateSsh()}
+                    >
+                      <SparklesIcon
+                        className={cn("size-3.5", busyKey === "generateSsh" && "animate-spin")}
+                      />
+                      {busyKey === "generateSsh" ? "Generating…" : "Generate"}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      placeholder="No file chosen"
+                      value={sshKeyPath}
+                      className="h-8 font-mono text-xs"
+                    />
+                    <Button size="sm" variant="secondary" onClick={() => void pickExistingSshKey()}>
+                      <FolderOpenIcon className="size-3.5" />
+                      Choose file
+                    </Button>
+                  </div>
+                )
+              ) : keyMode === "generate" ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="self-start"
+                  disabled={busy}
+                  onClick={() => void generateGpg()}
+                >
+                  <SparklesIcon
+                    className={cn("size-3.5", busyKey === "generateGpg" && "animate-spin")}
                   />
-                  <Button size="sm" variant="secondary" onClick={() => void pickExistingSshKey()}>
-                    <FolderOpenIcon className="size-3.5" />
-                    Existing
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={() => void generateSsh()}
-                  >
-                    <SparklesIcon
-                      className={cn("size-3.5", busyKey === "generateSsh" && "animate-spin")}
-                    />
-                    {busyKey === "generateSsh" ? "Generating…" : "Generate"}
-                  </Button>
-                </div>
+                  {busyKey === "generateGpg" ? "Generating…" : "Generate key"}
+                </Button>
               ) : (
-                <div className="flex gap-2">
-                  <select
-                    value={selectedGpgKey}
-                    onChange={(e) => setSelectedGpgKey(e.target.value)}
-                    className="h-8 flex-1 rounded-md border border-input bg-transparent px-2 text-sm"
-                  >
-                    <option value="">Choose a key…</option>
-                    {gpgKeys.map(([id, uid]) => (
-                      <option key={id} value={id}>
-                        {uid} ({id.slice(-8)})
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    disabled={busy}
-                    onClick={() => void generateGpg()}
-                  >
-                    <SparklesIcon
-                      className={cn("size-3.5", busyKey === "generateGpg" && "animate-spin")}
-                    />
-                    {busyKey === "generateGpg" ? "Generating…" : "Generate"}
-                  </Button>
-                </div>
+                <select
+                  value={selectedGpgKey}
+                  onChange={(e) => setSelectedGpgKey(e.target.value)}
+                  className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
+                >
+                  <option value="">Choose a key…</option>
+                  {gpgKeys.map(([id, uid]) => (
+                    <option key={id} value={id}>
+                      {uid} ({id.slice(-8)})
+                    </option>
+                  ))}
+                </select>
               )}
-              <p className="text-xs text-muted-foreground">
-                A generated key has no passphrase. GitBud signs silently on every commit, with
-                nothing extra to type each time.
-              </p>
+              {keyMode === "generate" && (
+                <p className="text-xs text-muted-foreground">
+                  A generated key has no passphrase. GitBud signs silently on every commit, with
+                  nothing extra to type each time.
+                </p>
+              )}
               {error && <p className="text-xs text-destructive">{error}</p>}
             </div>
           )}
