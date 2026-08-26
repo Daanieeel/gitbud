@@ -7,7 +7,7 @@ interface ErrorBoundaryState {
 }
 
 /** Catches render/commit-time errors anywhere below it so one broken component can't blank the
- * entire window. Without this, React unmounts the whole tree on any uncaught error — on this
+ * entire window. Without this, React unmounts the whole tree on any uncaught error; on this
  * app's dark theme that's indistinguishable from the window itself being broken. */
 export class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBoundaryState> {
   state: ErrorBoundaryState = { error: null };

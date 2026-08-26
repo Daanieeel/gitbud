@@ -27,6 +27,23 @@ const SYNC_TIMEOUT_MS = 90_000;
 
 const NOTIFY_THRESHOLD_MS = 4000;
 
+// Git's own text for a DNS/connect failure is developer-oriented and — for a "could not resolve
+// host" failure specifically — git prints the exact same "fatal: unable to access '<url>': ..."
+// line twice (once per curl retry), so a raw toast reads as one garbled, doubled sentence.
+// Mirrors the friendly text `send_err` (api.rs) already shows for the same failure class hit via
+// the GitHub REST API, so both surfaces read consistently.
+const GIT_NETWORK_ERROR_PATTERN =
+  /could not resolve host|could not resolve proxy|failed to connect|connection timed out|connection refused|network is unreachable|could not connect to server|ssl connect error|operation timed out/i;
+
+function formatGitError(message: string): string {
+  if (GIT_NETWORK_ERROR_PATTERN.test(message)) {
+    return "Couldn't reach GitHub, check your internet connection.";
+  }
+  // Otherwise just collapse exact-duplicate lines, in case git repeated one for some other reason.
+  const lines = message.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+  return [...new Set(lines)].join("\n");
+}
+
 /** Runs a long-lived git operation (fetch/pull/push/clone/...) with a cancellable, progress-
  * streaming toast. Shared by every mutation that wraps a git_shell.rs command, so the toast/
  * cancel/timeout/offline-detection behavior stays identical across all of them. `eventId` is the
@@ -108,7 +125,7 @@ export async function runGitSync(
         toast.dismiss(eventId);
         return;
       }
-      toast.error(outcome.error, { id: eventId, ...finalState });
+      toast.error(formatGitError(outcome.error), { id: eventId, ...finalState });
       return;
     }
     useNetworkStore.getState().noteSuccess();

@@ -1,41 +1,49 @@
 import hljs from "highlight.js/lib/core";
-import typescript from "highlight.js/lib/languages/typescript";
-import javascript from "highlight.js/lib/languages/javascript";
-import xml from "highlight.js/lib/languages/xml";
-import css from "highlight.js/lib/languages/css";
-import json from "highlight.js/lib/languages/json";
-import python from "highlight.js/lib/languages/python";
-import rust from "highlight.js/lib/languages/rust";
-import go from "highlight.js/lib/languages/go";
-import java from "highlight.js/lib/languages/java";
-import ruby from "highlight.js/lib/languages/ruby";
-import php from "highlight.js/lib/languages/php";
-import cpp from "highlight.js/lib/languages/cpp";
-import csharp from "highlight.js/lib/languages/csharp";
-import bash from "highlight.js/lib/languages/bash";
-import yaml from "highlight.js/lib/languages/yaml";
-import markdown from "highlight.js/lib/languages/markdown";
-import sql from "highlight.js/lib/languages/sql";
-import ini from "highlight.js/lib/languages/ini";
 
-hljs.registerLanguage("typescript", typescript);
-hljs.registerLanguage("javascript", javascript);
-hljs.registerLanguage("xml", xml);
-hljs.registerLanguage("css", css);
-hljs.registerLanguage("json", json);
-hljs.registerLanguage("python", python);
-hljs.registerLanguage("rust", rust);
-hljs.registerLanguage("go", go);
-hljs.registerLanguage("java", java);
-hljs.registerLanguage("ruby", ruby);
-hljs.registerLanguage("php", php);
-hljs.registerLanguage("cpp", cpp);
-hljs.registerLanguage("csharp", csharp);
-hljs.registerLanguage("bash", bash);
-hljs.registerLanguage("yaml", yaml);
-hljs.registerLanguage("markdown", markdown);
-hljs.registerLanguage("sql", sql);
-hljs.registerLanguage("ini", ini);
+// Loaded on first use rather than all up front: most sessions only ever touch a handful of
+// these languages, and eagerly importing+registering all ~19 grammars costs real memory the
+// moment any diff renders, whether or not most of them are ever needed.
+const LANGUAGE_LOADERS: Record<string, () => Promise<{ default: unknown }>> = {
+  typescript: () => import("highlight.js/lib/languages/typescript"),
+  javascript: () => import("highlight.js/lib/languages/javascript"),
+  xml: () => import("highlight.js/lib/languages/xml"),
+  css: () => import("highlight.js/lib/languages/css"),
+  json: () => import("highlight.js/lib/languages/json"),
+  python: () => import("highlight.js/lib/languages/python"),
+  rust: () => import("highlight.js/lib/languages/rust"),
+  go: () => import("highlight.js/lib/languages/go"),
+  java: () => import("highlight.js/lib/languages/java"),
+  ruby: () => import("highlight.js/lib/languages/ruby"),
+  php: () => import("highlight.js/lib/languages/php"),
+  cpp: () => import("highlight.js/lib/languages/cpp"),
+  csharp: () => import("highlight.js/lib/languages/csharp"),
+  bash: () => import("highlight.js/lib/languages/bash"),
+  yaml: () => import("highlight.js/lib/languages/yaml"),
+  markdown: () => import("highlight.js/lib/languages/markdown"),
+  sql: () => import("highlight.js/lib/languages/sql"),
+  ini: () => import("highlight.js/lib/languages/ini"),
+};
+
+const loadedLanguages = new Set<string>();
+const pendingLoads = new Map<string, Promise<void>>();
+
+/** Kicks off (and memoizes) loading + registering a language's grammar on first use. Returns a
+ * promise that resolves once `highlightLine` can actually use it, or `undefined` if it's already
+ * loaded/unsupported. Callers re-render once the promise resolves; `highlightLine` itself stays
+ * synchronous and just renders plain (unhighlighted) text until then. */
+export function ensureLanguageLoaded(language: string | undefined): Promise<void> | undefined {
+  if (!language || loadedLanguages.has(language)) return undefined;
+  const existing = pendingLoads.get(language);
+  if (existing) return existing;
+  const loader = LANGUAGE_LOADERS[language];
+  if (!loader) return undefined;
+  const pending = loader().then((mod) => {
+    hljs.registerLanguage(language, mod.default as Parameters<typeof hljs.registerLanguage>[1]);
+    loadedLanguages.add(language);
+  });
+  pendingLoads.set(language, pending);
+  return pending;
+}
 
 const EXT_TO_LANG: Record<string, string> = {
   ts: "typescript",
@@ -90,9 +98,11 @@ function escapeHtml(text: string): string {
 }
 
 /** Highlights a single line in isolation — loses cross-line grammar state (e.g. mid
- * multi-line comment/string) like most diff viewers' per-line highlighting does. */
+ * multi-line comment/string) like most diff viewers' per-line highlighting does. Renders as
+ * plain escaped text if `language`'s grammar hasn't finished loading yet (see
+ * `ensureLanguageLoaded`); callers trigger that and re-render once it resolves. */
 export function highlightLine(content: string, language: string | undefined): string {
-  if (!language) return escapeHtml(content);
+  if (!language || !loadedLanguages.has(language)) return escapeHtml(content);
   try {
     return hljs.highlight(content, { language, ignoreIllegals: true }).value;
   } catch {

@@ -1,5 +1,32 @@
 import { QueryClient } from "@tanstack/react-query";
 import { useNetworkStore } from "@/store/useNetworkStore";
+import type { CacheLevel } from "@/lib/types";
+
+// How long already-fetched, no-longer-viewed data (status, branches, log, diffs, stashes, ...)
+// stays in the in-memory query cache before being freed. The user-facing "cache_level" setting
+// (Settings > General) maps to one of these, applied at runtime via `applyCacheLevel` (see
+// App.tsx). Scoped entirely to this frontend query cache — the always-on local SQLite mirror for
+// GitHub PR data (pr_cache.rs) and that data's own deliberate eviction on leaving a PR/tab/repo
+// (PRTab.tsx) are both a deliberate, separate, non-configurable cache layer, untouched by this
+// setting at every level including "none".
+export const GC_TIME_BY_CACHE_LEVEL: Record<CacheLevel, number> = {
+  none: 0,
+  minimal: 5_000,
+  balanced: 30_000,
+  relaxed: 120_000,
+};
+
+// staleTime governs a second, independent form of caching: whether data already in the cache is
+// served as-is (no refetch) or treated as stale. At every other level this stays fixed regardless
+// of gcTime (see below) — but "none" needs to mean *zero* caching, not just fast eviction once
+// unobserved, so it's the one level where staleTime also collapses to 0: every mount/refocus/
+// reconnect is treated as needing a genuinely fresh fetch, never served straight from cache.
+const STALE_TIME_BY_CACHE_LEVEL: Record<CacheLevel, number> = {
+  none: 0,
+  minimal: 30_000,
+  balanced: 30_000,
+  relaxed: 30_000,
+};
 
 // Desktop app, single window, backend reachable over IPC (not HTTP) for anything but GitHub
 // calls — most queries have nothing to gain from window-refocus/interval refetching, and
@@ -16,21 +43,40 @@ import { useNetworkStore } from "@/store/useNetworkStore";
 // into a tab), that's done with an explicit one-shot `invalidateQueries` in an effect keyed on
 // the open/mount transition itself, not a query option — see TagsPanel, ReflogPanel,
 // MergePRDialog, PRTab, HistoryTab.
-export const queryClient = new QueryClient({
-  defaultOptions: {
+//
+// `gcTime` varies by cache_level for every level: most of what's cached (status, branches, log,
+// diffs, stashes, ...) is a cheap local git2 read, not a network call, so there's little to lose
+// from freeing it soon after you've navigated away. GitHub PR data additionally has its own
+// SQLite mirror (see pr_cache.rs) plus explicit eviction in PRTab.tsx, unaffected by this setting.
+// `staleTime` only varies at "none" (see STALE_TIME_BY_CACHE_LEVEL above) — everywhere else it
+// stays fixed.
+function buildDefaultOptions(cacheLevel: CacheLevel) {
+  return {
     queries: {
-      staleTime: 30_000,
-      gcTime: 5 * 60_000,
+      staleTime: STALE_TIME_BY_CACHE_LEVEL[cacheLevel],
+      gcTime: GC_TIME_BY_CACHE_LEVEL[cacheLevel],
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
       retry: 1,
-      networkMode: "always",
+      networkMode: "always" as const,
     },
     mutations: {
-      networkMode: "always",
-      onError: (err) => {
+      networkMode: "always" as const,
+      onError: (err: unknown) => {
         useNetworkStore.getState().noteError(String(err));
       },
     },
-  },
+  };
+}
+
+export const queryClient = new QueryClient({
+  defaultOptions: buildDefaultOptions("balanced"),
 });
+
+/** `QueryClient.setDefaultOptions` REPLACES the entire defaultOptions object rather than merging
+ * into it (verified directly: passing just `{ queries: { gcTime } }` silently resets staleTime,
+ * retry, and even the unrelated `mutations` defaults to library defaults). Always go through this
+ * rather than calling `setDefaultOptions` directly, so nothing gets dropped by accident. */
+export function applyCacheLevel(cacheLevel: CacheLevel) {
+  queryClient.setDefaultOptions(buildDefaultOptions(cacheLevel));
+}

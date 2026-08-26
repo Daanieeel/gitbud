@@ -169,6 +169,7 @@ export const api = {
   loadRepos: () => invoke<RepoEntry[]>("load_repos"),
   addRepo: (path: string) => invoke<RepoEntry[]>("add_repo", { path }),
   removeRepo: (path: string) => invoke<RepoEntry[]>("remove_repo", { path }),
+  moveRepoToTrash: (repoPath: string) => invoke<void>("move_repo_to_trash", { repoPath }),
   addRepoSection: (path: string, section: string) =>
     invoke<RepoEntry[]>("add_repo_section", { path, section }),
   removeRepoSection: (path: string, section: string) =>
@@ -329,14 +330,35 @@ export const api = {
     invoke<RepoMergeSettings>("github_get_repo_merge_settings", { repoPath, login, baseRef }),
   githubFindUserAvatarByEmail: (repoPath: string, login: string, email: string) =>
     invoke<string | null>("github_find_user_avatar_by_email", { repoPath, login, email }),
-  githubListPullRequestFiles: (repoPath: string, login: string, number: number) =>
+  githubListPullRequestFiles: (repoPath: string, login: string, number: number, headSha: string) =>
     invoke<[string, string, FileDiff][]>("github_list_pull_request_files", {
       repoPath,
       login,
       number,
+      headSha,
     }).then((rows): PullRequestFile[] =>
       rows.map(([filename, status, diff]) => ({ filename, status, diff })),
     ),
+  getCachedPullRequests: (repoPath: string, state: "open" | "closed" | "all") =>
+    invoke<PullRequest[]>("get_cached_pull_requests", { repoPath, state }),
+  getCachedPullRequestDetail: (repoPath: string, number: number) =>
+    invoke<[[string, string, FileDiff][], ReviewComment[]] | null>("get_cached_pull_request_detail", {
+      repoPath,
+      number,
+    }).then((result) =>
+      result
+        ? { files: result[0].map(([filename, status, diff]) => ({ filename, status, diff })), comments: result[1] }
+        : null,
+    ),
+  getCachedCheckRuns: (repoPath: string, sha: string) =>
+    invoke<CheckRun[] | null>("get_cached_check_runs", { repoPath, sha }),
+  cacheAvatar: (url: string) => invoke<string | null>("cache_avatar", { url }),
+  getCachedAvatar: (url: string) => invoke<string | null>("get_cached_avatar", { url }),
+  getCacheSizes: () =>
+    invoke<[number, number]>("get_cache_sizes").then(([repoBytes, avatarBytes]) => ({ repoBytes, avatarBytes })),
+  getCacheDirPath: () => invoke<string>("get_cache_dir_path"),
+  clearRepoCache: () => invoke<void>("clear_repo_cache"),
+  clearAvatarCache: () => invoke<void>("clear_avatar_cache"),
   githubGetPullRequestImageDiff: (
     repoPath: string,
     login: string,

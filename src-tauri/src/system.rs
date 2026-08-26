@@ -62,7 +62,7 @@ pub fn open_in_editor(path: &str, editor: &str, custom_app_path: Option<&str>) -
 }
 
 /// Best-effort icon for a custom editor app, as a `data:image/png;base64,...` URI, or `None` if
-/// it can't be found (no icon file, conversion failed, or unsupported platform). macOS only —
+/// it can't be found (no icon file, conversion failed, or unsupported platform). macOS only:
 /// reads `CFBundleIconFile` from the bundle's `Info.plist` via `defaults`, then converts the
 /// referenced `.icns` to PNG via `sips`, both of which ship with the OS.
 #[cfg(target_os = "macos")]

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { TriangleAlertIcon } from "lucide-react";
+import { TriangleAlertIcon, WifiOffIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
+import { useNetworkStore } from "@/store/useNetworkStore";
 import { usePRStore, type PRFilter } from "@/store/usePRStore";
 import { isBrokenTokenError, usePullRequestList } from "@/hooks/queries/usePullRequests";
 import { queryKeys } from "@/lib/queryKeys";
@@ -41,6 +42,34 @@ export function PRTab() {
     void api.githubRemoteOwnerRepo(repoPath).then((r) => setHasRemote(r != null));
   }, [repoPath]);
 
+  // Frees the (potentially huge, for a big PR's parsed file diffs) in-memory query cache for a
+  // repo the moment you're no longer looking at its PRs: either the Pulls tab is left entirely
+  // (PRTab unmounts, see App.tsx's `activeTab === "pulls"` conditional render) or you switch to
+  // a different repo while staying on this tab, instead of waiting up to the default 5min
+  // gcTime. Cheap either way: usePullRequests.ts's queryFns seed instantly from the local SQLite
+  // mirror on the next visit.
+  useEffect(() => {
+    return () => {
+      if (!repoPath) return;
+      queryClient.removeQueries({ queryKey: ["pr-list", repoPath] });
+      queryClient.removeQueries({ queryKey: ["pr-detail", repoPath] });
+      queryClient.removeQueries({ queryKey: ["check-runs", repoPath] });
+    };
+  }, [repoPath, queryClient]);
+
+  // A single large PR's parsed file diffs can be hundreds of thousands of objects on their own,
+  // so evict the previously-viewed PR's detail the moment you click a different one, rather than
+  // waiting for gcTime. Clicking through several PRs in quick succession would otherwise pile
+  // all of their diffs up in memory at once within that window. Deliberately not keyed on
+  // `pulls` (the list), since that changes on every background list refresh and would evict the PR
+  // you're *currently* looking at.
+  useEffect(() => {
+    return () => {
+      if (!repoPath || selectedNumber === null) return;
+      queryClient.removeQueries({ queryKey: queryKeys.prDetail(repoPath, currentLogin ?? "", selectedNumber) });
+    };
+  }, [selectedNumber, repoPath, currentLogin, queryClient]);
+
   // Force a fresh fetch whenever this tab is (re)entered or the filter changes, rather than
   // trusting whatever's still "fresh" by staleTime — a teammate's PR activity doesn't wait for a
   // staleTime window to expire, and the background sync (useProviderSync) only ever keeps the
@@ -59,6 +88,7 @@ export function PRTab() {
     isFetchingNextPage: loadingMore,
     fetchNextPage,
   } = usePullRequestList(hasRemote ? repoPath : null, currentLogin, filter);
+  const offline = useNetworkStore((s) => s.offline);
   const loadError = loadErrorObj ? String(loadErrorObj) : null;
   const hasMore = hasNextPage ?? false;
 
@@ -136,7 +166,25 @@ export function PRTab() {
         <div className="border-b border-border px-2 py-1 text-xs text-muted-foreground">
           {loading && pulls.length === 0 ? "Loading…" : `${pulls.length} ${filter}`}
         </div>
-        {loadError && <div className="p-2 text-xs text-destructive">{loadError}</div>}
+        {loadError && offline && (
+          <div className="m-2 rounded-md bg-accent-yellow/10 p-2 text-xs text-accent-yellow">
+            <div className="flex items-center gap-1.5 font-medium">
+              <WifiOffIcon className="size-3.5 shrink-0" />
+              <span>You are offline</span>
+            </div>
+            <p className="mt-0.5 text-accent-yellow/80">
+              {pulls.length > 0
+                ? "Showing cached PRs. This state could be out of date."
+                : "No cached PRs for this repo yet."}
+            </p>
+          </div>
+        )}
+        {loadError && !offline && (
+          <div className="m-2 flex items-center gap-1.5 rounded-md bg-destructive/10 p-2 text-xs text-destructive">
+            <TriangleAlertIcon className="size-3.5 shrink-0" />
+            <span className="min-w-0 flex-1">{loadError}</span>
+          </div>
+        )}
         <div className="min-h-0 flex-1">
           <PRList
             loading={loading}

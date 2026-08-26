@@ -20,6 +20,7 @@ import { useUpdateStore } from "@/store/useUpdateStore";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { useGitSync } from "@/hooks/queries/useGitSync";
 import { useProviderSync } from "@/hooks/useProviderSync";
+import { applyCacheLevel } from "@/lib/queryClient";
 
 function App() {
   const initGlobalListeners = useRepoStore((s) => s.initGlobalListeners);
@@ -30,6 +31,8 @@ function App() {
   const activeTab = useRepoStore((s) => s.activeTab);
   const repos = useRepoStore((s) => s.repos);
   const loadSettings = useSettingsStore((s) => s.load);
+  const settingsLoaded = useSettingsStore((s) => s.loaded);
+  const cacheLevel = useSettingsStore((s) => s.settings.cache_level);
   const initIdentities = useIdentityStore((s) => s.init);
   const syncRepoIdentity = useIdentityStore((s) => s.syncRepoIdentity);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
@@ -52,6 +55,15 @@ function App() {
   useEffect(() => {
     if (selectedRepo) void syncRepoIdentity(selectedRepo);
   }, [selectedRepo, syncRepoIdentity]);
+
+  // Settings load asynchronously after the queryClient is already constructed with its own
+  // hardcoded default, so this is what actually applies the persisted cache level. Deliberately
+  // only on the initial load (not reactive to every `cacheLevel` change): the Settings dialog
+  // requires a restart to change it, so this only ever needs to run once per app launch, right
+  // after `settingsLoaded` flips true.
+  useEffect(() => {
+    if (settingsLoaded) applyCacheLevel(cacheLevel);
+  }, [settingsLoaded]);
 
   // Deliberate exception to "no polling": there's no push channel for release publication, so
   // catching a new version requires asking the update endpoint periodically.
@@ -126,7 +138,7 @@ function App() {
 
   return (
     <TooltipProvider delayDuration={300}>
-    <div className="flex h-screen w-screen gap-3 bg-black p-3 text-foreground">
+    <div className="flex h-screen w-screen gap-3 bg-background p-3 text-foreground">
       <RepoSidebar />
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         <div className="flex shrink-0 flex-col overflow-hidden rounded-xl bg-card shadow-md">

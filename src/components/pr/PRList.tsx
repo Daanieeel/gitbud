@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import {
   GitPullRequestIcon,
@@ -37,6 +38,10 @@ const PR_STATUS_COLOR: Record<PRStatus, string> = {
   open: "text-accent-green",
 };
 
+// Just a starting guess (see `measureElement` below) — most rows are this tall, but one with
+// labels wraps a second line of pills underneath and grows.
+const ROW_HEIGHT_ESTIMATE = 52;
+
 interface PRListProps {
   loading: boolean;
   repoPath: string;
@@ -53,23 +58,6 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
   const [filter, setFilter] = useState("");
   const isPrTabActive = useIsPrTabActive();
 
-  const observerTarget = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const target = observerTarget.current;
-    if (!target) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore) {
-          onLoadMore();
-        }
-      },
-      { rootMargin: "100px" }
-    );
-    observer.observe(target);
-    return () => observer.unobserve(target);
-  }, [hasMore, loadingMore, onLoadMore]);
-
   const filtered = useMemo(() => {
     if (!filter.trim()) return pulls;
     const needle = filter.toLowerCase();
@@ -82,7 +70,6 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
   }, [pulls, filter]);
 
   const listRef = useRef<HTMLDivElement>(null);
-  const rowRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const numberKeys = useMemo(() => filtered.map((p) => String(p.number)), [filtered]);
   const handleArrowNav = useArrowKeyFileNav(
     numberKeys,
@@ -90,10 +77,29 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
     (key) => onSelect(Number(key)),
   );
 
+  const virtualizer = useVirtualizer({
+    count: filtered.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: () => ROW_HEIGHT_ESTIMATE,
+    overscan: 12,
+  });
+
+  const items = virtualizer.getVirtualItems();
+  const lastIndex = items.length > 0 ? items[items.length - 1].index : -1;
+
+  // Mirrors the old IntersectionObserver-on-a-trailing-sentinel approach, but that sentinel isn't
+  // a real DOM node in the scrollable flow anymore once rows are virtualized — so instead this
+  // fires once the virtualized window's last rendered row gets close to the end of what's loaded.
+  useEffect(() => {
+    if (hasMore && !loadingMore && lastIndex >= filtered.length - 5) onLoadMore();
+  }, [lastIndex, filtered.length, hasMore, loadingMore, onLoadMore]);
+
   useEffect(() => {
     if (selectedNumber === null) return;
-    rowRefs.current.get(selectedNumber)?.scrollIntoView({ block: "nearest" });
-  }, [selectedNumber]);
+    const index = filtered.findIndex((p) => p.number === selectedNumber);
+    if (index === -1) return;
+    virtualizer.scrollToIndex(index, { align: "auto" });
+  }, [selectedNumber, filtered, virtualizer]);
 
   useEffect(() => {
     listRef.current?.focus();
@@ -130,61 +136,64 @@ export function PRList({ loading, repoPath, login, pulls, selectedNumber, hasMor
         ) : filtered.length === 0 ? (
           <div className="p-4 text-center text-sm text-muted-foreground">No pull requests found</div>
         ) : (
-          filtered.map((pr) => {
-            const status = prStatus(pr);
-            const Icon = PR_STATUS_ICON[status];
-            return (
-              <div
-                key={pr.number}
-                ref={(el) => {
-                  if (el) rowRefs.current.set(pr.number, el);
-                  else rowRefs.current.delete(pr.number);
-                }}
-                className={cn(
-                  "flex cursor-pointer items-start gap-2 border-b border-border/50 px-2 py-2 text-sm hover:bg-accent",
-                  selectedNumber === pr.number && "bg-accent",
-                )}
-                onClick={() => onSelect(pr.number)}
-              >
-                <Icon className={cn("mt-0.5 size-3.5 shrink-0", PR_STATUS_COLOR[status])} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate">{pr.title}</div>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Avatar src={pr.author_avatar_url} alt={pr.author_login} className="size-3.5" />
-                    <span>
-                      #{pr.number} by {pr.author_login}
-                    </span>
-                    <CIBadge
-                      repoPath={repoPath}
-                      login={login}
-                      sha={pr.head_sha}
-                      pollIntervalMs={prPollIntervalMs(pr, isPrTabActive, pr.number === selectedNumber)}
-                    />
-                    {pr.merged && (
-                      <span className="rounded bg-accent-purple/20 px-1 text-accent-purple">merged</span>
+          <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
+            {items.map((vi) => {
+              const pr = filtered[vi.index];
+              const status = prStatus(pr);
+              const Icon = PR_STATUS_ICON[status];
+              return (
+                <div
+                  key={vi.key}
+                  ref={virtualizer.measureElement}
+                  data-index={vi.index}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start}px)` }}
+                >
+                  <div
+                    className={cn(
+                      "flex cursor-pointer items-start gap-2 border-b border-border/50 px-2 py-2 text-sm hover:bg-accent",
+                      selectedNumber === pr.number && "bg-accent",
                     )}
-                  </div>
-                  {pr.labels.length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {pr.labels.map((label) => (
-                        <span
-                          key={label}
-                          className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground"
-                        >
-                          {label}
+                    onClick={() => onSelect(pr.number)}
+                  >
+                    <Icon className={cn("mt-0.5 size-3.5 shrink-0", PR_STATUS_COLOR[status])} />
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate">{pr.title}</div>
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <Avatar src={pr.author_avatar_url} alt={pr.author_login} className="size-3.5" />
+                        <span>
+                          #{pr.number} by {pr.author_login}
                         </span>
-                      ))}
+                        <CIBadge
+                          repoPath={repoPath}
+                          login={login}
+                          sha={pr.head_sha}
+                          pollIntervalMs={prPollIntervalMs(pr, isPrTabActive, pr.number === selectedNumber)}
+                        />
+                        {pr.merged && (
+                          <span className="rounded bg-accent-purple/20 px-1 text-accent-purple">merged</span>
+                        )}
+                      </div>
+                      {pr.labels.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {pr.labels.map((label) => (
+                            <span
+                              key={label}
+                              className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground"
+                            >
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
-              </div>
-            );
-          })
-        )}
-        {hasMore && pulls.length > 0 && (
-          <div ref={observerTarget} className="p-4 text-center text-sm text-muted-foreground">
-            {loadingMore ? "Loading more…" : "Scroll for more"}
+              );
+            })}
           </div>
+        )}
+        {loadingMore && (
+          <div className="p-4 text-center text-sm text-muted-foreground">Loading more…</div>
         )}
       </div>
     </div>

@@ -288,7 +288,7 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                           <img
                             src={favoriteEditorOption.icon}
                             alt=""
-                            className={favoriteEditorOption.id === "zed" ? "size-5" : "size-3.5"}
+                            className={favoriteEditorOption.id === "zed" ? "size-4" : "size-3.5"}
                           />
                         ) : customIcon ? (
                           <img src={customIcon} alt="" className="size-3.5" />

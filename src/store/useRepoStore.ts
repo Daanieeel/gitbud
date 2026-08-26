@@ -169,10 +169,9 @@ export const useRepoStore = create<RepoState>((set, get) => ({
   removeRepo: async (path) => {
     const repos = await api.removeRepo(path);
     set({ repos });
-    // Switch away from the removed repo BEFORE evicting its query cache: components like
-    // SyncButton/CommitBox read useAheadBehind's data unguarded, trusting its `initialData` to
-    // never be undefined — but removeQueries on a still-actively-observed key transiently clears
-    // it out from under them. Reassigning `selectedRepo` first unsubscribes those observers.
+    // Switch away from the removed repo BEFORE evicting its query cache: removeQueries on a
+    // still-actively-observed key transiently clears its data out from under whatever's reading
+    // it. Reassigning `selectedRepo` first unsubscribes those observers.
     if (get().selectedRepo === path) {
       set({ selectedRepo: null });
       if (repos.length > 0) await get().selectRepo(repos[0].path);

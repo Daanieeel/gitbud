@@ -24,7 +24,7 @@ pub struct AheadBehind {
     pub published: bool,
     /// Whether HEAD's commit already exists on some remote-tracking branch, published or not.
     /// A freshly created local branch reports `published: false` even though HEAD is the exact
-    /// commit its parent branch already pushed — this field lets callers tell "genuinely new,
+    /// commit its parent branch already pushed. This field lets callers tell "genuinely new,
     /// unpushed commit" apart from "just hasn't been published from *this* branch yet".
     pub head_on_remote: bool,
 }

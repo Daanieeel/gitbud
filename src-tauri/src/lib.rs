@@ -8,6 +8,7 @@ mod hunk;
 mod image_diff;
 mod lfs;
 mod merge3;
+mod pr_cache;
 mod rebase;
 mod reflog;
 mod repo;
@@ -22,6 +23,7 @@ mod watch;
 mod worktrees;
 mod workspaces;
 
+use base64::{engine::general_purpose::STANDARD, Engine};
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
@@ -468,6 +470,16 @@ async fn add_repo(path: String) -> Result<Vec<config::RepoEntry>, String> {
 #[tauri::command]
 async fn remove_repo(path: String) -> Result<Vec<config::RepoEntry>, String> {
     tauri::async_runtime::spawn_blocking(move || config::remove_repo(&path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Moves a repo's local folder to the OS trash (Recycle Bin / Trash / freedesktop trash,
+/// depending on platform) — a separate, opt-in step from `remove_repo`, which only ever drops
+/// the repo from GitBud's list and never touches the filesystem.
+#[tauri::command]
+async fn move_repo_to_trash(repo_path: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || trash::delete(&repo_path).map_err(|e| e.to_string()))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -984,6 +996,30 @@ fn github_resolve(repo_path: &str, login: &str) -> Result<(String, String, Strin
     Ok((host, token, owner, repo))
 }
 
+/// Key for the local PR/CI SQLite mirror (see `pr_cache.rs`) — the repo's `(host, owner, repo)`
+/// identity rather than its local filesystem path, so renaming or moving the repo's folder on
+/// disk doesn't orphan its offline cache. Doesn't need a token/login, unlike `github_resolve`.
+fn cache_key(repo_path: &str) -> Result<String, String> {
+    let host = github::auth::get_host()?;
+    let (owner, repo) = config::remote_owner_repo(repo_path)
+        .ok_or("repository has no GitHub-style origin remote")?;
+    Ok(format!("{host}/{owner}/{repo}"))
+}
+
+/// Runs a `pr_cache` write on the blocking pool and logs (rather than silently discarding) any
+/// failure — the mirror is best-effort and must never fail the command it's piggybacking on, but
+/// a write that silently vanishes (e.g. under SQLite lock contention) shouldn't be invisible.
+async fn cache_write<F>(f: F)
+where
+    F: FnOnce() -> Result<(), String> + Send + 'static,
+{
+    match tauri::async_runtime::spawn_blocking(f).await {
+        Ok(Ok(())) => {}
+        Ok(Err(e)) => eprintln!("pr_cache write failed: {e}"),
+        Err(e) => eprintln!("pr_cache write task failed: {e}"),
+    }
+}
+
 #[tauri::command]
 async fn github_remote_owner_repo(repo_path: String) -> Option<(String, String)> {
     tauri::async_runtime::spawn_blocking(move || config::remote_owner_repo(&repo_path))
@@ -999,7 +1035,21 @@ async fn github_list_pull_requests(
     page: u32,
 ) -> Result<Vec<github::api::PullRequest>, String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::list_pull_requests(&host, &token, &owner, &repo, &state, page).await
+    let prs = github::api::list_pull_requests(&host, &token, &owner, &repo, &state, page).await?;
+    if let Ok(key) = cache_key(&repo_path) {
+        let list = prs.clone();
+        cache_write(move || pr_cache::upsert_pr_list(&key, &list)).await;
+    }
+    Ok(prs)
+}
+
+#[tauri::command]
+async fn get_cached_pull_requests(repo_path: String, state: String) -> Vec<github::api::PullRequest> {
+    let Ok(key) = cache_key(&repo_path) else { return Vec::new() };
+    tauri::async_runtime::spawn_blocking(move || pr_cache::get_cached_pr_list(&key, &state))
+        .await
+        .unwrap_or(Ok(Vec::new()))
+        .unwrap_or_default()
 }
 
 #[tauri::command]
@@ -1116,7 +1166,59 @@ async fn github_list_check_runs(
     sha: String,
 ) -> Result<Vec<github::api::CheckRun>, String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::list_check_runs(&host, &token, &owner, &repo, &sha).await
+    let runs = github::api::list_check_runs(&host, &token, &owner, &repo, &sha).await?;
+    if let Ok(key) = cache_key(&repo_path) {
+        let (s, to_cache) = (sha.clone(), runs.clone());
+        cache_write(move || pr_cache::upsert_check_runs(&key, &s, &to_cache)).await;
+    }
+    Ok(runs)
+}
+
+#[tauri::command]
+async fn get_cached_check_runs(repo_path: String, sha: String) -> Option<Vec<github::api::CheckRun>> {
+    let key = cache_key(&repo_path).ok()?;
+    tauri::async_runtime::spawn_blocking(move || pr_cache::get_cached_check_runs(&key, &sha))
+        .await
+        .unwrap_or(Ok(None))
+        .unwrap_or(None)
+}
+
+/// Pure local-cache read, for the offline fallback path; never touches the network.
+#[tauri::command]
+async fn get_cached_avatar(url: String) -> Option<String> {
+    tauri::async_runtime::spawn_blocking(move || pr_cache::get_cached_avatar(&url))
+        .await
+        .unwrap_or(Ok(None))
+        .unwrap_or(None)
+}
+
+/// Warms the local avatar cache for offline use: a no-op (fast SQLite read) if already cached,
+/// otherwise fetches and stores it. Avatar URLs are public, no auth needed.
+#[tauri::command]
+async fn cache_avatar(url: String) -> Option<String> {
+    let lookup_url = url.clone();
+    if let Ok(Some(cached)) =
+        tauri::async_runtime::spawn_blocking(move || pr_cache::get_cached_avatar(&lookup_url)).await.unwrap_or(Ok(None))
+    {
+        return Some(cached);
+    }
+
+    let resp = reqwest::get(&url).await.ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let content_type = resp
+        .headers()
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("image/png")
+        .to_string();
+    let bytes = resp.bytes().await.ok()?;
+    let data_uri = format!("data:{content_type};base64,{}", STANDARD.encode(&bytes));
+
+    let (store_url, store_data) = (url, data_uri.clone());
+    let _ = tauri::async_runtime::spawn_blocking(move || pr_cache::upsert_avatar(&store_url, &store_data)).await;
+    Some(data_uri)
 }
 
 #[tauri::command]
@@ -1176,7 +1278,17 @@ async fn github_merge_pull_request(
         commit_message.as_deref(),
         sha.as_deref(),
     )
-    .await
+    .await?;
+
+    // Write the now-merged state through to the cache immediately rather than waiting for the
+    // next full list refetch: neither this mutation nor create_pull_request invalidates
+    // queryKeys.prDetail/checkRuns on the frontend, only the pr-list prefix.
+    if let Ok(pr) = github::api::get_pull_request(&host, &token, &owner, &repo, number).await {
+        if let Ok(key) = cache_key(&repo_path) {
+            cache_write(move || pr_cache::upsert_pr(&key, &pr)).await;
+        }
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -1210,9 +1322,26 @@ async fn github_list_pull_request_files(
     repo_path: String,
     login: String,
     number: u64,
+    head_sha: String,
 ) -> Result<Vec<(String, String, diff::FileDiff)>, String> {
+    if let Ok(key) = cache_key(&repo_path) {
+        let (lookup_key, sha) = (key.clone(), head_sha.clone());
+        if let Ok(Some(cached)) =
+            tauri::async_runtime::spawn_blocking(move || pr_cache::get_cached_files(&lookup_key, number, &sha))
+                .await
+                .unwrap_or(Ok(None))
+        {
+            return Ok(cached);
+        }
+    }
+
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::list_pull_request_files(&host, &token, &owner, &repo, number).await
+    let files = github::api::list_pull_request_files(&host, &token, &owner, &repo, number).await?;
+    if let Ok(key) = cache_key(&repo_path) {
+        let (sha, to_cache) = (head_sha.clone(), files.clone());
+        cache_write(move || pr_cache::upsert_files(&key, number, &sha, &to_cache)).await;
+    }
+    Ok(files)
 }
 
 #[tauri::command]
@@ -1234,7 +1363,62 @@ async fn github_list_review_comments(
     number: u64,
 ) -> Result<Vec<github::api::ReviewComment>, String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::list_review_comments(&host, &token, &owner, &repo, number).await
+    let comments = github::api::list_review_comments(&host, &token, &owner, &repo, number).await?;
+    if let Ok(key) = cache_key(&repo_path) {
+        let to_cache = comments.clone();
+        cache_write(move || pr_cache::upsert_comments(&key, number, &to_cache)).await;
+    }
+    Ok(comments)
+}
+
+#[tauri::command]
+async fn get_cached_pull_request_detail(
+    repo_path: String,
+    number: u64,
+) -> Option<(Vec<(String, String, diff::FileDiff)>, Vec<github::api::ReviewComment>)> {
+    let key = cache_key(&repo_path).ok()?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let files = pr_cache::get_any_cached_files(&key, number).ok().flatten();
+        let comments = pr_cache::get_cached_comments(&key, number).ok().flatten();
+        match (files, comments) {
+            (None, None) => None,
+            (files, comments) => Some((files.unwrap_or_default(), comments.unwrap_or_default())),
+        }
+    })
+    .await
+    .unwrap_or(None)
+}
+
+/// Size on disk of the local GitHub PR data mirror (pr_cache.sqlite), split into `(repo_bytes,
+/// avatar_bytes)` for the "Cached repo data" and "Cached user avatars" rows in Settings >
+/// General > Local data.
+#[tauri::command]
+async fn get_cache_sizes() -> (u64, u64) {
+    tauri::async_runtime::spawn_blocking(pr_cache::cache_sizes).await.unwrap_or(Ok((0, 0))).unwrap_or((0, 0))
+}
+
+/// Directory the local GitHub PR data mirror lives in, for the "Open" button in Settings >
+/// General > Local data that reveals it in the OS file manager (frontend does the actual
+/// revealing via `@tauri-apps/plugin-opener`'s `revealItemInDir`, same as "Reveal in Finder"
+/// elsewhere). Shared by both the repo-data and avatar caches — they live in the same file.
+#[tauri::command]
+async fn get_cache_dir_path() -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(pr_cache::dir_path).await.map_err(|e| e.to_string())?
+}
+
+/// Empties the repo-scoped part of the local GitHub PR data mirror (PR lists/files/comments,
+/// check runs — not avatars), for the "Cached repo data" > "Clear" button in Settings > General.
+#[tauri::command]
+async fn clear_repo_cache() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(pr_cache::clear_repo_data).await.map_err(|e| e.to_string())?
+}
+
+/// Empties the avatar cache, for the "Cached user avatars" row's "Clear" button in Settings >
+/// General. Kept separate from `clear_repo_cache` since avatars are kept indefinitely and only
+/// ever removed by this explicit action (see `pr_cache::clear_avatars`).
+#[tauri::command]
+async fn clear_avatar_cache() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(pr_cache::clear_avatars).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -1530,6 +1714,7 @@ pub fn run() {
             load_repos,
             add_repo,
             remove_repo,
+            move_repo_to_trash,
             add_repo_section,
             remove_repo_section,
             remove_section,
@@ -1600,6 +1785,7 @@ pub fn run() {
             github_poll_device_flow,
             github_remote_owner_repo,
             github_list_pull_requests,
+            get_cached_pull_requests,
             github_get_pull_request,
             github_create_pull_request,
             github_update_pull_request_base,
@@ -1617,10 +1803,18 @@ pub fn run() {
             github_get_repo_merge_settings,
             github_find_user_avatar_by_email,
             github_list_pull_request_files,
+            get_cached_pull_request_detail,
+            get_cache_sizes,
+            get_cache_dir_path,
+            clear_repo_cache,
+            clear_avatar_cache,
             github_get_pull_request_image_diff,
             github_list_review_comments,
             github_create_review_comment,
             github_list_check_runs,
+            get_cached_check_runs,
+            cache_avatar,
+            get_cached_avatar,
             github_get_commit_verification,
             github_list_user_repos,
             read_pr_template,

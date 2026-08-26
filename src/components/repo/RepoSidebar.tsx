@@ -31,9 +31,9 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
+import { CheckboxGroup } from "@/components/ui/checkbox-group";
 import { toast } from "sonner";
 import { AddRepoMenu } from "./AddRepoMenu";
 import { BatchSyncTrigger } from "./BatchSyncPanel";
@@ -108,13 +108,14 @@ interface RepoRowProps {
   showAheadBehind: boolean;
   draggable: boolean;
   dragged: boolean;
-  confirmRemove: boolean;
   onSelect: () => void;
   onDragStart: () => void;
   onDragOver: (e: React.DragEvent) => void;
   onDrop: (e: React.DragEvent) => void;
   onDragEnd: () => void;
-  onConfirmRemoveChange: (open: boolean) => void;
+  /** Opens the confirm dialog (with the move-to-trash option) at the RepoSidebar level. */
+  onRequestRemove: () => void;
+  /** Instant, no-confirm removal — only wired to the context menu's "Remove from Sidebar". */
   onRemove: () => void;
   onPinToSection: () => void;
   /** Name of the pinned section this row is being rendered under, if any — enables the extra
@@ -132,13 +133,12 @@ function RepoRow({
   showAheadBehind,
   draggable,
   dragged,
-  confirmRemove,
   onSelect,
   onDragStart,
   onDragOver,
   onDrop,
   onDragEnd,
-  onConfirmRemoveChange,
+  onRequestRemove,
   onRemove,
   onPinToSection,
   sectionContext,
@@ -222,49 +222,20 @@ function RepoRow({
                 <TooltipContent>{`Remove from "${sectionContext}"`}</TooltipContent>
               </Tooltip>
             )}
-            <Popover open={confirmRemove} onOpenChange={onConfirmRemoveChange}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <PopoverTrigger asChild>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onConfirmRemoveChange(true);
-                      }}
-                      className={cn(
-                        "aspect-square w-0 shrink-0 overflow-hidden rounded-md bg-destructive/10 p-1 text-destructive opacity-0 transition-all hover:bg-destructive/20 group-hover:w-5 group-hover:ml-1 group-hover:opacity-100 flex items-center justify-center",
-                        confirmRemove && "w-5 ml-1 opacity-100",
-                      )}
-                    >
-                      <XIcon className="size-3.5" />
-                    </button>
-                  </PopoverTrigger>
-                </TooltipTrigger>
-                <TooltipContent>Remove from GitBud</TooltipContent>
-              </Tooltip>
-              <PopoverContent
-                align="end"
-                className="w-56 space-y-2 bg-accent-blue/5 p-3"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <p className="text-sm">Remove "{repo.name}" from the list?</p>
-                <div className="flex justify-end gap-2">
-                  <Button size="sm" variant="ghost" onClick={() => onConfirmRemoveChange(false)}>
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => {
-                      onConfirmRemoveChange(false);
-                      onRemove();
-                    }}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              </PopoverContent>
-            </Popover>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRequestRemove();
+                  }}
+                  className="aspect-square w-0 shrink-0 overflow-hidden rounded-md bg-destructive/10 p-1 text-destructive opacity-0 transition-all hover:bg-destructive/20 group-hover:w-5 group-hover:ml-1 group-hover:opacity-100 flex items-center justify-center"
+                >
+                  <XIcon className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Remove from GitBud</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </ContextMenuTrigger>
@@ -344,7 +315,9 @@ export function RepoSidebar() {
   const { width, onPointerDown } = useResizableWidth("sidebar-width:repos", 256, 200, 480);
   const [filter, setFilter] = useState("");
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
-  const [confirmRemovePath, setConfirmRemovePath] = useState<string | null>(null);
+  const [pendingRemoveRepo, setPendingRemoveRepo] = useState<RepoEntry | null>(null);
+  const [moveToTrash, setMoveToTrash] = useState(false);
+  const [removingRepo, setRemovingRepo] = useState(false);
   const [pinSectionRepo, setPinSectionRepo] = useState<RepoEntry | null>(null);
   const [collapsed, setCollapsed] = useState(() => window.localStorage.getItem("sidebar-collapsed") === "1");
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(() => loadCollapsedSections());
@@ -397,9 +370,30 @@ export function RepoSidebar() {
     setConfirmRemoveSection(null);
   };
 
+  const confirmRemoveRepo = async () => {
+    if (!pendingRemoveRepo) return;
+    setRemovingRepo(true);
+    try {
+      if (moveToTrash) {
+        // Best-effort: a failed trash-move shouldn't block removing the repo from the list, it
+        // just means the folder is left behind — surface it and move on.
+        try {
+          await api.moveRepoToTrash(pendingRemoveRepo.path);
+        } catch (err) {
+          toast.error(String(err));
+        }
+      }
+      await removeRepo(pendingRemoveRepo.path);
+    } finally {
+      setRemovingRepo(false);
+      setPendingRemoveRepo(null);
+      setMoveToTrash(false);
+    }
+  };
+
   // Routed through TanStack Query (same query keys `useAheadBehind`/etc. use for the selected
   // repo) instead of separate uncached `api.*` calls, so a repo-changed event for the selected
-  // repo doesn't trigger two independent fetches of the same data — one here, one in whichever
+  // repo doesn't trigger two independent fetches of the same data: one here, one in whichever
   // tab is showing it.
   const dirtyQueries = useQueries({
     queries: repos.map((r) => ({
@@ -720,13 +714,12 @@ export function RepoSidebar() {
                   showAheadBehind={showAheadBehind}
                   draggable={false}
                   dragged={false}
-                  confirmRemove={confirmRemovePath === repo.path}
                   onSelect={() => void selectRepo(repo.path)}
                   onDragStart={() => {}}
                   onDragOver={() => {}}
                   onDrop={() => {}}
                   onDragEnd={() => {}}
-                  onConfirmRemoveChange={(open) => setConfirmRemovePath(open ? repo.path : null)}
+                  onRequestRemove={() => setPendingRemoveRepo(repo)}
                   onRemove={() => void removeRepo(repo.path)}
                   onPinToSection={() => setPinSectionRepo(repo)}
                   sectionContext={section}
@@ -782,7 +775,6 @@ export function RepoSidebar() {
                 showAheadBehind={showAheadBehind}
                 draggable={sidebarSort === "manual"}
                 dragged={draggedPath === repo.path}
-                confirmRemove={confirmRemovePath === repo.path}
                 onSelect={() => void selectRepo(repo.path)}
                 onDragStart={() => setDraggedPath(repo.path)}
                 onDragOver={(e) => {
@@ -794,7 +786,7 @@ export function RepoSidebar() {
                   setDraggedPath(null);
                 }}
                 onDragEnd={() => setDraggedPath(null)}
-                onConfirmRemoveChange={(open) => setConfirmRemovePath(open ? repo.path : null)}
+                onRequestRemove={() => setPendingRemoveRepo(repo)}
                 onRemove={() => void removeRepo(repo.path)}
                 onPinToSection={() => setPinSectionRepo(repo)}
               />
@@ -846,6 +838,48 @@ export function RepoSidebar() {
             onClick={() => confirmRemoveSection && void removeSectionEntirely(confirmRemoveSection)}
           >
             Remove Section
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    <Dialog
+      open={pendingRemoveRepo !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          setPendingRemoveRepo(null);
+          setMoveToTrash(false);
+        }
+      }}
+    >
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Remove "{pendingRemoveRepo?.name}"?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          It'll be removed from GitBud's list. The local folder is left untouched unless you
+          check the box below.
+        </p>
+        <CheckboxGroup
+          className="text-sm text-muted-foreground"
+          variant="destructive"
+          checked={moveToTrash}
+          disabled={removingRepo}
+          onCheckedChange={(checked) => setMoveToTrash(checked === true)}
+        >
+          Also move repo folder to Trash
+        </CheckboxGroup>
+        <DialogFooter>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setPendingRemoveRepo(null);
+              setMoveToTrash(false);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button variant="destructive" disabled={removingRepo} onClick={() => void confirmRemoveRepo()}>
+            {removingRepo ? "Removing…" : "Remove"}
           </Button>
         </DialogFooter>
       </DialogContent>

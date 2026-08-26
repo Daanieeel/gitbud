@@ -16,7 +16,7 @@ Exhaustive list of implemented, partial, and not-started features. Status legend
 | Multi-select in Changes file explorer | Done | This session — shift-click range select, cmd/ctrl-click toggle, batch stage/unstage/discard/copy-paths via a distinct context menu when multiple files are selected |
 | Commit (+ amend) | Done | `CommitBox.tsx`; amend pre-fills last message; summary/description inputs have autocomplete off |
 | Commit message history | Not started | |
-| Auto-stage new changes | Done | Settings toggle, off by default; auto-stages new/modified files on status refresh (`useRepoStatus.ts`) — a fully-unstaged path the user deliberately unstaged stays that way, but a partially-staged file's new hunk is always staged (fixed this session — used to get stuck unstaged) |
+| Auto-stage new changes | Done | Settings toggle, off by default; auto-stages new/modified files on status refresh (`useRepoStatus.ts`); a fully-unstaged path the user deliberately unstaged stays that way, but a partially-staged file's new hunk is always staged (fixed this session, used to get stuck unstaged) |
 | Pre-filled commit message for single-file commits | Done | Summary only, when field is empty |
 | Undo last commit | Done | This session — soft-reset button below Commit for any unpushed commit; pre-fills the form with the undone message so repeated clicks walk back the whole unpushed chain |
 | Protected branch guard | Done | Warning in `CommitBox.tsx` + icon in `BranchSwitcher.tsx` for main/master |
@@ -84,11 +84,11 @@ Exhaustive list of implemented, partial, and not-started features. Status legend
 | Sidebar: ahead/behind badges | Done | |
 | Sidebar: animated sync status | Done | |
 | Repo workspaces (named saved groups) | Done | This session |
-| Multi-repo batch fetch/pull | Done | Split into separate "Fetch All" / "Pull All" buttons (this session — was one button that always pulled) |
+| Multi-repo batch fetch/pull | Done | Split into separate "Fetch All" / "Pull All" buttons (this session, was one button that always pulled) |
 | Drag-and-drop folder to add repo | Done | |
 | Desktop notifications | Done | Long-running sync completion |
 | Offline-mode indicator | Done | Toolbar badge when a network-level error is detected (`OfflineIndicator.tsx`, `useNetworkStore.ts`); clears on the next successful network action |
-| Open repo in browser / editor | Done | This session — sidebar context menu and toolbar button open the repo on its remote (provider logo) or in the user's favorite editor (`editors.ts`, settings-configured) |
+| Open repo in browser / editor | Done | This session: sidebar context menu and toolbar button open the repo on its remote (provider logo) or in the user's favorite editor (`editors.ts`, settings-configured) |
 | Default window size | Done | Tuned this session (doubled, then reduced ~25%) |
 | App icon | Done | Redesigned this session (fox/git-motif) |
 | Layout / information-architecture redesign | **Not started** | Still ad hoc placement; needs a dedicated design pass |

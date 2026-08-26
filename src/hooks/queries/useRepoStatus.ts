@@ -3,7 +3,7 @@ import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 import { useSettingsStore } from "@/store/useSettingsStore";
 
-// Paths auto-staged at least once per repo — so a file the user deliberately unstages *entirely*
+// Paths auto-staged at least once per repo, so a file the user deliberately unstages *entirely*
 // after auto-stage picked it up doesn't just get re-staged on the next status refetch. Doesn't
 // apply to a partially-staged file (see the `partially_staged` check below), since that always
 // means new changes exist on top of whatever's staged. Cleared for a path once it drops out of
@@ -33,7 +33,7 @@ async function fetchStatus(repoPath: string) {
 
     // `seen` only suppresses re-staging a path that's back to *fully* unstaged (the user
     // deliberately unstaged it). A `partially_staged` file always has new changes on top of
-    // whatever's already staged — by definition not what the user backed out of — so those
+    // whatever's already staged (by definition not what the user backed out of), so those
     // must be staged regardless of `seen`, or edits made to an already-staged file would never
     // get picked up.
     const toStage = status.files

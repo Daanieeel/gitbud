@@ -1,4 +1,5 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { ColumnsIcon, LinkIcon, MessageSquarePlusIcon, MinusIcon, PlusIcon, RowsIcon, Trash2Icon } from "lucide-react";
 import type { DiffHunk, DiffLine, FileDiff, ImageDiff, LineKind, ReviewComment } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -9,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Avatar } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useSettingsStore } from "@/store/useSettingsStore";
-import { applyHighlightRanges, highlightLine, languageForPath } from "@/lib/highlight";
+import { applyHighlightRanges, ensureLanguageLoaded, highlightLine, languageForPath } from "@/lib/highlight";
 
 interface HunkActions {
   /** Whether the diff being shown is the staged (HEAD->index) or unstaged (index->workdir) side. */
@@ -146,25 +147,23 @@ function HunkHeader({ hunk, staged }: { hunk: DiffHunk; staged?: boolean }) {
   );
 }
 
+/** No longer sticky-follows the viewport while scrolling through a big hunk (it did before diff
+ * rows were virtualized, see DiffSection) — a virtualized row's containing block is a small,
+ * scroll-transformed box, not the tall span a real vertical sticky needs to have room to stick
+ * within. Horizontal stickiness (staying pinned to the right edge on a long, unwrapped line) is
+ * unaffected by that and stays. */
 function HunkActionsRow({
   hunkIdx,
   hunkActions,
-  stickyTop,
 }: {
   hunkIdx: number;
   hunkActions?: HunkActions;
-  stickyTop: string;
 }) {
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   if (!hunkActions) return null;
   return (
     <div className="flex justify-end">
-      <div
-        className={cn(
-          "sticky right-3 z-[8] flex gap-1.5 py-1.5 text-xs",
-          stickyTop,
-        )}
-      >
+      <div className="sticky right-3 z-[8] flex gap-1.5 py-1.5 text-xs">
         {hunkActions.staged
           ? hunkActions.onUnstage && (
               <Tooltip>
@@ -438,6 +437,80 @@ function SplitCell({ line, language }: { line: DiffLine | null; language: string
   );
 }
 
+/** One flattened row of a virtualized diff section — a hunk's header/actions plus either its
+ * unified lines or its split row pairs, all as siblings in one list so the whole section (not
+ * just individual hunks) can be windowed by a single virtualizer. Hunk headers/actions used to be
+ * `position: sticky` so they'd chase the viewport while scrolling through a big hunk — now that
+ * every row (including these) is one of many absolutely-positioned virtual items, there's no tall
+ * span left for that stickiness to work within, so they scroll normally like any other row. */
+type DiffRow =
+  | { kind: "header"; hunkIdx: number }
+  | { kind: "actions"; hunkIdx: number }
+  | { kind: "line"; hunkIdx: number; lineIdx: number }
+  | { kind: "split"; hunkIdx: number; left: DiffLine | null; right: DiffLine | null };
+
+function buildDiffRows(hunks: DiffHunk[], mode: "unified" | "split"): DiffRow[] {
+  const rows: DiffRow[] = [];
+  hunks.forEach((hunk, hunkIdx) => {
+    rows.push({ kind: "header", hunkIdx });
+    rows.push({ kind: "actions", hunkIdx });
+    if (mode === "split") {
+      for (const { left, right } of toSplitRows(hunk)) rows.push({ kind: "split", hunkIdx, left, right });
+    } else {
+      hunk.lines.forEach((_, lineIdx) => rows.push({ kind: "line", hunkIdx, lineIdx }));
+    }
+  });
+  return rows;
+}
+
+const HEADER_ROW_ESTIMATE = 28;
+const ACTIONS_ROW_ESTIMATE = 40;
+
+/** Just a starting guess for each row's height before it's actually measured (see
+ * `measureElement` below) — real diff/split lines are single, unwrapped (`whitespace-pre`) lines
+ * so this is normally exact, except a unified line can grow taller than one line's worth once a
+ * comment thread or the add-comment composer is attached underneath it. */
+function estimateDiffRowSize(row: DiffRow, fontSize: number): number {
+  if (row.kind === "header") return HEADER_ROW_ESTIMATE;
+  if (row.kind === "actions") return ACTIONS_ROW_ESTIMATE;
+  return Math.ceil(fontSize * 1.35) + 2;
+}
+
+// Average monospace glyph width as a fraction of font-size, for `font-mono`'s stack — used to
+// estimate (not measure) how wide the longest line in a section is, in px.
+const CHAR_WIDTH_RATIO = 0.62;
+// Line-number gutter (two `w-8` columns + their `mr-3` margins) plus the kind-prefix column
+// (`mr-2` + one glyph) that precedes every line/cell's content — see UnifiedLine/SplitCell.
+const LINE_GUTTER_PX = 8 * 4 * 2 + 12 * 2 + 8 + 16;
+
+/** The longest `content` string among a section's lines, restricted to one side for split mode
+ * (a deletion never appears in the right column, an addition never in the left — see
+ * `toSplitRows`). Used to size the virtualized rows' container in px (see `DiffSection`) since,
+ * unlike the pre-virtualization DOM, absolutely-positioned rows can't push their container wider
+ * by simply overflowing it — nothing here needs to be exact, only wide enough that real content
+ * doesn't get clipped and short enough that there isn't a huge dead scroll margin. */
+function maxLineChars(hunks: DiffHunk[], side?: "left" | "right"): number {
+  let max = 0;
+  for (const hunk of hunks) {
+    for (const line of hunk.lines) {
+      if (side === "left" && line.kind === "addition") continue;
+      if (side === "right" && line.kind === "deletion") continue;
+      if (line.content.length > max) max = line.content.length;
+    }
+  }
+  return max;
+}
+
+function contentWidthPx(hunks: DiffHunk[], mode: "unified" | "split", fontSize: number): number {
+  const charWidth = fontSize * CHAR_WIDTH_RATIO;
+  if (mode === "split") {
+    const left = LINE_GUTTER_PX + maxLineChars(hunks, "left") * charWidth;
+    const right = LINE_GUTTER_PX + maxLineChars(hunks, "right") * charWidth;
+    return left + right;
+  }
+  return LINE_GUTTER_PX + maxLineChars(hunks) * charWidth;
+}
+
 interface DiffSectionProps {
   diff: FileDiff;
   hunkActions?: HunkActions;
@@ -449,12 +522,20 @@ interface DiffSectionProps {
   onCopyPermalink?: (line: number) => void;
   composerKey: string | null;
   setComposerKey: (key: string | null) => void;
+  fontSize: number;
+  scrollElementRef: React.RefObject<HTMLDivElement | null>;
 }
 
 /** One side's hunks (all of `diff`), optionally under its own "Staged changes"/"Unstaged
  * changes" label when rendered alongside the other side. Staged hunks get a green-tinted
  * wrapper and a small "staged" pill instead of the default blue tint, so both sides can be
- * visible together without being confused for each other. */
+ * visible together without being confused for each other.
+ *
+ * Renders as a single virtualized row list (see `buildDiffRows`) rather than mapping every hunk's
+ * every line into real DOM — a large PR's file, or a big working-tree diff, can be tens of
+ * thousands of line objects; without windowing every one of them becomes a live DOM node (plus
+ * its own syntax-highlighted innerHTML) the moment the file is opened, which is what actually
+ * drives this view's memory footprint up on large diffs, not just what's currently on screen. */
 function DiffSection({
   diff,
   hunkActions,
@@ -466,13 +547,22 @@ function DiffSection({
   onCopyPermalink,
   composerKey,
   setComposerKey,
+  fontSize,
+  scrollElementRef,
 }: DiffSectionProps) {
+  const rows = useMemo(() => buildDiffRows(diff.hunks, diffViewMode), [diff, diffViewMode]);
+  const width = useMemo(() => contentWidthPx(diff.hunks, diffViewMode, fontSize), [diff, diffViewMode, fontSize]);
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollElementRef.current,
+    estimateSize: (index) => estimateDiffRowSize(rows[index], fontSize),
+    overscan: 16,
+  });
+
   if (diff.hunks.length === 0) return null;
   const staged = hunkActions?.staged ?? false;
   const tint = staged ? "bg-accent-green/5" : "bg-accent-blue/5";
-  // Clears the file-path header (sticky top-0) plus the "Staged/Unstaged changes" label
-  // (sticky top-[29px]) when this section has one.
-  const actionsStickyTop = label ? "top-[50px]" : "top-[29px]";
+  const items = virtualizer.getVirtualItems();
 
   return (
     <div>
@@ -481,45 +571,49 @@ function DiffSection({
           {label}
         </div>
       )}
-      {diff.hunks.map((hunk, hunkIdx) =>
-        diffViewMode === "split" ? (
-          <div key={hunkIdx}>
-            <HunkHeader hunk={hunk} staged={staged} />
-            <div className={tint}>
-              <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} stickyTop={actionsStickyTop} />
-              {toSplitRows(hunk).map((row, rowIdx) => (
-                <div key={rowIdx} className="flex">
+      <div style={{ height: virtualizer.getTotalSize(), width, position: "relative" }}>
+        {items.map((vi) => {
+          const row = rows[vi.index];
+          return (
+            <div
+              key={vi.key}
+              ref={virtualizer.measureElement}
+              data-index={vi.index}
+              style={{ position: "absolute", top: 0, left: 0, width: "100%", transform: `translateY(${vi.start}px)` }}
+            >
+              {row.kind === "header" && <HunkHeader hunk={diff.hunks[row.hunkIdx]} staged={staged} />}
+              {row.kind === "actions" && (
+                <div className={tint}>
+                  <HunkActionsRow hunkIdx={row.hunkIdx} hunkActions={hunkActions} />
+                </div>
+              )}
+              {row.kind === "line" && (
+                <div className={tint}>
+                  <UnifiedLine
+                    line={diff.hunks[row.hunkIdx].lines[row.lineIdx]}
+                    hunkIdx={row.hunkIdx}
+                    lineIdx={row.lineIdx}
+                    language={language}
+                    comments={comments}
+                    onAddComment={onAddComment}
+                    onCopyPermalink={onCopyPermalink}
+                    hunkActions={hunkActions}
+                    composerKey={composerKey}
+                    setComposerKey={setComposerKey}
+                  />
+                </div>
+              )}
+              {row.kind === "split" && (
+                <div className={cn("flex", tint)}>
                   <SplitCell line={row.left} language={language} />
                   <div className="w-px shrink-0 bg-border" />
                   <SplitCell line={row.right} language={language} />
                 </div>
-              ))}
+              )}
             </div>
-          </div>
-        ) : (
-          <div key={hunkIdx}>
-            <HunkHeader hunk={hunk} staged={staged} />
-            <div className={tint}>
-              <HunkActionsRow hunkIdx={hunkIdx} hunkActions={hunkActions} stickyTop={actionsStickyTop} />
-              {hunk.lines.map((line, lineIdx) => (
-                <UnifiedLine
-                  key={lineIdx}
-                  line={line}
-                  hunkIdx={hunkIdx}
-                  lineIdx={lineIdx}
-                  language={language}
-                  comments={comments}
-                  onAddComment={onAddComment}
-                  onCopyPermalink={onCopyPermalink}
-                  hunkActions={hunkActions}
-                  composerKey={composerKey}
-                  setComposerKey={setComposerKey}
-                />
-              ))}
-            </div>
-          </div>
-        ),
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -540,6 +634,14 @@ function DiffViewImpl({
   const diffViewMode = useSettingsStore((s) => s.settings.diff_view);
   const updateSettings = useSettingsStore((s) => s.update);
   const language = useMemo(() => (diff ? languageForPath(diff.path) : undefined), [diff]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  // The language's grammar loads lazily on first use (see highlight.ts), so force a re-render once
+  // it's ready so this file's lines pick up highlighting instead of staying plain forever.
+  const [, forceHighlightRerender] = useState(0);
+  useEffect(() => {
+    const pending = ensureLanguageLoaded(language);
+    if (pending) void pending.then(() => forceHighlightRerender((n) => n + 1));
+  }, [language]);
 
   const ViewToggle = (
     <Tooltip>
@@ -595,7 +697,7 @@ function DiffViewImpl({
   }
 
   return (
-    <div className="h-full overflow-auto font-mono" style={{ fontSize: `${fontSize}px` }}>
+    <div ref={scrollRef} className="h-full overflow-auto font-mono" style={{ fontSize: `${fontSize}px` }}>
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-3 py-1.5 text-xs font-medium">
         <span>{diff.path}</span>
         {ViewToggle}
@@ -612,6 +714,8 @@ function DiffViewImpl({
           onCopyPermalink={onCopyPermalink}
           composerKey={composerKey}
           setComposerKey={setComposerKey}
+          fontSize={fontSize}
+          scrollElementRef={scrollRef}
         />
         {secondaryDiff && (
           <DiffSection
@@ -625,6 +729,8 @@ function DiffViewImpl({
             onCopyPermalink={onCopyPermalink}
             composerKey={composerKey}
             setComposerKey={setComposerKey}
+            fontSize={fontSize}
+            scrollElementRef={scrollRef}
           />
         )}
       </div>
