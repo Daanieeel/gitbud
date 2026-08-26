@@ -226,7 +226,7 @@ export function SigningSetupDialog({
          * absolute layers inset by the circle radius (3.5 = size-7 / 2) so they start and end
          * exactly at the first/last circle's center. Labels live in their own row below, aligned
          * left/right at the ends so a long one like "Add to provider" can't push anything. */}
-        <div className="w-full px-1 pt-4 text-xs text-muted-foreground">
+        <div className="mb-4 w-full px-1 pt-4 text-xs text-muted-foreground">
           <div className="relative flex items-center justify-between">
             <div className="absolute inset-x-3.5 top-1/2 -z-10 h-px -translate-y-1/2 bg-border" />
             <div
