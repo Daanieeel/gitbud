@@ -13,6 +13,8 @@ export const queryKeys = {
   dirty: (repoPath: string) => ["repo", repoPath, "dirty"] as const,
   branches: (repoPath: string) => ["repo", repoPath, "branches"] as const,
   aheadBehind: (repoPath: string) => ["repo", repoPath, "ahead-behind"] as const,
+  branchCommits: (repoPath: string, base: string, head: string) =>
+    ["repo", repoPath, "branch-commits", base, head] as const,
   remoteProvider: (repoPath: string) => ["repo", repoPath, "remote-provider"] as const,
   log: (repoPath: string) => ["repo", repoPath, "log"] as const,
   stashes: (repoPath: string) => ["repo", repoPath, "stashes"] as const,
