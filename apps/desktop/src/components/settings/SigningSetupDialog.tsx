@@ -207,40 +207,39 @@ export function SigningSetupDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex w-full items-start gap-1 pt-4 text-xs text-muted-foreground">
-          {STEP_ORDER.map((s, i) => {
-            const isLast = i === STEP_ORDER.length - 1;
-            return (
-              <div
-                key={s}
-                className={cn("flex flex-1 flex-col gap-2", isLast ? "items-end" : "items-start")}
-              >
-                <div className={cn("flex w-full items-center", isLast && "justify-end")}>
-                  <div
-                    className={cn(
-                      "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium",
-                      i <= stepIndex
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {i < stepIndex ? <CheckIcon className="size-3.5" /> : i + 1}
-                  </div>
-                  {!isLast && (
-                    <div
-                      className={cn(
-                        "mx-1 h-px flex-1",
-                        i <= stepIndex ? "bg-primary" : "bg-border",
-                      )}
-                    />
+        {/* `minmax(0, 1fr)` columns (what Tailwind's grid-cols-4 generates) are immune to a
+         * long label like "Add to provider" pushing the layout around — a plain flex-1 column
+         * would size itself off its content's min-width first, throwing the rest out of
+         * alignment. Each connector belongs to the step it leads INTO (index i, i>=1) and
+         * spans from the previous circle's center to this one's, via left:-50%/w-full — that
+         * also fixes the color rule: a segment is only "traveled" once you've reached the step
+         * at its far end (stepIndex >= i), not just because you're still on the step before it. */}
+        <div className="grid w-full grid-cols-4 pt-4 text-xs text-muted-foreground">
+          {STEP_ORDER.map((s, i) => (
+            <div key={s} className="relative flex flex-col items-center gap-2">
+              {i > 0 && (
+                <div
+                  className={cn(
+                    "absolute top-3.5 -left-1/2 -z-10 h-px w-full",
+                    stepIndex >= i ? "bg-primary" : "bg-border",
                   )}
-                </div>
-                <span className={cn(i === stepIndex && "font-medium text-foreground")}>
-                  {STEP_LABEL[s]}
-                </span>
+                />
+              )}
+              <div
+                className={cn(
+                  "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium",
+                  i <= stepIndex
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground",
+                )}
+              >
+                {i < stepIndex ? <CheckIcon className="size-3.5" /> : i + 1}
               </div>
-            );
-          })}
+              <span className={cn("text-center", i === stepIndex && "font-medium text-foreground")}>
+                {STEP_LABEL[s]}
+              </span>
+            </div>
+          ))}
         </div>
 
         <div className="flex min-h-64 flex-col justify-center">
@@ -266,7 +265,7 @@ export function SigningSetupDialog({
                     },
                   ]}
                 />
-                <div className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 rounded-md border border-border p-2 text-xs text-muted-foreground">
                   <InfoIcon className="size-3.5 shrink-0" />
                   {gpgAvailable ? (
                     <span>GPG installed and available</span>
