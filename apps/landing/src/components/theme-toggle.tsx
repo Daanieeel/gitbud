@@ -7,19 +7,19 @@ import { Button } from "@gitbud/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
 import { getMessages } from "@/i18n/get-messages";
 
-const THEME_VALUES = ["light", "dark", "system"] as const;
-type ThemeValue = (typeof THEME_VALUES)[number];
+export const THEME_VALUES = ["light", "dark", "system"] as const;
+export type ThemeValue = (typeof THEME_VALUES)[number];
 
-function isThemeValue(value: string | undefined): value is ThemeValue {
+export function isThemeValue(value: string | undefined): value is ThemeValue {
   return value === "light" || value === "dark" || value === "system";
 }
 
-const THEME_ICONS = { light: Sun, dark: Moon, system: Monitor } satisfies Record<
+export const THEME_ICONS = { light: Sun, dark: Moon, system: Monitor } satisfies Record<
   ThemeValue,
   typeof Sun
 >;
 
-const THEME_LABELS = { light: "Light", dark: "Dark", system: "System" } satisfies Record<
+export const THEME_LABELS = { light: "Light", dark: "Dark", system: "System" } satisfies Record<
   ThemeValue,
   string
 >;

@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, type ComponentType, type SVGProps } from "react";
-import { ChevronDown, Download } from "lucide-react";
+import { ChevronDown, CircleAlert, Download } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@gitbud/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
 import { AppleMark, LinuxMark, WindowsMark } from "@gitbud/ui/brand-logo";
+import { cn } from "@gitbud/ui/utils";
 
 export interface ReleaseAssets {
   macArm: string | null;
@@ -41,9 +42,11 @@ function hasHref(item: { label: string; href: string | null }): item is Download
 export function DownloadButton({
   assets,
   labels,
+  className,
 }: {
   assets: ReleaseAssets;
   labels: DownloadLabels;
+  className?: string;
 }) {
   const [os, setOs] = useState<DetectedOs>("unknown");
   const [mounted, setMounted] = useState(false);
@@ -67,8 +70,8 @@ export function DownloadButton({
           : { label: labels.fallback, href: RELEASES_URL };
 
   return (
-    <div className="inline-flex">
-      <Button size="lg" className="rounded-r-none px-5" asChild>
+    <div className={cn("inline-flex", className)}>
+      <Button size="lg" className="flex-1 rounded-r-none px-5" asChild>
         <Link href={primary.href}>{primary.label}</Link>
       </Button>
       <Popover>
@@ -82,31 +85,46 @@ export function DownloadButton({
           </Button>
         </PopoverTrigger>
         <PopoverContent align="end" className="w-56 p-1">
-          <DownloadGroup
-            label="macOS"
-            icon={AppleMark}
-            items={[
-              { label: "Apple Silicon", href: assets.macArm },
-              { label: "Intel", href: assets.macIntel },
-            ]}
-          />
-          <DownloadGroup
-            label="Windows"
-            icon={WindowsMark}
-            items={[
-              { label: "Installer (.exe)", href: assets.windowsExe },
-              { label: "MSI", href: assets.windowsMsi },
-            ]}
-          />
-          <DownloadGroup
-            label="Linux"
-            icon={LinuxMark}
-            items={[
-              { label: "AppImage", href: assets.linuxAppImage },
-              { label: ".deb", href: assets.linuxDeb },
-              { label: ".rpm", href: assets.linuxRpm },
-            ]}
-          />
+          {Object.values(assets).every((href) => href === null) ? (
+            <div className="flex flex-col items-center gap-2 px-3 py-4 text-center">
+              <CircleAlert className="text-muted-foreground size-5" />
+              <p className="text-muted-foreground text-xs">Couldn't load release assets.</p>
+              <Link
+                href={RELEASES_URL}
+                className="text-primary text-xs font-medium hover:underline"
+              >
+                View releases on GitHub
+              </Link>
+            </div>
+          ) : (
+            <>
+              <DownloadGroup
+                label="macOS"
+                icon={AppleMark}
+                items={[
+                  { label: "Apple Silicon", href: assets.macArm },
+                  { label: "Intel", href: assets.macIntel },
+                ]}
+              />
+              <DownloadGroup
+                label="Windows"
+                icon={WindowsMark}
+                items={[
+                  { label: "Installer (.exe)", href: assets.windowsExe },
+                  { label: "MSI", href: assets.windowsMsi },
+                ]}
+              />
+              <DownloadGroup
+                label="Linux"
+                icon={LinuxMark}
+                items={[
+                  { label: "AppImage", href: assets.linuxAppImage },
+                  { label: ".deb", href: assets.linuxDeb },
+                  { label: ".rpm", href: assets.linuxRpm },
+                ]}
+              />
+            </>
+          )}
         </PopoverContent>
       </Popover>
     </div>

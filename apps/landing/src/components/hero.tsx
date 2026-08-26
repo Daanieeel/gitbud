@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Button } from "@gitbud/ui/button";
 import { getMessages } from "@/i18n/get-messages";
 import { DownloadButton, type ReleaseAssets } from "@/components/download-button";
+import { githubFetch } from "@/lib/github";
 
 interface GitHubReleaseAsset {
   name: string;
@@ -25,7 +26,7 @@ const EMPTY_ASSETS: ReleaseAssets = {
 
 async function getReleaseAssets(): Promise<ReleaseAssets> {
   try {
-    const res = await fetch("https://api.github.com/repos/Daanieeel/gitbud/releases/latest");
+    const res = await githubFetch("https://api.github.com/repos/Daanieeel/gitbud/releases/latest");
     if (!res.ok) return EMPTY_ASSETS;
     // SAFETY: GitHub's releases endpoint always returns an assets array of {name, browser_download_url}.
     const release = (await res.json()) as GitHubRelease;
@@ -51,25 +52,22 @@ export async function Hero() {
   const assets = await getReleaseAssets();
 
   return (
-    <section className="mx-auto max-w-7xl px-6 pt-40 pb-16 sm:pt-48">
-      <div className="grid gap-8 sm:grid-cols-[1fr_auto] sm:items-start">
+    <section className="mx-auto max-w-7xl px-6 pt-36 pb-16 lg:pt-40 xl:pt-48">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-8">
         <div>
           <p className="text-muted-foreground text-xs uppercase">{hero.eyebrow}</p>
-          <h1 className="mt-4 text-5xl leading-[1.05] font-semibold tracking-tight sm:text-6xl">
-            {hero.headline.map((line) => (
-              <span key={line} className="block">
-                {line}
-              </span>
-            ))}
+          <h1 className="mt-4 text-4xl leading-[1.05] font-semibold tracking-tight sm:text-5xl lg:text-6xl">
+            {hero.headline[0]} <br className="hidden md:block" />
+            {hero.headline[1]}
           </h1>
         </div>
-        <div className="flex flex-col gap-6 sm:pt-12">
-          <p className="text-muted-foreground max-w-sm text-base text-justify">
+        <div className="flex flex-col gap-10 lg:gap-6 lg:pt-12">
+          <p className="text-muted-foreground w-full text-base text-justify lg:max-w-sm">
             {hero.description}
           </p>
-          <div className="flex flex-wrap gap-3">
-            <DownloadButton assets={assets} labels={hero.download} />
-            <Button size="lg" variant="secondary" asChild>
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <DownloadButton assets={assets} labels={hero.download} className="w-full sm:w-auto" />
+            <Button size="lg" variant="secondary" className="w-full sm:w-auto" asChild>
               <Link
                 href="https://github.com/Daanieeel/gitbud"
                 target="_blank"

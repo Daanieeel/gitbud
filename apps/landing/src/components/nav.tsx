@@ -1,5 +1,6 @@
 import { getMessages } from "@/i18n/get-messages";
 import { NavShell } from "@/components/nav-shell";
+import { githubFetch } from "@/lib/github";
 
 interface GitHubRepo {
   stargazers_count: number;
@@ -7,7 +8,7 @@ interface GitHubRepo {
 
 async function getStarCount(): Promise<number | null> {
   try {
-    const res = await fetch("https://api.github.com/repos/Daanieeel/gitbud");
+    const res = await githubFetch("https://api.github.com/repos/Daanieeel/gitbud");
     if (!res.ok) return null;
     // SAFETY: GitHub's repo endpoint always returns a numeric stargazers_count field.
     const { stargazers_count } = (await res.json()) as GitHubRepo;

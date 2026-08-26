@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Button } from "@gitbud/ui/button";
 import { GitHubMark } from "@gitbud/ui/brand-logo";
 import { cn } from "@gitbud/ui/utils";
+import { MobileNav } from "@/components/mobile-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 
 interface NavLink {
@@ -65,7 +66,7 @@ export function NavShell({
           <span className="text-base font-semibold tracking-tight">GitBud</span>
         </Link>
 
-        <ul className="hidden items-center gap-6 sm:flex">
+        <ul className="hidden items-center gap-6 lg:flex">
           {links.map((link) => (
             <li key={link.href}>
               <Link
@@ -79,7 +80,9 @@ export function NavShell({
         </ul>
 
         <div className="flex items-center gap-2">
-          <ThemeToggle />
+          <div className="hidden lg:block">
+            <ThemeToggle />
+          </div>
           <Button variant="secondary" asChild>
             <Link
               href="https://github.com/Daanieeel/gitbud"
@@ -97,6 +100,9 @@ export function NavShell({
               )}
             </Link>
           </Button>
+          <div className="lg:hidden">
+            <MobileNav links={links} />
+          </div>
         </div>
       </nav>
     </header>
