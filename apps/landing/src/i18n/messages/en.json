@@ -1,0 +1,25 @@
+{
+  "meta": {
+    "title": "GitBud — Git, without the friction",
+    "description": "GitBud is a fast, native Git client for developers who want a clear history, obvious diffs, and nothing standing in the way of shipping."
+  },
+  "hero": {
+    "eyebrow": "Open Source Git Client",
+    "headline": ["Git, without", "the friction."],
+    "description": "GitBud is a fast, native Git client for developers who want a clear history, obvious diffs, and nothing standing in the way of shipping.",
+    "primaryCta": "Download for Mac",
+    "secondaryCta": "View on GitHub",
+    "mediaPlaceholder": "Product video coming soon",
+    "trust": {
+      "tagline": "Trusted by developers who ship every day.",
+      "stats": [
+        { "label": "GitHub Stars", "value": "1,000+" },
+        { "label": "Repos Opened", "value": "10,000+" },
+        { "label": "Contributors", "value": "50+" }
+      ]
+    }
+  },
+  "netlifyBadge": {
+    "label": "Powered by"
+  }
+}
