@@ -206,7 +206,6 @@ export function SigningSetupDialog({
   if (!repoPath) return null;
 
   const hasKey = format === "ssh" ? sshKeyPath.trim().length > 0 : selectedGpgKey.length > 0;
-  const sshDefaultPath = defaultDir ? `${defaultDir}/.ssh/gitbud_signing_ed25519` : "";
   const activePubkey = format === "ssh" ? pubkey : gpgPubkey;
   const provider = providerHost ? detectRemoteProvider(providerHost) : "unknown";
   const providerLink = providerHost ? signingKeySettingsUrl(providerHost, provider, format) : null;
@@ -387,7 +386,8 @@ export function SigningSetupDialog({
                   <div className="flex gap-2">
                     <Input
                       readOnly
-                      value={sshKeyPath || sshDefaultPath}
+                      placeholder="Generate new key…"
+                      value={sshKeyPath}
                       className="h-8 font-mono text-xs"
                     />
                     <Button
