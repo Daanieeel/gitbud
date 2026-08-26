@@ -40,7 +40,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
-import { githubFileUrl } from "@/lib/github-links";
+import { detectRemoteProvider, remoteFileUrl, type RemoteProvider } from "@/lib/remote-provider";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
 import { api } from "@/lib/tauri";
@@ -50,9 +50,19 @@ import { useAddToGitignore, useDiscardFile, useIgnoreExtension, useIgnoreFolder 
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
 import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
+import { GitHubMark } from "@/components/github/GitHubMark";
+import { GitLabMark } from "@/components/github/GitLabMark";
+import { BitbucketMark } from "@/components/github/BitbucketMark";
 import { BlameDialog } from "./BlameDialog";
 import { FilePathLabel } from "./FilePathLabel";
 import type { LfsFileInfo } from "@/lib/types";
+
+const REMOTE_PROVIDER_NAME: Record<RemoteProvider, string> = {
+  github: "GitHub",
+  gitlab: "GitLab",
+  bitbucket: "Bitbucket",
+  unknown: "Remote",
+};
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -110,6 +120,21 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
   const [confirmDiscardPath, setConfirmDiscardPath] = useState<string | null>(null);
   const [confirmDiscardBatch, setConfirmDiscardBatch] = useState(false);
   const [lfsInfo, setLfsInfo] = useState<Record<string, LfsFileInfo>>({});
+  const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: RemoteProvider } | null>(null);
+
+  useEffect(() => {
+    setRemoteInfo(null);
+    if (!repoPath) return;
+    let cancelled = false;
+    void api.remoteWebInfo(repoPath).then((info) => {
+      if (cancelled || !info) return;
+      const [host, url] = info;
+      setRemoteInfo({ url, provider: detectRemoteProvider(host) });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath]);
 
   // Multi-select: shift-click extends a range from `anchorIndex`, cmd/ctrl-click toggles one
   // file in/out. A plain click always collapses back to a single selection, matching standard
@@ -317,17 +342,17 @@ export function FileList({ files, selectedPath, onSelect, onToggle, onToggleMany
                         Open in {editorName}
                       </ContextMenuItem>
                     )}
-                    {branch && (
+                    {branch && remoteInfo && (
                       <ContextMenuItem
                         onSelect={() => {
-                          if (!repoPath) return;
-                          void githubFileUrl(repoPath, branch, file.path).then((url) => {
-                            if (url) void openUrl(url);
-                          });
+                          void openUrl(remoteFileUrl(remoteInfo.url, remoteInfo.provider, branch, file.path));
                         }}
                       >
-                        <ExternalLinkIcon className="size-3.5" />
-                        View File on GitHub
+                        {remoteInfo.provider === "github" && <GitHubMark className="size-3.5" />}
+                        {remoteInfo.provider === "gitlab" && <GitLabMark className="size-3.5" />}
+                        {remoteInfo.provider === "bitbucket" && <BitbucketMark className="size-3.5" />}
+                        {remoteInfo.provider === "unknown" && <ExternalLinkIcon className="size-3.5" />}
+                        View File on {REMOTE_PROVIDER_NAME[remoteInfo.provider]}
                       </ContextMenuItem>
                     )}
                     <ContextMenuSeparator />
