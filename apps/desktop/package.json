@@ -1,0 +1,45 @@
+{
+  "name": "@gitbud/desktop",
+  "version": "0.2.3",
+  "private": true,
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run tauri dev",
+    "build": "tsc && vite build",
+    "check": "tsc --noEmit && cargo check --quiet --manifest-path src-tauri/Cargo.toml",
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "version:bump": "bun run scripts/bump-version.ts"
+  },
+  "dependencies": {
+    "@gitbud/ui": "workspace:*",
+    "@react-symbols/icons": "^1.4.1",
+    "@tanstack/react-query": "^5.102.1",
+    "@tanstack/react-virtual": "catalog:",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-dialog": "^2.7.2",
+    "@tauri-apps/plugin-notification": "^2.3.3",
+    "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.10.1",
+    "date-fns": "^4.4.0",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "sonner": "catalog:",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@gitbud/config": "workspace:*",
+    "@tailwindcss/vite": "catalog:",
+    "@tauri-apps/cli": "^2",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "playwright": "^1.62.1",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

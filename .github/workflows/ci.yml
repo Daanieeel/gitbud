@@ -12,12 +12,15 @@ concurrency:
 
 jobs:
   frontend:
-    name: Typecheck + build (frontend)
+    name: Typecheck + lint + build (frontend)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
+      - run: bun run lint:js
+      - run: bun run format:check:js
+      - run: bun run quality
       - run: bun run build
 
   rust:
@@ -40,16 +43,24 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: apps/desktop/src-tauri
 
       - uses: oven-sh/setup-bun@v2
 
       - run: bun install --frozen-lockfile
 
       - name: cargo check
-        working-directory: src-tauri
+        working-directory: apps/desktop/src-tauri
         run: cargo check --locked
 
       - name: cargo test
-        working-directory: src-tauri
+        working-directory: apps/desktop/src-tauri
         run: cargo test --locked
+
+      - name: cargo clippy
+        if: matrix.os == 'ubuntu-latest'
+        run: bun run lint:rust
+
+      - name: cargo fmt --check
+        if: matrix.os == 'ubuntu-latest'
+        run: bun run format:check:rust

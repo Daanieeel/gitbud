@@ -1,0 +1,58 @@
+{
+  "name": "@gitbud/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./avatar": "./src/components/ui/avatar.tsx",
+    "./badge": "./src/components/ui/badge.tsx",
+    "./button": "./src/components/ui/button.tsx",
+    "./checkbox-group": "./src/components/ui/checkbox-group.tsx",
+    "./checkbox": "./src/components/ui/checkbox.tsx",
+    "./context-menu": "./src/components/ui/context-menu.tsx",
+    "./dialog": "./src/components/ui/dialog.tsx",
+    "./dropdown-menu": "./src/components/ui/dropdown-menu.tsx",
+    "./input": "./src/components/ui/input.tsx",
+    "./popover": "./src/components/ui/popover.tsx",
+    "./skeleton": "./src/components/ui/skeleton.tsx",
+    "./slider": "./src/components/ui/slider.tsx",
+    "./sonner": "./src/components/ui/sonner.tsx",
+    "./textarea": "./src/components/ui/textarea.tsx",
+    "./tooltip": "./src/components/ui/tooltip.tsx",
+    "./diff-view": "./src/components/diff/DiffView.tsx",
+    "./image-diff-view": "./src/components/diff/ImageDiffView.tsx",
+    "./diff-types": "./src/components/diff/types.ts",
+    "./utils": "./src/lib/utils.ts",
+    "./avatar-cache": "./src/lib/avatar-cache.tsx",
+    "./diff-settings": "./src/lib/diff-settings.tsx",
+    "./styles.css": "./src/styles.css"
+  },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radix-ui/react-checkbox": "catalog:",
+    "@radix-ui/react-context-menu": "catalog:",
+    "@radix-ui/react-dialog": "catalog:",
+    "@radix-ui/react-dropdown-menu": "catalog:",
+    "@radix-ui/react-popover": "catalog:",
+    "@radix-ui/react-slider": "catalog:",
+    "@radix-ui/react-slot": "catalog:",
+    "@radix-ui/react-tooltip": "catalog:",
+    "@tanstack/react-virtual": "catalog:",
+    "class-variance-authority": "catalog:",
+    "clsx": "catalog:",
+    "highlight.js": "catalog:",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "sonner": "catalog:",
+    "tailwind-merge": "catalog:"
+  },
+  "devDependencies": {
+    "@gitbud/config": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}

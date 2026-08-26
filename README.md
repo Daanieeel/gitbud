@@ -33,17 +33,17 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 
 ## Roadmap
 
-- [X] Auto-updater
-- [X] Bring uncommitted changes to other branch feature
-- [X] PR quick link on current branch
-- [X] GitHub profile pictures in commit history
-- [X] Delete branch on remote feature
+- [x] Auto-updater
+- [x] Bring uncommitted changes to other branch feature
+- [x] PR quick link on current branch
+- [x] GitHub profile pictures in commit history
+- [x] Delete branch on remote feature
 - [ ] Pop-out merge conflict resolution editor
 - [ ] Settings redesign
-- [X] Open File in Editor
+- [x] Open File in Editor
 - [ ] Better PR viewer (comments, files, commits) like on GitHub
-- [X] Move to TanStack Query
-- [X] Live-syncing with git provider (PRs, commits etc)
+- [x] Move to TanStack Query
+- [x] Live-syncing with git provider (PRs, commits etc)
 - [ ] Improve git blame view
 - [ ] View releases in-app
 - [ ] Commit sigining setup wizard
@@ -103,10 +103,10 @@ bun run tauri dev
 bun run tauri build
 ```
 
-Run the Rust test suite from `src-tauri/`:
+Run the Rust test suite from `apps/desktop/src-tauri/`:
 
 ```bash
-cd src-tauri
+cd apps/desktop/src-tauri
 cargo test
 ```
 
@@ -116,8 +116,10 @@ Pull requests, checks, and review comments need a signed-in GitHub account. GitB
 
 ## Architecture
 
-- **Rust (`src-tauri/`)** holds all git truth: `git2` for status/diff/staging/commit/branch/history/hunks, system `git`/`gh` shelled out for anything touching auth (fetch/pull/push/clone), `notify` for debounced filesystem watching, OS keychain for GitHub tokens.
-- **React + TypeScript (`src/`)** is a thin rendering layer over Tauri commands/events. Zustand stores per concern (repo state, GitHub, PRs, settings). No git logic on the frontend, by design: it should be replaceable without touching a single Rust file.
+This is a Bun/Turborepo monorepo: the desktop app lives in `apps/desktop/`, with shared UI components and Tailwind theme in `packages/ui/`.
+
+- **Rust (`apps/desktop/src-tauri/`)** holds all git truth: `git2` for status/diff/staging/commit/branch/history/hunks, system `git`/`gh` shelled out for anything touching auth (fetch/pull/push/clone), `notify` for debounced filesystem watching, OS keychain for GitHub tokens.
+- **React + TypeScript (`apps/desktop/src/`)** is a thin rendering layer over Tauri commands/events. Zustand stores per concern (repo state, GitHub, PRs, settings). No git logic on the frontend, by design: it should be replaceable without touching a single Rust file.
 
 ## Contributing
 
@@ -125,10 +127,14 @@ Issues and PRs welcome. This is early enough that a well-argued PR can genuinely
 
 1. **RAM and cold-start numbers are acceptance criteria, not vibes.** If a change adds meaningful idle memory or startup time, it needs a reason.
 2. **Local state stays event-driven.** Anything backed by the local `.git` (status, log, branches) should update from the filesystem watcher or Tauri events, not a timer. Remote-facing data (PRs, CI checks, background fetch) already polls on a backoff schedule since GitHub gives us no push channel for it; reuse that schedule instead of adding another timer.
-3. **Auth stays out of Rust.** Anything that needs a user's GitHub credentials for git operations (fetch/pull/push/clone) shells out to system `git`; only the GitHub *API* (PRs, checks, comments) talks HTTP directly, using tokens from Device Flow or `gh`.
-4. **Keep the frontend dumb.** Git logic belongs in `src-tauri/`, not in a Zustand store.
+3. **Auth stays out of Rust.** Anything that needs a user's GitHub credentials for git operations (fetch/pull/push/clone) shells out to system `git`; only the GitHub _API_ (PRs, checks, comments) talks HTTP directly, using tokens from Device Flow or `gh`.
+4. **Keep the frontend dumb.** Git logic belongs in `apps/desktop/src-tauri/`, not in a Zustand store.
 
-Every push and PR runs through [CI](.github/workflows/ci.yml): `cargo check` + `cargo test` on macOS, Windows, and Linux, plus a frontend typecheck and build. Keep it green.
+Every push and PR runs through [CI](.github/workflows/ci.yml): `cargo check` + `cargo test` on macOS, Windows, and Linux, plus a frontend typecheck, build, lint, and format check. Keep it green.
+
+### Linting & formatting
+
+JS/TS is linted and formatted with [Oxlint](https://oxc.rs)/[oxfmt](https://oxc.rs/docs/guide/usage/formatter), Rust with `clippy`/`rustfmt`. Run `bun run lint` / `bun run format` from the repo root to check/fix everything. VS Code and Zed users: the recommended extension ([`oxc.oxc-vscode`](https://marketplace.visualstudio.com/items?itemName=oxc.oxc-vscode) / [Oxc](https://zed.dev/extensions/oxc)) is preconfigured in `.vscode/` and `.zed/` to format on save.
 
 ## License
 

@@ -40,7 +40,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: apps/desktop/src-tauri
 
       - uses: oven-sh/setup-bun@v2
 
@@ -48,7 +48,7 @@ jobs:
 
       - name: Clean stale bundle output
         shell: bash
-        run: rm -rf src-tauri/target/*/release/bundle src-tauri/target/release/bundle
+        run: rm -rf apps/desktop/src-tauri/target/*/release/bundle apps/desktop/src-tauri/target/release/bundle
 
       - uses: tauri-apps/tauri-action@v0
         env:
@@ -56,6 +56,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          projectPath: apps/desktop
           includeUpdaterJson: true
           tagName: ${{ github.ref_name }}
           releaseName: "GitBud ${{ github.ref_name }}"
