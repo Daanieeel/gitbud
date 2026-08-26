@@ -207,7 +207,7 @@ export function SigningSetupDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1 pt-4 text-xs text-muted-foreground">
           {STEP_ORDER.map((s, i) => {
             const isLast = i === STEP_ORDER.length - 1;
             const group = (
@@ -255,7 +255,7 @@ export function SigningSetupDialog({
           })}
         </div>
 
-        <div className="min-h-64">
+        <div className="flex min-h-64 flex-col justify-center">
           {step === "intro" && (
             <div className="flex flex-col gap-3">
               <div className="flex flex-col gap-1.5">
@@ -358,6 +358,7 @@ export function SigningSetupDialog({
                 A generated key has no passphrase. GitBud signs silently on every commit, with
                 nothing extra to type each time.
               </p>
+              {error && <p className="text-xs text-destructive">{error}</p>}
             </div>
           )}
 

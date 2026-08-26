@@ -68,6 +68,11 @@ pub fn generate_gpg_key(name: &str, email: &str) -> Result<String, String> {
 
 /// Generates a new SSH signing keypair at `path` (no passphrase) and returns the public key.
 pub fn generate_ssh_signing_key(path: &str, email: &str) -> Result<String, String> {
+    // ssh-keygen doesn't create missing parent directories itself (e.g. a fresh machine with
+    // no ~/.ssh yet) — it just fails with "No such file or directory".
+    if let Some(parent) = std::path::Path::new(path).parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
     let output = Command::new("ssh-keygen")
         .args(["-t", "ed25519", "-f", path, "-N", "", "-C", email])
         .output()
@@ -303,6 +308,30 @@ mod tests {
             std::env::temp_dir().join(format!("gitbud-test-signing-sshkey-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let key_path = dir.join("id_ed25519").to_string_lossy().to_string();
+
+        let pubkey = generate_ssh_signing_key(&key_path, "test@example.com").unwrap();
+
+        assert!(pubkey.starts_with("ssh-ed25519 "));
+        assert!(std::path::Path::new(&key_path).exists());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// Regression test: a fresh machine (or a first-time signing key, distinct from any
+    /// existing auth key) may not have `~/.ssh` yet — ssh-keygen itself won't create it and
+    /// used to fail outright.
+    #[test]
+    fn generate_ssh_signing_key_creates_missing_parent_dirs() {
+        let dir = std::env::temp_dir().join(format!(
+            "gitbud-test-signing-sshkey-missing-parent-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(!dir.exists());
+        let key_path = dir
+            .join("nested")
+            .join("id_ed25519")
+            .to_string_lossy()
+            .to_string();
 
         let pubkey = generate_ssh_signing_key(&key_path, "test@example.com").unwrap();
 
