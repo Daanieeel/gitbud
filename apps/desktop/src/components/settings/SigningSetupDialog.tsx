@@ -152,6 +152,7 @@ export function SigningSetupDialog({
     const file = await open({
       title: "Choose an SSH public key (.pub)",
       defaultPath: defaultDir ? `${defaultDir}/.ssh` : undefined,
+      filters: [{ name: "SSH public key", extensions: ["pub"] }],
     });
     if (!isSinglePath(file)) return;
     setSshKeyPath(file.endsWith(".pub") ? file.slice(0, -4) : file);
@@ -288,18 +289,28 @@ export function SigningSetupDialog({
               </div>
             ))}
           </div>
-          <div className="mt-2 grid grid-cols-4">
+          {/* Positioned to land under each circle's exact center — the same "inset by radius,
+           * then a fraction of what's left" math the track/progress-fill above use — rather than
+           * centered in an equal-width grid column, which drifted off-center for the two middle
+           * steps as soon as a neighboring label (like "Add to provider") was a different width. */}
+          <div className="relative mt-2 h-4">
             {STEP_ORDER.map((s, i) => (
               <span
                 key={s}
                 className={cn(
-                  i === 0
-                    ? "text-left"
-                    : i === STEP_ORDER.length - 1
-                      ? "text-right"
-                      : "text-center",
+                  "absolute top-0 whitespace-nowrap",
                   i === stepIndex && "font-medium text-foreground",
                 )}
+                style={
+                  i === 0
+                    ? { left: 0 }
+                    : i === STEP_ORDER.length - 1
+                      ? { right: 0 }
+                      : {
+                          left: `calc(0.875rem + ${i / (STEP_ORDER.length - 1)} * (100% - 1.75rem))`,
+                          transform: "translateX(-50%)",
+                        }
+                }
               >
                 {STEP_LABEL[s]}
               </span>
