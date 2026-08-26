@@ -1813,12 +1813,12 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        .setup(|app| {
+        .setup(|_app| {
             #[cfg(target_os = "macos")]
             {
                 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 
-                let app_handle = app.handle();
+                let app_handle = _app.handle();
                 let app_submenu = Submenu::with_items(
                     app_handle,
                     "GitBud",
@@ -1948,9 +1948,9 @@ pub fn run() {
                     ],
                 )?;
 
-                app.set_menu(menu)?;
+                _app.set_menu(menu)?;
 
-                app.on_menu_event(move |app_handle, event| {
+                _app.on_menu_event(move |app_handle, event| {
                     use tauri::Emitter;
                     match event.id.as_ref() {
                         "settings" | "add_repo" | "fetch" | "pull" | "push" | "branch_switcher"

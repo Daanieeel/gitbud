@@ -1,3 +1,4 @@
+#[cfg(target_os = "macos")]
 use base64::{engine::general_purpose::STANDARD, Engine};
 use std::process::Command;
 
