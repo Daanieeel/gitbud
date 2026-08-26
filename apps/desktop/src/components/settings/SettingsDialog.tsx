@@ -22,7 +22,7 @@ import { Checkbox } from "@gitbud/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { GitHubMark } from "@/components/github/GitHubMark";
+import { GitHubMark } from "@gitbud/ui/brand-logo";
 import { UpdateChecker } from "./UpdateChecker";
 import { SigningSetupDialog } from "./SigningSetupDialog";
 import { EditorPicker } from "./EditorPicker";

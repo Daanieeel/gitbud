@@ -49,9 +49,7 @@ import {
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
 import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
-import { GitHubMark } from "@/components/github/GitHubMark";
-import { GitLabMark } from "@/components/github/GitLabMark";
-import { BitbucketMark } from "@/components/github/BitbucketMark";
+import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
 import { BlameDialog } from "./BlameDialog";
 import { FilePathLabel } from "./FilePathLabel";
 import type { LfsFileInfo } from "@/lib/types";

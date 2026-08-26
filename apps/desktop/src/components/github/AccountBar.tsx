@@ -12,9 +12,7 @@ import {
 import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { EditorPicker } from "@/components/settings/EditorPicker";
 import { CUSTOM_EDITOR_ID } from "@/lib/editors";
-import { GitHubMark } from "./GitHubMark";
-import { GitLabMark } from "./GitLabMark";
-import { BitbucketMark } from "./BitbucketMark";
+import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
 import { Badge } from "@gitbud/ui/badge";
 import { Button } from "@gitbud/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";

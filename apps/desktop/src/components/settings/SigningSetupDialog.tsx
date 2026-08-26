@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   CheckIcon,
   CopyIcon,
   ExternalLinkIcon,
   FolderOpenIcon,
+  GlobeIcon,
   InfoIcon,
   KeyRoundIcon,
   Loader2Icon,
@@ -19,10 +20,16 @@ import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
+import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
+import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
 import { api } from "@/lib/tauri";
 import { copyToClipboard } from "@/lib/clipboard";
 import { isSinglePath } from "@/lib/dialogPaths";
-import { detectRemoteProvider, signingKeySettingsUrl } from "@/lib/remote-provider";
+import {
+  detectRemoteProvider,
+  signingKeySettingsUrl,
+  type RemoteProvider,
+} from "@/lib/remote-provider";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { cn } from "@gitbud/ui/utils";
 
@@ -49,6 +56,20 @@ const STEP_LABEL = {
   provider: "Add to provider",
   verify: "Verify",
 } satisfies Record<Step, string>;
+
+const PROVIDER_LABEL = {
+  github: "GitHub",
+  gitlab: "GitLab",
+  bitbucket: "Bitbucket",
+  unknown: "Custom",
+} satisfies Record<RemoteProvider, string>;
+
+const PROVIDER_DEFAULT_HOST = {
+  github: "github.com",
+  gitlab: "gitlab.com",
+  bitbucket: "bitbucket.org",
+  unknown: null,
+} satisfies Record<RemoteProvider, string | null>;
 
 /** End-to-end commit signing setup: pick a format, get a key (generated or existing), add it
  * to the repo's git provider, then prove the whole chain actually works before calling it done.
@@ -77,6 +98,7 @@ export function SigningSetupDialog({
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [providerHost, setProviderHost] = useState<string | null>(null);
+  const [providerChoice, setProviderChoice] = useState<RemoteProvider>("unknown");
   const [addedConfirmed, setAddedConfirmed] = useState(false);
   const [checks, setChecks] = useState<VerifyChecks>({
     testSigned: "pending",
@@ -93,7 +115,11 @@ export function SigningSetupDialog({
       if (available) void api.listGpgKeys().then(setGpgKeys);
     });
     if (repoPath)
-      void api.remoteWebInfo(repoPath).then((info) => setProviderHost(info?.[0] ?? null));
+      void api.remoteWebInfo(repoPath).then((info) => {
+        const host = info?.[0] ?? null;
+        setProviderHost(host);
+        setProviderChoice(host ? detectRemoteProvider(host) : "unknown");
+      });
   }, [isOpen, repoPath]);
 
   const reset = () => {
@@ -123,7 +149,10 @@ export function SigningSetupDialog({
     });
 
   const pickExistingSshKey = async () => {
-    const file = await open({ title: "Choose an SSH public key (.pub)" });
+    const file = await open({
+      title: "Choose an SSH public key (.pub)",
+      defaultPath: defaultDir ? `${defaultDir}/.ssh` : undefined,
+    });
     if (!isSinglePath(file)) return;
     setSshKeyPath(file.endsWith(".pub") ? file.slice(0, -4) : file);
     // No pubkey preview for an imported key — reading arbitrary files isn't wired up on the
@@ -207,8 +236,15 @@ export function SigningSetupDialog({
 
   const hasKey = format === "ssh" ? sshKeyPath.trim().length > 0 : selectedGpgKey.length > 0;
   const activePubkey = format === "ssh" ? pubkey : gpgPubkey;
-  const provider = providerHost ? detectRemoteProvider(providerHost) : "unknown";
-  const providerLink = providerHost ? signingKeySettingsUrl(providerHost, provider, format) : null;
+  const detectedProvider = providerHost ? detectRemoteProvider(providerHost) : "unknown";
+  // The real detected host is only valid for the detected provider — if the user picks a
+  // different one (their repo's remote doesn't match where they actually keep their account),
+  // fall back to that provider's default public domain instead of mismatching host and shape.
+  const providerChoiceHost =
+    providerChoice === detectedProvider ? providerHost : PROVIDER_DEFAULT_HOST[providerChoice];
+  const providerLink = providerChoiceHost
+    ? signingKeySettingsUrl(providerChoiceHost, providerChoice, format)
+    : null;
   const stepIndex = STEP_ORDER.indexOf(step);
 
   return (
@@ -216,7 +252,7 @@ export function SigningSetupDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ShieldCheckIcon className="size-4" /> Set Up Commit Signing
+            <ShieldCheckIcon className="size-5" /> Set Up Commit Signing
           </DialogTitle>
         </DialogHeader>
 
@@ -475,32 +511,32 @@ export function SigningSetupDialog({
                   </Tooltip>
                 </div>
               )}
-              <div className="flex items-center gap-1.5">
-                {providerLink ? (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => void openUrl(providerLink.url)}
-                    className="self-start"
-                  >
-                    <ExternalLinkIcon className="size-3.5" />
-                    Open signing key settings
-                  </Button>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Paste this key wherever your provider manages signing keys.
-                  </p>
-                )}
-                {providerLink?.note && <InfoTooltip text={providerLink.note} />}
-              </div>
-              <label className="flex items-center gap-1.5 text-sm">
-                <input
-                  type="checkbox"
-                  checked={addedConfirmed}
-                  onChange={(e) => setAddedConfirmed(e.target.checked)}
-                />
+              <ProviderPicker value={providerChoice} onChange={setProviderChoice} />
+              {providerLink ? (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void openUrl(providerLink.url)}
+                  className="w-full"
+                >
+                  <ExternalLinkIcon className="size-3.5" />
+                  Open signing key settings
+                </Button>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Paste this key wherever your provider manages signing keys.
+                </p>
+              )}
+              {providerLink?.note && (
+                <p className="text-xs text-muted-foreground">{providerLink.note}</p>
+              )}
+              <CheckboxGroup
+                className="text-sm"
+                checked={addedConfirmed}
+                onCheckedChange={(checked) => setAddedConfirmed(checked === true)}
+              >
                 I've added this key to my account
-              </label>
+              </CheckboxGroup>
               {error && <p className="text-xs text-destructive">{error}</p>}
             </div>
           )}
@@ -560,14 +596,38 @@ export function SigningSetupDialog({
   );
 }
 
-function InfoTooltip({ text }: { text: string }) {
+/** Same card style as CardPicker below (border, primary highlight when selected) but compact and
+ * icon-led instead of description-led — four providers fit comfortably in one row. */
+function ProviderPicker({
+  value,
+  onChange,
+}: {
+  value: RemoteProvider;
+  onChange: (v: RemoteProvider) => void;
+}) {
+  const options: { value: RemoteProvider; icon: ReactNode }[] = [
+    { value: "github", icon: <GitHubMark className="size-4" /> },
+    { value: "gitlab", icon: <GitLabMark className="size-4" /> },
+    { value: "bitbucket", icon: <BitbucketMark className="size-4" /> },
+    { value: "unknown", icon: <GlobeIcon className="size-4" /> },
+  ];
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <InfoIcon className="size-3.5 shrink-0 text-muted-foreground" />
-      </TooltipTrigger>
-      <TooltipContent className="max-w-64">{text}</TooltipContent>
-    </Tooltip>
+    <div className="flex gap-2">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "flex flex-1 flex-col items-center gap-1.5 rounded-md border border-border p-2",
+            value === o.value && "border-2 border-primary bg-primary/10 p-[7px]",
+          )}
+        >
+          {o.icon}
+          <span className="text-xs font-medium">{PROVIDER_LABEL[o.value]}</span>
+        </button>
+      ))}
+    </div>
   );
 }
 

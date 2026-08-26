@@ -6,6 +6,7 @@
   "exports": {
     "./avatar": "./src/components/ui/avatar.tsx",
     "./badge": "./src/components/ui/badge.tsx",
+    "./brand-logo": "./src/components/ui/brand-logo.tsx",
     "./button": "./src/components/ui/button.tsx",
     "./checkbox-group": "./src/components/ui/checkbox-group.tsx",
     "./checkbox": "./src/components/ui/checkbox.tsx",
