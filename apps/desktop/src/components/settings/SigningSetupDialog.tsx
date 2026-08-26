@@ -207,49 +207,37 @@ export function SigningSetupDialog({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex items-center gap-1 pt-4 text-xs text-muted-foreground">
+        <div className="flex w-full items-start gap-1 pt-4 text-xs text-muted-foreground">
           {STEP_ORDER.map((s, i) => {
             const isLast = i === STEP_ORDER.length - 1;
-            const group = (
-              <div className="flex items-center gap-2">
-                <div
-                  className={cn(
-                    "flex size-5 shrink-0 items-center justify-center rounded-full border text-[10px]",
-                    i < stepIndex && "border-primary bg-primary text-primary-foreground",
-                    i === stepIndex && "border-primary text-primary",
-                    i > stepIndex && "border-border",
+            return (
+              <div
+                key={s}
+                className={cn("flex flex-1 flex-col gap-2", isLast ? "items-end" : "items-start")}
+              >
+                <div className={cn("flex w-full items-center", isLast && "justify-end")}>
+                  <div
+                    className={cn(
+                      "flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-medium",
+                      i <= stepIndex
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    {i < stepIndex ? <CheckIcon className="size-3.5" /> : i + 1}
+                  </div>
+                  {!isLast && (
+                    <div
+                      className={cn(
+                        "mx-1 h-px flex-1",
+                        i <= stepIndex ? "bg-primary" : "bg-border",
+                      )}
+                    />
                   )}
-                >
-                  {i < stepIndex ? <CheckIcon className="size-3" /> : i + 1}
                 </div>
-                <span
-                  className={cn(
-                    "whitespace-nowrap",
-                    i === stepIndex && "font-medium text-foreground",
-                  )}
-                >
+                <span className={cn(i === stepIndex && "font-medium text-foreground")}>
                   {STEP_LABEL[s]}
                 </span>
-              </div>
-            );
-            const connector = <div className="mx-1 h-px flex-1 bg-border" />;
-            // The last step's connector is its own leading line rather than the previous
-            // step's trailing one — otherwise it has to share a cramped cell with whichever
-            // step's label happens to be the longest, and the line to its left can shrink away
-            // to nothing.
-            return (
-              <div key={s} className="flex flex-1 items-center gap-1">
-                {isLast ? (
-                  <>
-                    {connector}
-                    {group}
-                  </>
-                ) : (
-                  <>
-                    {group}
-                    {connector}
-                  </>
-                )}
               </div>
             );
           })}
@@ -272,12 +260,29 @@ export function SigningSetupDialog({
                     {
                       value: "openpgp",
                       label: "GPG",
-                      description: "Older, widely recognized standard",
+                      description: "Older, widely recognized standard. Needs GnuPG installed",
                       disabled: !gpgAvailable,
                       disabledReason: "gpg not found on PATH",
                     },
                   ]}
                 />
+                <div className="flex items-center gap-1.5 rounded-md bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+                  <InfoIcon className="size-3.5 shrink-0" />
+                  {gpgAvailable ? (
+                    <span>GPG installed and available</span>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate">
+                      GPG not installed.{" "}
+                      <button
+                        type="button"
+                        onClick={() => void openUrl("https://gnupg.org/download/")}
+                        className="font-medium text-foreground hover:underline"
+                      >
+                        Install GnuPG
+                      </button>
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">Scope</span>
