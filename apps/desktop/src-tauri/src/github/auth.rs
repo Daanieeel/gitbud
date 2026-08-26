@@ -238,7 +238,10 @@ pub async fn start_device_flow(host: &str, client_id: &str) -> Result<DeviceCode
         .post(format!("{}/login/device/code", web_base(host)))
         .header("Accept", "application/json")
         .header("User-Agent", USER_AGENT)
-        .form(&[("client_id", client_id), ("scope", "repo")])
+        .form(&[
+            ("client_id", client_id),
+            ("scope", "repo read:public_key read:gpg_key"),
+        ])
         .send()
         .await
         .map_err(|e| e.to_string())?;

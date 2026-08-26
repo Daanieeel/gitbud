@@ -38,6 +38,7 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [x] PR quick link on current branch
 - [x] GitHub profile pictures in commit history
 - [x] Delete branch on remote feature
+- [ ] GitLab and Bitbucket support
 - [ ] Pop-out merge conflict resolution editor
 - [ ] Settings redesign
 - [x] Open File in Editor
@@ -45,10 +46,11 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [x] Move to TanStack Query
 - [x] Live-syncing with git provider (PRs, commits etc)
 - [ ] Improve git blame view
-- [ ] View releases in-app
-- [ ] Commit sigining setup wizard
+- [ ] View releases in-app (Releases Tab next to Changes, History and Pull Requests)
+- [x] Commit signing setup wizard
 - [ ] Full screen reclone/relocate/remove from gitbud prompt for repo paths that the app cant find anymroe (moved/deleted)
-- [ ] .gitignore tab for managing gitignore rules in an interactive UI
+- [ ] .gitignore tab for managing gitignore rules in an interactive UI (.gitignore Tab next to Changes, History and Pull Requests)
+- [ ] Unit tests for frontend logic (lib/merge3, autosquash, compact-graph, fuzzy, gitSync)
 - [ ] ...and more to come
 
 ## Features

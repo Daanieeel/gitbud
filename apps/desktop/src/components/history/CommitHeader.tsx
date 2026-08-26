@@ -1,12 +1,10 @@
-import { useEffect, useState } from "react";
 import { format } from "date-fns";
-import { CheckIcon, CopyIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
+import { CopyButton } from "@gitbud/ui/copy-button";
 import { CommitAuthorAvatar } from "./CommitList";
 import { useCommitDetail } from "@/hooks/queries/useCommitDetail";
 import { useTags } from "@/hooks/queries/useTags";
 import { useGitHubStore } from "@/store/useGitHubStore";
-import { copyToClipboard } from "@/lib/clipboard";
 
 interface CommitHeaderProps {
   repoPath: string | null;
@@ -19,13 +17,6 @@ export function CommitHeader({ repoPath, oid }: CommitHeaderProps) {
   const { data: detail } = useCommitDetail(repoPath, oid);
   const { data: tags = [] } = useTags(repoPath, true);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timer);
-  }, [copied]);
 
   if (!detail) return null;
 
@@ -68,21 +59,13 @@ export function CommitHeader({ repoPath, oid }: CommitHeaderProps) {
           ))}
         </div>
         <span>{format(new Date(detail.timestamp * 1000), "PPp")}</span>
-        <button
-          type="button"
-          onClick={() => {
-            void copyToClipboard(detail.oid);
-            setCopied(true);
-          }}
+        <CopyButton
+          value={detail.oid}
+          iconClassName="size-3"
           className="flex items-center gap-1 font-mono hover:text-foreground"
         >
           {detail.short_oid}
-          {copied ? (
-            <CheckIcon className="size-3 text-green-500" />
-          ) : (
-            <CopyIcon className="size-3" />
-          )}
-        </button>
+        </CopyButton>
         <span className="text-accent-green">+{detail.insertions}</span>
         <span className="text-accent-pink">-{detail.deletions}</span>
       </div>

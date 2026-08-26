@@ -6,10 +6,13 @@
   "exports": {
     "./avatar": "./src/components/ui/avatar.tsx",
     "./badge": "./src/components/ui/badge.tsx",
+    "./brand-logo": "./src/components/ui/brand-logo.tsx",
     "./button": "./src/components/ui/button.tsx",
+    "./card-picker": "./src/components/ui/card-picker.tsx",
     "./checkbox-group": "./src/components/ui/checkbox-group.tsx",
     "./checkbox": "./src/components/ui/checkbox.tsx",
     "./context-menu": "./src/components/ui/context-menu.tsx",
+    "./copy-button": "./src/components/ui/copy-button.tsx",
     "./dialog": "./src/components/ui/dialog.tsx",
     "./dropdown-menu": "./src/components/ui/dropdown-menu.tsx",
     "./input": "./src/components/ui/input.tsx",

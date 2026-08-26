@@ -70,16 +70,24 @@ export const api = {
     invoke<void>("resolve_conflict_with_content", { repoPath, path, content }),
 
   hasGpg: () => invoke<boolean>("has_gpg"),
+  installGpgViaBrew: () => invoke<void>("install_gpg_via_brew"),
   listGpgKeys: () => invoke<[string, string][]>("list_gpg_keys"),
   generateGpgKey: (name: string, email: string) =>
     invoke<string>("generate_gpg_key", { name, email }),
   generateSshSigningKey: (path: string, email: string) =>
     invoke<string>("generate_ssh_signing_key", { path, email }),
+  readSshPublicKey: (pubKeyPath: string) => invoke<string>("read_ssh_public_key", { pubKeyPath }),
   configureSigning: (repoPath: string, format: string, signingKey: string, global: boolean) =>
     invoke<void>("configure_signing", { repoPath, format, signingKey, global }),
   disableSigning: (repoPath: string, global: boolean) =>
     invoke<void>("disable_signing", { repoPath, global }),
   getSigningStatus: (repoPath: string) => invoke<SigningStatus>("get_signing_status", { repoPath }),
+  exportGpgPublicKey: (keyId: string) => invoke<string>("export_gpg_public_key", { keyId }),
+  testSigning: (format: string, key: string) => invoke<void>("test_signing", { format, key }),
+  githubHasSshSigningKey: (login: string, pubkey: string) =>
+    invoke<boolean>("github_has_ssh_signing_key", { login, pubkey }),
+  githubHasGpgKey: (login: string, keyId: string) =>
+    invoke<boolean>("github_has_gpg_key", { login, keyId }),
   readWorkingFile: (repoPath: string, path: string) =>
     invoke<string>("read_working_file", { repoPath, path }),
   stageHunk: (repoPath: string, path: string, hunkIndex: number) =>

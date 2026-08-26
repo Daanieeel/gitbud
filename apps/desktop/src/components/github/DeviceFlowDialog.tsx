@@ -1,11 +1,5 @@
-import { useEffect, useState } from "react";
-import {
-  CheckIcon,
-  CopyIcon,
-  ExternalLinkIcon,
-  Loader2Icon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { useEffect } from "react";
+import { ExternalLinkIcon, Loader2Icon, TriangleAlertIcon } from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   Dialog,
@@ -15,13 +9,12 @@ import {
   DialogTitle,
 } from "@gitbud/ui/dialog";
 import { Button } from "@gitbud/ui/button";
+import { CopyButton } from "@gitbud/ui/copy-button";
 import { useGitHubStore } from "@/store/useGitHubStore";
-import { copyToClipboard } from "@/lib/clipboard";
 
 export function DeviceFlowDialog() {
   const deviceFlow = useGitHubStore((s) => s.deviceFlow);
   const cancelSignIn = useGitHubStore((s) => s.cancelSignIn);
-  const [copied, setCopied] = useState(false);
 
   const deviceCode = deviceFlow?.code.device_code;
   useEffect(() => {
@@ -30,12 +23,6 @@ export function DeviceFlowDialog() {
     // Only re-open automatically when a new code is issued, not on every status change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deviceCode]);
-
-  useEffect(() => {
-    if (!copied) return;
-    const timer = setTimeout(() => setCopied(false), 2000);
-    return () => clearTimeout(timer);
-  }, [copied]);
 
   return (
     <Dialog open={deviceFlow !== null} onOpenChange={(open) => !open && cancelSignIn()}>
@@ -52,21 +39,12 @@ export function DeviceFlowDialog() {
               <span className="font-mono text-2xl tracking-[0.2em]">
                 {deviceFlow.code.user_code}
               </span>
-              <button
-                type="button"
-                onClick={() => {
-                  void copyToClipboard(deviceFlow.code.user_code);
-                  setCopied(true);
-                }}
+              <CopyButton
+                value={deviceFlow.code.user_code}
+                iconClassName="size-4"
                 className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
                 title="Copy code"
-              >
-                {copied ? (
-                  <CheckIcon className="size-4 text-green-500" />
-                ) : (
-                  <CopyIcon className="size-4" />
-                )}
-              </button>
+              />
             </div>
             <Button
               size="sm"
