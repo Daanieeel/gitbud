@@ -10,6 +10,23 @@ pub fn has_gpg() -> bool {
         .unwrap_or(false)
 }
 
+/// Installs GnuPG via Homebrew (`brew install gnupg`) — macOS/Linux only, since that's the only
+/// package manager GitBud offers a one-click install through. Blocks until brew finishes (which
+/// can be well over a minute on a cold cache), so callers should run this off the UI thread and
+/// show it as busy, then re-check `has_gpg` once it resolves rather than trusting this call
+/// alone — a nonzero exit here doesn't necessarily mean gpg is still missing (e.g. "already
+/// installed" isn't a hard failure worth surfacing).
+pub fn install_gpg_via_brew() -> Result<(), String> {
+    let output = Command::new("brew")
+        .args(["install", "gnupg"])
+        .output()
+        .map_err(|e| format!("couldn't run brew: {e}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    Ok(())
+}
+
 /// Lists this machine's GPG secret keys as (key id, user id) pairs, for "import an existing key".
 pub fn list_gpg_keys() -> Result<Vec<(String, String)>, String> {
     let output = Command::new("gpg")

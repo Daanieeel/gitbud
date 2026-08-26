@@ -133,6 +133,14 @@ export function SigningSetupDialog({
       setGpgKeys(await api.listGpgKeys());
     });
 
+  const installGpgViaBrew = () =>
+    runBusy("installGpg", async () => {
+      await api.installGpgViaBrew();
+      // A successful brew run doesn't necessarily mean gpg is now on PATH (e.g. it was already
+      // installed) — re-check for real instead of trusting the exit code alone.
+      setGpgAvailable(await api.hasGpg());
+    });
+
   async function runBusy(key: string, fn: () => Promise<void>) {
     setError(null);
     setBusyKey(key);
@@ -265,22 +273,41 @@ export function SigningSetupDialog({
                     },
                   ]}
                 />
-                <div className="flex items-center gap-2 rounded-md border border-border p-2 text-xs text-muted-foreground">
-                  <InfoIcon className="size-3.5 shrink-0" />
-                  {gpgAvailable ? (
-                    <span>GPG installed and available</span>
-                  ) : (
-                    <span className="min-w-0 flex-1 truncate">
-                      GPG not installed.{" "}
-                      <button
-                        type="button"
-                        onClick={() => void openUrl("https://gnupg.org/download/")}
-                        className="font-medium text-foreground hover:underline"
-                      >
-                        Install GnuPG
-                      </button>
-                    </span>
-                  )}
+                <div className="flex flex-col gap-1.5 rounded-md border border-border p-2 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <InfoIcon className="size-3.5 shrink-0" />
+                      <span>
+                        {gpgAvailable ? "GPG installed and available" : "GPG not installed."}
+                      </span>
+                    </div>
+                    {!gpgAvailable && (
+                      <div className="flex shrink-0 gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-6 px-2 text-xs"
+                          onClick={() => void openUrl("https://gnupg.org/download/")}
+                        >
+                          Download
+                          <ExternalLinkIcon className="size-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-6 px-2 text-xs"
+                          disabled={busy}
+                          onClick={() => void installGpgViaBrew()}
+                        >
+                          <SparklesIcon
+                            className={cn("size-3.5", busyKey === "installGpg" && "animate-spin")}
+                          />
+                          {busyKey === "installGpg" ? "Installing…" : "Install with brew"}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  {error && <p className="text-destructive">{error}</p>}
                 </div>
               </div>
               <div className="flex flex-col gap-1.5">

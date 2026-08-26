@@ -70,6 +70,7 @@ export const api = {
     invoke<void>("resolve_conflict_with_content", { repoPath, path, content }),
 
   hasGpg: () => invoke<boolean>("has_gpg"),
+  installGpgViaBrew: () => invoke<void>("install_gpg_via_brew"),
   listGpgKeys: () => invoke<[string, string][]>("list_gpg_keys"),
   generateGpgKey: (name: string, email: string) =>
     invoke<string>("generate_gpg_key", { name, email }),

@@ -807,6 +807,13 @@ async fn has_gpg() -> bool {
 }
 
 #[tauri::command]
+async fn install_gpg_via_brew() -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(signing::install_gpg_via_brew)
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn list_gpg_keys() -> Result<Vec<(String, String)>, String> {
     tauri::async_runtime::spawn_blocking(signing::list_gpg_keys)
         .await
@@ -2093,6 +2100,7 @@ pub fn run() {
             get_conflict_sides,
             resolve_conflict_with_content,
             has_gpg,
+            install_gpg_via_brew,
             list_gpg_keys,
             generate_gpg_key,
             generate_ssh_signing_key,
