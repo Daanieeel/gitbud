@@ -78,7 +78,7 @@ pub fn generate_gpg_key(name: &str, email: &str) -> Result<String, String> {
         std::env::temp_dir().join(format!("gitbud-gpg-batch-{}.txt", std::process::id()));
     std::fs::write(&batch_file, &batch).map_err(|e| e.to_string())?;
     let output = Command::new("gpg")
-        .args(["--batch", "--generate-key"])
+        .args(["--batch", "--status-fd", "1", "--generate-key"])
         .arg(&batch_file)
         .output();
     let _ = std::fs::remove_file(&batch_file);
@@ -86,15 +86,15 @@ pub fn generate_gpg_key(name: &str, email: &str) -> Result<String, String> {
     if !output.status.success() {
         return Err(output_error(&output));
     }
-    // gpg reports the new key's id on stderr, e.g. "gpg: key ABCDEF1234567890 marked as ultimately trusted"
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    stderr
+    // `--status-fd 1` puts a stable, machine-readable "[GNUPG:] KEY_CREATED <type> <fingerprint>"
+    // line on stdout. The id used to be scraped from gpg's human-readable stderr message instead
+    // ("gpg: key ... marked as ultimately trusted"), which is localized — it silently broke on
+    // any system not running gpg in English.
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    stdout
         .lines()
-        .find_map(|l| {
-            l.trim()
-                .strip_prefix("gpg: key ")
-                .and_then(|rest| rest.split_whitespace().next())
-        })
+        .find_map(|l| l.strip_prefix("[GNUPG:] KEY_CREATED "))
+        .and_then(|rest| rest.split_whitespace().nth(1))
         .map(|s| s.to_string())
         .ok_or_else(|| "Generated the key but couldn't parse its id from gpg's output".to_string())
 }

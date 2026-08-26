@@ -1,7 +1,6 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import {
   CheckIcon,
-  CopyIcon,
   ExternalLinkIcon,
   FolderOpenIcon,
   GlobeIcon,
@@ -22,9 +21,9 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { CardPicker } from "@gitbud/ui/card-picker";
 import { Checkbox } from "@gitbud/ui/checkbox";
+import { CopyButton } from "@gitbud/ui/copy-button";
 import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
 import { api } from "@/lib/tauri";
-import { copyToClipboard } from "@/lib/clipboard";
 import { isSinglePath } from "@/lib/dialogPaths";
 import { firstMatch } from "@/lib/utils";
 import {
@@ -471,18 +470,29 @@ export function SigningSetupDialog({
                   </div>
                 )
               ) : keyMode === "generate" ? (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="self-start"
-                  disabled={busy}
-                  onClick={() => void generateGpg()}
-                >
-                  <SparklesIcon
-                    className={cn("size-3.5", busyKey === "generateGpg" && "animate-spin")}
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    placeholder="Generate new key…"
+                    value={
+                      selectedGpgKey
+                        ? `${gpgKeys.find(([id]) => id === selectedGpgKey)?.[1] ?? ""} (${selectedGpgKey.slice(-8)})`
+                        : ""
+                    }
+                    className="h-8 font-mono text-xs"
                   />
-                  {busyKey === "generateGpg" ? "Generating…" : "Generate key"}
-                </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    disabled={busy}
+                    onClick={() => void generateGpg()}
+                  >
+                    <SparklesIcon
+                      className={cn("size-3.5", busyKey === "generateGpg" && "animate-spin")}
+                    />
+                    {busyKey === "generateGpg" ? "Generating…" : "Generate"}
+                  </Button>
+                </div>
               ) : (
                 <select
                   value={selectedGpgKey}
@@ -511,17 +521,15 @@ export function SigningSetupDialog({
             <div className="flex flex-col gap-2.5">
               {activePubkey && (
                 <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2">
-                  <span className="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono text-sm">
+                  <span className="max-h-20 min-w-0 flex-1 overflow-y-auto leading-5 font-mono text-sm break-all whitespace-pre-wrap">
                     {activePubkey}
                   </span>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button
-                        onClick={() => void copyToClipboard(activePubkey)}
+                      <CopyButton
+                        value={activePubkey}
                         className="shrink-0 text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        <CopyIcon className="size-3.5" />
-                      </button>
+                      />
                     </TooltipTrigger>
                     <TooltipContent>Copy public key</TooltipContent>
                   </Tooltip>

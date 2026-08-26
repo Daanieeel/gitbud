@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CopyIcon, FolderOpenIcon, KeyRoundIcon, SparklesIcon } from "lucide-react";
+import { FolderOpenIcon, KeyRoundIcon, SparklesIcon } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { homeDir } from "@tauri-apps/api/path";
 import { Button } from "@gitbud/ui/button";
@@ -14,10 +14,10 @@ import {
 } from "@gitbud/ui/dialog";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { CardPicker } from "@gitbud/ui/card-picker";
+import { CopyButton } from "@gitbud/ui/copy-button";
 import { useIdentityStore } from "@/store/useIdentityStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@gitbud/ui/utils";
-import { copyToClipboard } from "@/lib/clipboard";
 import { isSinglePath } from "@/lib/dialogPaths";
 
 interface AddSshIdentityDialogProps {
@@ -170,13 +170,10 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
                     </span>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          onClick={() => void copyToClipboard(pubkey)}
+                        <CopyButton
+                          value={pubkey}
                           className="shrink-0 text-muted-foreground hover:text-foreground"
-                        >
-                          <CopyIcon className="size-3.5" />
-                        </button>
+                        />
                       </TooltipTrigger>
                       <TooltipContent>Copy public key</TooltipContent>
                     </Tooltip>

@@ -12,6 +12,7 @@
     "./checkbox-group": "./src/components/ui/checkbox-group.tsx",
     "./checkbox": "./src/components/ui/checkbox.tsx",
     "./context-menu": "./src/components/ui/context-menu.tsx",
+    "./copy-button": "./src/components/ui/copy-button.tsx",
     "./dialog": "./src/components/ui/dialog.tsx",
     "./dropdown-menu": "./src/components/ui/dropdown-menu.tsx",
     "./input": "./src/components/ui/input.tsx",
