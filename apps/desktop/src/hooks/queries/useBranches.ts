@@ -150,4 +150,3 @@ export function useMergeBranch(repoPath: string | null) {
     onSuccess: invalidate,
   });
 }
-
