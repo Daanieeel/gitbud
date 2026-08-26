@@ -100,20 +100,19 @@ pub fn generate_gpg_key(name: &str, email: &str) -> Result<String, String> {
 }
 
 /// Generates a new SSH signing keypair at `path` (no passphrase) and returns the public key.
+/// Idempotent: calling it again at the same path (e.g. the user hits "Generate" a second time)
+/// just replaces the key rather than failing.
 pub fn generate_ssh_signing_key(path: &str, email: &str) -> Result<String, String> {
-    // Bail out before invoking ssh-keygen at all if a key is already there: ssh-keygen's
-    // "Overwrite (y/n)?" prompt goes to stdout, and with no terminal attached it reads EOF,
-    // declines, and exits with an empty stderr — silently, from the caller's point of view.
-    if std::path::Path::new(path).exists() {
-        return Err(format!(
-            "A key already exists at {path}. Choose a different path or pick \"Choose existing key\" instead."
-        ));
-    }
     // ssh-keygen doesn't create missing parent directories itself (e.g. a fresh machine with
     // no ~/.ssh yet) — it just fails with "No such file or directory".
     if let Some(parent) = std::path::Path::new(path).parent() {
         std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
+    // Remove any previous key at this path before regenerating: otherwise ssh-keygen hits its
+    // interactive "Overwrite (y/n)?" prompt, which writes to stdout and — with no terminal
+    // attached — reads EOF, declines, and exits with an empty stderr, hiding the failure entirely.
+    let _ = std::fs::remove_file(path);
+    let _ = std::fs::remove_file(format!("{path}.pub"));
     let output = Command::new("ssh-keygen")
         .args(["-t", "ed25519", "-f", path, "-N", "", "-C", email])
         .output()
@@ -359,22 +358,23 @@ mod tests {
 
     /// Regression test: ssh-keygen's overwrite prompt for an already-existing key goes to
     /// stdout, and with no terminal attached it declines with an EMPTY stderr — which used to
-    /// surface as a blank, invisible error in the UI. Generation must fail with a clear message
-    /// instead of ever reaching ssh-keygen for a path that's already taken.
+    /// surface as a blank, invisible error in the UI whenever the user hit "Generate" a second
+    /// time at the wizard's fixed default path. Regenerating at the same path must just work.
     #[test]
-    fn generate_ssh_signing_key_rejects_an_existing_path_with_a_clear_message() {
+    fn generate_ssh_signing_key_is_idempotent() {
         let dir = std::env::temp_dir().join(format!(
-            "gitbud-test-signing-sshkey-exists-{}",
+            "gitbud-test-signing-sshkey-idempotent-{}",
             std::process::id()
         ));
         std::fs::create_dir_all(&dir).unwrap();
         let key_path = dir.join("id_ed25519").to_string_lossy().to_string();
-        std::fs::write(&key_path, "not a real key").unwrap();
 
-        let err = generate_ssh_signing_key(&key_path, "test@example.com").unwrap_err();
+        let first = generate_ssh_signing_key(&key_path, "test@example.com").unwrap();
+        let second = generate_ssh_signing_key(&key_path, "test@example.com").unwrap();
 
-        assert!(!err.is_empty());
-        assert!(err.contains(&key_path));
+        assert!(first.starts_with("ssh-ed25519 "));
+        assert!(second.starts_with("ssh-ed25519 "));
+        assert_ne!(first, second, "regenerating should produce a fresh keypair");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
