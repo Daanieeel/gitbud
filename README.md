@@ -130,7 +130,11 @@ Issues and PRs welcome. This is early enough that a well-argued PR can genuinely
 3. **Auth stays out of Rust.** Anything that needs a user's GitHub credentials for git operations (fetch/pull/push/clone) shells out to system `git`; only the GitHub *API* (PRs, checks, comments) talks HTTP directly, using tokens from Device Flow or `gh`.
 4. **Keep the frontend dumb.** Git logic belongs in `apps/desktop/src-tauri/`, not in a Zustand store.
 
-Every push and PR runs through [CI](.github/workflows/ci.yml): `cargo check` + `cargo test` on macOS, Windows, and Linux, plus a frontend typecheck and build. Keep it green.
+Every push and PR runs through [CI](.github/workflows/ci.yml): `cargo check` + `cargo test` on macOS, Windows, and Linux, plus a frontend typecheck, build, lint, and format check. Keep it green.
+
+### Linting & formatting
+
+JS/TS is linted and formatted with [Oxlint](https://oxc.rs)/[oxfmt](https://oxc.rs/docs/guide/usage/formatter), Rust with `clippy`/`rustfmt`. Run `bun run lint` / `bun run format` from the repo root to check/fix everything. VS Code and Zed users: the recommended extension ([`oxc.oxc-vscode`](https://marketplace.visualstudio.com/items?itemName=oxc.oxc-vscode) / [Oxc](https://zed.dev/extensions/oxc)) is preconfigured in `.vscode/` and `.zed/` to format on save.
 
 ## License
 

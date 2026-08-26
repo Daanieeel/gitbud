@@ -2,6 +2,9 @@
   "name": "gitbud",
   "private": true,
   "packageManager": "bun@1.4.0",
+  "overrides": {
+    "fsevents": "^2.3.3"
+  },
   "workspaces": {
     "packages": ["apps/*", "packages/*"],
     "catalog": {
@@ -35,6 +38,16 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "check": "turbo run check",
+    "lint:js": "NODE_OPTIONS=--experimental-strip-types oxlint .",
+    "lint:rust": "cargo clippy --quiet --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings",
+    "lint": "bun run lint:js && bun run lint:rust",
+    "format:js": "NODE_OPTIONS=--experimental-strip-types oxfmt .",
+    "format:rust": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml",
+    "format": "bun run format:js && bun run format:rust",
+    "format:check:js": "NODE_OPTIONS=--experimental-strip-types oxfmt --check .",
+    "format:check:rust": "cargo fmt --manifest-path apps/desktop/src-tauri/Cargo.toml --check",
+    "format:check": "bun run format:check:js && bun run format:check:rust",
+    "quality": "bun scripts/check-dead-code.ts && bun scripts/check-duplicate-deps.ts",
     "dev:desktop": "turbo run dev --filter=@gitbud/desktop",
     "build:desktop": "turbo run build --filter=@gitbud/desktop",
     "check:desktop": "turbo run check --filter=@gitbud/desktop",
@@ -43,6 +56,9 @@
     "ui:add": "cd packages/ui && bunx shadcn@latest add"
   },
   "devDependencies": {
+    "@oxlint/plugins": "1.80.0",
+    "oxfmt": "0.65.0",
+    "oxlint": "1.80.0",
     "turbo": "^2.5.0"
   }
 }

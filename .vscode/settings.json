@@ -1,0 +1,10 @@
+{
+  "[javascript][typescript][javascriptreact][typescriptreact][json][jsonc]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.oxc": "always"
+    }
+  },
+  "rust-analyzer.check.command": "clippy"
+}
