@@ -102,6 +102,22 @@ export function useAddToGitignore(repoPath: string | null) {
   });
 }
 
+export function useIgnoreFolder(repoPath: string | null) {
+  const invalidate = useInvalidateStatus(repoPath);
+  return useMutation({
+    mutationFn: (folderPath: string) => api.ignoreFolder(repoPath as string, folderPath),
+    onSuccess: invalidate,
+  });
+}
+
+export function useIgnoreExtension(repoPath: string | null) {
+  const invalidate = useInvalidateStatus(repoPath);
+  return useMutation({
+    mutationFn: (extension: string) => api.ignoreExtension(repoPath as string, extension),
+    onSuccess: invalidate,
+  });
+}
+
 export function useStageHunk(repoPath: string | null) {
   const queryClient = useQueryClient();
   return useMutation({

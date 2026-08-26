@@ -377,19 +377,15 @@ pub fn discard_file(repo_path: &str, path: &str) -> Result<(), String> {
     }
 }
 
-/// Appends the given paths to the repo's root `.gitignore`, anchored with a leading `/` so
-/// they match only that exact path rather than any same-named file anywhere in the tree.
-/// Paths already present are skipped rather than duplicated.
-pub fn add_to_gitignore(repo_path: &str, paths: &[String]) -> Result<(), String> {
+/// Appends the given already-formatted entries (e.g. `/path/to/file`, `/path/to/folder/**`,
+/// `*.ext`) to the repo's root `.gitignore`. Entries already present are skipped rather than
+/// duplicated.
+fn append_gitignore_entries(repo_path: &str, entries: &[String]) -> Result<(), String> {
     let gitignore_path = std::path::Path::new(repo_path).join(".gitignore");
     let mut content = std::fs::read_to_string(&gitignore_path).unwrap_or_default();
     let existing: std::collections::HashSet<&str> = content.lines().collect();
 
-    let to_add: Vec<String> = paths
-        .iter()
-        .map(|p| format!("/{p}"))
-        .filter(|entry| !existing.contains(entry.as_str()))
-        .collect();
+    let to_add: Vec<&String> = entries.iter().filter(|entry| !existing.contains(entry.as_str())).collect();
     if to_add.is_empty() {
         return Ok(());
     }
@@ -398,10 +394,29 @@ pub fn add_to_gitignore(repo_path: &str, paths: &[String]) -> Result<(), String>
         content.push('\n');
     }
     for entry in to_add {
-        content.push_str(&entry);
+        content.push_str(entry);
         content.push('\n');
     }
     std::fs::write(&gitignore_path, content).map_err(|e| e.to_string())
+}
+
+/// Appends the given paths to the repo's root `.gitignore`, anchored with a leading `/` so
+/// they match only that exact path rather than any same-named file anywhere in the tree.
+pub fn add_to_gitignore(repo_path: &str, paths: &[String]) -> Result<(), String> {
+    let entries: Vec<String> = paths.iter().map(|p| format!("/{p}")).collect();
+    append_gitignore_entries(repo_path, &entries)
+}
+
+/// Ignores an entire folder (and everything under it), anchored to the repo root the same way
+/// `add_to_gitignore` anchors single files.
+pub fn ignore_folder(repo_path: &str, folder_path: &str) -> Result<(), String> {
+    append_gitignore_entries(repo_path, &[format!("/{folder_path}/**")])
+}
+
+/// Ignores every file with the given extension anywhere in the repo — deliberately not anchored
+/// to a path, unlike `add_to_gitignore`/`ignore_folder`, since the point is repo-wide coverage.
+pub fn ignore_extension(repo_path: &str, extension: &str) -> Result<(), String> {
+    append_gitignore_entries(repo_path, &[format!("*.{extension}")])
 }
 
 /// Resolves a merge conflict on `path` by taking one side wholesale: writes that side's

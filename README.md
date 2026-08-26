@@ -48,6 +48,7 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [ ] View releases in-app
 - [ ] Commit sigining setup wizard
 - [ ] Full screen reclone/relocate/remove from gitbud prompt for repo paths that the app cant find anymroe (moved/deleted)
+- [ ] .gitignore tab for managing gitignore rules in an interactive UI
 - [ ] ...and more to come
 
 ## Features

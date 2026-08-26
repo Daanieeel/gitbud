@@ -55,7 +55,7 @@ import { useRepoSyncing } from "@/hooks/queries/useGitSync";
 import { api } from "@/lib/tauri";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
-import { detectRemoteProvider } from "@/lib/remote-provider";
+import { detectRemoteProvider, type RemoteProvider } from "@/lib/remote-provider";
 import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
 import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
 import { queryClient } from "@/lib/queryClient";
@@ -98,6 +98,13 @@ function loadCollapsedSections(): Set<string> {
     return new Set();
   }
 }
+
+const REMOTE_PROVIDER_LABEL: Record<RemoteProvider, string> = {
+  github: "Open on GitHub",
+  gitlab: "Open on GitLab",
+  bitbucket: "Open on Bitbucket",
+  unknown: "Open in Browser",
+};
 
 interface RepoRowProps {
   repo: RepoEntry;
@@ -248,10 +255,6 @@ function RepoRow({
           <FolderOpenIcon className="size-3.5" />
           Open in Finder
         </ContextMenuItem>
-        <ContextMenuItem onSelect={() => void copyToClipboard(repo.path)}>
-          <CopyIcon className="size-3.5" />
-          Copy Path
-        </ContextMenuItem>
         {(favoriteEditorOption || isCustomEditor) && (
           <ContextMenuItem
             onSelect={() => {
@@ -279,9 +282,19 @@ function RepoRow({
             {remoteInfo.provider === "gitlab" && <GitLabMark className="size-3.5" />}
             {remoteInfo.provider === "bitbucket" && <BitbucketMark className="size-3.5" />}
             {remoteInfo.provider === "unknown" && <ExternalLinkIcon className="size-3.5" />}
-            Open in Browser
+            {REMOTE_PROVIDER_LABEL[remoteInfo.provider]}
           </ContextMenuItem>
         )}
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => void copyToClipboard(repo.path)}>
+          <CopyIcon className="size-3.5" />
+          Copy Path
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => void copyToClipboard(repo.name)}>
+          <CopyIcon className="size-3.5" />
+          Copy Repo Name
+        </ContextMenuItem>
+        <ContextMenuSeparator />
         <ContextMenuItem onSelect={onPinToSection}>
           <PinIcon className="size-3.5" />
           Pin to Section…
