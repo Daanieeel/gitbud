@@ -146,6 +146,14 @@ fn intraline_diff(old: &str, new: &str) -> (CharRanges, CharRanges) {
 /// the "changed" ranges tends to look noisy and arbitrary rather than clarifying anything.
 const MAX_HIGHLIGHTED_CHANGE_LEN: u32 = 15;
 
+/// `TextDiff::from_chars` is roughly O(n·m) in the two lines' lengths — fine for ordinary code
+/// lines, but a single-line minified asset, lockfile entry, or generated JSON blob can run into
+/// the thousands of characters, where that cost becomes multiple seconds for one file. A line
+/// this long is already all but guaranteed to blow past `MAX_HIGHLIGHTED_CHANGE_LEN` (a change
+/// small enough to still be worth highlighting inside a genuinely huge line is vanishingly
+/// rare), so it's skipped outright rather than diffed and then discarded.
+const MAX_INTRALINE_DIFF_LEN: usize = 2000;
+
 fn ranges_total_len(ranges: &[(u32, u32)]) -> u32 {
     ranges.iter().map(|(start, end)| end - start).sum()
 }
@@ -175,10 +183,14 @@ pub fn add_intraline_highlights(hunks: &mut [DiffHunk]) {
 
             let pair_count = (del_end - del_start).min(add_end - add_start);
             for offset in 0..pair_count {
-                let (old_ranges, new_ranges) = intraline_diff(
-                    &hunk.lines[del_start + offset].content,
-                    &hunk.lines[add_start + offset].content,
-                );
+                let old_content = &hunk.lines[del_start + offset].content;
+                let new_content = &hunk.lines[add_start + offset].content;
+                if old_content.len() > MAX_INTRALINE_DIFF_LEN
+                    || new_content.len() > MAX_INTRALINE_DIFF_LEN
+                {
+                    continue;
+                }
+                let (old_ranges, new_ranges) = intraline_diff(old_content, new_content);
                 if ranges_total_len(&old_ranges) > MAX_HIGHLIGHTED_CHANGE_LEN
                     || ranges_total_len(&new_ranges) > MAX_HIGHLIGHTED_CHANGE_LEN
                 {

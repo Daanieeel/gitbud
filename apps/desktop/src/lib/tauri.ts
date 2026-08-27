@@ -249,6 +249,7 @@ export const api = {
   checkoutPullRequest: (repoPath: string, number: number) =>
     invoke<string>("checkout_pull_request", { repoPath, number }),
 
+  pathExists: (path: string) => invoke<boolean>("path_exists", { path }),
   openInTerminal: (path: string) => invoke<void>("open_in_terminal", { path }),
   openInEditor: (path: string, editor: string, customAppPath: string | null) =>
     invoke<void>("open_in_editor", { path, editor, customAppPath }),

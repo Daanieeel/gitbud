@@ -105,13 +105,10 @@ impl GhClient {
             errors: Vec<GraphQlError>,
         }
 
-        let res = check(
+        let res = send_checked(
             self.http
                 .post(&self.graphql)
-                .json(&Body { query, variables })
-                .send()
-                .await
-                .map_err(|e| e.to_string())?,
+                .json(&Body { query, variables }),
         )
         .await?;
         let parsed: GraphQlResponse<T> = res.json().await.map_err(|e| e.to_string())?;
@@ -132,6 +129,75 @@ async fn check(res: reqwest::Response) -> Result<reqwest::Response, String> {
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
         Err(format!("GitHub API error {status}: {body}"))
+    }
+}
+
+const MAX_RATE_LIMIT_RETRIES: u32 = 3;
+
+/// How long to back off before retrying, if `res` looks like a GitHub rate limit response —
+/// primary (429, or 403 with `X-RateLimit-Remaining: 0`) or secondary (403 with `Retry-After`,
+/// GitHub's signal for "too many requests too fast", distinct from the hourly primary limit).
+/// `None` for anything else, including a plain permission-denied 403, which must not be retried.
+fn rate_limit_wait(res: &reqwest::Response) -> Option<std::time::Duration> {
+    use reqwest::StatusCode;
+    let status = res.status();
+    if status != StatusCode::TOO_MANY_REQUESTS && status != StatusCode::FORBIDDEN {
+        return None;
+    }
+    let header = |name: &str| res.headers().get(name).and_then(|v| v.to_str().ok());
+
+    if let Some(secs) = header("retry-after").and_then(|s| s.parse::<u64>().ok()) {
+        return Some(std::time::Duration::from_secs(secs.min(60)));
+    }
+    if header("x-ratelimit-remaining") == Some("0") {
+        if let Some(reset) = header("x-ratelimit-reset").and_then(|s| s.parse::<i64>().ok()) {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs() as i64)
+                .unwrap_or(0);
+            return Some(std::time::Duration::from_secs(
+                (reset - now).clamp(1, 60) as u64
+            ));
+        }
+    }
+    // A 429 with no informative headers at all still deserves one short backoff rather than an
+    // immediate raw error; a 403 with neither header is a normal permission failure, not a
+    // rate limit, so it's left alone (falls through to `None`).
+    (status == StatusCode::TOO_MANY_REQUESTS).then(|| std::time::Duration::from_secs(2))
+}
+
+/// Sends `builder`, transparently backing off and retrying when the response is a GitHub rate
+/// limit (see `rate_limit_wait`) instead of surfacing it as a raw error straight away — GitHub's
+/// ToS bans "abusive" request volume, and a busy user clicking around this app can otherwise trip
+/// its secondary rate limit during totally ordinary use. Falls back to a plain send when the
+/// request body can't be cloned for a retry (only possible for a streamed body — none of this
+/// file's requests use one).
+async fn send_checked(builder: reqwest::RequestBuilder) -> Result<reqwest::Response, String> {
+    check(send_with_retry(builder).await?).await
+}
+
+/// The retry-on-rate-limit loop behind `send_checked`, split out so callers that need to
+/// inspect the raw status themselves (e.g. `delete_branch`'s "already gone" 422) can do so
+/// before it's turned into an `Err`.
+async fn send_with_retry(
+    mut builder: reqwest::RequestBuilder,
+) -> Result<reqwest::Response, String> {
+    let mut attempt = 0;
+    loop {
+        let retry_clone = builder.try_clone();
+        let res = builder.send().await.map_err(send_err)?;
+        if attempt >= MAX_RATE_LIMIT_RETRIES {
+            return Ok(res);
+        }
+        let Some(wait) = rate_limit_wait(&res) else {
+            return Ok(res);
+        };
+        let Some(next) = retry_clone else {
+            return Ok(res);
+        };
+        tokio::time::sleep(wait).await;
+        builder = next;
+        attempt += 1;
     }
 }
 
@@ -196,13 +262,7 @@ pub async fn find_user_avatar_by_email(
         // search below (which, like the `.png` shortcut, excludes noreply addresses entirely).
         if username.ends_with("[bot]") {
             let gh = GhClient::new(host, token)?;
-            let res = check(
-                gh.get(&format!("/users/{username}"))
-                    .send()
-                    .await
-                    .map_err(|e| e.to_string())?,
-            )
-            .await?;
+            let res = send_checked(gh.get(&format!("/users/{username}"))).await?;
             let user: RawUser = res.json().await.map_err(|e| e.to_string())?;
             return Ok(Some(user.avatar_url));
         }
@@ -210,12 +270,9 @@ pub async fn find_user_avatar_by_email(
     }
     let gh = GhClient::new(host, token)?;
     let query = format!("{email} in:email");
-    let res = check(
+    let res = send_checked(
         gh.get("/search/users")
-            .query(&[("q", query.as_str()), ("per_page", "1")])
-            .send()
-            .await
-            .map_err(|e| e.to_string())?,
+            .query(&[("q", query.as_str()), ("per_page", "1")]),
     )
     .await?;
     let parsed: SearchUsersResponse = res.json().await.map_err(|e| e.to_string())?;
@@ -290,7 +347,7 @@ pub async fn list_pull_requests(
 ) -> Result<Vec<PullRequest>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls?state={state}&per_page=50&page={page}");
-    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get(&path)).await?;
     let raw: Vec<RawPullRequest> = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into_iter().map(PullRequest::from).collect())
 }
@@ -304,7 +361,7 @@ pub async fn get_pull_request(
 ) -> Result<PullRequest, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}");
-    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get(&path)).await?;
     let raw: RawPullRequest = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into())
 }
@@ -453,7 +510,7 @@ pub async fn get_repo_merge_settings(
 ) -> Result<RepoMergeSettings, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}");
-    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get(&path)).await?;
     let raw: RawRepo = res.json().await.map_err(|e| e.to_string())?;
     let linear_history = requires_linear_history(host, token, owner, repo, base_ref).await;
     let ruleset_methods = ruleset_allowed_merge_methods(host, token, owner, repo, base_ref).await;
@@ -493,19 +550,13 @@ pub async fn create_pull_request(
 ) -> Result<PullRequest, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls");
-    let res = check(
-        gh.post(&path)
-            .json(&CreatePrBody {
-                title,
-                head,
-                base,
-                body,
-                draft,
-            })
-            .send()
-            .await
-            .map_err(|e| e.to_string())?,
-    )
+    let res = send_checked(gh.post(&path).json(&CreatePrBody {
+        title,
+        head,
+        base,
+        body,
+        draft,
+    }))
     .await?;
     let raw: RawPullRequest = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into())
@@ -529,14 +580,7 @@ pub async fn update_pull_request_base(
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}");
-    check(
-        gh.patch(&path)
-            .json(&UpdatePrBaseBody { base })
-            .send()
-            .await
-            .map_err(|e| e.to_string())?,
-    )
-    .await?;
+    send_checked(gh.patch(&path).json(&UpdatePrBaseBody { base })).await?;
     Ok(())
 }
 
@@ -562,13 +606,7 @@ struct GithubGpgKey {
 /// confirm" rather than "not found", not surface it as a hard failure.
 pub async fn has_ssh_signing_key(host: &str, token: &str, pubkey: &str) -> Result<bool, String> {
     let gh = GhClient::new(host, token)?;
-    let res = check(
-        gh.get("/user/ssh_signing_keys")
-            .send()
-            .await
-            .map_err(send_err)?,
-    )
-    .await?;
+    let res = send_checked(gh.get("/user/ssh_signing_keys")).await?;
     let keys: Vec<GithubSshKey> = res.json().await.map_err(|e| e.to_string())?;
     let material = |k: &str| k.split_whitespace().take(2).collect::<Vec<_>>().join(" ");
     let target = material(pubkey);
@@ -578,7 +616,7 @@ pub async fn has_ssh_signing_key(host: &str, token: &str, pubkey: &str) -> Resul
 /// Same idea for a GPG key id — needs `read:gpg_key`.
 pub async fn has_gpg_key(host: &str, token: &str, key_id: &str) -> Result<bool, String> {
     let gh = GhClient::new(host, token)?;
-    let res = check(gh.get("/user/gpg_keys").send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get("/user/gpg_keys")).await?;
     let keys: Vec<GithubGpgKey> = res.json().await.map_err(|e| e.to_string())?;
     let needle = key_id.trim_start_matches("0x").to_uppercase();
     Ok(keys.iter().any(|k| {
@@ -594,7 +632,7 @@ pub async fn list_labels(
 ) -> Result<Vec<Label>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/labels?per_page=100");
-    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get(&path)).await?;
     res.json().await.map_err(|e| e.to_string())
 }
 
@@ -614,7 +652,7 @@ pub async fn list_assignable_users(
 ) -> Result<Vec<AssignableUser>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/assignees?per_page=100");
-    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get(&path)).await?;
     res.json().await.map_err(|e| e.to_string())
 }
 
@@ -633,14 +671,7 @@ pub async fn add_labels(
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/issues/{number}/labels");
-    check(
-        gh.post(&path)
-            .json(&LabelsBody { labels })
-            .send()
-            .await
-            .map_err(|e| e.to_string())?,
-    )
-    .await?;
+    send_checked(gh.post(&path).json(&LabelsBody { labels })).await?;
     Ok(())
 }
 
@@ -659,14 +690,7 @@ pub async fn add_assignees(
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/issues/{number}/assignees");
-    check(
-        gh.post(&path)
-            .json(&AssigneesBody { assignees })
-            .send()
-            .await
-            .map_err(|e| e.to_string())?,
-    )
-    .await?;
+    send_checked(gh.post(&path).json(&AssigneesBody { assignees })).await?;
     Ok(())
 }
 
@@ -685,14 +709,7 @@ pub async fn request_reviewers(
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/requested_reviewers");
-    check(
-        gh.post(&path)
-            .json(&ReviewersBody { reviewers })
-            .send()
-            .await
-            .map_err(|e| e.to_string())?,
-    )
-    .await?;
+    send_checked(gh.post(&path).json(&ReviewersBody { reviewers })).await?;
     Ok(())
 }
 
@@ -710,7 +727,7 @@ pub async fn list_milestones(
 ) -> Result<Vec<Milestone>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/milestones?state=open&per_page=100");
-    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get(&path)).await?;
     res.json().await.map_err(|e| e.to_string())
 }
 
@@ -729,14 +746,7 @@ pub async fn set_milestone(
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/issues/{number}");
-    check(
-        gh.patch(&path)
-            .json(&MilestoneBody { milestone })
-            .send()
-            .await
-            .map_err(|e| e.to_string())?,
-    )
-    .await?;
+    send_checked(gh.patch(&path).json(&MilestoneBody { milestone })).await?;
     Ok(())
 }
 
@@ -880,18 +890,12 @@ pub async fn merge_pull_request(
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/merge");
-    check(
-        gh.put(&path)
-            .json(&MergeBody {
-                merge_method,
-                commit_title,
-                commit_message,
-                sha,
-            })
-            .send()
-            .await
-            .map_err(|e| e.to_string())?,
-    )
+    send_checked(gh.put(&path).json(&MergeBody {
+        merge_method,
+        commit_title,
+        commit_message,
+        sha,
+    }))
     .await?;
     Ok(())
 }
@@ -908,7 +912,7 @@ pub async fn delete_branch(
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/git/refs/heads/{branch}");
-    let res = gh.delete(&path).send().await.map_err(send_err)?;
+    let res = send_with_retry(gh.delete(&path)).await?;
     if res.status() == reqwest::StatusCode::UNPROCESSABLE_ENTITY {
         return Ok(());
     }
@@ -934,7 +938,7 @@ pub async fn list_pull_request_files(
 ) -> Result<Vec<PrFileEntry>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/files?per_page=100");
-    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get(&path)).await?;
     let raw: Vec<RawPullRequestFile> = res.json().await.map_err(|e| e.to_string())?;
 
     Ok(raw
@@ -1135,7 +1139,7 @@ pub async fn list_review_comments(
 ) -> Result<Vec<ReviewComment>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/comments?per_page=100");
-    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get(&path)).await?;
     let raw: Vec<RawReviewComment> = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into_iter().map(ReviewComment::from).collect())
 }
@@ -1164,19 +1168,13 @@ pub async fn create_review_comment(
 ) -> Result<ReviewComment, String> {
     let gh = GhClient::new(host, token)?;
     let url_path = format!("/repos/{owner}/{repo}/pulls/{number}/comments");
-    let res = check(
-        gh.post(&url_path)
-            .json(&CreateReviewCommentBody {
-                body,
-                commit_id,
-                path,
-                line,
-                side,
-            })
-            .send()
-            .await
-            .map_err(|e| e.to_string())?,
-    )
+    let res = send_checked(gh.post(&url_path).json(&CreateReviewCommentBody {
+        body,
+        commit_id,
+        path,
+        line,
+        side,
+    }))
     .await?;
     let raw: RawReviewComment = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into())
@@ -1208,7 +1206,7 @@ pub async fn list_check_runs(
 ) -> Result<Vec<CheckRun>, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/commits/{sha}/check-runs?per_page=50");
-    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get(&path)).await?;
     let parsed: CheckRunsResponse = res.json().await.map_err(|e| e.to_string())?;
     Ok(parsed.check_runs)
 }
@@ -1239,7 +1237,7 @@ pub async fn get_commit_verification(
 ) -> Result<CommitVerification, String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/commits/{sha}");
-    let res = check(gh.get(&path).send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get(&path)).await?;
     let parsed: CommitDetailResponse = res.json().await.map_err(|e| e.to_string())?;
     Ok(parsed.commit.verification)
 }
@@ -1260,7 +1258,7 @@ pub async fn list_user_repos(host: &str, token: &str) -> Result<Vec<GitHubRepo>,
     let gh = GhClient::new(host, token)?;
     let path =
         "/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member";
-    let res = check(gh.get(path).send().await.map_err(send_err)?).await?;
+    let res = send_checked(gh.get(path)).await?;
     res.json().await.map_err(|e| e.to_string())
 }
 

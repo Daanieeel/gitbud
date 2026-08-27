@@ -4,23 +4,30 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useCommitLog } from "@/hooks/queries/useCommitLog";
 import { useCommitFileDiff, useCommitFiles } from "@/hooks/queries/useCommitDetail";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
+import { useRemoteInfo } from "@/hooks/useRemoteInfo";
 import { queryKeys } from "@/lib/queryKeys";
 import { toMainlineCommits } from "@/lib/compact-graph";
 import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { CommitHeader } from "./CommitHeader";
 import { CommitList } from "./CommitList";
+import { CommitSearchResults } from "./CommitSearchResults";
 import { CreateBranchAtDialog } from "./CreateBranchAtDialog";
 import { InteractiveRebaseDialog } from "./InteractiveRebaseDialog";
 import { DiffView } from "@gitbud/ui/diff-view";
 import { cn } from "@gitbud/ui/utils";
 import { copyToClipboard } from "@/lib/clipboard";
 import { githubFileUrl } from "@/lib/github-links";
+import { api } from "@/lib/tauri";
+import type { CommitSearchResult } from "@/lib/types";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
+import { GenericFileMenuItems } from "@/components/changes/GenericFileMenuItems";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { Input } from "@gitbud/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@gitbud/ui/context-menu";
 
 export function HistoryTab() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -74,6 +81,28 @@ export function HistoryTab() {
     selectCommitFile,
   );
   const fileListRef = useRef<HTMLDivElement>(null);
+  const remoteInfo = useRemoteInfo(repoPath);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<CommitSearchResult[]>([]);
+  const isSearching = searchQuery.trim().length >= 2;
+
+  useEffect(() => {
+    if (!repoPath || !isSearching) {
+      setSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      void api
+        .searchCommits(repoPath, searchQuery.trim(), 200)
+        .then((results) => !cancelled && setSearchResults(results));
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [repoPath, searchQuery, isSearching]);
 
   if (commits.length === 0) {
     return (
@@ -89,11 +118,17 @@ export function HistoryTab() {
         style={{ width: commitList.width }}
         className="flex shrink-0 flex-col border-r border-border"
       >
-        <div className="flex shrink-0 items-center justify-end border-b border-border px-2 py-1">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1">
+          <Input
+            placeholder="Search by author, SHA, or message"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-7 flex-1"
+          />
           <Tooltip>
             <TooltipTrigger asChild>
               <CheckboxGroup
-                className="text-xs text-muted-foreground"
+                className="shrink-0 text-xs text-muted-foreground"
                 checked={compact}
                 onCheckedChange={(checked) => setCompact(checked === true)}
               >
@@ -107,15 +142,25 @@ export function HistoryTab() {
           </Tooltip>
         </div>
         <div className="min-h-0 flex-1">
-          <CommitList
-            commits={displayedCommits}
-            selectedOid={selectedCommitOid}
-            onSelect={selectCommit}
-            onNeedMore={() => hasNextPage && !isFetchingNextPage && void fetchNextPage()}
-            onCreateBranchHere={setBranchAtOid}
-            onRebaseFromHere={setRebaseBaseOid}
-            compact={compact}
-          />
+          {isSearching ? (
+            <CommitSearchResults
+              results={searchResults}
+              selectedOid={selectedCommitOid}
+              onSelect={selectCommit}
+              onCreateBranchHere={setBranchAtOid}
+              onRebaseFromHere={setRebaseBaseOid}
+            />
+          ) : (
+            <CommitList
+              commits={displayedCommits}
+              selectedOid={selectedCommitOid}
+              onSelect={selectCommit}
+              onNeedMore={() => hasNextPage && !isFetchingNextPage && void fetchNextPage()}
+              onCreateBranchHere={setBranchAtOid}
+              onRebaseFromHere={setRebaseBaseOid}
+              compact={compact}
+            />
+          )}
         </div>
       </div>
       <ResizeHandle onPointerDown={commitList.onPointerDown} />
@@ -130,22 +175,36 @@ export function HistoryTab() {
             className="shrink-0 overflow-auto border-r border-border outline-none"
           >
             {selectedCommitFiles.map(([path, status]) => (
-              <Tooltip key={path}>
-                <TooltipTrigger asChild>
-                  <div
-                    className={cn(
-                      "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
-                      selectedCommitFilePath === path && "bg-accent",
-                    )}
-                    onClick={() => selectCommitFile(path)}
-                  >
-                    <FileTypeIcon path={path} className="size-3.5 shrink-0" />
-                    <FilePathLabel path={path} />
-                    <FileStatusIcon status={status} className="size-3.5" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>{`${path} (${status})`}</TooltipContent>
-              </Tooltip>
+              <ContextMenu key={path}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <ContextMenuTrigger asChild>
+                      <div
+                        className={cn(
+                          "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
+                          selectedCommitFilePath === path && "bg-accent",
+                        )}
+                        onClick={() => selectCommitFile(path)}
+                      >
+                        <FileTypeIcon path={path} className="size-3.5 shrink-0" />
+                        <FilePathLabel path={path} />
+                        <FileStatusIcon status={status} className="size-3.5" />
+                      </div>
+                    </ContextMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>{`${path} (${status})`}</TooltipContent>
+                </Tooltip>
+                {repoPath && (
+                  <ContextMenuContent>
+                    <GenericFileMenuItems
+                      repoPath={repoPath}
+                      path={path}
+                      providerRef={selectedCommitOid ?? undefined}
+                      remoteInfo={remoteInfo}
+                    />
+                  </ContextMenuContent>
+                )}
+              </ContextMenu>
             ))}
           </div>
           <ResizeHandle onPointerDown={fileList.onPointerDown} />

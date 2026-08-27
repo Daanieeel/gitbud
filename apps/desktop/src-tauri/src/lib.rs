@@ -1734,6 +1734,16 @@ async fn github_create_review_comment(
     .await
 }
 
+/// Whether `path` currently exists on disk — used to hide filesystem-dependent context menu
+/// actions (Reveal in Finder, Open in Editor) for a file from an old commit, PR, or stash that's
+/// since been renamed or deleted, rather than let the user hit a dead action.
+#[tauri::command]
+async fn path_exists(path: String) -> bool {
+    tauri::async_runtime::spawn_blocking(move || std::path::Path::new(&path).exists())
+        .await
+        .unwrap_or(false)
+}
+
 #[tauri::command]
 async fn open_in_terminal(path: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || system::open_in_terminal(&path))
@@ -2138,6 +2148,7 @@ pub fn run() {
             get_upstream_ahead_behind,
             sync_upstream,
             checkout_pull_request,
+            path_exists,
             open_in_terminal,
             open_in_editor,
             get_app_icon,

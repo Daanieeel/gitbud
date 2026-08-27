@@ -19,6 +19,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
+import { GenericFileMenuItems } from "@/components/changes/GenericFileMenuItems";
+import { useRemoteInfo } from "@/hooks/useRemoteInfo";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@gitbud/ui/context-menu";
 
 interface PRDetailProps {
   repoPath: string;
@@ -75,6 +78,7 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
   );
   const fileListRef = useRef<HTMLDivElement>(null);
   const { width, onPointerDown } = useResizableWidth("panel-width:pr-files", 224, 160, 560);
+  const remoteInfo = useRemoteInfo(repoPath);
 
   useEffect(() => {
     fileListRef.current?.focus();
@@ -148,22 +152,34 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
           className="shrink-0 overflow-auto border-r border-border outline-none"
         >
           {files.map((f) => (
-            <Tooltip key={f.filename}>
-              <TooltipTrigger asChild>
-                <div
-                  className={cn(
-                    "flex cursor-pointer select-none items-center gap-2 px-2 py-1 text-sm hover:bg-accent",
-                    selectedFilePath === f.filename && "bg-accent",
-                  )}
-                  onClick={() => selectFile(f.filename)}
-                >
-                  <FileTypeIcon path={f.filename} className="size-3.5 shrink-0" />
-                  <FilePathLabel path={f.filename} />
-                  <FileStatusIcon status={f.status} className="size-3.5" />
-                </div>
-              </TooltipTrigger>
-              <TooltipContent>{`${f.filename} (${f.status})`}</TooltipContent>
-            </Tooltip>
+            <ContextMenu key={f.filename}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <ContextMenuTrigger asChild>
+                    <div
+                      className={cn(
+                        "flex cursor-pointer select-none items-center gap-2 px-2 py-1 text-sm hover:bg-accent",
+                        selectedFilePath === f.filename && "bg-accent",
+                      )}
+                      onClick={() => selectFile(f.filename)}
+                    >
+                      <FileTypeIcon path={f.filename} className="size-3.5 shrink-0" />
+                      <FilePathLabel path={f.filename} />
+                      <FileStatusIcon status={f.status} className="size-3.5" />
+                    </div>
+                  </ContextMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>{`${f.filename} (${f.status})`}</TooltipContent>
+              </Tooltip>
+              <ContextMenuContent>
+                <GenericFileMenuItems
+                  repoPath={repoPath}
+                  path={f.filename}
+                  providerRef={pr.head_sha}
+                  remoteInfo={remoteInfo}
+                />
+              </ContextMenuContent>
+            </ContextMenu>
           ))}
         </div>
         <ResizeHandle onPointerDown={onPointerDown} />

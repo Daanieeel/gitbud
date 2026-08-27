@@ -568,6 +568,25 @@ function DiffSection({
     estimateSize: (index) => estimateDiffRowSize(rows[index], fontSize),
     overscan: 16,
   });
+  // The virtualizer's very first size measurement (in a layout effect, right as this mounts)
+  // can land before an ancestor panel/split-view has settled into its final size — it still
+  // subscribes a ResizeObserver for later corrections, but if the corrected range comes out
+  // identical to the (wrong) initial one it dedupes the update away and nothing re-renders,
+  // leaving a scrollable-but-empty diff until something unrelated forces a re-render (toggling
+  // split/unified, or a full reload). Forcing one extra render a couple of frames after mount —
+  // by which point layout has always settled — makes `getVirtualItems()` below re-derive from
+  // whatever the scroll container's real, final size turned out to be.
+  const [, forceRemeasure] = useState(0);
+  useEffect(() => {
+    let secondFrame = 0;
+    const firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => forceRemeasure((n) => n + 1));
+    });
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  }, []);
 
   if (diff.hunks.length === 0) return null;
   const staged = hunkActions?.staged ?? false;

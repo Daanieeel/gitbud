@@ -58,6 +58,7 @@
     "check:landing": "turbo run check --filter=@gitbud/landing",
     "tauri": "bun run --cwd apps/desktop tauri",
     "version:bump:desktop": "bun run --cwd apps/desktop version:bump",
+    "version:info": "bun scripts/version-info.ts",
     "ui:add": "cd packages/ui && bunx shadcn@latest add"
   },
   "devDependencies": {

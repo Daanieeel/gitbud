@@ -2,17 +2,33 @@ import { useMemo, useState, useEffect, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import {
+  CopyIcon,
+  ExternalLinkIcon,
+  GitBranchIcon,
+  GitMergeIcon,
   GitPullRequestIcon,
   GitPullRequestDraftIcon,
   GitPullRequestClosedIcon,
   GitPullRequestArrowIcon,
 } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import { toast } from "sonner";
 import { Input } from "@gitbud/ui/input";
 import { Avatar } from "@gitbud/ui/avatar";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@gitbud/ui/context-menu";
 import { cn } from "@gitbud/ui/utils";
+import { copyToClipboard } from "@/lib/clipboard";
+import { api } from "@/lib/tauri";
 import type { PullRequest } from "@/lib/types";
 import { prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
 import { CIBadge } from "./CIBadge";
+import { MergePRDialog } from "./MergePRDialog";
 import { Skeleton } from "@gitbud/ui/skeleton";
 
 type PRStatus = "merged" | "draft" | "closed" | "open";
@@ -67,6 +83,20 @@ export function PRList({
 }: PRListProps) {
   const [filter, setFilter] = useState("");
   const isPrTabActive = useIsPrTabActive();
+  const [checkingOutNumber, setCheckingOutNumber] = useState<number | null>(null);
+  const [mergingPr, setMergingPr] = useState<PullRequest | null>(null);
+
+  const checkoutPr = async (pr: PullRequest) => {
+    setCheckingOutNumber(pr.number);
+    try {
+      await api.checkoutPullRequest(repoPath, pr.number);
+      toast.success(`Checked out pr-${pr.number}`);
+    } catch (err) {
+      toast.error(String(err));
+    } finally {
+      setCheckingOutNumber(null);
+    }
+  };
 
   const filtered = useMemo(() => {
     if (!filter.trim()) return pulls;
@@ -166,55 +196,95 @@ export function PRList({
                     transform: `translateY(${vi.start}px)`,
                   }}
                 >
-                  <div
-                    className={cn(
-                      "flex cursor-pointer items-start gap-2 border-b border-border/50 px-2 py-2 text-sm hover:bg-accent",
-                      selectedNumber === pr.number && "bg-accent",
-                    )}
-                    onClick={() => onSelect(pr.number)}
-                  >
-                    <Icon className={cn("mt-0.5 size-3.5 shrink-0", PR_STATUS_COLOR[status])} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate">{pr.title}</div>
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <Avatar
-                          src={pr.author_avatar_url}
-                          alt={pr.author_login}
-                          className="size-3.5"
-                        />
-                        <span>
-                          #{pr.number} by {pr.author_login}
-                        </span>
-                        <CIBadge
-                          repoPath={repoPath}
-                          login={login}
-                          sha={pr.head_sha}
-                          pollIntervalMs={prPollIntervalMs(
-                            pr,
-                            isPrTabActive,
-                            pr.number === selectedNumber,
-                          )}
-                        />
-                        {pr.merged && (
-                          <span className="rounded bg-accent-purple/20 px-1 text-accent-purple">
-                            merged
-                          </span>
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                      <div
+                        className={cn(
+                          "flex cursor-pointer items-start gap-2 border-b border-border/50 px-2 py-2 text-sm hover:bg-accent",
+                          selectedNumber === pr.number && "bg-accent",
                         )}
-                      </div>
-                      {pr.labels.length > 0 && (
-                        <div className="mt-1 flex flex-wrap gap-1">
-                          {pr.labels.map((label) => (
-                            <span
-                              key={label}
-                              className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground"
-                            >
-                              {label}
+                        onClick={() => onSelect(pr.number)}
+                      >
+                        <Icon className={cn("mt-0.5 size-3.5 shrink-0", PR_STATUS_COLOR[status])} />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate">{pr.title}</div>
+                          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Avatar
+                              src={pr.author_avatar_url}
+                              alt={pr.author_login}
+                              className="size-3.5"
+                            />
+                            <span>
+                              #{pr.number} by {pr.author_login}
                             </span>
-                          ))}
+                            <CIBadge
+                              repoPath={repoPath}
+                              login={login}
+                              sha={pr.head_sha}
+                              pollIntervalMs={prPollIntervalMs(
+                                pr,
+                                isPrTabActive,
+                                pr.number === selectedNumber,
+                              )}
+                            />
+                            {pr.merged && (
+                              <span className="rounded bg-accent-purple/20 px-1 text-accent-purple">
+                                merged
+                              </span>
+                            )}
+                          </div>
+                          {pr.labels.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {pr.labels.map((label) => (
+                                <span
+                                  key={label}
+                                  className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground"
+                                >
+                                  {label}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
+                      </div>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem onSelect={() => void openUrl(pr.html_url)}>
+                        <ExternalLinkIcon className="size-3.5" />
+                        Open PR on GitHub
+                      </ContextMenuItem>
+                      <ContextMenuItem
+                        disabled={checkingOutNumber === pr.number}
+                        onSelect={() => void checkoutPr(pr)}
+                      >
+                        <GitBranchIcon className="size-3.5" />
+                        {checkingOutNumber === pr.number ? "Checking out…" : "Checkout"}
+                      </ContextMenuItem>
+                      {!pr.merged && pr.state === "open" && (
+                        <ContextMenuItem onSelect={() => setMergingPr(pr)}>
+                          <GitMergeIcon className="size-3.5" />
+                          Merge…
+                        </ContextMenuItem>
                       )}
-                    </div>
-                  </div>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem onSelect={() => void copyToClipboard(pr.html_url)}>
+                        <CopyIcon className="size-3.5" />
+                        Copy PR URL
+                      </ContextMenuItem>
+                      <ContextMenuItem onSelect={() => void copyToClipboard(String(pr.number))}>
+                        <CopyIcon className="size-3.5" />
+                        Copy PR Number
+                      </ContextMenuItem>
+                      <ContextMenuItem onSelect={() => void copyToClipboard(pr.head_ref)}>
+                        <CopyIcon className="size-3.5" />
+                        Copy Branch Name
+                      </ContextMenuItem>
+                      <ContextMenuItem onSelect={() => void copyToClipboard(pr.head_sha)}>
+                        <CopyIcon className="size-3.5" />
+                        Copy Commit SHA
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 </div>
               );
             })}
@@ -224,6 +294,15 @@ export function PRList({
           <div className="p-4 text-center text-sm text-muted-foreground">Loading more…</div>
         )}
       </div>
+      {mergingPr && (
+        <MergePRDialog
+          open={mergingPr !== null}
+          onOpenChange={(open) => !open && setMergingPr(null)}
+          repoPath={repoPath}
+          login={login}
+          pr={mergingPr}
+        />
+      )}
     </div>
   );
 }
