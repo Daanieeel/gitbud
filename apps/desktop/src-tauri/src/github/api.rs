@@ -1243,6 +1243,12 @@ pub async fn get_commit_verification(
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitHubRepoOwner {
+    pub login: String,
+    pub avatar_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GitHubRepo {
     pub full_name: String,
     pub clone_url: String,
@@ -1250,6 +1256,7 @@ pub struct GitHubRepo {
     pub private: bool,
     pub fork: bool,
     pub updated_at: String,
+    pub owner: GitHubRepoOwner,
 }
 
 /// Lists the authenticated user's own repos, plus org repos they have access to, newest first —

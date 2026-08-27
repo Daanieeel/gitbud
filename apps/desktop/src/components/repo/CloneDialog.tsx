@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
-import { DownloadIcon, GlobeIcon, LockIcon } from "lucide-react";
+import { DownloadIcon, GlobeIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
-import { Input } from "@gitbud/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -17,10 +16,10 @@ import { useGitHubStore } from "@/store/useGitHubStore";
 import { api } from "@/lib/tauri";
 import type { GitHubRepo } from "@/lib/types";
 import type { RemoteProvider } from "@/lib/remote-provider";
-import { cn } from "@gitbud/ui/utils";
 import { isSinglePath } from "@/lib/dialogPaths";
 import { DestinationField } from "./DestinationField";
 import { ProtocolUrlInput, type CloneProtocol } from "./ProtocolUrlInput";
+import { RepoPickerList, type RepoListEntry } from "./RepoPickerList";
 
 interface CloneDialogProps {
   open: boolean;
@@ -28,12 +27,41 @@ interface CloneDialogProps {
   onClone: (url: string, dest: string) => Promise<void>;
 }
 
-const PROVIDER_OPTIONS: { value: RemoteProvider; label: string; icon: ReactNode }[] = [
+const PROVIDER_OPTIONS: {
+  value: RemoteProvider;
+  label: string;
+  icon: ReactNode;
+  disabled?: boolean;
+  disabledReason?: string;
+}[] = [
   { value: "github", label: "GitHub", icon: <GitHubMark className="size-4" /> },
-  { value: "gitlab", label: "GitLab", icon: <GitLabMark className="size-4" /> },
-  { value: "bitbucket", label: "Bitbucket", icon: <BitbucketMark className="size-4" /> },
+  {
+    value: "gitlab",
+    label: "GitLab",
+    icon: <GitLabMark className="size-4" />,
+    disabled: true,
+    disabledReason: "Coming soon",
+  },
+  {
+    value: "bitbucket",
+    label: "Bitbucket",
+    icon: <BitbucketMark className="size-4" />,
+    disabled: true,
+    disabledReason: "Coming soon",
+  },
   { value: "unknown", label: "Custom", icon: <GlobeIcon className="size-4" /> },
 ];
+
+function toRepoListEntry(r: GitHubRepo): RepoListEntry {
+  return {
+    cloneUrl: r.clone_url,
+    ownerLogin: r.owner.login,
+    repoName: r.full_name.slice(r.owner.login.length + 1),
+    avatarUrl: r.owner.avatar_url,
+    private: r.private,
+    fork: r.fork,
+  };
+}
 
 const PROTOCOL_SCHEME = { https: "https://", ssh: "ssh://" } satisfies Record<
   CloneProtocol,
@@ -76,12 +104,7 @@ export function CloneDialog({ open: isOpen, onOpenChange, onClone }: CloneDialog
     void api.githubListUserRepos(currentLogin!).then(setRepos, () => setRepos([]));
   }, [isOpen, hasAccount, currentLogin]);
 
-  const filteredRepos = useMemo(() => {
-    if (!repos) return [];
-    if (!repoFilter.trim()) return repos;
-    const needle = repoFilter.toLowerCase();
-    return repos.filter((r) => r.full_name.toLowerCase().includes(needle));
-  }, [repos, repoFilter]);
+  const repoEntries = useMemo(() => (repos ? repos.map(toRepoListEntry) : null), [repos]);
 
   const url = hasAccount
     ? selectedRepoUrl
@@ -130,42 +153,19 @@ export function CloneDialog({ open: isOpen, onOpenChange, onClone }: CloneDialog
           <ProviderPicker value={provider} onChange={setProvider} options={PROVIDER_OPTIONS} />
 
           {hasAccount ? (
-            <div className="flex flex-col gap-1">
-              <Input
-                placeholder="Search your repositories"
-                value={repoFilter}
-                onChange={(e) => setRepoFilter(e.target.value)}
-                className="h-7"
-              />
-              <div className="max-h-40 overflow-auto rounded-md border border-border">
-                {repos === null && (
-                  <div className="p-2 text-center text-xs text-muted-foreground">Loading…</div>
-                )}
-                {repos !== null && filteredRepos.length === 0 && (
-                  <div className="p-2 text-center text-xs text-muted-foreground">No matches</div>
-                )}
-                {filteredRepos.map((r) => (
-                  <div
-                    key={r.full_name}
-                    className={cn(
-                      "flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent",
-                      selectedRepoUrl === r.clone_url && "bg-accent",
-                    )}
-                    onClick={() => setSelectedRepoUrl(r.clone_url)}
-                  >
-                    {r.private && <LockIcon className="size-3 shrink-0 text-muted-foreground" />}
-                    <span className="truncate">{r.full_name}</span>
-                    {r.fork && <span className="shrink-0 text-xs text-muted-foreground">fork</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
+            <RepoPickerList
+              entries={repoEntries}
+              filter={repoFilter}
+              onFilterChange={setRepoFilter}
+              selectedUrl={selectedRepoUrl}
+              onSelect={setSelectedRepoUrl}
+              searchPlaceholder="Search your repositories"
+            />
           ) : (
             <div className="flex flex-col gap-1.5">
-              {provider !== "unknown" && (
+              {provider === "github" && (
                 <p className="text-xs text-muted-foreground">
-                  {provider === "github" ? "Not signed in to GitHub." : "Not connected."} Paste a
-                  repository URL below.
+                  Not signed in to GitHub. Paste a repository URL below.
                 </p>
               )}
               <ProtocolUrlInput

@@ -19,19 +19,21 @@ const GROUPS: LogoMultiSelectGroup[] = CATEGORY_ORDER.map((category) => ({
 interface GitignorePickerProps {
   selected: string[];
   onChange: (selected: string[]) => void;
+  className?: string;
 }
 
 /** Thin wrapper pre-wiring the generic LogoMultiSelect primitive to the gitignore template
  * catalog. Centralized here (rather than inline in the create-repo dialog) so the planned
  * in-app ".gitignore" tab can reuse the exact same picker and data later. */
-export function GitignorePicker({ selected, onChange }: GitignorePickerProps) {
+export function GitignorePicker({ selected, onChange, className }: GitignorePickerProps) {
   return (
     <LogoMultiSelect
       groups={GROUPS}
       selected={selected}
       onChange={onChange}
-      placeholder="Add .gitignore templates"
+      placeholder=".gitignore templates"
       searchPlaceholder="Search templates…"
+      className={className}
     />
   );
 }

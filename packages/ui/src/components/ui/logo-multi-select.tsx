@@ -3,7 +3,6 @@ import { ChevronDownIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { Input } from "./input";
 import { Checkbox } from "./checkbox";
-import { Button } from "./button";
 import { cn } from "../../lib/utils";
 
 export interface LogoMultiSelectOption {
@@ -59,15 +58,20 @@ export function LogoMultiSelect({
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="secondary" size="sm" className={cn("justify-between", className)}>
-          <span className="truncate">
-            {selected.length > 0 ? `${selected.length} selected` : placeholder}
-          </span>
-          <ChevronDownIcon className="size-3.5 shrink-0 opacity-50" />
-        </Button>
+        <button
+          type="button"
+          aria-label={placeholder}
+          className={cn(
+            "flex h-9 w-fit cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50",
+            className,
+          )}
+        >
+          <span className="truncate">{selected.length} selected</span>
+          <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground opacity-50" />
+        </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-0">
-        <div className="border-b border-border p-1.5">
+      <PopoverContent className="flex w-[var(--radix-popover-trigger-width)] min-w-72 flex-col p-0">
+        <div className="shrink-0 border-b border-border p-1.5">
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -75,7 +79,7 @@ export function LogoMultiSelect({
             className="h-7"
           />
         </div>
-        <div className="max-h-72 overflow-y-auto p-1">
+        <div className="h-72 overflow-y-auto p-1">
           {filteredGroups.length === 0 && (
             <div className="p-2 text-center text-xs text-muted-foreground">No matches</div>
           )}

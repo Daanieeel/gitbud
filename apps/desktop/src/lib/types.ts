@@ -317,6 +317,11 @@ export interface CommitVerification {
   reason: string;
 }
 
+export interface GitHubRepoOwner {
+  login: string;
+  avatar_url: string;
+}
+
 export interface GitHubRepo {
   full_name: string;
   clone_url: string;
@@ -324,4 +329,5 @@ export interface GitHubRepo {
   private: boolean;
   fork: boolean;
   updated_at: string;
+  owner: GitHubRepoOwner;
 }

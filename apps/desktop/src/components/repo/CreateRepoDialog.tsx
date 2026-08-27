@@ -107,7 +107,13 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
     setCreating(true);
     try {
       const files: { name: string; contents: string }[] = [];
-      if (addReadme) files.push({ name: "README.md", contents: `# ${repoName.trim()}\n` });
+      if (addReadme) {
+        const body = description.trim();
+        files.push({
+          name: "README.md",
+          contents: body ? `# ${repoName.trim()}\n\n${body}\n` : `# ${repoName.trim()}\n`,
+        });
+      }
       if (gitignoreSelected.length > 0) {
         files.push({ name: ".gitignore", contents: buildGitignore(gitignoreSelected) });
       }
@@ -178,18 +184,22 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
             onCheckedChange={(checked) => setAddReadme(checked === true)}
             className="text-sm"
           >
-            Initialize an empty README file
+            Initialize a README file
           </CheckboxGroup>
 
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">.gitignore</span>
-            <GitignorePicker selected={gitignoreSelected} onChange={setGitignoreSelected} />
+            <GitignorePicker
+              selected={gitignoreSelected}
+              onChange={setGitignoreSelected}
+              className="w-full"
+            />
           </div>
 
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">License</span>
             <Select value={licenseId} onValueChange={setLicenseId}>
-              <SelectTrigger size="sm" className="w-56">
+              <SelectTrigger className="w-full">
                 <SelectValue placeholder="None" />
               </SelectTrigger>
               <SelectContent>
