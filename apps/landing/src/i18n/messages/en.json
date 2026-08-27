@@ -19,9 +19,9 @@
     "trust": {
       "tagline": "Trusted by developers who ship every day.",
       "stats": [
-        { "label": "GitHub Stars", "value": "1,000+" },
-        { "label": "Repos Opened", "value": "10,000+" },
-        { "label": "Contributors", "value": "50+" }
+        { "label": "Idle RAM", "value": "< 50MB" },
+        { "label": "Cold Start", "value": "< 1s" },
+        { "label": "Built With", "value": "Rust + Tauri" }
       ]
     }
   },
