@@ -11,6 +11,7 @@
     "./card-picker": "./src/components/ui/card-picker.tsx",
     "./checkbox-group": "./src/components/ui/checkbox-group.tsx",
     "./checkbox": "./src/components/ui/checkbox.tsx",
+    "./coming-soon": "./src/components/ui/coming-soon.tsx",
     "./context-menu": "./src/components/ui/context-menu.tsx",
     "./copy-button": "./src/components/ui/copy-button.tsx",
     "./dialog": "./src/components/ui/dialog.tsx",
