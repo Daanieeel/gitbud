@@ -1,24 +1,10 @@
 import { Hero } from "@/components/hero";
 import { getMessages } from "@/i18n/get-messages";
-import { siteUrl } from "@/lib/site";
+import { getSoftwareApplicationJsonLd } from "@/lib/json-ld";
 
 export default function HomePage() {
   const { meta } = getMessages();
-
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: "GitBud",
-    description: meta.description,
-    url: siteUrl,
-    applicationCategory: "DeveloperApplication",
-    operatingSystem: "macOS, Windows, Linux",
-    offers: {
-      "@type": "Offer",
-      price: "0",
-      priceCurrency: "USD",
-    },
-  };
+  const jsonLd = getSoftwareApplicationJsonLd(meta.description);
 
   return (
     <main>
