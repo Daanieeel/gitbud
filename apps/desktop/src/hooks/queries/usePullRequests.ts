@@ -46,9 +46,9 @@ export function usePullRequestList(
       }
       // Centralized offline flag (useNetworkStore) — skip straight to the error path instead of
       // re-firing a network call that's just going to hang out to its connect timeout again. The
-      // `online` browser event (see App.tsx) and refetchOnReconnect are what clear `offline` and
-      // let the next call back through.
-      if (useNetworkStore.getState().offline) {
+      // `online` browser event (see App.tsx), refetchOnReconnect, and `shouldSkip`'s own periodic
+      // retry probe are what clear `offline` and let calls back through.
+      if (useNetworkStore.getState().shouldSkip()) {
         throw new Error("Skipping GitHub request: already offline.");
       }
       try {
@@ -113,7 +113,7 @@ export function usePullRequestDetail(
       // Same centralized offline check as usePullRequestList (useNetworkStore) — skip straight
       // to the error path instead of re-firing network calls that are just going to hang out to
       // their connect timeout again.
-      if (useNetworkStore.getState().offline) {
+      if (useNetworkStore.getState().shouldSkip()) {
         throw new Error("Skipping GitHub request: already offline.");
       }
       try {

@@ -58,7 +58,7 @@ export function useCheckRuns(
       // Same centralized offline check as usePullRequestList (useNetworkStore) — skip straight
       // to the error path instead of re-firing a network call that's just going to hang out to
       // its connect timeout again, especially since this can poll every 10-60s.
-      if (useNetworkStore.getState().offline) {
+      if (useNetworkStore.getState().shouldSkip()) {
         throw new Error("Skipping GitHub request: already offline.");
       }
       if (!repoPath || !login || !sha) throw new Error("no repo/login/commit selected");
