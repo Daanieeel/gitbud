@@ -1,0 +1,29 @@
+{
+  "name": "@gitbud/landing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "check": "tsc --noEmit",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@gitbud/ui": "workspace:*",
+    "lucide-react": "catalog:",
+    "next": "^16.3.3",
+    "next-themes": "^0.4.6",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@gitbud/config": "workspace:*",
+    "@tailwindcss/postcss": "catalog:",
+    "@types/node": "^24",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:"
+  }
+}

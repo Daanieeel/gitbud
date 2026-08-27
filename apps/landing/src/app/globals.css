@@ -1,0 +1,10 @@
+@import "@gitbud/ui/styles.css";
+
+/* The ui package's base layer sets html/body/#root to a fixed, non-scrolling height for the
+ * desktop app's single-pane layout. The landing page is a normal scrolling document, so undo
+ * that here rather than in the shared package. */
+html,
+body {
+  height: auto;
+  overflow: visible;
+}
