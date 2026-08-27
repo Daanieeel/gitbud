@@ -77,7 +77,7 @@ export function RepoPickerList({
           <div className="p-2 text-center text-xs text-muted-foreground">No matches</div>
         )}
         {[...grouped.entries()].map(([owner, repos]) => {
-          const isCollapsed = collapsed.has(owner);
+          const isCollapsed = collapsed.has(owner) && !filter.trim();
           const visibleRepos = repos.filter(
             (repo) => !isCollapsed || repo.cloneUrl === selectedUrl,
           );
