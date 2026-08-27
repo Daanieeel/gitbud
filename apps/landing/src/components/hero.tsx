@@ -97,10 +97,12 @@ export async function Hero() {
 
       <div className="bg-accent border-border relative mt-16 aspect-video overflow-hidden rounded-3xl border">
         <Image
-          src="/screenshots.png"
+          src="/screenshots.webp"
           alt={hero.mediaPlaceholder}
           fill
           priority
+          fetchPriority="high"
+          sizes="(min-width: 1280px) 1232px, 100vw"
           className="scale-110 object-cover"
         />
       </div>
