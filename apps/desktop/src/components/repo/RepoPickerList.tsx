@@ -1,4 +1,5 @@
-import { LockKeyholeIcon } from "lucide-react";
+import { useState } from "react";
+import { ChevronDownIcon, ChevronRightIcon, LockKeyholeIcon } from "lucide-react";
 import { Input } from "@gitbud/ui/input";
 import { Avatar } from "@gitbud/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
@@ -45,6 +46,16 @@ export function RepoPickerList({
   onSelect,
   searchPlaceholder = "Search repositories",
 }: RepoPickerListProps) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const toggleCollapsed = (owner: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(owner)) next.delete(owner);
+      else next.add(owner);
+      return next;
+    });
+  };
+
   const filtered = (entries ?? []).filter((e) =>
     `${e.ownerLogin}/${e.repoName}`.toLowerCase().includes(filter.trim().toLowerCase()),
   );
@@ -65,38 +76,55 @@ export function RepoPickerList({
         {entries !== null && filtered.length === 0 && (
           <div className="p-2 text-center text-xs text-muted-foreground">No matches</div>
         )}
-        {[...grouped.entries()].map(([owner, repos]) => (
-          <div key={owner}>
-            <div className="px-2 pt-1.5 pb-0.5 text-xs font-medium text-muted-foreground">
-              {owner}
-            </div>
-            {repos.map((repo) => (
-              <div
-                key={repo.cloneUrl}
-                className={cn(
-                  "flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent",
-                  selectedUrl === repo.cloneUrl && "bg-accent",
-                )}
-                onClick={() => onSelect(repo.cloneUrl)}
+        {[...grouped.entries()].map(([owner, repos]) => {
+          const isCollapsed = collapsed.has(owner);
+          const visibleRepos = repos.filter(
+            (repo) => !isCollapsed || repo.cloneUrl === selectedUrl,
+          );
+          return (
+            <div key={owner}>
+              <button
+                type="button"
+                className="flex w-full items-center gap-1 px-2 pt-1.5 pb-0.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                onClick={() => toggleCollapsed(owner)}
               >
-                <Avatar src={repo.avatarUrl} alt="" className="size-4" />
-                <span className="truncate">{repo.repoName}</span>
-                {repo.fork && <span className="shrink-0 text-xs text-muted-foreground">fork</span>}
-                <span className="flex-1" />
-                {repo.private && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <LockKeyholeIcon className="size-3 shrink-0 text-muted-foreground" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>Private repository</TooltipContent>
-                  </Tooltip>
+                {isCollapsed ? (
+                  <ChevronRightIcon className="size-3 shrink-0" />
+                ) : (
+                  <ChevronDownIcon className="size-3 shrink-0" />
                 )}
-              </div>
-            ))}
-          </div>
-        ))}
+                <span className="truncate">{owner}</span>
+              </button>
+              {visibleRepos.map((repo) => (
+                <div
+                  key={repo.cloneUrl}
+                  className={cn(
+                    "flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent",
+                    selectedUrl === repo.cloneUrl && "bg-accent",
+                  )}
+                  onClick={() => onSelect(repo.cloneUrl)}
+                >
+                  <Avatar src={repo.avatarUrl} alt="" className="size-4" />
+                  <span className="truncate">{repo.repoName}</span>
+                  {repo.fork && (
+                    <span className="shrink-0 text-xs text-muted-foreground">fork</span>
+                  )}
+                  <span className="flex-1" />
+                  {repo.private && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <LockKeyholeIcon className="size-3 shrink-0 text-muted-foreground" />
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>Private repository</TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
