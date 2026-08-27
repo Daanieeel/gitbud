@@ -961,6 +961,35 @@ async fn init_repo(path: String) -> Result<(), String> {
     .map_err(|e| e.to_string())?
 }
 
+// Generic write used right after `init_repo` to drop a README/.gitignore/LICENSE into a freshly
+// created repo, and reusable later by the planned in-app .gitignore editor.
+#[tauri::command]
+async fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        std::fs::write(&path, contents).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// Best-effort default for pre-filling a license's copyright line before a repo (and thus its own
+// git config) exists — falls back to empty strings the caller can leave blank.
+#[tauri::command]
+async fn get_global_git_identity() -> (Option<String>, Option<String>) {
+    tauri::async_runtime::spawn_blocking(|| {
+        let config = match git2::Config::open_default() {
+            Ok(c) => c,
+            Err(_) => return (None, None),
+        };
+        (
+            config.get_string("user.name").ok(),
+            config.get_string("user.email").ok(),
+        )
+    })
+    .await
+    .unwrap_or((None, None))
+}
+
 // --- stash ---
 
 #[tauri::command]
@@ -2135,6 +2164,8 @@ pub fn run() {
             apply_ssh_identity_to_repo,
             clear_ssh_identity_from_repo,
             init_repo,
+            write_text_file,
+            get_global_git_identity,
             git_fetch,
             git_pull,
             git_pull_with_strategy,

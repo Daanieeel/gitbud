@@ -10,11 +10,13 @@ import {
 } from "@gitbud/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { CloneDialog } from "./CloneDialog";
+import { CreateRepoDialog } from "./CreateRepoDialog";
 import { useRepoStore } from "@/store/useRepoStore";
 import { isSinglePath } from "@/lib/dialogPaths";
 
 export function AddRepoMenu() {
   const [cloneOpen, setCloneOpen] = useState(false);
+  const [createOpen, setCreateOpen] = useState(false);
   const cloneRepo = useRepoStore((s) => s.cloneRepo);
   const addExistingRepo = useRepoStore((s) => s.addExistingRepo);
   const createNewRepo = useRepoStore((s) => s.createNewRepo);
@@ -22,14 +24,6 @@ export function AddRepoMenu() {
   const addExisting = async () => {
     const dir = await open({ directory: true, title: "Add Existing Repository" });
     if (isSinglePath(dir)) await addExistingRepo(dir);
-  };
-
-  const createNew = async () => {
-    const dir = await open({
-      directory: true,
-      title: "Choose a folder to initialize as a repository",
-    });
-    if (isSinglePath(dir)) await createNewRepo(dir);
   };
 
   return (
@@ -50,7 +44,7 @@ export function AddRepoMenu() {
             <DownloadIcon className="size-3.5" />
             Clone Repository…
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => void createNew()}>
+          <DropdownMenuItem onSelect={() => setCreateOpen(true)}>
             <FolderPlusIcon className="size-3.5" />
             Create New Repository…
           </DropdownMenuItem>
@@ -61,6 +55,7 @@ export function AddRepoMenu() {
         </DropdownMenuContent>
       </DropdownMenu>
       <CloneDialog open={cloneOpen} onOpenChange={setCloneOpen} onClone={cloneRepo} />
+      <CreateRepoDialog open={createOpen} onOpenChange={setCreateOpen} onCreate={createNewRepo} />
     </>
   );
 }

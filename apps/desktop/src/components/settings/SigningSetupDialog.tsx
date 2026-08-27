@@ -23,6 +23,7 @@ import { CardPicker } from "@gitbud/ui/card-picker";
 import { Checkbox } from "@gitbud/ui/checkbox";
 import { CopyButton } from "@gitbud/ui/copy-button";
 import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
+import { ProviderPicker } from "@gitbud/ui/provider-picker";
 import { api } from "@/lib/tauri";
 import { isSinglePath } from "@/lib/dialogPaths";
 import { firstMatch } from "@/lib/utils";
@@ -71,6 +72,17 @@ const PROVIDER_DEFAULT_HOST = {
   bitbucket: "bitbucket.org",
   unknown: null,
 } satisfies Record<RemoteProvider, string | null>;
+
+const PROVIDER_OPTIONS: { value: RemoteProvider; label: string; icon: ReactNode }[] = [
+  { value: "github", label: PROVIDER_LABEL.github, icon: <GitHubMark className="size-4" /> },
+  { value: "gitlab", label: PROVIDER_LABEL.gitlab, icon: <GitLabMark className="size-4" /> },
+  {
+    value: "bitbucket",
+    label: PROVIDER_LABEL.bitbucket,
+    icon: <BitbucketMark className="size-4" />,
+  },
+  { value: "unknown", label: PROVIDER_LABEL.unknown, icon: <GlobeIcon className="size-4" /> },
+];
 
 /** End-to-end commit signing setup: pick a format, get a key (generated or existing), add it
  * to the repo's git provider, then prove the whole chain actually works before calling it done.
@@ -535,7 +547,11 @@ export function SigningSetupDialog({
                   </Tooltip>
                 </div>
               )}
-              <ProviderPicker value={providerChoice} onChange={setProviderChoice} />
+              <ProviderPicker
+                value={providerChoice}
+                onChange={setProviderChoice}
+                options={PROVIDER_OPTIONS}
+              />
               {providerLink ? (
                 <Button
                   size="sm"
@@ -622,41 +638,6 @@ export function SigningSetupDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** Same card style as CardPicker below (border, primary highlight when selected) but compact and
- * icon-led instead of description-led — four providers fit comfortably in one row. */
-function ProviderPicker({
-  value,
-  onChange,
-}: {
-  value: RemoteProvider;
-  onChange: (v: RemoteProvider) => void;
-}) {
-  const options: { value: RemoteProvider; icon: ReactNode }[] = [
-    { value: "github", icon: <GitHubMark className="size-4" /> },
-    { value: "gitlab", icon: <GitLabMark className="size-4" /> },
-    { value: "bitbucket", icon: <BitbucketMark className="size-4" /> },
-    { value: "unknown", icon: <GlobeIcon className="size-4" /> },
-  ];
-  return (
-    <div className="flex gap-2">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={cn(
-            "flex flex-1 flex-col items-center gap-1.5 rounded-md border border-border p-2",
-            value === o.value && "border-2 border-primary bg-primary/10 p-[7px]",
-          )}
-        >
-          {o.icon}
-          <span className="text-xs font-medium">{PROVIDER_LABEL[o.value]}</span>
-        </button>
-      ))}
-    </div>
   );
 }
 

@@ -219,6 +219,10 @@ export const api = {
   gitLfsPush: (repoPath: string, branch: string) =>
     invoke<void>("git_lfs_push", { repoPath, branch }),
   initRepo: (path: string) => invoke<void>("init_repo", { path }),
+  writeTextFile: (path: string, contents: string) =>
+    invoke<void>("write_text_file", { path, contents }),
+  getGlobalGitIdentity: () =>
+    invoke<[string | null, string | null]>("get_global_git_identity"),
 
   listSshIdentities: () => invoke<SshIdentity[]>("list_ssh_identities"),
   addSshIdentity: (label: string, host: string, keyPath: string) =>
