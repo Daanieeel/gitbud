@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import { HelpCircle } from "lucide-react";
 import { ComingSoon } from "@gitbud/ui/coming-soon";
+import { siteUrl } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "FAQ · GitBud",
+  alternates: {
+    canonical: `${siteUrl}/faq/`,
+  },
 };
 
 export default function FaqPage() {
