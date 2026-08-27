@@ -1461,7 +1461,7 @@ dependencies = [
 
 [[package]]
 name = "gitbud"
-version = "0.3.14"
+version = "0.3.15"
 dependencies = [
  "base64 0.22.1",
  "chrono",
