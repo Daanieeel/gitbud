@@ -4,10 +4,10 @@
 // deploy host; this only ever runs server-side, so the token never reaches the client.
 export async function githubFetch(url: string): Promise<Response> {
   const token = process.env.GITHUB_TOKEN;
-  return fetch(url, {
-    headers: {
-      "User-Agent": "gitbud-landing",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+  if (token) {
+    return fetch(url, {
+      headers: { "User-Agent": "gitbud-landing", Authorization: `Bearer ${token}` },
+    });
+  }
+  return fetch(url, { headers: { "User-Agent": "gitbud-landing" } });
 }
