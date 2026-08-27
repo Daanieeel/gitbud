@@ -51,7 +51,13 @@ export function GenericFileMenuItems({
 
   return (
     <>
-      <ContextMenuItem onSelect={() => void revealItemInDir(`${repoPath}/${path}`)}>
+      <ContextMenuItem
+        onSelect={() => {
+          void revealItemInDir(`${repoPath}/${path}`).catch(() =>
+            toast.error("Couldn't find that file — it may not exist at this path anymore"),
+          );
+        }}
+      >
         <FolderOpenIcon className="size-3.5" />
         Reveal in Finder
       </ContextMenuItem>

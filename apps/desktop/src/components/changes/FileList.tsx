@@ -337,7 +337,9 @@ export function FileList({
                     <ContextMenuItem
                       onSelect={() => {
                         if (!repoPath) return;
-                        void revealItemInDir(`${repoPath}/${file.path}`);
+                        void revealItemInDir(`${repoPath}/${file.path}`).catch(() =>
+                          toast.error("Couldn't find that file — it may not exist at this path anymore"),
+                        );
                       }}
                     >
                       <FolderOpenIcon className="size-3.5" />
