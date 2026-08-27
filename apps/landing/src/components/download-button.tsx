@@ -7,6 +7,7 @@ import { Button } from "@gitbud/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
 import { AppleMark, LinuxMark, WindowsMark } from "@gitbud/ui/brand-logo";
 import { cn } from "@gitbud/ui/utils";
+import { MacSigningFixDialog } from "@/components/mac-signing-fix-dialog";
 
 export interface ReleaseAssets {
   macArm: string | null;
@@ -50,6 +51,7 @@ export function DownloadButton({
 }) {
   const [os, setOs] = useState<DetectedOs>("unknown");
   const [mounted, setMounted] = useState(false);
+  const [showMacFix, setShowMacFix] = useState(false);
 
   useEffect(() => {
     const ua = navigator.userAgent;
@@ -72,7 +74,14 @@ export function DownloadButton({
   return (
     <div className={cn("inline-flex", className)}>
       <Button size="lg" className="flex-1 rounded-r-none px-5" asChild>
-        <Link href={primary.href}>{primary.label}</Link>
+        <Link
+          href={primary.href}
+          onClick={() => {
+            if (os === "mac") setShowMacFix(true);
+          }}
+        >
+          {primary.label}
+        </Link>
       </Button>
       <Popover>
         <PopoverTrigger asChild>
@@ -105,6 +114,7 @@ export function DownloadButton({
                   { label: "Apple Silicon", href: assets.macArm },
                   { label: "Intel", href: assets.macIntel },
                 ]}
+                onItemClick={() => setShowMacFix(true)}
               />
               <DownloadGroup
                 label="Windows"
@@ -127,6 +137,7 @@ export function DownloadButton({
           )}
         </PopoverContent>
       </Popover>
+      <MacSigningFixDialog open={showMacFix} onOpenChange={setShowMacFix} />
     </div>
   );
 }
@@ -135,10 +146,12 @@ function DownloadGroup({
   label,
   icon: Icon,
   items,
+  onItemClick,
 }: {
   label: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
   items: { label: string; href: string | null }[];
+  onItemClick?: () => void;
 }) {
   const available = items.filter(hasHref);
   if (available.length === 0) return null;
@@ -153,6 +166,7 @@ function DownloadGroup({
         <Link
           key={item.label}
           href={item.href}
+          onClick={onItemClick}
           className="hover:bg-accent hover:text-accent-foreground flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm transition-colors"
         >
           {item.label}

@@ -1,4 +1,4 @@
-import { Rocket } from "lucide-react";
+import { HeartHandshake, Rocket } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { Badge } from "@gitbud/ui/badge";
@@ -6,6 +6,8 @@ import { Button } from "@gitbud/ui/button";
 import { getMessages } from "@/i18n/get-messages";
 import { DownloadButton, type ReleaseAssets } from "@/components/download-button";
 import { githubFetch } from "@/lib/github";
+
+const DISCORD_DM_URL = "https://discord.com/users/427107119406514176";
 
 interface GitHubReleaseAsset {
   name: string;
@@ -95,7 +97,23 @@ export async function Hero() {
         </div>
       </div>
 
-      <div className="bg-accent border-border relative mt-16 aspect-video overflow-hidden rounded-3xl border">
+      <div className="border-border bg-muted mt-16 flex items-center gap-3 rounded-2xl border px-5 py-4">
+        <HeartHandshake className="text-muted-foreground size-5 shrink-0" />
+        <p className="text-sm">
+          GitBud isn&apos;t notarized by Apple yet. We&apos;re looking for sponsors to cover a
+          paid Apple Developer account.{" "}
+          <Link
+            href={DISCORD_DM_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-medium underline underline-offset-2"
+          >
+            Message me on Discord
+          </Link>
+        </p>
+      </div>
+
+      <div className="bg-accent border-border relative mt-6 aspect-video overflow-hidden rounded-3xl border">
         <Image
           src="/screenshots.webp"
           alt={hero.mediaPlaceholder}
