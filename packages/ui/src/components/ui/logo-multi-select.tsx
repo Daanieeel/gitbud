@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ChevronDownIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "./popover";
 import { Input } from "./input";
@@ -39,22 +39,6 @@ export function LogoMultiSelect({
   className,
 }: LogoMultiSelectProps) {
   const [query, setQuery] = useState("");
-  const listRef = useRef<HTMLDivElement>(null);
-
-  // Radix positions PopoverContent with an inline `transform`, and WebKit (Tauri's macOS
-  // webview) sometimes fails to route trackpad/wheel scroll into an `overflow-y-auto` region
-  // nested inside a transformed ancestor. React's onWheel is also passive by default, so
-  // preventDefault there is a no-op — a real (non-passive) DOM listener is what actually works.
-  useEffect(() => {
-    const el = listRef.current;
-    if (!el) return;
-    const onWheel = (e: WheelEvent) => {
-      el.scrollTop += e.deltaY;
-      e.preventDefault();
-    };
-    el.addEventListener("wheel", onWheel, { passive: false });
-    return () => el.removeEventListener("wheel", onWheel);
-  }, []);
 
   const filteredGroups = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -94,7 +78,18 @@ export function LogoMultiSelect({
             className="h-7"
           />
         </div>
-        <div ref={listRef} className="h-72 overflow-y-auto p-1">
+        <div
+          className="h-72 overflow-y-auto p-1"
+          // Portalled straight to `body`, a DOM sibling of the enclosing Dialog rather than a
+          // descendant, so the Dialog's scroll lock (which only recognizes scrollable elements
+          // nested inside its own content) swallows wheel events over it and native scrolling
+          // silently does nothing. Scroll it manually instead of relying on that (same fix as
+          // EditorPicker's popover, which has the identical Dialog-sibling-portal situation).
+          onWheel={(e) => {
+            e.currentTarget.scrollTop += e.deltaY;
+            e.stopPropagation();
+          }}
+        >
           {filteredGroups.length === 0 && (
             <div className="p-2 text-center text-xs text-muted-foreground">No matches</div>
           )}
