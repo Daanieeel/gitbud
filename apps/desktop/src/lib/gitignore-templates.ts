@@ -2150,8 +2150,28 @@ nohup.out`,
 // Builds a combined .gitignore by concatenating the selected templates (found via
 // GITIGNORE_TEMPLATES, in that array's order, not selectedIds' order, so output is stable
 // regardless of pick order), each prefixed with a `### <label> ###` header, joined by a blank line.
+// Templates commonly overlap (e.g. Node and Bun both ignore `.DS_Store`/`.env`), so a rule
+// already emitted by an earlier section is dropped from later ones. Comments and blank lines
+// are left alone (they're per-section context, not rules), and a section that ends up with no
+// surviving rule lines is skipped entirely rather than left as a bare, empty header.
 export function buildGitignore(selectedIds: string[]): string {
-  return GITIGNORE_TEMPLATES.filter((template) => selectedIds.includes(template.id))
-    .map((template) => `### ${template.label} ###\n${template.content}`)
-    .join("\n\n");
+  const seenRules = new Set<string>();
+  const sections: string[] = [];
+  for (const template of GITIGNORE_TEMPLATES) {
+    if (!selectedIds.includes(template.id)) continue;
+    const lines = template.content.split("\n").filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) return true;
+      if (seenRules.has(trimmed)) return false;
+      seenRules.add(trimmed);
+      return true;
+    });
+    const hasRules = lines.some((line) => {
+      const trimmed = line.trim();
+      return trimmed && !trimmed.startsWith("#");
+    });
+    if (!hasRules) continue;
+    sections.push(`### ${template.label} ###\n${lines.join("\n")}`);
+  }
+  return sections.join("\n\n");
 }
