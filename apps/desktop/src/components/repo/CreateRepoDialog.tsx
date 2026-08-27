@@ -1,10 +1,9 @@
-import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { homeDir } from "@tauri-apps/api/path";
 import { FolderPlusIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
-import { Textarea } from "@gitbud/ui/textarea";
 import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import {
   Dialog,
@@ -21,7 +20,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@gitbud/ui/select";
-import { cn } from "@gitbud/ui/utils";
 import { api } from "@/lib/tauri";
 import { isSinglePath } from "@/lib/dialogPaths";
 import { buildGitignore } from "@/lib/gitignore-templates";
@@ -39,36 +37,12 @@ interface CreateRepoDialogProps {
   ) => Promise<void>;
 }
 
-/** Grows with typed content up to 4 lines (max-h-24), then scrolls instead of growing further,
- * and is never manually resizable (the Textarea primitive is already `resize-none`). */
-function AutoGrowTextarea({ value, onChange, className, ...rest }: ComponentProps<typeof Textarea>) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
-
-  return (
-    <Textarea
-      ref={ref}
-      value={value}
-      onChange={onChange}
-      className={cn("max-h-24 overflow-y-auto", className)}
-      {...rest}
-    />
-  );
-}
-
 export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: CreateRepoDialogProps) {
   const [repoName, setRepoName] = useState("");
   const [branchName, setBranchName] = useState("");
   const [parentDir, setParentDir] = useState<string | null>(null);
   const [destPath, setDestPath] = useState("");
   const [destEdited, setDestEdited] = useState(false);
-  const [description, setDescription] = useState("");
   const [addReadme, setAddReadme] = useState(true);
   const [gitignoreSelected, setGitignoreSelected] = useState<string[]>([]);
   const [licenseId, setLicenseId] = useState<string>("");
@@ -93,7 +67,6 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
     setParentDir(null);
     setDestPath("");
     setDestEdited(false);
-    setDescription("");
     setAddReadme(true);
     setGitignoreSelected([]);
     setLicenseId("");
@@ -114,11 +87,7 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
     try {
       const files: { name: string; contents: string }[] = [];
       if (addReadme) {
-        const body = description.trim();
-        files.push({
-          name: "README.md",
-          contents: body ? `# ${repoName.trim()}\n\n${body}\n` : `# ${repoName.trim()}\n`,
-        });
+        files.push({ name: "README.md", contents: `# ${repoName.trim()}\n` });
       }
       if (gitignoreSelected.length > 0) {
         files.push({ name: ".gitignore", contents: buildGitignore(gitignoreSelected) });
@@ -186,16 +155,6 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
               }}
               onBrowse={() => void pickParentDir()}
               placeholder="Destination folder"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Description</span>
-            <AutoGrowTextarea
-              placeholder="What's this repository about?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={1}
             />
           </div>
 

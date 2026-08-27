@@ -1,7 +1,8 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { CloudUploadIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
+import { Textarea } from "@gitbud/ui/textarea";
 import { CardPicker } from "@gitbud/ui/card-picker";
 import { ProviderPicker } from "@gitbud/ui/provider-picker";
 import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
@@ -20,12 +21,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@gitbud/ui/select";
+import { cn } from "@gitbud/ui/utils";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { api } from "@/lib/tauri";
 import { runGitSync } from "@/lib/gitSync";
 import { queryClient } from "@/lib/queryClient";
 import { queryKeys } from "@/lib/queryKeys";
 import type { RemoteProvider } from "@/lib/remote-provider";
+
+/** Grows with typed content up to 4 lines (max-h-24), then scrolls instead of growing further,
+ * and is never manually resizable (the Textarea primitive is already `resize-none`). */
+function AutoGrowTextarea({ value, onChange, className, ...rest }: ComponentProps<typeof Textarea>) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+
+  return (
+    <Textarea
+      ref={ref}
+      value={value}
+      onChange={onChange}
+      className={cn("max-h-24 overflow-y-auto", className)}
+      {...rest}
+    />
+  );
+}
 
 interface PublishDialogProps {
   open: boolean;
@@ -157,10 +182,11 @@ export function PublishDialog({ open: isOpen, onOpenChange, repoPath, onPublishe
 
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">Description</span>
-                <Input
+                <AutoGrowTextarea
                   placeholder="What's this repository about?"
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
+                  rows={1}
                 />
               </div>
 
