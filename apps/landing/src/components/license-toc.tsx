@@ -22,6 +22,9 @@ export function LicenseToc({ items }: { items: LicenseTocItem[] }) {
       if (event.key === "Escape") setOpen(false);
     };
     const onClickOutside = (event: MouseEvent) => {
+      // SAFETY: mousedown's event.target is always the DOM node the click landed on, which is
+      // always a Node (Element or Text); the DOM lib types it as EventTarget only because the
+      // listener is generic over any target.
       const target = event.target as Node;
       if (!buttonRef.current?.contains(target) && !panelRef.current?.contains(target)) {
         setOpen(false);
