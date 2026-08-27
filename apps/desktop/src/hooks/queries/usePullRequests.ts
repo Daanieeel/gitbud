@@ -227,12 +227,20 @@ export function useMergePullRequest(repoPath: string | null, login: string | nul
           const fallback =
             cached.branches.find((b) => !b.is_remote && b.name === baseRef) ??
             cached.branches.find((b) => !b.is_remote && b.name !== headRef);
-          if (fallback) await api.checkoutBranch(repoPath, fallback.name).catch(() => {});
+          if (fallback) {
+            await api.checkoutBranch(repoPath, fallback.name).catch(() => {});
+            // Landing on the fallback branch after a merge is exactly when it's most likely to
+            // be behind origin (the merge that was just performed happened on GitHub, not
+            // locally) — fetch (not pull, nothing to reconcile locally) so ahead/behind counts
+            // and the branch list reflect it right away.
+            await api.gitFetch(repoPath).catch(() => {});
+          }
         }
         await api.deleteBranch(repoPath, headRef).catch(() => {});
         void queryClient.invalidateQueries({ queryKey: queryKeys.branches(repoPath) });
         void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
         void queryClient.invalidateQueries({ queryKey: queryKeys.log(repoPath) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(repoPath) });
         void useRepoStore.getState().loadRepos();
       }
     },
