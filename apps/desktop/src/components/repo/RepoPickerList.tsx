@@ -95,33 +95,48 @@ export function RepoPickerList({
                 )}
                 <span className="truncate">{owner}</span>
               </button>
-              {visibleRepos.map((repo) => (
-                <div
-                  key={repo.cloneUrl}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent",
-                    selectedUrl === repo.cloneUrl && "bg-accent",
-                  )}
-                  onClick={() => onSelect(repo.cloneUrl)}
-                >
-                  <Avatar src={repo.avatarUrl} alt="" className="size-4" />
-                  <span className="truncate">{repo.repoName}</span>
-                  {repo.fork && (
-                    <span className="shrink-0 text-xs text-muted-foreground">fork</span>
-                  )}
-                  <span className="flex-1" />
-                  {repo.private && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span>
-                          <LockKeyholeIcon className="size-3 shrink-0 text-muted-foreground" />
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent>Private repository</TooltipContent>
-                    </Tooltip>
-                  )}
-                </div>
-              ))}
+              {visibleRepos.map((repo) => {
+                const selected = selectedUrl === repo.cloneUrl;
+                return (
+                  <div
+                    key={repo.cloneUrl}
+                    className={cn(
+                      "flex cursor-pointer items-center gap-2 px-2 py-1.5 text-sm hover:bg-accent",
+                      selected && "bg-primary text-primary-foreground hover:bg-primary/90",
+                    )}
+                    onClick={() => onSelect(repo.cloneUrl)}
+                  >
+                    <Avatar src={repo.avatarUrl} alt="" className="size-4" />
+                    <span className="truncate">{repo.repoName}</span>
+                    {repo.fork && (
+                      <span
+                        className={cn(
+                          "shrink-0 text-xs text-muted-foreground",
+                          selected && "text-primary-foreground/70",
+                        )}
+                      >
+                        fork
+                      </span>
+                    )}
+                    <span className="flex-1" />
+                    {repo.private && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>
+                            <LockKeyholeIcon
+                              className={cn(
+                                "size-3 shrink-0 text-muted-foreground",
+                                selected && "text-primary-foreground",
+                              )}
+                            />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>Private repository</TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         })}
