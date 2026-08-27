@@ -47,7 +47,11 @@ interface RepoState {
 
   addExistingRepo: (path: string) => Promise<void>;
   cloneRepo: (url: string, dest: string) => Promise<void>;
-  createNewRepo: (path: string, files?: { name: string; contents: string }[]) => Promise<void>;
+  createNewRepo: (
+    path: string,
+    defaultBranch?: string,
+    files?: { name: string; contents: string }[],
+  ) => Promise<void>;
   removeRepo: (path: string) => Promise<void>;
 }
 
@@ -168,8 +172,8 @@ export const useRepoStore = create<RepoState>((set, get) => ({
     set({ repos });
     await get().selectRepo(dest);
   },
-  createNewRepo: async (path, files) => {
-    await api.initRepo(path);
+  createNewRepo: async (path, defaultBranch, files) => {
+    await api.initRepo(path, defaultBranch);
     for (const file of files ?? []) {
       await api.writeTextFile(`${path}/${file.name}`, file.contents);
     }

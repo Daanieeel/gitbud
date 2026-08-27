@@ -947,11 +947,15 @@ async fn clear_ssh_identity_from_repo(repo_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn init_repo(path: String) -> Result<(), String> {
+async fn init_repo(path: String, default_branch: Option<String>) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let default_branch = settings::get_settings()
-            .map(|s| s.default_branch_name)
-            .unwrap_or_else(|_| "main".to_string());
+        let default_branch = default_branch
+            .filter(|b| !b.trim().is_empty())
+            .unwrap_or_else(|| {
+                settings::get_settings()
+                    .map(|s| s.default_branch_name)
+                    .unwrap_or_else(|_| "main".to_string())
+            });
         let mut opts = git2::RepositoryInitOptions::new();
         opts.initial_head(&default_branch);
         git2::Repository::init_opts(&path, &opts).map_err(|e| e.message().to_string())?;

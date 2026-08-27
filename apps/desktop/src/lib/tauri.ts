@@ -218,7 +218,8 @@ export const api = {
   gitLfsPull: (repoPath: string) => invoke<void>("git_lfs_pull", { repoPath }),
   gitLfsPush: (repoPath: string, branch: string) =>
     invoke<void>("git_lfs_push", { repoPath, branch }),
-  initRepo: (path: string) => invoke<void>("init_repo", { path }),
+  initRepo: (path: string, defaultBranch?: string) =>
+    invoke<void>("init_repo", { path, defaultBranch }),
   writeTextFile: (path: string, contents: string) =>
     invoke<void>("write_text_file", { path, contents }),
   getGlobalGitIdentity: () =>

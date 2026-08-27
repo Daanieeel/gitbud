@@ -32,7 +32,11 @@ import { GitignorePicker } from "@/components/gitignore/GitignorePicker";
 interface CreateRepoDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreate: (path: string, files?: { name: string; contents: string }[]) => Promise<void>;
+  onCreate: (
+    path: string,
+    defaultBranch?: string,
+    files?: { name: string; contents: string }[],
+  ) => Promise<void>;
 }
 
 /** Grows with typed content up to 4 lines (max-h-24), then scrolls instead of growing further,
@@ -60,6 +64,7 @@ function AutoGrowTextarea({ value, onChange, className, ...rest }: ComponentProp
 
 export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: CreateRepoDialogProps) {
   const [repoName, setRepoName] = useState("");
+  const [branchName, setBranchName] = useState("");
   const [parentDir, setParentDir] = useState<string | null>(null);
   const [destPath, setDestPath] = useState("");
   const [destEdited, setDestEdited] = useState(false);
@@ -84,6 +89,7 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
 
   const reset = () => {
     setRepoName("");
+    setBranchName("");
     setParentDir(null);
     setDestPath("");
     setDestEdited(false);
@@ -124,7 +130,7 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
           contents: license.content(identity.name ?? "", new Date().getFullYear()),
         });
       }
-      await onCreate(destPath.trim(), files);
+      await onCreate(destPath.trim(), branchName.trim() || "main", files);
       reset();
       onOpenChange(false);
     } finally {
@@ -166,6 +172,15 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
               }}
               onBrowse={() => void pickParentDir()}
               placeholder="Destination folder"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Default branch</span>
+            <Input
+              placeholder="main"
+              value={branchName}
+              onChange={(e) => setBranchName(e.target.value)}
             />
           </div>
 
