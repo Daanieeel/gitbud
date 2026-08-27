@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { RefreshCwIcon } from "lucide-react";
+import { RefreshCwIcon, WifiOffIcon } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { cn } from "@gitbud/ui/utils";
+import { useNetworkStore } from "@/store/useNetworkStore";
 
 interface CheckRunsRefreshProps {
   /** From useCheckRuns's `dataUpdatedAt` — when the currently-shown result was fetched. */
@@ -25,6 +26,7 @@ export function CheckRunsRefresh({
   pollIntervalMs,
 }: CheckRunsRefreshProps) {
   const [now, setNow] = useState(() => Date.now());
+  const offline = useNetworkStore((s) => s.offline);
 
   useEffect(() => {
     if (pollIntervalMs === null) return;
@@ -39,7 +41,14 @@ export function CheckRunsRefresh({
 
   return (
     <div className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
-      {secondsLeft !== null && <span>Refreshing in {secondsLeft}s</span>}
+      {offline ? (
+        <span className="flex items-center gap-1 text-destructive">
+          <WifiOffIcon className="size-3.5" />
+          Offline
+        </span>
+      ) : (
+        secondsLeft !== null && <span>Refreshing in {secondsLeft}s</span>
+      )}
       <Tooltip>
         <TooltipTrigger asChild>
           <button
