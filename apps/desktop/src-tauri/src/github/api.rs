@@ -105,8 +105,12 @@ impl GhClient {
             errors: Vec<GraphQlError>,
         }
 
-        let res = send_checked(self.http.post(&self.graphql).json(&Body { query, variables }))
-            .await?;
+        let res = send_checked(
+            self.http
+                .post(&self.graphql)
+                .json(&Body { query, variables }),
+        )
+        .await?;
         let parsed: GraphQlResponse<T> = res.json().await.map_err(|e| e.to_string())?;
         if !parsed.errors.is_empty() {
             let messages: Vec<String> = parsed.errors.into_iter().map(|e| e.message).collect();
@@ -151,7 +155,9 @@ fn rate_limit_wait(res: &reqwest::Response) -> Option<std::time::Duration> {
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs() as i64)
                 .unwrap_or(0);
-            return Some(std::time::Duration::from_secs((reset - now).clamp(1, 60) as u64));
+            return Some(std::time::Duration::from_secs(
+                (reset - now).clamp(1, 60) as u64
+            ));
         }
     }
     // A 429 with no informative headers at all still deserves one short backoff rather than an
@@ -173,7 +179,9 @@ async fn send_checked(builder: reqwest::RequestBuilder) -> Result<reqwest::Respo
 /// The retry-on-rate-limit loop behind `send_checked`, split out so callers that need to
 /// inspect the raw status themselves (e.g. `delete_branch`'s "already gone" 422) can do so
 /// before it's turned into an `Err`.
-async fn send_with_retry(mut builder: reqwest::RequestBuilder) -> Result<reqwest::Response, String> {
+async fn send_with_retry(
+    mut builder: reqwest::RequestBuilder,
+) -> Result<reqwest::Response, String> {
     let mut attempt = 0;
     loop {
         let retry_clone = builder.try_clone();
