@@ -8,9 +8,13 @@ import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
 import { LicenseToc, type LicenseTocItem } from "@/components/license-toc";
+import { siteUrl } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "License · GitBud",
+  alternates: {
+    canonical: `${siteUrl}/license/`,
+  },
 };
 
 const PERMISSIONS = ["Commercial use", "Modification", "Distribution", "Patent use", "Private use"];

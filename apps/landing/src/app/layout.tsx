@@ -12,6 +12,9 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: meta.title,
   description: meta.description,
+  alternates: {
+    canonical: siteUrl,
+  },
   openGraph: {
     title: meta.title,
     description: meta.description,
