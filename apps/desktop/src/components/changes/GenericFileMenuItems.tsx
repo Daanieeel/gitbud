@@ -96,6 +96,10 @@ export function GenericFileMenuItems({
         </ContextMenuItem>
       )}
       <ContextMenuSeparator />
+      <ContextMenuItem onSelect={() => void copyToClipboard(path.split("/").pop() ?? path)}>
+        <CopyIcon className="size-3.5" />
+        Copy Name
+      </ContextMenuItem>
       <ContextMenuItem onSelect={() => void copyToClipboard(path)}>
         <CopyIcon className="size-3.5" />
         Copy Path

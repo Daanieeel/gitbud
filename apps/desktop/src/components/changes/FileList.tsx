@@ -305,6 +305,16 @@ export function FileList({
                       <XIcon className="size-3.5" />
                       Unstage {selectedList.length} Files
                     </ContextMenuItem>
+                    <ContextMenuItem
+                      onSelect={() =>
+                        void copyToClipboard(
+                          selectedList.map((p) => p.split("/").pop() ?? p).join("\n"),
+                        )
+                      }
+                    >
+                      <CopyIcon className="size-3.5" />
+                      Copy Names
+                    </ContextMenuItem>
                     <ContextMenuItem onSelect={() => void copyToClipboard(selectedList.join("\n"))}>
                       <CopyIcon className="size-3.5" />
                       Copy Paths
@@ -389,6 +399,14 @@ export function FileList({
                       </ContextMenuItem>
                     )}
                     <ContextMenuSeparator />
+                    <ContextMenuItem
+                      onSelect={() =>
+                        void copyToClipboard(file.path.split("/").pop() ?? file.path)
+                      }
+                    >
+                      <CopyIcon className="size-3.5" />
+                      Copy Name
+                    </ContextMenuItem>
                     <ContextMenuItem onSelect={() => void copyToClipboard(file.path)}>
                       <CopyIcon className="size-3.5" />
                       Copy Path
