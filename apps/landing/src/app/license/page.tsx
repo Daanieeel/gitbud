@@ -72,25 +72,31 @@ function LicenseSummary() {
           modified version must be made available.
         </p>
 
-        <div className="mt-8 grid grid-cols-2 gap-x-8 gap-y-6 sm:grid-cols-3">
-          <TermList
-            title="Permissions"
-            items={PERMISSIONS}
-            icon={Check}
-            iconClassName="text-accent-green"
-          />
-          <TermList
-            title="Limitations"
-            items={LIMITATIONS}
-            icon={X}
-            iconClassName="text-destructive"
-          />
-          <TermList
-            title="Conditions"
-            items={CONDITIONS}
-            icon={Info}
-            iconClassName="text-accent-blue"
-          />
+        <div className="mt-8 flex flex-wrap gap-x-8 gap-y-6">
+          <div className="grow basis-full sm:basis-[calc(33.333%-1.334rem)]">
+            <TermList
+              title="Permissions"
+              items={PERMISSIONS}
+              icon={Check}
+              iconClassName="text-accent-green"
+            />
+          </div>
+          <div className="grow basis-full sm:basis-[calc(33.333%-1.334rem)]">
+            <TermList
+              title="Limitations"
+              items={LIMITATIONS}
+              icon={X}
+              iconClassName="text-destructive"
+            />
+          </div>
+          <div className="grow basis-full sm:basis-[calc(33.333%-1.334rem)]">
+            <TermList
+              title="Conditions"
+              items={CONDITIONS}
+              icon={Info}
+              iconClassName="text-accent-blue"
+            />
+          </div>
         </div>
       </div>
 
@@ -122,12 +128,34 @@ async function getLicenseHtml(): Promise<string> {
     .map((line) => line.trimStart())
     .join("\n");
 
+  // The plain-text license has no markdown heading syntax, just conventionally-formatted
+  // section titles: the document title, a handful of all-caps/title-case section markers,
+  // and numbered clauses ("0. Definitions.", "1. Source Code.", ...). Promote each to a real
+  // ATX heading (by paragraph block, since blank lines are the only paragraph delimiter here)
+  // so the rendered page gets real <h2>/<h3>/<h4> tags instead of plain paragraphs.
+  const TOP_LEVEL_HEADINGS = new Set([
+    "Preamble",
+    "TERMS AND CONDITIONS",
+    "END OF TERMS AND CONDITIONS",
+    "How to Apply These Terms to Your New Programs",
+  ]);
+  const NUMBERED_SECTION = /^\d{1,2}\.\s+.+\.$/;
+  const withHeadings = dedented
+    .split("\n\n")
+    .map((block) => {
+      if (block.startsWith("GNU AFFERO GENERAL PUBLIC LICENSE")) return `## ${block}`;
+      if (TOP_LEVEL_HEADINGS.has(block)) return `### ${block}`;
+      if (NUMBERED_SECTION.test(block)) return `#### ${block}`;
+      return block;
+    })
+    .join("\n\n");
+
   // CommonMark reads bare "<...>" as either an autolink (only for URLs/emails) or raw
   // inline HTML, which is dropped by remark-rehype. The license's own template placeholders
   // (e.g. "<year>", "<name of author>") match the raw-HTML case and would otherwise vanish,
   // so swap out real autolinks first, escape every remaining "<"/">", then restore them.
   const autolinks: string[] = [];
-  const escaped = dedented
+  const escaped = withHeadings
     .replace(/<(https?:\/\/[^\s<>]+)>/g, (match) => {
       autolinks.push(match);
       return `%%AUTOLINK_${autolinks.length - 1}%%`;
