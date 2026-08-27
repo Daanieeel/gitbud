@@ -9,6 +9,7 @@ import { PRTab } from "@/components/pr/PRTab";
 import { UpstreamBanner } from "@/components/pr/UpstreamBanner";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ResolveDivergedPullDialog } from "@/components/repo/ResolveDivergedPullDialog";
+import { ResolveUnstagedPullDialog } from "@/components/repo/ResolveUnstagedPullDialog";
 import { Toaster } from "@gitbud/ui/sonner";
 import { TooltipProvider } from "@gitbud/ui/tooltip";
 import { AvatarCacheProvider } from "@gitbud/ui/avatar-cache";
@@ -193,6 +194,7 @@ function App() {
               onOpenChange={(open) => setPalette((p) => ({ ...p, open }))}
             />
             <ResolveDivergedPullDialog />
+            <ResolveUnstagedPullDialog />
           </div>
         </DiffSettingsProvider>
       </AvatarCacheProvider>

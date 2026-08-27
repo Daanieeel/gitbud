@@ -4,6 +4,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import { runGitSync } from "@/lib/gitSync";
 import { useRepoStore } from "@/store/useRepoStore";
 import { isDivergedPullError, useDivergedPullStore } from "@/store/useDivergedPullStore";
+import { isUnstagedChangesPullError, useUnstagedPullStore } from "@/store/useUnstagedPullStore";
 
 // A button's disabled/spinning state tied directly to an async action can finish and flip back
 // off faster than a human eye (or even a browser paint) reliably registers, which reads as "the
@@ -81,9 +82,15 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
           description: `Pulling origin/${branch ?? "current branch"}…`,
           doneMessage: `Pulled origin/${branch ?? "current branch"}`,
           onError: (message) => {
-            if (!isDivergedPullError(message)) return false;
-            useDivergedPullStore.getState().open(repoPath);
-            return true;
+            if (isDivergedPullError(message)) {
+              useDivergedPullStore.getState().open(repoPath);
+              return true;
+            }
+            if (isUnstagedChangesPullError(message)) {
+              useUnstagedPullStore.getState().open(repoPath);
+              return true;
+            }
+            return false;
           },
         });
         invalidate([
@@ -145,9 +152,15 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
             description: `Syncing ${branch ?? "current branch"} with origin…`,
             doneMessage: `Synced ${branch ?? "current branch"} with origin`,
             onError: (message) => {
-              if (!isDivergedPullError(message)) return false;
-              useDivergedPullStore.getState().open(repoPath);
-              return true;
+              if (isDivergedPullError(message)) {
+                useDivergedPullStore.getState().open(repoPath);
+                return true;
+              }
+              if (isUnstagedChangesPullError(message)) {
+                useUnstagedPullStore.getState().open(repoPath);
+                return true;
+              }
+              return false;
             },
           },
         );
@@ -210,6 +223,50 @@ export function useResolveDivergedPull(repoPath: string | null) {
         void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
         void queryClient.invalidateQueries({ queryKey: queryKeys.log(repoPath) });
         void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(repoPath) });
+      }),
+  });
+}
+
+/** Resolves a rebase-mode pull that failed because the working tree was dirty, from
+ * ResolveUnstagedPullDialog's two choices: abort the pull outright (restoring the pre-pull
+ * state exactly, nothing to unstash since nothing was stashed), or stash the local changes,
+ * pull, and restore them automatically afterward. */
+export function useResolveUnstagedPull(repoPath: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationKey: repoPath ? syncMutationKey(repoPath) : undefined,
+    mutationFn: (choice: "abort" | "stash-and-pull") =>
+      guarded(async () => {
+        if (!repoPath) return;
+        if (choice === "abort") {
+          await runGitSync(repoPath, () => api.gitAbortPull(repoPath), {
+            description: "Aborting pull…",
+            doneMessage: "Pull aborted",
+          });
+        } else {
+          await runGitSync(
+            repoPath,
+            async () => {
+              await api.stashSave(repoPath, "WIP before pulling", true);
+              // The stash must come off even if the pull itself fails (e.g. a genuine
+              // conflict) — otherwise the user's changes are stuck in the stash list instead
+              // of back in their working tree.
+              try {
+                await api.gitPull(repoPath);
+              } finally {
+                await api.stashPop(repoPath, 0);
+              }
+            },
+            {
+              description: "Stashing changes and pulling…",
+              doneMessage: "Pulled origin and restored your changes",
+            },
+          );
+        }
+        void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.log(repoPath) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(repoPath) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.stashes(repoPath) });
       }),
   });
 }
