@@ -56,9 +56,7 @@ function ComingSoon({
       </div>
 
       <h1 className="relative mt-6 text-3xl font-semibold tracking-tight sm:text-4xl">{title}</h1>
-      <p className="text-muted-foreground relative mt-3 text-base">
-        This page is coming soon.
-      </p>
+      <p className="text-muted-foreground relative mt-3 text-base">This page is coming soon.</p>
     </section>
   );
 }
