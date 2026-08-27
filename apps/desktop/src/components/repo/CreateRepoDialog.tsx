@@ -152,14 +152,24 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
           <DialogDescription>Sets up a new git repository on your machine.</DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Name</span>
-            <Input
-              placeholder="my-project"
-              value={repoName}
-              onChange={(e) => setRepoName(e.target.value)}
-              autoFocus
-            />
+          <div className="flex gap-3">
+            <div className="flex flex-1 flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Name</span>
+              <Input
+                placeholder="my-project"
+                value={repoName}
+                onChange={(e) => setRepoName(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex w-36 shrink-0 flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Default branch</span>
+              <Input
+                placeholder="main"
+                value={branchName}
+                onChange={(e) => setBranchName(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -172,15 +182,6 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
               }}
               onBrowse={() => void pickParentDir()}
               placeholder="Destination folder"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Default branch</span>
-            <Input
-              placeholder="main"
-              value={branchName}
-              onChange={(e) => setBranchName(e.target.value)}
             />
           </div>
 
