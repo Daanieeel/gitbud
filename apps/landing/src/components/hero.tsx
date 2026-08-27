@@ -60,7 +60,7 @@ export async function Hero() {
   const { version, assets } = await getLatestRelease();
 
   return (
-    <section className="mx-auto max-w-7xl px-6 pt-36 pb-16 lg:pt-40 xl:pt-48">
+    <section className="mx-auto max-w-7xl px-6 pt-30 pb-16 sm:pt-36 lg:pt-40 xl:pt-48">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-8">
         <div>
           <Link
@@ -97,7 +97,7 @@ export async function Hero() {
         </div>
       </div>
 
-      <div className="border-border bg-muted mt-16 flex items-center gap-3 rounded-2xl border px-5 py-4">
+      <div className="border-border bg-muted mt-6 flex items-center gap-3 rounded-2xl border px-5 py-4 sm:mt-16">
         <HeartHandshake className="text-muted-foreground size-5 shrink-0" />
         <p className="text-sm">
           GitBud isn&apos;t notarized by Apple yet. We&apos;re looking for sponsors to cover a paid
