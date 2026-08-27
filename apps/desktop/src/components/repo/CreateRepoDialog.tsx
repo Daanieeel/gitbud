@@ -154,7 +154,9 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
         <div className="flex flex-col gap-3">
           <div className="flex gap-3">
             <div className="flex flex-1 flex-col gap-1.5">
-              <span className="text-xs font-medium text-muted-foreground">Name</span>
+              <span className="text-xs font-medium text-muted-foreground">
+                Name <span className="text-destructive">*</span>
+              </span>
               <Input
                 placeholder="my-project"
                 value={repoName}
@@ -173,7 +175,9 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Destination</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              Destination <span className="text-destructive">*</span>
+            </span>
             <DestinationField
               value={destPath}
               onChange={(v) => {
