@@ -53,7 +53,7 @@ function LicenseSummary() {
   return (
     <div className="border-border bg-card overflow-hidden rounded-2xl border">
       <div className="p-6 sm:p-8">
-        <div className="flex gap-4">
+        <div className="flex flex-col gap-4 md:flex-row">
           <div className="bg-background border-border flex size-14 shrink-0 items-center justify-center rounded-xl border">
             <Scale className="text-accent-purple size-7" strokeWidth={1.75} aria-hidden />
           </div>
@@ -67,11 +67,11 @@ function LicenseSummary() {
 
         <p className="text-muted-foreground mt-4 text-justify text-sm leading-relaxed">
           Permissions of this strongest copyleft license are conditioned on making available
-          complete source code of licensed works and modifications, which include larger works
-          using a licensed work, under the same license. Copyright and license notices must be
-          preserved. Contributors provide an express grant of patent rights. When a modified
-          version is used to provide a service over a network, the complete source code of the
-          modified version must be made available.
+          complete source code of licensed works and modifications, which include larger works using
+          a licensed work, under the same license. Copyright and license notices must be preserved.
+          Contributors provide an express grant of patent rights. When a modified version is used to
+          provide a service over a network, the complete source code of the modified version must be
+          made available.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-x-8 gap-y-6">
