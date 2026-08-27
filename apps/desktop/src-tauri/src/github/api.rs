@@ -1269,6 +1269,33 @@ pub async fn list_user_repos(host: &str, token: &str) -> Result<Vec<GitHubRepo>,
     res.json().await.map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Serialize)]
+struct CreateRepoBody<'a> {
+    name: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<&'a str>,
+    private: bool,
+}
+
+/// Creates a new repo under the authenticated user's own account (not an org) — backs the
+/// "publish" flow for a local-only repo that doesn't have a remote yet.
+pub async fn create_repo(
+    host: &str,
+    token: &str,
+    name: &str,
+    description: Option<&str>,
+    private: bool,
+) -> Result<GitHubRepo, String> {
+    let gh = GhClient::new(host, token)?;
+    let res = send_checked(gh.post("/user/repos").json(&CreateRepoBody {
+        name,
+        description,
+        private,
+    }))
+    .await?;
+    res.json().await.map_err(|e| e.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

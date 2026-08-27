@@ -1102,6 +1102,15 @@ async fn git_push(app: AppHandle, repo_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn git_publish(app: AppHandle, repo_path: String, url: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_shell::add_remote_and_push(&app, &repo_path, &url, &repo_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn git_clone(app: AppHandle, url: String, dest: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || git_shell::clone(&app, &url, &dest, &dest))
         .await
@@ -1541,6 +1550,18 @@ async fn github_list_user_repos(login: String) -> Result<Vec<github::api::GitHub
     let host = github::auth::get_host()?;
     let token = github::auth::get_token(&login)?;
     github::api::list_user_repos(&host, &token).await
+}
+
+#[tauri::command]
+async fn github_create_repo(
+    login: String,
+    name: String,
+    description: Option<String>,
+    private: bool,
+) -> Result<github::api::GitHubRepo, String> {
+    let host = github::auth::get_host()?;
+    let token = github::auth::get_token(&login)?;
+    github::api::create_repo(&host, &token, &name, description.as_deref(), private).await
 }
 
 #[tauri::command]
@@ -2175,6 +2196,7 @@ pub fn run() {
             git_pull_with_strategy,
             git_abort_pull,
             git_push,
+            git_publish,
             cancel_git_operation,
             git_clone,
             get_ahead_behind,
@@ -2240,6 +2262,7 @@ pub fn run() {
             get_cached_avatar,
             github_get_commit_verification,
             github_list_user_repos,
+            github_create_repo,
             read_pr_template,
         ])
         .run(tauri::generate_context!())
