@@ -4,6 +4,7 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useCommitLog } from "@/hooks/queries/useCommitLog";
 import { useCommitFileDiff, useCommitFiles } from "@/hooks/queries/useCommitDetail";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
+import { useRemoteInfo } from "@/hooks/useRemoteInfo";
 import { queryKeys } from "@/lib/queryKeys";
 import { toMainlineCommits } from "@/lib/compact-graph";
 import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
@@ -18,9 +19,11 @@ import { githubFileUrl } from "@/lib/github-links";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
+import { GenericFileMenuItems } from "@/components/changes/GenericFileMenuItems";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@gitbud/ui/context-menu";
 
 export function HistoryTab() {
   const repoPath = useRepoStore((s) => s.selectedRepo);
@@ -74,6 +77,7 @@ export function HistoryTab() {
     selectCommitFile,
   );
   const fileListRef = useRef<HTMLDivElement>(null);
+  const remoteInfo = useRemoteInfo(repoPath);
 
   if (commits.length === 0) {
     return (
@@ -130,22 +134,36 @@ export function HistoryTab() {
             className="shrink-0 overflow-auto border-r border-border outline-none"
           >
             {selectedCommitFiles.map(([path, status]) => (
-              <Tooltip key={path}>
-                <TooltipTrigger asChild>
-                  <div
-                    className={cn(
-                      "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
-                      selectedCommitFilePath === path && "bg-accent",
-                    )}
-                    onClick={() => selectCommitFile(path)}
-                  >
-                    <FileTypeIcon path={path} className="size-3.5 shrink-0" />
-                    <FilePathLabel path={path} />
-                    <FileStatusIcon status={status} className="size-3.5" />
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent>{`${path} (${status})`}</TooltipContent>
-              </Tooltip>
+              <ContextMenu key={path}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <ContextMenuTrigger asChild>
+                      <div
+                        className={cn(
+                          "flex h-7 items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
+                          selectedCommitFilePath === path && "bg-accent",
+                        )}
+                        onClick={() => selectCommitFile(path)}
+                      >
+                        <FileTypeIcon path={path} className="size-3.5 shrink-0" />
+                        <FilePathLabel path={path} />
+                        <FileStatusIcon status={status} className="size-3.5" />
+                      </div>
+                    </ContextMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>{`${path} (${status})`}</TooltipContent>
+                </Tooltip>
+                {repoPath && (
+                  <ContextMenuContent>
+                    <GenericFileMenuItems
+                      repoPath={repoPath}
+                      path={path}
+                      providerRef={selectedCommitOid ?? undefined}
+                      remoteInfo={remoteInfo}
+                    />
+                  </ContextMenuContent>
+                )}
+              </ContextMenu>
             ))}
           </div>
           <ResizeHandle onPointerDown={fileList.onPointerDown} />

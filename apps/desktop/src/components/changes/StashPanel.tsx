@@ -20,9 +20,11 @@ import { cn } from "@gitbud/ui/utils";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "./FilePathLabel";
+import { GenericFileMenuItems } from "./GenericFileMenuItems";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@gitbud/ui/context-menu";
 
 interface StashPanelProps {
   hasChanges: boolean;
@@ -82,42 +84,52 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
           <div className="p-3 text-center text-sm text-muted-foreground">No files</div>
         )}
         {files.map(([path, status]) => (
-          <div
-            key={path}
-            className={cn(
-              "group flex h-7 items-center gap-2 px-2 text-sm hover:bg-accent",
-              selectedPath === path && "bg-accent",
-            )}
-          >
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span
-                  className="flex min-w-0 flex-1 cursor-pointer items-center gap-2"
-                  onClick={() => setSelectedPath(path)}
-                >
-                  <FileTypeIcon path={path} className="size-3.5 shrink-0" />
-                  <FilePathLabel path={path} />
-                  <FileStatusIcon status={status} className="size-3.5" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent>{`${path} (${status})`}</TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  className={cn(
-                    "shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-50",
-                    selectedPath === path ? "opacity-100" : "opacity-0 group-hover:opacity-100",
-                  )}
-                  disabled={applyingPath === path}
-                  onClick={() => void applyFile(path)}
-                >
-                  <Undo2Icon className={cn("size-3.5", applyingPath === path && "animate-spin")} />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent>Restore this file from the stash, without popping it</TooltipContent>
-            </Tooltip>
-          </div>
+          <ContextMenu key={path}>
+            <ContextMenuTrigger asChild>
+              <div
+                className={cn(
+                  "group flex h-7 items-center gap-2 px-2 text-sm hover:bg-accent",
+                  selectedPath === path && "bg-accent",
+                )}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className="flex min-w-0 flex-1 cursor-pointer items-center gap-2"
+                      onClick={() => setSelectedPath(path)}
+                    >
+                      <FileTypeIcon path={path} className="size-3.5 shrink-0" />
+                      <FilePathLabel path={path} />
+                      <FileStatusIcon status={status} className="size-3.5" />
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>{`${path} (${status})`}</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      className={cn(
+                        "shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-50",
+                        selectedPath === path
+                          ? "opacity-100"
+                          : "opacity-0 group-hover:opacity-100",
+                      )}
+                      disabled={applyingPath === path}
+                      onClick={() => void applyFile(path)}
+                    >
+                      <Undo2Icon
+                        className={cn("size-3.5", applyingPath === path && "animate-spin")}
+                      />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Restore this file from the stash, without popping it</TooltipContent>
+                </Tooltip>
+              </div>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+              <GenericFileMenuItems repoPath={repoPath} path={path} remoteInfo={null} />
+            </ContextMenuContent>
+          </ContextMenu>
         ))}
       </div>
       <ResizeHandle onPointerDown={onPointerDown} />
