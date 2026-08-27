@@ -110,9 +110,7 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
                     <button
                       className={cn(
                         "shrink-0 text-muted-foreground hover:text-foreground disabled:opacity-50",
-                        selectedPath === path
-                          ? "opacity-100"
-                          : "opacity-0 group-hover:opacity-100",
+                        selectedPath === path ? "opacity-100" : "opacity-0 group-hover:opacity-100",
                       )}
                       disabled={applyingPath === path}
                       onClick={() => void applyFile(path)}
@@ -122,7 +120,9 @@ function StashDetail({ repoPath, index }: { repoPath: string; index: number }) {
                       />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Restore this file from the stash, without popping it</TooltipContent>
+                  <TooltipContent>
+                    Restore this file from the stash, without popping it
+                  </TooltipContent>
                 </Tooltip>
               </div>
             </ContextMenuTrigger>

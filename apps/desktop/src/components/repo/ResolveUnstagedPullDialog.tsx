@@ -37,8 +37,8 @@ export function ResolveUnstagedPullDialog() {
         <DialogHeader>
           <DialogTitle>You have uncommitted changes</DialogTitle>
           <DialogDescription>
-            Pulling with rebase needs a clean working tree, so it stopped before touching
-            anything. Choose how to proceed.
+            Pulling with rebase needs a clean working tree, so it stopped before touching anything.
+            Choose how to proceed.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-2">

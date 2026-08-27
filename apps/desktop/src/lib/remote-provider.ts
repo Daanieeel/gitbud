@@ -41,7 +41,11 @@ export function signingKeySettingsUrl(
 /** Builds a branch-view URL for a repo's remote web UI, given its base repo URL (as returned
  * by `remoteWebInfo`) and provider. Falls back to GitHub's `/tree/` path shape for unknown
  * hosts, since most self-hosted forges (Gitea, Forgejo, etc.) mirror it. */
-export function remoteBranchUrl(baseRepoUrl: string, provider: RemoteProvider, branch: string): string {
+export function remoteBranchUrl(
+  baseRepoUrl: string,
+  provider: RemoteProvider,
+  branch: string,
+): string {
   const encBranch = encodeURIComponent(branch);
   switch (provider) {
     case "gitlab":

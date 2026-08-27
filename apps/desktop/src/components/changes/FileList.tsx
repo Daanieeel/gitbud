@@ -338,7 +338,9 @@ export function FileList({
                       onSelect={() => {
                         if (!repoPath) return;
                         void revealItemInDir(`${repoPath}/${file.path}`).catch(() =>
-                          toast.error("Couldn't find that file — it may not exist at this path anymore"),
+                          toast.error(
+                            "Couldn't find that file — it may not exist at this path anymore",
+                          ),
                         );
                       }}
                     >
@@ -402,9 +404,7 @@ export function FileList({
                     )}
                     <ContextMenuSeparator />
                     <ContextMenuItem
-                      onSelect={() =>
-                        void copyToClipboard(file.path.split("/").pop() ?? file.path)
-                      }
+                      onSelect={() => void copyToClipboard(file.path.split("/").pop() ?? file.path)}
                     >
                       <CopyIcon className="size-3.5" />
                       Copy Name

@@ -136,7 +136,14 @@ const rows: Row[] = packages.map((pkg) => {
     status = "behind latest release!";
     statusColor = RED;
   }
-  return { dir: pkg.dir, name: pkg.name, version: pkg.version, latest: latestRelease, status, statusColor };
+  return {
+    dir: pkg.dir,
+    name: pkg.name,
+    version: pkg.version,
+    latest: latestRelease,
+    status,
+    statusColor,
+  };
 });
 
 const columns = [
@@ -169,8 +176,14 @@ printRow(
   columns.map((c) => c.header),
   columns.map(() => BOLD),
 );
-printRow(widths.map((w) => "─".repeat(w)), NO_COLOR);
+printRow(
+  widths.map((w) => "─".repeat(w)),
+  NO_COLOR,
+);
 for (const row of rows) {
-  printRow(columns.map((c) => String(row[c.key])), [...NO_COLOR.slice(0, -1), row.statusColor]);
+  printRow(
+    columns.map((c) => String(row[c.key])),
+    [...NO_COLOR.slice(0, -1), row.statusColor],
+  );
 }
 console.log();

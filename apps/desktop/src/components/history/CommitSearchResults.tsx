@@ -57,9 +57,7 @@ export function CommitSearchResults({
   const currentLogin = useGitHubStore((s) => s.currentLogin);
 
   if (results.length === 0) {
-    return (
-      <div className="p-4 text-center text-sm text-muted-foreground">No matching commits</div>
-    );
+    return <div className="p-4 text-center text-sm text-muted-foreground">No matching commits</div>;
   }
 
   return (

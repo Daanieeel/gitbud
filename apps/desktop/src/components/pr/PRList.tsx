@@ -205,9 +205,7 @@ export function PRList({
                         )}
                         onClick={() => onSelect(pr.number)}
                       >
-                        <Icon
-                          className={cn("mt-0.5 size-3.5 shrink-0", PR_STATUS_COLOR[status])}
-                        />
+                        <Icon className={cn("mt-0.5 size-3.5 shrink-0", PR_STATUS_COLOR[status])} />
                         <div className="min-w-0 flex-1">
                           <div className="truncate">{pr.title}</div>
                           <div className="flex items-center gap-1 text-xs text-muted-foreground">
