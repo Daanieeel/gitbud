@@ -5,6 +5,9 @@
 export async function githubFetch(url: string): Promise<Response> {
   const token = process.env.GITHUB_TOKEN;
   return fetch(url, {
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    headers: {
+      "User-Agent": "gitbud-landing",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
   });
 }
