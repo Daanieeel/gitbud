@@ -2,10 +2,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { Metadata } from "next";
 import { Check, Info, Scale, X } from "lucide-react";
+import rehypeSlug from "rehype-slug";
 import rehypeStringify from "rehype-stringify";
 import remarkParse from "remark-parse";
 import remarkRehype from "remark-rehype";
 import { unified } from "unified";
+import { LicenseToc, type LicenseTocItem } from "@/components/license-toc";
 
 export const metadata: Metadata = {
   title: "License · GitBud",
@@ -56,7 +58,7 @@ function LicenseSummary() {
             <Scale className="text-accent-purple size-7" strokeWidth={1.75} aria-hidden />
           </div>
           <div>
-            <p className="text-muted-foreground text-sm">Daanieeel/gitbud is licensed under the</p>
+            <p className="text-muted-foreground text-sm">GitBud is licensed under the</p>
             <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
               GNU Affero General Public License v3.0
             </h2>
@@ -115,7 +117,7 @@ function LicenseSummary() {
   );
 }
 
-async function getLicenseHtml(): Promise<string> {
+async function getLicenseHtml(): Promise<{ html: string; toc: LicenseTocItem[] }> {
   const licensePath = path.join(process.cwd(), "..", "..", "LICENSE");
   const source = await readFile(licensePath, "utf8");
 
@@ -167,14 +169,27 @@ async function getLicenseHtml(): Promise<string> {
   const file = await unified()
     .use(remarkParse)
     .use(remarkRehype)
+    .use(rehypeSlug)
     .use(rehypeStringify)
     .process(escaped);
 
-  return String(file);
+  const html = String(file);
+
+  // rehype-slug already computed the ids used in `html`; scrape them back out here rather
+  // than re-deriving slugs, so the table of contents can never drift from the rendered anchors.
+  const toc: LicenseTocItem[] = [...html.matchAll(/<h([2-4]) id="([^"]+)">(.*?)<\/h\1>/g)].map(
+    ([, level, id, text]) => ({
+      level: Number(level),
+      id,
+      text: text.replace(/<[^>]+>/g, ""),
+    }),
+  );
+
+  return { html, toc };
 }
 
 export default async function LicensePage() {
-  const html = await getLicenseHtml();
+  const { html, toc } = await getLicenseHtml();
 
   return (
     <main>
@@ -194,6 +209,8 @@ export default async function LicensePage() {
           dangerouslySetInnerHTML={{ __html: html }}
         />
       </section>
+
+      <LicenseToc items={toc} />
     </main>
   );
 }

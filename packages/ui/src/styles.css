@@ -259,6 +259,9 @@
 .markdown-body h3,
 .markdown-body h4 {
   letter-spacing: -0.01em;
+  /* Keeps anchor jumps (e.g. from a table of contents) from landing flush under a fixed
+   * top nav. */
+  scroll-margin-top: 6rem;
 }
 
 .markdown-body h1 {

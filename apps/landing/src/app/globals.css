@@ -8,3 +8,8 @@ body {
   height: auto;
   overflow: visible;
 }
+
+/* Smooth in-page jumps for the license table of contents. */
+html {
+  scroll-behavior: smooth;
+}
