@@ -25,18 +25,18 @@ export function MacSigningFixDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+        <DialogHeader className="text-left">
           <DialogTitle className="flex items-center gap-2 text-xl">
             <TriangleAlertIcon className="size-6 shrink-0 text-destructive" />
             macOS says the app is damaged
           </DialogTitle>
-          <DialogDescription className="text-base">
+          <DialogDescription className="text-left text-base">
             GitBud isn&apos;t notarized by Apple yet, so Gatekeeper blocks it as if it were
             corrupted. It isn&apos;t. Run this command in Terminal after moving GitBud to
             Applications to clear the quarantine flag:
           </DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col items-center gap-4 py-2">
+        <div className="flex flex-col gap-4 py-2">
           <div className="flex w-full items-center gap-2 rounded-md border border-border bg-muted/40 px-4 py-3">
             <span className="min-w-0 flex-1 overflow-x-auto font-mono text-base whitespace-pre">
               {FIX_COMMAND}
@@ -48,9 +48,9 @@ export function MacSigningFixDialog({
               title="Copy command"
             />
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-left text-xs text-muted-foreground">
             This is a temporary workaround. A signed, notarized build needs a paid Apple Developer
-            account, which we don&apos;t have yet. We&apos;re looking for sponsors to cover it.
+            account, which we don&apos;t have yet. We&apos;re looking for sponsors.
           </p>
           <Button size="sm" variant="secondary" className="w-full" asChild>
             <Link href={DISCORD_DM_URL} target="_blank" rel="noopener noreferrer">
