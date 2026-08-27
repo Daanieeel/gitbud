@@ -199,7 +199,7 @@ export function CreateRepoDialog({ open: isOpen, onOpenChange, onCreate }: Creat
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">License</span>
             <Select value={licenseId} onValueChange={setLicenseId}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="w-full border-input bg-accent font-normal hover:bg-accent/80 hover:text-accent-foreground">
                 <SelectValue placeholder="None" />
               </SelectTrigger>
               <SelectContent>
