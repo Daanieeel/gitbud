@@ -43,6 +43,7 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 - [x] Move to TanStack Query
 - [x] Live-syncing with git provider (PRs, commits etc)
 - [x] Commit signing setup wizard
+- [X] Fix add repository options' looks (clone, create new)
 - [ ] Full screen reclone/relocate/remove from gitbud prompt for repo paths that the app cant find anymroe (moved/deleted)
 - [ ] Better PR viewer (comments, files, commits) like on GitHub
   - [ ] Detailed CI steps & logs in-app

@@ -136,7 +136,7 @@ export function CIBadge({ repoPath, login, sha, pollIntervalMs = null }: CIBadge
         </PopoverContent>
       </Popover>
       <TooltipContent>
-        {offline ? `CI: ${overall} — cached while offline, may be outdated` : `CI: ${overall}`}
+        {offline ? `CI: ${overall}; cached while offline, may be outdated` : `CI: ${overall}`}
       </TooltipContent>
     </Tooltip>
   );
