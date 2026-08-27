@@ -1,5 +1,7 @@
+import { Rocket } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { Badge } from "@gitbud/ui/badge";
 import { Button } from "@gitbud/ui/button";
 import { getMessages } from "@/i18n/get-messages";
 import { DownloadButton, type ReleaseAssets } from "@/components/download-button";
@@ -11,6 +13,7 @@ interface GitHubReleaseAsset {
 }
 
 interface GitHubRelease {
+  tag_name: string;
   assets: GitHubReleaseAsset[];
 }
 
@@ -24,38 +27,50 @@ const EMPTY_ASSETS: ReleaseAssets = {
   linuxRpm: null,
 };
 
-async function getReleaseAssets(): Promise<ReleaseAssets> {
+async function getLatestRelease(): Promise<{ version: string | null; assets: ReleaseAssets }> {
   try {
     const res = await githubFetch("https://api.github.com/repos/Daanieeel/gitbud/releases/latest");
-    if (!res.ok) return EMPTY_ASSETS;
+    if (!res.ok) return { version: null, assets: EMPTY_ASSETS };
     // SAFETY: GitHub's releases endpoint always returns an assets array of {name, browser_download_url}.
     const release = (await res.json()) as GitHubRelease;
     const find = (pattern: RegExp) =>
       release.assets.find((asset) => pattern.test(asset.name))?.browser_download_url ?? null;
 
     return {
-      macArm: find(/_aarch64\.dmg$/i),
-      macIntel: find(/_x(64|86_64)\.dmg$/i),
-      windowsExe: find(/-setup\.exe$/i),
-      windowsMsi: find(/\.msi$/i),
-      linuxAppImage: find(/\.AppImage$/i),
-      linuxDeb: find(/\.deb$/i),
-      linuxRpm: find(/\.rpm$/i),
+      version: release.tag_name,
+      assets: {
+        macArm: find(/_aarch64\.dmg$/i),
+        macIntel: find(/_x(64|86_64)\.dmg$/i),
+        windowsExe: find(/-setup\.exe$/i),
+        windowsMsi: find(/\.msi$/i),
+        linuxAppImage: find(/\.AppImage$/i),
+        linuxDeb: find(/\.deb$/i),
+        linuxRpm: find(/\.rpm$/i),
+      },
     };
   } catch {
-    return EMPTY_ASSETS;
+    return { version: null, assets: EMPTY_ASSETS };
   }
 }
 
 export async function Hero() {
   const { hero } = getMessages();
-  const assets = await getReleaseAssets();
+  const { version, assets } = await getLatestRelease();
 
   return (
     <section className="mx-auto max-w-7xl px-6 pt-36 pb-16 lg:pt-40 xl:pt-48">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-8">
         <div>
-          <p className="text-muted-foreground text-xs uppercase">{hero.eyebrow}</p>
+          <Link
+            href="https://github.com/Daanieeel/gitbud/releases"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Badge variant="positive" className="gap-1.5 px-3 py-1 text-sm">
+              <Rocket className="size-3.5" />
+              {version ?? "In early development"}
+            </Badge>
+          </Link>
           <h1 className="mt-4 text-4xl leading-[1.05] font-semibold tracking-tight sm:text-5xl lg:text-6xl">
             {hero.headline[0]} <br className="hidden md:block" />
             {hero.headline[1]}
