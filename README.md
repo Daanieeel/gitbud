@@ -2,7 +2,7 @@
 
 # GitBud
 
-**A Git client that doesn't eat your RAM.**
+**A lightweight and fast Git client. Free forever, no catch.**
 
 [![CI](https://github.com/Daanieeel/gitbud/actions/workflows/ci.yml/badge.svg)](https://github.com/Daanieeel/gitbud/actions/workflows/ci.yml)
 [![Release](https://github.com/Daanieeel/gitbud/actions/workflows/release.yml/badge.svg)](https://github.com/Daanieeel/gitbud/actions/workflows/release.yml)
