@@ -183,6 +183,27 @@ pub fn list_branches(repo_path: &str) -> Result<Vec<BranchInfo>, String> {
             is_remote,
         });
     }
+
+    // A freshly `git init`'d repo with no commits yet has an unborn HEAD: it symbolically
+    // points at e.g. "refs/heads/main", but that ref doesn't exist until the first commit, so
+    // `branches()` above finds nothing at all (matches `git branch -a` printing nothing too).
+    // A shell prompt still happily shows "main" by reading HEAD's symbolic target directly
+    // rather than resolving it — do the same here so the branch list isn't just empty.
+    if result.is_empty() {
+        if let Ok(head_ref) = repo.find_reference("HEAD") {
+            if let Some(name) = head_ref
+                .symbolic_target()
+                .and_then(|t| t.strip_prefix("refs/heads/"))
+            {
+                result.push(BranchInfo {
+                    name: name.to_string(),
+                    is_head: true,
+                    is_remote: false,
+                });
+            }
+        }
+    }
+
     Ok(result)
 }
 
@@ -582,6 +603,23 @@ mod tests {
             Self { path }
         }
 
+        /// Mirrors `init_repo`'s `RepositoryInitOptions::initial_head` — a freshly created repo
+        /// with a chosen default branch name and, deliberately, no commit yet.
+        fn new_unborn(name: &str, branch: &str) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "gitbud-test-repo-{name}-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            std::fs::create_dir_all(&path).unwrap();
+            let mut opts = git2::RepositoryInitOptions::new();
+            opts.initial_head(branch);
+            Repository::init_opts(&path, &opts).unwrap();
+            Self { path }
+        }
+
         fn path_str(&self) -> String {
             self.path.to_string_lossy().to_string()
         }
@@ -616,6 +654,26 @@ mod tests {
             .expect("a branch should be head");
         assert_eq!(head_branch.name, current);
         assert!(!head_branch.is_remote);
+    }
+
+    #[test]
+    fn lists_chosen_branch_name_before_first_commit() {
+        // Regression test: a repo just created via the "Create New Repository" dialog (no
+        // README/.gitignore/license selected) has no commits yet, so `git branch -a` and git2's
+        // `branches()` both legitimately show nothing until the first commit — but the branch
+        // dropdown still needs to show the branch name the user actually chose, not go empty.
+        let scratch = ScratchRepo::new_unborn("unborn-branch", "develop");
+        let repo_path = scratch.path_str();
+
+        let branches = list_branches(&repo_path).expect("branches should succeed");
+        assert_eq!(
+            branches.len(),
+            1,
+            "expected exactly the chosen branch, synthesized from HEAD: {branches:?}"
+        );
+        assert_eq!(branches[0].name, "develop");
+        assert!(branches[0].is_head);
+        assert!(!branches[0].is_remote);
     }
 
     #[test]
