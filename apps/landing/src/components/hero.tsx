@@ -100,8 +100,8 @@ export async function Hero() {
       <div className="border-border bg-muted mt-16 flex items-center gap-3 rounded-2xl border px-5 py-4">
         <HeartHandshake className="text-muted-foreground size-5 shrink-0" />
         <p className="text-sm">
-          GitBud isn&apos;t notarized by Apple yet. We&apos;re looking for sponsors to cover a
-          paid Apple Developer account.{" "}
+          GitBud isn&apos;t notarized by Apple yet. We&apos;re looking for sponsors to cover a paid
+          Apple Developer account.{" "}
           <Link
             href={DISCORD_DM_URL}
             target="_blank"
