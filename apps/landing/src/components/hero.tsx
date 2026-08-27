@@ -60,7 +60,7 @@ export async function Hero() {
   const { version, assets } = await getLatestRelease();
 
   return (
-    <section className="mx-auto max-w-7xl px-6 pt-36 pb-16 lg:pt-40 xl:pt-48">
+    <section className="mx-auto max-w-7xl px-6 pt-28 pb-16 lg:pt-40 xl:pt-48">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-8">
         <div>
           <Link
