@@ -17,11 +17,6 @@ export async function githubCommitUrl(repoPath: string, oid: string): Promise<st
   return base ? `${base}/commit/${oid}` : null;
 }
 
-export async function githubBranchUrl(repoPath: string, branch: string): Promise<string | null> {
-  const base = await githubRepoUrl(repoPath);
-  return base ? `${base}/tree/${encodeURIComponent(branch)}` : null;
-}
-
 export async function githubFileUrl(
   repoPath: string,
   ref: string,

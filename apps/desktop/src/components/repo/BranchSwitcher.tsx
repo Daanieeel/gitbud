@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ChevronsUpDownIcon,
   CloudUploadIcon,
@@ -43,7 +43,22 @@ import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@gitbud/ui/utils";
 import { isProtectedBranch } from "@/lib/utils";
 import { copyToClipboard } from "@/lib/clipboard";
-import { githubBranchUrl } from "@/lib/github-links";
+import { detectRemoteProvider, remoteBranchUrl, type RemoteProvider } from "@/lib/remote-provider";
+import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
+
+const OPEN_BRANCH_LABEL = {
+  github: "Open Branch on GitHub",
+  gitlab: "Open Branch on GitLab",
+  bitbucket: "Open Branch on Bitbucket",
+  unknown: "Open Branch in Browser",
+} satisfies Record<RemoteProvider, string>;
+
+const OPEN_BRANCH_ICON = {
+  github: <GitHubMark className="size-3.5" />,
+  gitlab: <GitLabMark className="size-3.5" />,
+  bitbucket: <BitbucketMark className="size-3.5" />,
+  unknown: <ExternalLinkIcon className="size-3.5" />,
+} satisfies Record<RemoteProvider, ReactNode>;
 
 export function BranchSwitcher() {
   const selectedRepo = useRepoStore((s) => s.selectedRepo);
@@ -78,12 +93,29 @@ export function BranchSwitcher() {
   } | null>(null);
   const [deleteOnRemote, setDeleteOnRemote] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [remoteInfo, setRemoteInfo] = useState<{ url: string; provider: RemoteProvider } | null>(
+    null,
+  );
 
   useEffect(() => {
     const handleOpenBranchSwitcher = () => setOpen(true);
     window.addEventListener("open-branch-switcher", handleOpenBranchSwitcher);
     return () => window.removeEventListener("open-branch-switcher", handleOpenBranchSwitcher);
   }, []);
+
+  useEffect(() => {
+    setRemoteInfo(null);
+    if (!selectedRepo) return;
+    let cancelled = false;
+    void api.remoteWebInfo(selectedRepo).then((info) => {
+      if (cancelled || !info) return;
+      const [host, url] = info;
+      setRemoteInfo({ url, provider: detectRemoteProvider(host) });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRepo]);
 
   const local = useMemo(
     () =>
@@ -349,17 +381,16 @@ export function BranchSwitcher() {
                     <CopyIcon className="size-3.5" />
                     Copy Name
                   </ContextMenuItem>
-                  <ContextMenuItem
-                    onSelect={() => {
-                      if (!selectedRepo) return;
-                      void githubBranchUrl(selectedRepo, b.name).then((url) => {
-                        if (url) void openUrl(url);
-                      });
-                    }}
-                  >
-                    <ExternalLinkIcon className="size-3.5" />
-                    Open Branch on GitHub
-                  </ContextMenuItem>
+                  {remoteInfo && (
+                    <ContextMenuItem
+                      onSelect={() =>
+                        void openUrl(remoteBranchUrl(remoteInfo.url, remoteInfo.provider, b.name))
+                      }
+                    >
+                      {OPEN_BRANCH_ICON[remoteInfo.provider]}
+                      {OPEN_BRANCH_LABEL[remoteInfo.provider]}
+                    </ContextMenuItem>
+                  )}
                   <ContextMenuSeparator />
                   <ContextMenuItem
                     onSelect={() => {
