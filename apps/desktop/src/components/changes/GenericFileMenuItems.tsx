@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { CodeIcon, CopyIcon, ExternalLinkIcon, FolderOpenIcon, TerminalIcon } from "lucide-react";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { toast } from "sonner";
@@ -49,23 +50,40 @@ export function GenericFileMenuItems({
     favoriteEditorOption?.name ??
     (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
 
+  // A commit/PR/stash file list can point at a path that's since been renamed or deleted — check
+  // once per open rather than assume, so a file-from-history menu doesn't offer two actions
+  // (Reveal in Finder, Open in Editor) that are guaranteed to hit nothing. Defaults to true
+  // (shown) so the check resolving a beat after the menu opens doesn't flash items in and out.
+  const [fileExists, setFileExists] = useState(true);
+  useEffect(() => {
+    let cancelled = false;
+    void api.pathExists(`${repoPath}/${path}`).then((exists) => {
+      if (!cancelled) setFileExists(exists);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath, path]);
+
   return (
     <>
-      <ContextMenuItem
-        onSelect={() => {
-          void revealItemInDir(`${repoPath}/${path}`).catch(() =>
-            toast.error("Couldn't find that file — it may not exist at this path anymore"),
-          );
-        }}
-      >
-        <FolderOpenIcon className="size-3.5" />
-        Reveal in Finder
-      </ContextMenuItem>
+      {fileExists && (
+        <ContextMenuItem
+          onSelect={() => {
+            void revealItemInDir(`${repoPath}/${path}`).catch(() =>
+              toast.error("Couldn't find that file — it may not exist at this path anymore"),
+            );
+          }}
+        >
+          <FolderOpenIcon className="size-3.5" />
+          Reveal in Finder
+        </ContextMenuItem>
+      )}
       <ContextMenuItem onSelect={() => void api.openInTerminal(repoPath)}>
         <TerminalIcon className="size-3.5" />
         Open in Terminal
       </ContextMenuItem>
-      {(favoriteEditorOption || isCustomEditor) && (
+      {fileExists && (favoriteEditorOption || isCustomEditor) && (
         <ContextMenuItem
           onSelect={() => {
             if (!favoriteEditorId) return;
