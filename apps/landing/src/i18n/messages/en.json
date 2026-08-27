@@ -29,7 +29,8 @@
       { "label": "Features", "href": "/features" },
       { "label": "Docs", "href": "/docs" },
       { "label": "Changelog", "href": "/changelog" },
-      { "label": "FAQ", "href": "/faq" }
+      { "label": "FAQ", "href": "/faq" },
+      { "label": "License", "href": "/license" }
     ],
     "githubLabel": "GitHub",
     "themeToggleLabel": "Toggle theme"

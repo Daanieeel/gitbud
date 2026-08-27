@@ -51,8 +51,8 @@ export function NavShell({
         className={cn(
           "flex w-full items-center justify-between gap-4 rounded-2xl border border-transparent py-2.5 pr-2 pl-5 transition-all duration-300",
           scrolled
-            ? "border-border bg-card/80 max-w-4xl backdrop-blur-md"
-            : "max-w-[770px] bg-transparent",
+            ? "border-border bg-card/80 max-w-5xl backdrop-blur-md"
+            : "max-w-[860px] bg-transparent",
         )}
       >
         <Link href="/" className="flex shrink-0 items-center gap-2">

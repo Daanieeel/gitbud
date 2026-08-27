@@ -4,7 +4,16 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import Link from "next/link";
-import { BookOpen, CircleHelp, History, Menu, Sparkles, X, type LucideIcon } from "lucide-react";
+import {
+  BookOpen,
+  CircleHelp,
+  History,
+  Menu,
+  Scale,
+  Sparkles,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { useTheme } from "next-themes";
 import { Button } from "@gitbud/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@gitbud/ui/select";
@@ -21,6 +30,7 @@ const LINK_ICONS = {
   "/docs": BookOpen,
   "/changelog": History,
   "/faq": CircleHelp,
+  "/license": Scale,
 } satisfies Record<string, LucideIcon>;
 
 const rowClass =
