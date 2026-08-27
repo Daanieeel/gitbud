@@ -67,7 +67,9 @@
     "turbo": "^2.5.0"
   },
   "overrides": {
-    "fsevents": "^2.3.3"
+    "fsevents": "^2.3.3",
+    "postcss": "8.5.23",
+    "semver": "^7.8.5"
   },
   "packageManager": "bun@1.4.0"
 }

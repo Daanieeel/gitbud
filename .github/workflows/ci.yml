@@ -21,6 +21,7 @@ jobs:
       - run: bun run lint:js
       - run: bun run format:check:js
       - run: bun run quality
+      - run: bun run check:landing
       - run: bun run build
 
   rust:
