@@ -71,6 +71,54 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Generate checksums and signatures
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          GPG_SIGNING_KEY: ${{ secrets.GPG_SIGNING_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p release-assets
+          cd release-assets
+          gh release download "$TAG" --repo "$REPO"
+
+          # Generate SHA256SUMS for release binaries and archives
+          find . -maxdepth 1 -type f ! -name "SHA256SUMS*" ! -name "latest.json" ! -name "*.sig" ! -name "*.asc" -exec sha256sum {} + | sed 's| \./|  |' | sort -k 2 > ../SHA256SUMS
+          cd ..
+
+          upload_files=("SHA256SUMS")
+
+          if [ -n "${GPG_SIGNING_KEY:-}" ]; then
+            echo "Importing GPG signing key..."
+            if echo "$GPG_SIGNING_KEY" | grep -q "BEGIN PGP PRIVATE KEY BLOCK"; then
+              echo "$GPG_SIGNING_KEY" | gpg --batch --import
+            else
+              echo "$GPG_SIGNING_KEY" | base64 -d | gpg --batch --import
+            fi
+
+            gpg_opts=(--batch --yes)
+            if [ -n "${GPG_PASSPHRASE:-}" ]; then
+              gpg_opts+=(--pinentry-mode loopback --passphrase "$GPG_PASSPHRASE")
+            fi
+
+            gpg "${gpg_opts[@]}" --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
+            upload_files+=("SHA256SUMS.asc")
+
+            for file in release-assets/*.deb release-assets/*.rpm release-assets/*.AppImage; do
+              if [ -f "$file" ]; then
+                gpg "${gpg_opts[@]}" --armor --detach-sign --output "$file.asc" "$file"
+                upload_files+=("$file.asc")
+              fi
+            done
+          else
+            echo "GPG_SIGNING_KEY secret is not configured. Skipping GPG detached signature generation."
+          fi
+
+          gh release upload "$TAG" "${upload_files[@]}" --repo "$REPO" --clobber
+
       - name: Build release notes (changelog + download links)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -98,6 +146,8 @@ jobs:
           deb=$(find_url '\.deb$')
           rpm=$(find_url '\.rpm$')
           appimage=$(find_url '\.AppImage$')
+          sha256sums=$(find_url '^SHA256SUMS$')
+          sha256sums_asc=$(find_url '^SHA256SUMS\.asc$')
 
           {
             cat changelog.md
@@ -110,7 +160,7 @@ jobs:
             [ -n "$mac_arm" ] && echo "- [Apple Silicon]($mac_arm)"
             [ -n "$mac_intel" ] && echo "- [Intel]($mac_intel)"
             echo ""
-            echo "> Not code-signed yet — macOS will say \`\"GitBud.app\" is damaged and can't be opened\`. Fix: \`xattr -cr /Applications/GitBud.app\`"
+            echo "> Not code-signed yet: macOS will say \`\"GitBud.app\" is damaged and can't be opened\`. Fix: \`xattr -cr /Applications/GitBud.app\`"
             echo ""
             echo "**Windows:**"
             [ -n "$win_msi" ] && echo "- [Installer (.msi)]($win_msi)"
@@ -120,6 +170,12 @@ jobs:
             [ -n "$deb" ] && echo "- [.deb (Debian/Ubuntu)]($deb)"
             [ -n "$rpm" ] && echo "- [.rpm (Fedora/RHEL)]($rpm)"
             [ -n "$appimage" ] && echo "- [AppImage]($appimage)"
+            if [ -n "$sha256sums" ]; then
+              echo ""
+              echo "**Verification:**"
+              echo "- [SHA256SUMS]($sha256sums)"
+              [ -n "$sha256sums_asc" ] && echo "- [SHA256SUMS.asc (GPG Signature)]($sha256sums_asc)"
+            fi
           } > notes.md
 
           gh release edit "$TAG" --repo "$REPO" --notes-file notes.md
