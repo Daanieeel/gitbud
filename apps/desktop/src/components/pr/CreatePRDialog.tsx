@@ -10,6 +10,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { DiffView } from "@gitbud/ui/diff-view";
 import { ProgressCircle } from "@gitbud/ui/progress-circle";
+import { BranchName } from "@gitbud/ui/branch-name";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
@@ -249,12 +250,12 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
                 selected={base}
                 onChange={setBase}
                 placeholder="Select branch"
-                className="max-w-xs"
+                className="shrink-0 max-w-xs"
                 triggerClassName="max-w-xs font-mono text-sm"
                 contentClassName="font-mono"
               />
               <span className="shrink-0 text-muted-foreground">←</span>
-              <span className="truncate font-mono">{branch}</span>
+              <BranchName className="min-w-0 flex-1">{branch}</BranchName>
             </div>
             <Input
               placeholder="Title"
