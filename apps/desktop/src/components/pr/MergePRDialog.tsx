@@ -9,6 +9,7 @@ import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { Skeleton } from "@gitbud/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@gitbud/ui/select";
 import { useMergePullRequest } from "@/hooks/queries/usePullRequests";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { prPollIntervalMs, useCheckRuns, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
@@ -193,19 +194,20 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
         </DialogHeader>
         <div className="flex flex-col gap-3">
           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <span className="font-mono">{pr.head_ref}</span>
-            <span>→</span>
-            <select
-              value={targetBase}
-              onChange={(e) => setTargetBase(e.target.value)}
-              className="h-6 rounded-md border border-input bg-transparent px-1.5 font-mono text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              {baseOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
+            <span className="truncate font-mono">{pr.head_ref}</span>
+            <span className="shrink-0">→</span>
+            <Select value={targetBase} onValueChange={setTargetBase}>
+              <SelectTrigger size="sm" className="h-7 max-w-xs font-mono text-sm text-foreground">
+                <SelectValue placeholder="Select branch" />
+              </SelectTrigger>
+              <SelectContent>
+                {baseOptions.map((name) => (
+                  <SelectItem key={name} value={name} className="font-mono text-sm">
+                    {name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {targetBase !== pr.base_ref && (
