@@ -21,6 +21,7 @@ import { Input } from "@gitbud/ui/input";
 import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
+import { BranchName } from "@gitbud/ui/branch-name";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -516,7 +517,10 @@ export function BranchSwitcher() {
       >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle>Rename "{renaming}"</DialogTitle>
+            <DialogTitle className="flex min-w-0 items-center gap-1.5 pr-6">
+              <span className="shrink-0">Rename</span>
+              <BranchName className="min-w-0 flex-1">{renaming}</BranchName>
+            </DialogTitle>
           </DialogHeader>
           <Input
             autoFocus
@@ -579,9 +583,11 @@ export function BranchSwitcher() {
                 checked={switchChoice === "leave"}
                 onChange={() => setSwitchChoice("leave")}
               />
-              <span>
-                <span className="font-medium">Leave my changes on {branch}</span>
-                <br />
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="flex min-w-0 items-center gap-1.5 font-medium">
+                  <span className="shrink-0">Leave my changes on</span>
+                  <BranchName className="h-6 text-xs max-w-full">{branch}</BranchName>
+                </span>
                 <span className="text-muted-foreground">
                   Your in-progress work will be stashed on this branch for you to return to later
                 </span>
@@ -599,9 +605,11 @@ export function BranchSwitcher() {
                 checked={switchChoice === "bring"}
                 onChange={() => setSwitchChoice("bring")}
               />
-              <span>
-                <span className="font-medium">Bring my changes to {pendingSwitch}</span>
-                <br />
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="flex min-w-0 items-center gap-1.5 font-medium">
+                  <span className="shrink-0">Bring my changes to</span>
+                  <BranchName className="h-6 text-xs max-w-full">{pendingSwitch}</BranchName>
+                </span>
                 <span className="text-muted-foreground">
                   Your in-progress work will follow you to the new branch
                 </span>
@@ -626,7 +634,11 @@ export function BranchSwitcher() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Delete "{pendingDelete?.name}"?</DialogTitle>
+            <DialogTitle className="flex min-w-0 items-center gap-1.5 pr-6">
+              <span className="shrink-0">Delete</span>
+              <BranchName className="min-w-0 flex-1">{pendingDelete?.name}</BranchName>
+              <span className="shrink-0">?</span>
+            </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-2">
             {pendingDelete?.uncommitted && (

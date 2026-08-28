@@ -9,6 +9,7 @@ import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { Skeleton } from "@gitbud/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
+import { BranchName } from "@gitbud/ui/branch-name";
 import { SingleSelectField } from "./SingleSelectField";
 import { useMergePullRequest } from "@/hooks/queries/usePullRequests";
 import { useBranches } from "@/hooks/queries/useBranches";
@@ -193,9 +194,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
           </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
-          <div className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
-            <span className="truncate font-mono">{pr.head_ref}</span>
-            <span className="shrink-0">→</span>
+          <div className="flex min-w-0 items-center gap-2 text-sm">
             <SingleSelectField
               options={baseOptions.map((name) => ({
                 key: name,
@@ -204,10 +203,12 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
               selected={targetBase}
               onChange={setTargetBase}
               placeholder="Select branch"
-              className="max-w-xs"
+              className="shrink-0 max-w-xs"
               triggerClassName="max-w-xs font-mono text-sm text-foreground"
               contentClassName="font-mono"
             />
+            <span className="shrink-0 text-muted-foreground">←</span>
+            <BranchName className="min-w-0 flex-1">{pr.head_ref}</BranchName>
           </div>
 
           {targetBase !== pr.base_ref && (
