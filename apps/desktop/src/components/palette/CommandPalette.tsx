@@ -84,8 +84,13 @@ export function CommandPalette({ open, onOpenChange, mode }: CommandPaletteProps
     }
 
     if (mode !== "repos") {
+      const localNames = new Set(branches.filter((b) => !b.is_remote).map((b) => b.name));
       for (const b of branches) {
-        if (b.is_remote) continue;
+        if (b.is_remote) {
+          if (b.name.endsWith("/HEAD")) continue;
+          const shortName = b.name.replace(/^[^/]+\//, "");
+          if (localNames.has(shortName)) continue;
+        }
         const score = fuzzyScore(needle, b.name);
         if (score !== null) {
           scored.push({
@@ -94,7 +99,7 @@ export function CommandPalette({ open, onOpenChange, mode }: CommandPaletteProps
               kind: "branch",
               key: `branch:${b.name}`,
               label: b.name,
-              sublabel: "branch",
+              sublabel: b.is_remote ? "remote branch" : "branch",
               name: b.name,
             },
           });

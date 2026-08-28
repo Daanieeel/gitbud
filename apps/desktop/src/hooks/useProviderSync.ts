@@ -3,8 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 import { useNetworkStore } from "@/store/useNetworkStore";
-import { useRepoStore } from "@/store/useRepoStore";
-import { useRepoSyncing } from "@/hooks/queries/useGitSync";
+import { invalidateRepoAfterSync, useRepoSyncing } from "@/hooks/queries/useGitSync";
 
 // The open-PR list refresh is a cheap REST GET — poll it fast right after opening the app or
 // switching repos (when "did anything change" is most likely to matter and most worth
@@ -66,12 +65,12 @@ export function useProviderSync(repoPath: string | null, login: string | null) {
     const fetchRemote = async () => {
       if (manualSyncRef.current) return;
       try {
+        const hasRemote = await api.hasOriginRemote(repoPath).catch(() => false);
+        if (!hasRemote) return;
         await api.gitFetch(repoPath);
         if (cancelled) return;
         useNetworkStore.getState().noteSuccess();
-        void queryClient.invalidateQueries({ queryKey: queryKeys.branches(repoPath) });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(repoPath) });
-        void useRepoStore.getState().loadRepos();
+        invalidateRepoAfterSync(queryClient, repoPath);
       } catch (err) {
         if (!cancelled) useNetworkStore.getState().noteError(String(err));
       }
