@@ -255,7 +255,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
                 contentClassName="font-mono"
               />
               <span className="shrink-0 text-muted-foreground">←</span>
-              <BranchName className="min-w-0 flex-1">{branch}</BranchName>
+              <BranchName className="min-w-0 max-w-full">{branch}</BranchName>
             </div>
             <Input
               placeholder="Title"

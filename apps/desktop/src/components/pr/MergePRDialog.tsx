@@ -208,7 +208,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
               contentClassName="font-mono"
             />
             <span className="shrink-0 text-muted-foreground">←</span>
-            <BranchName className="min-w-0 flex-1">{pr.head_ref}</BranchName>
+            <BranchName className="min-w-0 max-w-full">{pr.head_ref}</BranchName>
           </div>
 
           {targetBase !== pr.base_ref && (
