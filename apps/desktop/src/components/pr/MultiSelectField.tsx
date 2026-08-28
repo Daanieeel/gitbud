@@ -7,6 +7,7 @@ import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 export interface MultiSelectOption {
   key: string;
   label: React.ReactNode;
+  searchText?: string;
 }
 
 interface MultiSelectFieldProps {
@@ -17,9 +18,8 @@ interface MultiSelectFieldProps {
   onChange: (selected: string[]) => void;
 }
 
-/** A filterable checkbox list behind a chip-showing trigger button — used for picking labels,
- * assignees, and reviewers, none of which have a native `<select>` equivalent since more than
- * one can be chosen at once. */
+/** A filterable checkbox list behind a chip-showing trigger button used for picking labels,
+ * assignees, reviewers, and projects. */
 export function MultiSelectField({
   label,
   placeholder,
@@ -30,7 +30,13 @@ export function MultiSelectField({
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
 
-  const filtered = options.filter((o) => o.key.toLowerCase().includes(filter.toLowerCase()));
+  const filtered = options.filter((o) => {
+    const text = o.searchText ?? o.key;
+    return (
+      text.toLowerCase().includes(filter.toLowerCase()) ||
+      o.key.toLowerCase().includes(filter.toLowerCase())
+    );
+  });
 
   const toggle = (key: string) => {
     onChange(selected.includes(key) ? selected.filter((k) => k !== key) : [...selected, key]);
