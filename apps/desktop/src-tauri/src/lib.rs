@@ -947,11 +947,15 @@ async fn clear_ssh_identity_from_repo(repo_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-async fn init_repo(path: String) -> Result<(), String> {
+async fn init_repo(path: String, default_branch: Option<String>) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let default_branch = settings::get_settings()
-            .map(|s| s.default_branch_name)
-            .unwrap_or_else(|_| "main".to_string());
+        let default_branch = default_branch
+            .filter(|b| !b.trim().is_empty())
+            .unwrap_or_else(|| {
+                settings::get_settings()
+                    .map(|s| s.default_branch_name)
+                    .unwrap_or_else(|_| "main".to_string())
+            });
         let mut opts = git2::RepositoryInitOptions::new();
         opts.initial_head(&default_branch);
         git2::Repository::init_opts(&path, &opts).map_err(|e| e.message().to_string())?;
@@ -959,6 +963,35 @@ async fn init_repo(path: String) -> Result<(), String> {
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+// Generic write used right after `init_repo` to drop a README/.gitignore/LICENSE into a freshly
+// created repo, and reusable later by the planned in-app .gitignore editor.
+#[tauri::command]
+async fn write_text_file(path: String, contents: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        std::fs::write(&path, contents).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+// Best-effort default for pre-filling a license's copyright line before a repo (and thus its own
+// git config) exists — falls back to empty strings the caller can leave blank.
+#[tauri::command]
+async fn get_global_git_identity() -> (Option<String>, Option<String>) {
+    tauri::async_runtime::spawn_blocking(|| {
+        let config = match git2::Config::open_default() {
+            Ok(c) => c,
+            Err(_) => return (None, None),
+        };
+        (
+            config.get_string("user.name").ok(),
+            config.get_string("user.email").ok(),
+        )
+    })
+    .await
+    .unwrap_or((None, None))
 }
 
 // --- stash ---
@@ -1069,6 +1102,15 @@ async fn git_push(app: AppHandle, repo_path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn git_publish(app: AppHandle, repo_path: String, url: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        git_shell::add_remote_and_push(&app, &repo_path, &url, &repo_path)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn git_clone(app: AppHandle, url: String, dest: String) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || git_shell::clone(&app, &url, &dest, &dest))
         .await
@@ -1095,6 +1137,13 @@ async fn get_ahead_behind(repo_path: String) -> Result<git_shell::AheadBehind, S
 #[tauri::command]
 async fn has_upstream_remote(repo_path: String) -> bool {
     tauri::async_runtime::spawn_blocking(move || git_shell::has_remote(&repo_path, "upstream"))
+        .await
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+async fn has_origin_remote(repo_path: String) -> bool {
+    tauri::async_runtime::spawn_blocking(move || git_shell::has_remote(&repo_path, "origin"))
         .await
         .unwrap_or(false)
 }
@@ -1508,6 +1557,18 @@ async fn github_list_user_repos(login: String) -> Result<Vec<github::api::GitHub
     let host = github::auth::get_host()?;
     let token = github::auth::get_token(&login)?;
     github::api::list_user_repos(&host, &token).await
+}
+
+#[tauri::command]
+async fn github_create_repo(
+    login: String,
+    name: String,
+    description: Option<String>,
+    private: bool,
+) -> Result<github::api::GitHubRepo, String> {
+    let host = github::auth::get_host()?;
+    let token = github::auth::get_token(&login)?;
+    github::api::create_repo(&host, &token, &name, description.as_deref(), private).await
 }
 
 #[tauri::command]
@@ -2135,15 +2196,19 @@ pub fn run() {
             apply_ssh_identity_to_repo,
             clear_ssh_identity_from_repo,
             init_repo,
+            write_text_file,
+            get_global_git_identity,
             git_fetch,
             git_pull,
             git_pull_with_strategy,
             git_abort_pull,
             git_push,
+            git_publish,
             cancel_git_operation,
             git_clone,
             get_ahead_behind,
             has_upstream_remote,
+            has_origin_remote,
             remote_web_info,
             get_upstream_ahead_behind,
             sync_upstream,
@@ -2205,6 +2270,7 @@ pub fn run() {
             get_cached_avatar,
             github_get_commit_verification,
             github_list_user_repos,
+            github_create_repo,
             read_pr_template,
         ])
         .run(tauri::generate_context!())

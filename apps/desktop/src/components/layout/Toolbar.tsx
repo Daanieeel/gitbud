@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   GitPullRequestCreateArrow,
@@ -32,6 +32,7 @@ import { WorktreesPanel } from "@/components/repo/WorktreesPanel";
 import { ReflogPanel } from "@/components/history/ReflogPanel";
 import { LfsPanel } from "@/components/repo/LfsPanel";
 import { SyncButton } from "@/components/repo/SyncButton";
+import { PublishButton } from "@/components/repo/PublishButton";
 import { CreatePRDialog } from "@/components/pr/CreatePRDialog";
 import { Button } from "@gitbud/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
@@ -99,10 +100,15 @@ export function Toolbar() {
     favoriteEditorOption?.name ??
     (isCustomEditor && customEditorCommand ? customEditorName(customEditorCommand) : "Editor");
 
-  useEffect(() => {
+  const [hasOrigin, setHasOrigin] = useState<boolean | null>(null);
+  const refreshRemoteInfo = useCallback(() => {
     setRemoteInfo(null);
-    if (!repoPath) return;
+    setHasOrigin(null);
+    if (!repoPath) return () => {};
     let cancelled = false;
+    void api.hasOriginRemote(repoPath).then((has) => {
+      if (!cancelled) setHasOrigin(has);
+    });
     void api.remoteWebInfo(repoPath).then((info) => {
       if (cancelled || !info) return;
       const [host, url] = info;
@@ -112,6 +118,8 @@ export function Toolbar() {
       cancelled = true;
     };
   }, [repoPath]);
+
+  useEffect(() => refreshRemoteInfo(), [refreshRemoteInfo]);
 
   useEffect(() => {
     const handleOpenCreatePr = () => setPreviewPrOpen(true);
@@ -264,7 +272,11 @@ export function Toolbar() {
           </PopoverContent>
         </Popover>
       )}
-      <SyncButton />
+      {repoPath && hasOrigin === false ? (
+        <PublishButton repoPath={repoPath} onPublished={refreshRemoteInfo} />
+      ) : (
+        <SyncButton />
+      )}
       <CreatePRDialog open={previewPrOpen} onOpenChange={setPreviewPrOpen} />
     </header>
   );

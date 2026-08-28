@@ -150,14 +150,29 @@ pub fn is_dirty(repo_path: &str) -> Result<bool, String> {
     get_status(repo_path).map(|s| !s.files.is_empty())
 }
 
+/// A freshly `git init`'d repo with no commits yet has an unborn HEAD: `repo.head()` errors
+/// outright (there's no ref for it to resolve to), even though HEAD does symbolically point at
+/// e.g. "refs/heads/main" — the name a shell prompt shows by reading that target directly rather
+/// than resolving it. Used as the fallback wherever `repo.head()` failing shouldn't mean "no
+/// branch to show" for a repo that just hasn't been committed to yet.
+fn unborn_head_branch_name(repo: &Repository) -> Option<String> {
+    let head_ref = repo.find_reference("HEAD").ok()?;
+    let target = head_ref.symbolic_target()?;
+    Some(
+        target
+            .strip_prefix("refs/heads/")
+            .unwrap_or(target)
+            .to_string(),
+    )
+}
+
 pub fn get_current_branch(repo_path: &str) -> Result<String, String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
-    let head = repo.head().map_err(|e| e.message().to_string())?;
-    if head.is_branch() {
-        Ok(head.shorthand().unwrap_or("HEAD").to_string())
-    } else {
-        Ok("HEAD (detached)".to_string())
-    }
+    return match repo.head() {
+        Ok(head) if head.is_branch() => Ok(head.shorthand().unwrap_or("HEAD").to_string()),
+        Ok(_) => Ok("HEAD (detached)".to_string()),
+        Err(e) => unborn_head_branch_name(&repo).ok_or_else(|| e.message().to_string()),
+    };
 }
 
 pub fn list_branches(repo_path: &str) -> Result<Vec<BranchInfo>, String> {
@@ -183,6 +198,20 @@ pub fn list_branches(repo_path: &str) -> Result<Vec<BranchInfo>, String> {
             is_remote,
         });
     }
+
+    // No commits yet, so `branches()` above legitimately found nothing (see
+    // `unborn_head_branch_name`'s doc comment) — synthesize the one entry so the list isn't
+    // just empty before the first commit.
+    if result.is_empty() {
+        if let Some(name) = unborn_head_branch_name(&repo) {
+            result.push(BranchInfo {
+                name,
+                is_head: true,
+                is_remote: false,
+            });
+        }
+    }
+
     Ok(result)
 }
 
@@ -582,6 +611,23 @@ mod tests {
             Self { path }
         }
 
+        /// Mirrors `init_repo`'s `RepositoryInitOptions::initial_head` — a freshly created repo
+        /// with a chosen default branch name and, deliberately, no commit yet.
+        fn new_unborn(name: &str, branch: &str) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "gitbud-test-repo-{name}-{}",
+                std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_nanos()
+            ));
+            std::fs::create_dir_all(&path).unwrap();
+            let mut opts = git2::RepositoryInitOptions::new();
+            opts.initial_head(branch);
+            Repository::init_opts(&path, &opts).unwrap();
+            Self { path }
+        }
+
         fn path_str(&self) -> String {
             self.path.to_string_lossy().to_string()
         }
@@ -616,6 +662,39 @@ mod tests {
             .expect("a branch should be head");
         assert_eq!(head_branch.name, current);
         assert!(!head_branch.is_remote);
+    }
+
+    #[test]
+    fn lists_chosen_branch_name_before_first_commit() {
+        // Regression test: a repo just created via the "Create New Repository" dialog (no
+        // README/.gitignore/license selected) has no commits yet, so `git branch -a` and git2's
+        // `branches()` both legitimately show nothing until the first commit — but the branch
+        // dropdown still needs to show the branch name the user actually chose, not go empty.
+        let scratch = ScratchRepo::new_unborn("unborn-branch", "develop");
+        let repo_path = scratch.path_str();
+
+        let branches = list_branches(&repo_path).expect("branches should succeed");
+        assert_eq!(
+            branches.len(),
+            1,
+            "expected exactly the chosen branch, synthesized from HEAD: {branches:?}"
+        );
+        assert_eq!(branches[0].name, "develop");
+        assert!(branches[0].is_head);
+        assert!(!branches[0].is_remote);
+    }
+
+    #[test]
+    fn reads_chosen_branch_name_before_first_commit() {
+        // Same unborn-HEAD case as lists_chosen_branch_name_before_first_commit, but for
+        // get_current_branch — this is the one useBranches() actually calls first, and until
+        // this one was also fixed it rejected outright, which failed the whole Promise.all in
+        // useBranches and left BOTH branch and branches undefined regardless of the list fix.
+        let scratch = ScratchRepo::new_unborn("unborn-current-branch", "develop");
+        let repo_path = scratch.path_str();
+
+        let branch = get_current_branch(&repo_path).expect("current branch should succeed");
+        assert_eq!(branch, "develop");
     }
 
     #[test]

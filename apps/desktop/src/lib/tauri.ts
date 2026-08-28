@@ -218,7 +218,11 @@ export const api = {
   gitLfsPull: (repoPath: string) => invoke<void>("git_lfs_pull", { repoPath }),
   gitLfsPush: (repoPath: string, branch: string) =>
     invoke<void>("git_lfs_push", { repoPath, branch }),
-  initRepo: (path: string) => invoke<void>("init_repo", { path }),
+  initRepo: (path: string, defaultBranch?: string) =>
+    invoke<void>("init_repo", { path, defaultBranch }),
+  writeTextFile: (path: string, contents: string) =>
+    invoke<void>("write_text_file", { path, contents }),
+  getGlobalGitIdentity: () => invoke<[string | null, string | null]>("get_global_git_identity"),
 
   listSshIdentities: () => invoke<SshIdentity[]>("list_ssh_identities"),
   addSshIdentity: (label: string, host: string, keyPath: string) =>
@@ -235,11 +239,13 @@ export const api = {
     invoke<void>("git_pull_with_strategy", { repoPath, strategy }),
   gitAbortPull: (repoPath: string) => invoke<void>("git_abort_pull", { repoPath }),
   gitPush: (repoPath: string) => invoke<void>("git_push", { repoPath }),
+  gitPublish: (repoPath: string, url: string) => invoke<void>("git_publish", { repoPath, url }),
   gitClone: (url: string, dest: string) => invoke<void>("git_clone", { url, dest }),
   cancelGitOperation: (eventId: string) =>
     invoke<void>("cancel_git_operation", { repoPath: eventId }),
   getAheadBehind: (repoPath: string) => invoke<AheadBehind>("get_ahead_behind", { repoPath }),
   hasUpstreamRemote: (repoPath: string) => invoke<boolean>("has_upstream_remote", { repoPath }),
+  hasOriginRemote: (repoPath: string) => invoke<boolean>("has_origin_remote", { repoPath }),
   remoteWebInfo: (repoPath: string) =>
     invoke<[string, string] | null>("remote_web_info", { repoPath }),
   getUpstreamAheadBehind: (repoPath: string, branch: string) =>
@@ -436,4 +442,6 @@ export const api = {
   githubGetCommitVerification: (repoPath: string, login: string, sha: string) =>
     invoke<CommitVerification>("github_get_commit_verification", { repoPath, login, sha }),
   githubListUserRepos: (login: string) => invoke<GitHubRepo[]>("github_list_user_repos", { login }),
+  githubCreateRepo: (login: string, name: string, description: string | null, isPrivate: boolean) =>
+    invoke<GitHubRepo>("github_create_repo", { login, name, description, private: isPrivate }),
 };

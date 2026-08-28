@@ -380,6 +380,24 @@ pub fn push(app: &AppHandle, repo_path: &str, event_id: &str) -> Result<(), Stri
     )
 }
 
+/// The local-repo half of "publish": wires up `origin` to a repo just created via the GitHub
+/// API, then pushes like a normal first push. Assumes `origin` doesn't already exist — the
+/// "no remote configured" state the publish button only offers itself in.
+pub fn add_remote_and_push(
+    app: &AppHandle,
+    repo_path: &str,
+    url: &str,
+    event_id: &str,
+) -> Result<(), String> {
+    run_streaming(
+        app,
+        Some(repo_path),
+        &["remote", "add", "origin", url],
+        event_id,
+    )?;
+    push(app, repo_path, event_id)
+}
+
 /// Renames a branch on `origin` to match a local rename that's already happened (via
 /// `repo::rename_branch`): pushes the (already locally-renamed) branch under its new name,
 /// setting it as the upstream in the same step, then removes the old name from the remote.
