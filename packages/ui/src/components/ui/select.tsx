@@ -8,10 +8,7 @@ import { cn } from "../../lib/utils";
 const Select = SelectPrimitive.Root;
 const SelectGroup = SelectPrimitive.Group;
 
-function SelectValue({
-  className,
-  ...props
-}: React.ComponentProps<typeof SelectPrimitive.Value>) {
+function SelectValue({ className, ...props }: React.ComponentProps<typeof SelectPrimitive.Value>) {
   return <SelectPrimitive.Value className={cn("truncate", className)} {...props} />;
 }
 
