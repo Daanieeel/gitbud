@@ -93,11 +93,39 @@ jobs:
 
           if [ -n "${GPG_SIGNING_KEY:-}" ]; then
             echo "Importing GPG signing key..."
-            if echo "$GPG_SIGNING_KEY" | grep -q "BEGIN PGP PRIVATE KEY BLOCK"; then
-              echo "$GPG_SIGNING_KEY" | gpg --batch --import
-            else
-              echo "$GPG_SIGNING_KEY" | base64 -d | gpg --batch --import
-            fi
+            mkdir -p ~/.gnupg
+            chmod 700 ~/.gnupg
+            echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
+            gpgconf --reload gpg-agent 2>/dev/null || true
+
+            python3 -c '
+import os, sys, base64
+
+key = os.environ.get("GPG_SIGNING_KEY", "").strip()
+if not key:
+    sys.exit(0)
+
+if "\\n" in key and "\n" not in key:
+    key = key.replace("\\r\\n", "\n").replace("\\n", "\n")
+
+if "-----BEGIN" in key and "KEY BLOCK-----" in key:
+    sys.stdout.buffer.write(key.encode("utf-8") + b"\n")
+else:
+    cleaned = "".join(key.split())
+    try:
+        decoded = base64.b64decode(cleaned)
+        try:
+            decoded_str = decoded.decode("utf-8")
+            if "-----BEGIN" in decoded_str:
+                if "\\n" in decoded_str and "\n" not in decoded_str:
+                    decoded_str = decoded_str.replace("\\r\\n", "\n").replace("\\n", "\n")
+                decoded = decoded_str.encode("utf-8")
+        except Exception:
+            pass
+        sys.stdout.buffer.write(decoded)
+    except Exception:
+        sys.stdout.buffer.write(key.encode("utf-8") + b"\n")
+' | gpg --batch --import
 
             gpg_opts=(--batch --yes)
             if [ -n "${GPG_PASSPHRASE:-}" ]; then
