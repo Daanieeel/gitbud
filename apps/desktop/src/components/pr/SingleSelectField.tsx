@@ -8,6 +8,8 @@ export interface SingleSelectOption {
   key: string;
   label: React.ReactNode;
   searchText?: string;
+  slotLeft?: React.ReactNode;
+  slotRight?: React.ReactNode;
 }
 
 interface SingleSelectFieldProps {
@@ -69,9 +71,27 @@ export function SingleSelectField({
               triggerClassName,
             )}
           >
-            <span className={cn("min-w-0 flex-1 truncate", !selected && "text-muted-foreground")}>
-              {selected ? (selectedOption?.label ?? selected) : (placeholder ?? "None")}
-            </span>
+            {selectedOption ? (
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-1.5 truncate">
+                  {selectedOption.slotLeft && (
+                    <span className="flex shrink-0 items-center">{selectedOption.slotLeft}</span>
+                  )}
+                  <span className="truncate">{selectedOption.label}</span>
+                </div>
+                {selectedOption.slotRight && (
+                  <span className="flex shrink-0 items-center text-xs text-muted-foreground">
+                    {selectedOption.slotRight}
+                  </span>
+                )}
+              </div>
+            ) : selected ? (
+              <span className="min-w-0 flex-1 truncate">{selected}</span>
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                {placeholder ?? "None"}
+              </span>
+            )}
             <ChevronDownIcon className="size-3.5 shrink-0 opacity-50" />
           </button>
         </PopoverTrigger>
@@ -128,7 +148,19 @@ export function SingleSelectField({
                     setOpen(false);
                   }}
                 >
-                  <span className="min-w-0 flex-1 truncate text-left">{o.label}</span>
+                  <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-1.5 truncate">
+                      {o.slotLeft && (
+                        <span className="flex shrink-0 items-center">{o.slotLeft}</span>
+                      )}
+                      <span className="truncate text-left">{o.label}</span>
+                    </div>
+                    {o.slotRight && (
+                      <span className="flex shrink-0 items-center text-xs text-muted-foreground">
+                        {o.slotRight}
+                      </span>
+                    )}
+                  </div>
                   {isSelected && <CheckIcon className="size-3.5 shrink-0 text-primary" />}
                 </button>
               );

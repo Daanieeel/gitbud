@@ -9,6 +9,7 @@ import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { DiffView } from "@gitbud/ui/diff-view";
+import { ProgressCircle } from "@gitbud/ui/progress-circle";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
@@ -227,12 +228,8 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
 
   const userOptions = assignableUsers.map((u) => ({
     key: u.login,
-    label: (
-      <span className="flex items-center gap-1.5">
-        <img src={u.avatar_url} alt="" className="size-4 rounded-full" />
-        {u.login}
-      </span>
-    ),
+    label: u.login,
+    slotLeft: <img src={u.avatar_url} alt="" className="size-4 rounded-full" />,
   }));
 
   return (
@@ -373,14 +370,12 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
               placeholder="No labels"
               options={labels.map((l) => ({
                 key: l.name,
-                label: (
-                  <span className="flex items-center gap-1.5">
-                    <span
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: `#${l.color}` }}
-                    />
-                    {l.name}
-                  </span>
+                label: l.name,
+                slotLeft: (
+                  <span
+                    className="inline-block size-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: `#${l.color}` }}
+                  />
                 ),
               }))}
               selected={selectedLabels}
@@ -404,11 +399,17 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
               label="Milestone"
               placeholder="No milestone"
               clearLabel="Clear milestone"
-              options={milestones.map((m) => ({
-                key: String(m.number),
-                label: m.title,
-                searchText: m.title,
-              }))}
+              options={milestones.map((m) => {
+                const total = (m.open_issues ?? 0) + (m.closed_issues ?? 0);
+                const progress = total > 0 ? Math.round(((m.closed_issues ?? 0) / total) * 100) : 0;
+                return {
+                  key: String(m.number),
+                  label: m.title,
+                  searchText: m.title,
+                  slotLeft: <ProgressCircle value={progress} size={14} strokeWidth={2} />,
+                  slotRight: `${progress}%`,
+                };
+              })}
               selected={selectedMilestone}
               onChange={setSelectedMilestone}
             />

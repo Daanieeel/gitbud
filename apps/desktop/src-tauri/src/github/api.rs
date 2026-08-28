@@ -717,6 +717,10 @@ pub async fn request_reviewers(
 pub struct Milestone {
     pub number: u64,
     pub title: String,
+    #[serde(default)]
+    pub open_issues: u64,
+    #[serde(default)]
+    pub closed_issues: u64,
 }
 
 pub async fn list_milestones(

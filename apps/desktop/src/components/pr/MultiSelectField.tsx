@@ -8,6 +8,8 @@ export interface MultiSelectOption {
   key: string;
   label: React.ReactNode;
   searchText?: string;
+  slotLeft?: React.ReactNode;
+  slotRight?: React.ReactNode;
 }
 
 interface MultiSelectFieldProps {
@@ -59,11 +61,19 @@ export function MultiSelectField({
                 return (
                   <span
                     key={key}
-                    className="flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground"
+                    className="flex max-w-full items-center gap-1.5 truncate rounded bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground"
                   >
-                    {opt?.label ?? key}
+                    {opt?.slotLeft && (
+                      <span className="flex shrink-0 items-center">{opt.slotLeft}</span>
+                    )}
+                    <span className="min-w-0 truncate">{opt?.label ?? key}</span>
+                    {opt?.slotRight && (
+                      <span className="flex shrink-0 items-center text-muted-foreground">
+                        {opt.slotRight}
+                      </span>
+                    )}
                     <XIcon
-                      className="size-3 hover:text-destructive"
+                      className="size-3 shrink-0 hover:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation();
                         toggle(key);
@@ -108,7 +118,17 @@ export function MultiSelectField({
                 checked={selected.includes(o.key)}
                 onCheckedChange={() => toggle(o.key)}
               >
-                {o.label}
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-1.5 truncate">
+                    {o.slotLeft && <span className="flex shrink-0 items-center">{o.slotLeft}</span>}
+                    <span className="min-w-0 truncate">{o.label}</span>
+                  </div>
+                  {o.slotRight && (
+                    <span className="flex shrink-0 items-center text-xs text-muted-foreground">
+                      {o.slotRight}
+                    </span>
+                  )}
+                </div>
               </CheckboxGroup>
             ))}
           </div>
