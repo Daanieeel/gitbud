@@ -8,7 +8,6 @@ import { Textarea } from "@gitbud/ui/textarea";
 import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@gitbud/ui/select";
 import { DiffView } from "@gitbud/ui/diff-view";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
@@ -244,20 +243,20 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
         </DialogHeader>
         <div className="flex min-h-0 flex-1 gap-4">
           <div className="flex min-w-0 flex-[2] flex-col gap-3">
-            <div className="flex shrink-0 items-center gap-2 text-sm">
-              <Select value={base} onValueChange={setBase}>
-                <SelectTrigger size="sm" className="h-7 max-w-xs font-mono text-sm">
-                  <SelectValue placeholder="Select branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {localBranches.map((b) => (
-                    <SelectItem key={b.name} value={b.name} className="font-mono text-sm">
-                      {b.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <span className="text-muted-foreground">←</span>
+            <div className="flex min-w-0 shrink-0 items-center gap-2 text-sm">
+              <SingleSelectField
+                options={localBranches.map((b) => ({
+                  key: b.name,
+                  label: b.name,
+                }))}
+                selected={base}
+                onChange={setBase}
+                placeholder="Select branch"
+                className="max-w-xs"
+                triggerClassName="max-w-xs font-mono text-sm"
+                contentClassName="font-mono"
+              />
+              <span className="shrink-0 text-muted-foreground">←</span>
               <span className="truncate font-mono">{branch}</span>
             </div>
             <Input

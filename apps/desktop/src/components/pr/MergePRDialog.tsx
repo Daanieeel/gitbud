@@ -9,7 +9,7 @@ import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { Skeleton } from "@gitbud/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@gitbud/ui/select";
+import { SingleSelectField } from "./SingleSelectField";
 import { useMergePullRequest } from "@/hooks/queries/usePullRequests";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { prPollIntervalMs, useCheckRuns, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
@@ -193,21 +193,21 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
           </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+          <div className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
             <span className="truncate font-mono">{pr.head_ref}</span>
             <span className="shrink-0">→</span>
-            <Select value={targetBase} onValueChange={setTargetBase}>
-              <SelectTrigger size="sm" className="h-7 max-w-xs font-mono text-sm text-foreground">
-                <SelectValue placeholder="Select branch" />
-              </SelectTrigger>
-              <SelectContent>
-                {baseOptions.map((name) => (
-                  <SelectItem key={name} value={name} className="font-mono text-sm">
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <SingleSelectField
+              options={baseOptions.map((name) => ({
+                key: name,
+                label: name,
+              }))}
+              selected={targetBase}
+              onChange={setTargetBase}
+              placeholder="Select branch"
+              className="max-w-xs"
+              triggerClassName="max-w-xs font-mono text-sm text-foreground"
+              contentClassName="font-mono"
+            />
           </div>
 
           {targetBase !== pr.base_ref && (
