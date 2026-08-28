@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   frontend:
-    name: Typecheck + lint + build (frontend)
+    name: Typecheck + lint + test + build (frontend)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,6 +21,7 @@ jobs:
       - run: bun run lint:js
       - run: bun run format:check:js
       - run: bun run quality
+      - run: bun test
       - run: bun run check:landing
       - run: bun run build
 

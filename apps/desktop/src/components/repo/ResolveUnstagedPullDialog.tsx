@@ -54,7 +54,7 @@ export function ResolveUnstagedPullDialog() {
                 {resolving === "stash-and-pull" ? "Stashing and pulling…" : "Stash & pull"}
               </span>
               <span className="text-xs text-muted-foreground">
-                Set your changes aside, pull, then bring them back automatically
+                Set your changes aside, pull, then bring them back
               </span>
             </span>
           </Button>

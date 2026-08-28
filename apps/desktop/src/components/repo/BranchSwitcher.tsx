@@ -94,6 +94,7 @@ export function BranchSwitcher() {
     uncommitted: boolean;
     unmerged: boolean;
     published: boolean;
+    isRemote?: boolean;
   } | null>(null);
   const [deleteOnRemote, setDeleteOnRemote] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -271,13 +272,14 @@ export function BranchSwitcher() {
   // never pushed); otherwise opens the confirmation dialog with whichever of those is true.
   const requestDelete = async (name: string, isRemote = false) => {
     if (isRemote) {
-      const shortName = name.replace(/^origin\//, "");
+      const shortName = name.replace(/^[^/]+\//, "");
       setDeleteOnRemote(true);
       setPendingDelete({
         name: shortName,
         uncommitted: false,
         unmerged: false,
         published: true,
+        isRemote: true,
       });
       return;
     }
@@ -302,12 +304,17 @@ export function BranchSwitcher() {
 
   const confirmDelete = async () => {
     if (!pendingDelete) return;
+    if (pendingDelete.isRemote && !deleteOnRemote) return;
     setDeleting(true);
     try {
       await deleteBranchMutation.mutateAsync({
         name: pendingDelete.name,
-        opts: { deleteRemote: pendingDelete.published && deleteOnRemote },
+        opts: {
+          deleteRemote: (pendingDelete.isRemote || pendingDelete.published) && deleteOnRemote,
+        },
       });
+    } catch (err) {
+      toast.error(String(err));
     } finally {
       setDeleting(false);
       setPendingDelete(null);
@@ -656,7 +663,11 @@ export function BranchSwitcher() {
             {pendingDelete?.published && (
               <div className="flex items-start gap-2 rounded-md border border-destructive bg-destructive/10 p-3 text-sm text-destructive">
                 <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" />
-                <span>This branch is published to origin</span>
+                <span>
+                  {pendingDelete.isRemote
+                    ? "This branch only exists on origin and will be deleted from the remote"
+                    : "This branch is published to origin"}
+                </span>
               </div>
             )}
           </div>
@@ -674,7 +685,11 @@ export function BranchSwitcher() {
             <Button variant="ghost" onClick={() => setPendingDelete(null)}>
               Cancel
             </Button>
-            <Button variant="destructive" disabled={deleting} onClick={() => void confirmDelete()}>
+            <Button
+              variant="destructive"
+              disabled={deleting || Boolean(pendingDelete?.isRemote && !deleteOnRemote)}
+              onClick={() => void confirmDelete()}
+            >
               Delete Branch
             </Button>
           </DialogFooter>
