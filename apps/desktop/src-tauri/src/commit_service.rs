@@ -36,10 +36,16 @@ fn signing_config(repo: &Repository) -> Result<Option<(String, String)>, String>
 /// protected keys, since there's no prompt UI to ask for one) — ssh-keygen reads it directly,
 /// no agent involved.
 pub fn ssh_sign(key_path: &str, buffer: &[u8]) -> Result<String, String> {
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let id = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let dir = std::env::temp_dir();
-    let buf_path = dir.join(format!("gitbud-commit-buf-{}", std::process::id()));
+    let buf_path = dir.join(format!("gitbud-commit-buf-{}-{}", std::process::id(), id));
     std::fs::write(&buf_path, buffer).map_err(|e| e.to_string())?;
-    let sig_path = dir.join(format!("gitbud-commit-buf-{}.sig", std::process::id()));
+    let sig_path = dir.join(format!(
+        "gitbud-commit-buf-{}-{}.sig",
+        std::process::id(),
+        id
+    ));
     let _ = std::fs::remove_file(&sig_path);
 
     let output = crate::signing::command_with_path("ssh-keygen")

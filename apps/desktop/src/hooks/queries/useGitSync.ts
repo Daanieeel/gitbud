@@ -43,17 +43,23 @@ export function useRepoSyncing(repoPath: string | null) {
   );
 }
 
+export function invalidateRepoAfterSync(
+  queryClient: ReturnType<typeof useQueryClient>,
+  repoPath: string,
+) {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.repo(repoPath) });
+  void queryClient.invalidateQueries({ queryKey: ["pr-list", repoPath] });
+  void queryClient.invalidateQueries({ queryKey: ["pr-detail", repoPath] });
+  void queryClient.invalidateQueries({ queryKey: ["check-runs", repoPath] });
+  void useRepoStore.getState().loadRepos();
+}
+
 /** Fetch/pull/push/sync/LFS actions for a repo. `branch` is only used to word the progress
- * toast — pass `null` from callers that only need `syncing` and never trigger these actions. */
+ * toast - pass `null` from callers that only need `syncing` and never trigger these actions. */
 export function useGitSync(repoPath: string | null, branch: string | null) {
   const queryClient = useQueryClient();
   const syncing = useRepoSyncing(repoPath);
   const mutationKey = repoPath ? syncMutationKey(repoPath) : undefined;
-
-  const invalidate = (keys: readonly (readonly (string | number)[])[]) => {
-    if (!repoPath) return;
-    for (const key of keys) void queryClient.invalidateQueries({ queryKey: key });
-  };
 
   const fetchMutation = useMutation({
     mutationKey,
@@ -64,12 +70,7 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
           description: "Fetching origin…",
           doneMessage: "Fetched origin",
         });
-        invalidate([
-          queryKeys.branches(repoPath),
-          queryKeys.status(repoPath),
-          queryKeys.aheadBehind(repoPath),
-        ]);
-        void useRepoStore.getState().loadRepos();
+        invalidateRepoAfterSync(queryClient, repoPath);
       }),
   });
 
@@ -93,11 +94,7 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
             return false;
           },
         });
-        invalidate([
-          queryKeys.status(repoPath),
-          queryKeys.log(repoPath),
-          queryKeys.aheadBehind(repoPath),
-        ]);
+        invalidateRepoAfterSync(queryClient, repoPath);
       }),
   });
 
@@ -118,7 +115,8 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
             ? `Published ${branch ?? "current branch"} to origin`
             : `Pushed ${branch ?? "current branch"} to origin`,
         });
-        invalidate([queryKeys.aheadBehind(repoPath)]);
+        void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(repoPath) });
+        void queryClient.invalidateQueries({ queryKey: queryKeys.branches(repoPath) });
       }),
   });
 
@@ -164,11 +162,7 @@ export function useGitSync(repoPath: string | null, branch: string | null) {
             },
           },
         );
-        invalidate([
-          queryKeys.status(repoPath),
-          queryKeys.log(repoPath),
-          queryKeys.aheadBehind(repoPath),
-        ]);
+        invalidateRepoAfterSync(queryClient, repoPath);
       }),
   });
 
@@ -220,9 +214,7 @@ export function useResolveDivergedPull(repoPath: string | null) {
           description: strategy === "merge" ? "Merging origin…" : "Rebasing onto origin…",
           doneMessage: strategy === "merge" ? "Merged origin" : "Rebased onto origin",
         });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.log(repoPath) });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(repoPath) });
+        invalidateRepoAfterSync(queryClient, repoPath);
       }),
   });
 }
@@ -249,7 +241,7 @@ export function useResolveUnstagedPull(repoPath: string | null) {
             async () => {
               await api.stashSave(repoPath, "WIP before pulling", true);
               // The stash must come off even if the pull itself fails (e.g. a genuine
-              // conflict) — otherwise the user's changes are stuck in the stash list instead
+              // conflict) - otherwise the user's changes are stuck in the stash list instead
               // of back in their working tree.
               try {
                 await api.gitPull(repoPath);
@@ -263,9 +255,7 @@ export function useResolveUnstagedPull(repoPath: string | null) {
             },
           );
         }
-        void queryClient.invalidateQueries({ queryKey: queryKeys.status(repoPath) });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.log(repoPath) });
-        void queryClient.invalidateQueries({ queryKey: queryKeys.aheadBehind(repoPath) });
+        invalidateRepoAfterSync(queryClient, repoPath);
         void queryClient.invalidateQueries({ queryKey: queryKeys.stashes(repoPath) });
       }),
   });

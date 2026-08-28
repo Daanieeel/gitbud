@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { api } from "@/lib/tauri";
-import { useRepoStore } from "./useRepoStore";
+import { queryClient } from "@/lib/queryClient";
+import { invalidateRepoAfterSync } from "@/hooks/queries/useGitSync";
 
 const CONCURRENCY = 4;
 
@@ -73,12 +74,13 @@ export const useBatchSyncStore = create<BatchSyncState>((set, get) => ({
   runFetchAll: (repoPaths) =>
     run(set, get, repoPaths, "fetch", async (path) => {
       await api.gitFetch(path);
+      invalidateRepoAfterSync(queryClient, path);
     })(),
 
   runPullAll: (repoPaths) =>
     run(set, get, repoPaths, "pull", async (path) => {
       await api.gitPull(path);
-      await useRepoStore.getState().loadRepos();
+      invalidateRepoAfterSync(queryClient, path);
     })(),
 
   dismiss: () => set({ outcomes: {}, errors: {} }),

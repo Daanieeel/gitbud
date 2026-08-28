@@ -217,13 +217,93 @@ pub fn list_branches(repo_path: &str) -> Result<Vec<BranchInfo>, String> {
 
 pub fn checkout_branch(repo_path: &str, branch: &str) -> Result<(), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+
+    if let Ok(mut local_branch) = repo.find_branch(branch, git2::BranchType::Local) {
+        let reference = local_branch.get_mut();
+        let ref_name = reference.name().ok_or("invalid ref name")?.to_string();
+        let commit = reference
+            .peel_to_commit()
+            .map_err(|e| e.message().to_string())?;
+        repo.checkout_tree(commit.as_object(), None)
+            .map_err(|e| e.message().to_string())?;
+        return repo
+            .set_head(&ref_name)
+            .map_err(|e| e.message().to_string());
+    }
+
+    let remote_ref_name = if branch.starts_with("refs/remotes/") {
+        Some(branch.to_string())
+    } else if let Ok(remote_branch) = repo.find_branch(branch, git2::BranchType::Remote) {
+        remote_branch.get().name().map(|s| s.to_string())
+    } else if let Ok(remote_branch) =
+        repo.find_branch(&format!("origin/{branch}"), git2::BranchType::Remote)
+    {
+        remote_branch.get().name().map(|s| s.to_string())
+    } else {
+        None
+    };
+
+    if let Some(ref remote_ref_name) = remote_ref_name {
+        let short_name = if let Some(stripped) = remote_ref_name.strip_prefix("refs/remotes/") {
+            stripped
+                .split_once('/')
+                .map(|(_, rest)| rest)
+                .unwrap_or(stripped)
+        } else if let Some((_remote, rest)) = remote_ref_name.split_once('/') {
+            rest
+        } else {
+            remote_ref_name.as_str()
+        };
+
+        if let Ok(mut local_branch) = repo.find_branch(short_name, git2::BranchType::Local) {
+            let reference = local_branch.get_mut();
+            let ref_name = reference.name().ok_or("invalid ref name")?.to_string();
+            let commit = reference
+                .peel_to_commit()
+                .map_err(|e| e.message().to_string())?;
+            repo.checkout_tree(commit.as_object(), None)
+                .map_err(|e| e.message().to_string())?;
+            return repo
+                .set_head(&ref_name)
+                .map_err(|e| e.message().to_string());
+        }
+
+        let remote_ref = repo
+            .find_reference(remote_ref_name)
+            .or_else(|_| repo.find_reference(&format!("refs/remotes/{remote_ref_name}")))
+            .map_err(|e| e.message().to_string())?;
+        let commit = remote_ref
+            .peel_to_commit()
+            .map_err(|e| e.message().to_string())?;
+
+        let mut new_local_branch = repo
+            .branch(short_name, &commit, false)
+            .map_err(|e| e.message().to_string())?;
+        let remote_shorthand = remote_ref.shorthand().unwrap_or(remote_ref_name);
+        let _ = new_local_branch.set_upstream(Some(remote_shorthand));
+
+        repo.checkout_tree(commit.as_object(), None)
+            .map_err(|e| e.message().to_string())?;
+        let ref_name = format!("refs/heads/{short_name}");
+        return repo
+            .set_head(&ref_name)
+            .map_err(|e| e.message().to_string());
+    }
+
     let (object, reference) = repo
         .revparse_ext(branch)
         .map_err(|e| e.message().to_string())?;
     repo.checkout_tree(&object, None)
         .map_err(|e| e.message().to_string())?;
     match reference {
-        Some(r) => repo.set_head(r.name().ok_or("invalid ref name")?),
+        Some(r) => {
+            let ref_name = r.name().ok_or("invalid ref name")?;
+            if ref_name.starts_with("refs/heads/") {
+                repo.set_head(ref_name)
+            } else {
+                repo.set_head_detached(object.id())
+            }
+        }
         None => repo.set_head_detached(object.id()),
     }
     .map_err(|e| e.message().to_string())
@@ -852,6 +932,149 @@ mod tests {
             .find_commit(git2::Oid::from_str(&fixup_oid).unwrap())
             .unwrap();
         assert_eq!(commit.summary(), Some("fixup! add a feature"));
+    }
+
+    #[test]
+    fn remote_branch_fetch_and_checkout_roundtrip() {
+        let remote_scratch = ScratchRepo::new("remote-origin");
+        let remote_path = remote_scratch.path_str();
+        remote_scratch.write_and_commit("a.txt", "a\n", "initial remote commit");
+        let default_branch = get_current_branch(&remote_path).unwrap();
+
+        // Create a new branch on remote with a unique commit
+        create_branch(&remote_path, "remote-feat", true).unwrap();
+        remote_scratch.write_and_commit("feat.txt", "feature content\n", "remote branch commit");
+        checkout_branch(&remote_path, &default_branch).unwrap();
+
+        // Create a local scratch repo and add the remote repo as origin
+        let local_scratch = ScratchRepo::new("local-clone");
+        let local_path = local_scratch.path_str();
+        local_scratch.write_and_commit("a.txt", "a\n", "initial local commit");
+
+        let local_git2_repo = Repository::open(&local_path).unwrap();
+        local_git2_repo.remote("origin", &remote_path).unwrap();
+
+        // Fetch from origin into local repository
+        let mut remote = local_git2_repo.find_remote("origin").unwrap();
+        remote
+            .fetch(&["+refs/heads/*:refs/remotes/origin/*"], None, None)
+            .unwrap();
+
+        // Verify list_branches shows the remote branch
+        let branches = list_branches(&local_path).expect("list_branches should succeed");
+        let remote_feat = branches
+            .iter()
+            .find(|b| b.name == "origin/remote-feat")
+            .expect("expected origin/remote-feat to be present after fetch");
+        assert!(remote_feat.is_remote);
+        assert!(!remote_feat.is_head);
+
+        // Checkout the remote branch
+        checkout_branch(&local_path, "origin/remote-feat")
+            .expect("checkout remote branch should succeed");
+
+        // Verify current branch is now remote-feat
+        let current = get_current_branch(&local_path).unwrap();
+        assert_eq!(current, "remote-feat");
+
+        // Verify list_branches shows remote-feat as a local head branch
+        let branches_after = list_branches(&local_path).unwrap();
+        let local_feat = branches_after
+            .iter()
+            .find(|b| b.name == "remote-feat")
+            .expect("expected local remote-feat branch to exist");
+        assert!(!local_feat.is_remote);
+        assert!(local_feat.is_head);
+
+        // Verify the file from the remote branch exists in the working directory
+        assert!(local_scratch.path.join("feat.txt").exists());
+    }
+
+    #[test]
+    fn checkout_remote_branch_by_short_name() {
+        let remote_scratch = ScratchRepo::new("remote-short-origin");
+        let remote_path = remote_scratch.path_str();
+        remote_scratch.write_and_commit("a.txt", "a\n", "initial remote commit");
+        let default_branch = get_current_branch(&remote_path).unwrap();
+
+        // Create a new branch on remote
+        create_branch(&remote_path, "feat-short", true).unwrap();
+        remote_scratch.write_and_commit("short.txt", "short content\n", "feat commit");
+        checkout_branch(&remote_path, &default_branch).unwrap();
+
+        // Create local repo tracking remote
+        let local_scratch = ScratchRepo::new("local-short");
+        let local_path = local_scratch.path_str();
+        local_scratch.write_and_commit("a.txt", "a\n", "initial local commit");
+
+        let local_git2_repo = Repository::open(&local_path).unwrap();
+        local_git2_repo.remote("origin", &remote_path).unwrap();
+
+        // Fetch from origin
+        let mut remote = local_git2_repo.find_remote("origin").unwrap();
+        remote
+            .fetch(&["+refs/heads/*:refs/remotes/origin/*"], None, None)
+            .unwrap();
+
+        // Checkout passing only the short name "feat-short" (not "origin/feat-short")
+        checkout_branch(&local_path, "feat-short").expect("checkout by short name should succeed");
+
+        assert_eq!(get_current_branch(&local_path).unwrap(), "feat-short");
+        assert!(local_scratch.path.join("short.txt").exists());
+    }
+
+    #[test]
+    fn fetch_updates_ahead_behind_counters_for_unpulled_remote_commits() {
+        let remote_scratch = ScratchRepo::new("remote-ahead-behind");
+        let remote_path = remote_scratch.path_str();
+        let init_oid = remote_scratch.write_and_commit("a.txt", "a\n", "initial commit");
+        let branch = get_current_branch(&remote_path).unwrap();
+
+        let local_scratch = ScratchRepo::new("local-ahead-behind");
+        let local_path = local_scratch.path_str();
+
+        // Link origin
+        let local_git2_repo = Repository::open(&local_path).unwrap();
+        local_git2_repo.remote("origin", &remote_path).unwrap();
+
+        // Fetch initial state from remote
+        let mut remote = local_git2_repo.find_remote("origin").unwrap();
+        remote
+            .fetch(&["+refs/heads/*:refs/remotes/origin/*"], None, None)
+            .unwrap();
+
+        // Create local tracking branch at the fetched commit
+        let commit = local_git2_repo
+            .find_commit(git2::Oid::from_str(&init_oid).unwrap())
+            .unwrap();
+        let mut local_branch = local_git2_repo.branch(&branch, &commit, true).unwrap();
+        local_branch
+            .set_upstream(Some(&format!("origin/{branch}")))
+            .unwrap();
+        local_git2_repo
+            .set_head(&format!("refs/heads/{branch}"))
+            .unwrap();
+        local_git2_repo
+            .checkout_head(Some(git2::build::CheckoutBuilder::new().force()))
+            .unwrap();
+
+        let initial_ab = crate::git_shell::get_ahead_behind(&local_path).unwrap();
+        assert_eq!(initial_ab.behind, 0);
+        assert_eq!(initial_ab.ahead, 0);
+
+        // Remote gets a new commit
+        remote_scratch.write_and_commit("b.txt", "b\n", "new remote commit");
+
+        // Fetch into local
+        remote
+            .fetch(&["+refs/heads/*:refs/remotes/origin/*"], None, None)
+            .unwrap();
+
+        // Ahead/behind counter now reports 1 commit behind
+        let after_fetch_ab = crate::git_shell::get_ahead_behind(&local_path).unwrap();
+        assert_eq!(after_fetch_ab.behind, 1);
+        assert_eq!(after_fetch_ab.ahead, 0);
+        assert!(after_fetch_ab.published);
     }
 }
 
