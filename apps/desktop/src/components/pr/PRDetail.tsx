@@ -5,6 +5,7 @@ import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { ExternalLinkIcon, GitBranchIcon, GitMergeIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { Avatar } from "@gitbud/ui/avatar";
+import { BranchName } from "@gitbud/ui/branch-name";
 import { DiffView } from "@gitbud/ui/diff-view";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { CIBadge } from "./CIBadge";
@@ -92,8 +93,10 @@ export function PRDetail({ repoPath, login, pr }: PRDetailProps) {
           <div className="truncate text-sm font-medium">
             {pr.title} <span className="text-muted-foreground">#{pr.number}</span>
           </div>
-          <div className="text-xs text-muted-foreground">
-            {pr.head_ref} → {pr.base_ref}
+          <div className="flex min-w-0 items-center gap-1.5 pt-0.5 text-xs text-muted-foreground">
+            <BranchName className="h-5 px-1.5 text-xs">{pr.base_ref}</BranchName>
+            <span className="shrink-0">←</span>
+            <BranchName className="h-5 px-1.5 text-xs">{pr.head_ref}</BranchName>
           </div>
         </div>
         <CIBadge

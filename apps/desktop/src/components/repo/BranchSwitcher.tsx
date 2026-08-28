@@ -524,9 +524,9 @@ export function BranchSwitcher() {
       >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex min-w-0 items-center gap-1.5 pr-6">
+            <DialogTitle className="flex min-w-0 max-w-full items-center gap-1.5 pr-6">
               <span className="shrink-0">Rename</span>
-              <BranchName className="min-w-0 flex-1">{renaming}</BranchName>
+              <BranchName className="min-w-0 max-w-full">{renaming}</BranchName>
             </DialogTitle>
           </DialogHeader>
           <Input
@@ -641,9 +641,9 @@ export function BranchSwitcher() {
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex min-w-0 items-center gap-1.5 pr-6">
+            <DialogTitle className="flex min-w-0 max-w-full items-center gap-1.5 pr-6">
               <span className="shrink-0">Delete</span>
-              <BranchName className="min-w-0 flex-1">{pendingDelete?.name}</BranchName>
+              <BranchName className="min-w-0 max-w-full">{pendingDelete?.name}</BranchName>
               <span className="shrink-0">?</span>
             </DialogTitle>
           </DialogHeader>

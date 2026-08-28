@@ -16,7 +16,7 @@ export function BranchName({ className, children, onWheel, ...props }: BranchNam
         }
       }}
       className={cn(
-        "flex h-7 min-w-0 max-w-full items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-md border border-border bg-muted/60 px-2 font-mono text-sm whitespace-nowrap text-foreground",
+        "inline-flex h-7 w-fit min-w-0 max-w-full shrink items-center overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden rounded-md border border-border bg-muted/60 px-2 font-mono text-sm whitespace-nowrap text-foreground",
         className,
       )}
       {...props}
