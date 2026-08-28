@@ -8,6 +8,7 @@ import { Textarea } from "@gitbud/ui/textarea";
 import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@gitbud/ui/select";
 import { DiffView } from "@gitbud/ui/diff-view";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
@@ -244,19 +245,20 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
         <div className="flex min-h-0 flex-1 gap-4">
           <div className="flex min-w-0 flex-[2] flex-col gap-3">
             <div className="flex shrink-0 items-center gap-2 text-sm">
-              <select
-                value={base}
-                onChange={(e) => setBase(e.target.value)}
-                className="h-7 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {localBranches.map((b) => (
-                  <option key={b.name} value={b.name}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
+              <Select value={base} onValueChange={setBase}>
+                <SelectTrigger size="sm" className="h-7 max-w-xs font-mono text-sm">
+                  <SelectValue placeholder="Select branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {localBranches.map((b) => (
+                    <SelectItem key={b.name} value={b.name} className="font-mono text-sm">
+                      {b.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <span className="text-muted-foreground">←</span>
-              <span className="font-mono">{branch}</span>
+              <span className="truncate font-mono">{branch}</span>
             </div>
             <Input
               placeholder="Title"
