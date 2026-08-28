@@ -343,7 +343,9 @@ mod tests {
                     .as_nanos()
             ));
             std::fs::create_dir_all(&path).unwrap();
-            Repository::init(&path).unwrap();
+            let repo = Repository::init(&path).unwrap();
+            let mut config = repo.config().unwrap();
+            config.set_bool("commit.gpgsign", false).unwrap();
             Self { path }
         }
 

@@ -8,6 +8,7 @@ import {
   GitMergeIcon,
   PencilIcon,
   PlusIcon,
+  RefreshCwIcon,
   Trash2Icon,
   TriangleAlertIcon,
 } from "lucide-react";
@@ -37,6 +38,7 @@ import {
   useMergeBranch,
   useRenameBranch,
 } from "@/hooks/queries/useBranches";
+import { useGitSync } from "@/hooks/queries/useGitSync";
 import { useStatus } from "@/hooks/queries/useRepoStatus";
 import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/queryKeys";
@@ -67,6 +69,7 @@ export function BranchSwitcher() {
   const branch = branchData?.branch ?? null;
   const branches = branchData?.branches ?? [];
   const { data: status } = useStatus(selectedRepo);
+  const { syncing: repoSyncing, fetch: fetchRepo } = useGitSync(selectedRepo, branch);
   const checkoutBranchMutation = useCheckoutBranch(selectedRepo);
   const createBranchMutation = useCreateBranch(selectedRepo);
   const deleteBranchMutation = useDeleteBranch(selectedRepo);
@@ -117,11 +120,53 @@ export function BranchSwitcher() {
     };
   }, [selectedRepo]);
 
-  const local = useMemo(
-    () =>
-      branches.filter((b) => !b.is_remote && b.name.toLowerCase().includes(filter.toLowerCase())),
-    [branches, filter],
+  // Unfiltered - deciding whether delete should be disabled at all, or
+  // which branch to fall back to, must not depend on whatever the user's typed into the search box.
+  const allLocalBranches = useMemo(() => branches.filter((b) => !b.is_remote), [branches]);
+  const localBranchNames = useMemo(
+    () => new Set(allLocalBranches.map((b) => b.name)),
+    [allLocalBranches],
   );
+  // A local branch with no matching origin/<name> remote branch has never been pushed -
+  // labeled "local" so it stands out from regular (tracked) branches, which need no label.
+  const remoteBranchNames = useMemo(
+    () => new Set(branches.filter((b) => b.is_remote).map((b) => b.name)),
+    [branches],
+  );
+  const isLocalOnly = (name: string) => !remoteBranchNames.has(`origin/${name}`);
+
+  const remoteOnlyBranches = useMemo(
+    () =>
+      branches.filter((b) => {
+        if (!b.is_remote || b.name.endsWith("/HEAD")) return false;
+        const shortName = b.name.replace(/^[^/]+\//, "");
+        return !localBranchNames.has(shortName);
+      }),
+    [branches, localBranchNames],
+  );
+
+  const filteredLocal = useMemo(
+    () => allLocalBranches.filter((b) => b.name.toLowerCase().includes(filter.toLowerCase())),
+    [allLocalBranches, filter],
+  );
+  const filteredRemote = useMemo(
+    () =>
+      remoteOnlyBranches.filter((b) => {
+        const shortName = b.name.replace(/^[^/]+\//, "");
+        const lowerFilter = filter.toLowerCase();
+        return (
+          b.name.toLowerCase().includes(lowerFilter) ||
+          shortName.toLowerCase().includes(lowerFilter)
+        );
+      }),
+    [remoteOnlyBranches, filter],
+  );
+
+  const visibleBranches = useMemo(
+    () => [...filteredLocal, ...filteredRemote],
+    [filteredLocal, filteredRemote],
+  );
+
   // Typing (or reopening) resets the keyboard highlight back to the top of the list rather
   // than leaving it wherever it was, matching standard combobox behavior.
   useEffect(() => {
@@ -131,18 +176,10 @@ export function BranchSwitcher() {
   useEffect(() => {
     highlightedRowRefs.current.get(highlightedIndex)?.scrollIntoView({ block: "nearest" });
   }, [highlightedIndex]);
-  // Unfiltered (unlike `local`, above) — deciding whether delete should be disabled at all, or
-  // which branch to fall back to, must not depend on whatever the user's typed into the search box.
-  const allLocalBranches = useMemo(() => branches.filter((b) => !b.is_remote), [branches]);
-  // A local branch with no matching origin/<name> remote branch has never been pushed —
-  // labeled "local" so it stands out from regular (tracked) branches, which need no label.
-  const remoteBranchNames = useMemo(
-    () => new Set(branches.filter((b) => b.is_remote).map((b) => b.name)),
-    [branches],
-  );
-  const isLocalOnly = (name: string) => !remoteBranchNames.has(`origin/${name}`);
 
-  const exactMatch = branches.some((b) => !b.is_remote && b.name === filter.trim());
+  const exactMatch = visibleBranches.some(
+    (b) => b.name === filter.trim() || b.name.replace(/^[^/]+\//, "") === filter.trim(),
+  );
   const canCreate = filter.trim().length > 0 && !exactMatch;
 
   if (!selectedRepo) {
@@ -231,14 +268,25 @@ export function BranchSwitcher() {
 
   // Deletes right away when nothing's at risk (no uncommitted changes on it, fully merged,
   // never pushed); otherwise opens the confirmation dialog with whichever of those is true.
-  const requestDelete = async (name: string) => {
+  const requestDelete = async (name: string, isRemote = false) => {
+    if (isRemote) {
+      const shortName = name.replace(/^origin\//, "");
+      setDeleteOnRemote(true);
+      setPendingDelete({
+        name: shortName,
+        uncommitted: false,
+        unmerged: false,
+        published: true,
+      });
+      return;
+    }
     const published = !isLocalOnly(name);
     const uncommitted = name === branch && (status?.files.length ?? 0) > 0;
     const target =
       allLocalBranches.find((b) => b.name !== name && (b.name === "main" || b.name === "master"))
         ?.name ?? allLocalBranches.find((b) => b.name !== name)?.name;
     // No other branch to compare against shouldn't happen (delete is disabled when this is the
-    // only local branch) — but if it somehow does, err conservative and treat as unmerged.
+    // only local branch) - but if it somehow does, err conservative and treat as unmerged.
     const unmerged =
       !target ||
       !(selectedRepo && (await api.isBranchMerged(selectedRepo, name, target).catch(() => false)));
@@ -322,7 +370,7 @@ export function BranchSwitcher() {
           <TooltipContent>Switch or create a branch</TooltipContent>
         </Tooltip>
         <PopoverContent className="w-64 p-0">
-          <div className="border-b border-border p-2">
+          <div className="border-b border-border p-2 flex gap-2">
             <Input
               autoFocus
               autoComplete="off"
@@ -332,7 +380,7 @@ export function BranchSwitcher() {
               onKeyDown={(e) => {
                 if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                   e.preventDefault();
-                  const lastIndex = local.length - 1;
+                  const lastIndex = visibleBranches.length - 1;
                   if (lastIndex < 0) return;
                   setHighlightedIndex((i) =>
                     e.key === "ArrowDown" ? Math.min(i + 1, lastIndex) : Math.max(i - 1, 0),
@@ -340,86 +388,114 @@ export function BranchSwitcher() {
                   return;
                 }
                 if (e.key !== "Enter") return;
-                const highlighted = local[highlightedIndex];
+                const highlighted = visibleBranches[highlightedIndex];
                 if (highlighted) void doCheckout(highlighted.name);
                 else if (canCreate) void doCreate(filter.trim());
               }}
               className="h-7"
             />
+            <Button
+              variant="secondary"
+              size="sm"
+              className="h-7 w-7"
+              disabled={repoSyncing}
+              onClick={(e) => {
+                e.stopPropagation();
+                void fetchRepo();
+              }}
+            >
+              <RefreshCwIcon className={cn("size-2", repoSyncing && "animate-spin")} />
+            </Button>
           </div>
           <div className="flex max-h-64 flex-col gap-1 overflow-auto p-1">
-            {local.map((b, index) => (
-              <ContextMenu key={b.name}>
-                <ContextMenuTrigger asChild>
-                  <div
-                    ref={(el) => {
-                      if (el) highlightedRowRefs.current.set(index, el);
-                      else highlightedRowRefs.current.delete(index);
-                    }}
-                    className={cn(
-                      "flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
-                      b.is_head && "bg-accent",
-                      index === highlightedIndex && "ring-1 ring-inset ring-primary",
-                    )}
-                    onClick={() => void doCheckout(b.name)}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                    {isLocalOnly(b.name) && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="shrink-0 rounded-full bg-accent-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-blue">
-                            local
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>{`${b.name} has never been pushed`}</TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
-                </ContextMenuTrigger>
-                <ContextMenuContent>
-                  <ContextMenuItem onSelect={() => void copyToClipboard(b.name)}>
-                    <CopyIcon className="size-3.5" />
-                    Copy Name
-                  </ContextMenuItem>
-                  {remoteInfo && (
-                    <ContextMenuItem
-                      onSelect={() =>
-                        void openUrl(remoteBranchUrl(remoteInfo.url, remoteInfo.provider, b.name))
-                      }
+            {visibleBranches.map((b, index) => {
+              const shortName = b.is_remote ? b.name.replace(/^[^/]+\//, "") : b.name;
+              return (
+                <ContextMenu key={b.name}>
+                  <ContextMenuTrigger asChild>
+                    <div
+                      ref={(el) => {
+                        if (el) highlightedRowRefs.current.set(index, el);
+                        else highlightedRowRefs.current.delete(index);
+                      }}
+                      className={cn(
+                        "flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
+                        b.is_head && "bg-accent",
+                        index === highlightedIndex && "ring-1 ring-inset ring-primary",
+                      )}
+                      onClick={() => void doCheckout(b.name)}
                     >
-                      {OPEN_BRANCH_ICON[remoteInfo.provider]}
-                      {OPEN_BRANCH_LABEL[remoteInfo.provider]}
+                      <span className="min-w-0 flex-1 truncate">{b.name}</span>
+                      {b.is_remote ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="shrink-0 rounded-full bg-accent-purple/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-purple">
+                              remote
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>Remote branch on origin</TooltipContent>
+                        </Tooltip>
+                      ) : isLocalOnly(b.name) ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="shrink-0 rounded-full bg-accent-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-accent-blue">
+                              local
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>{`${b.name} has never been pushed`}</TooltipContent>
+                        </Tooltip>
+                      ) : null}
+                    </div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onSelect={() => void copyToClipboard(b.name)}>
+                      <CopyIcon className="size-3.5" />
+                      Copy Name
                     </ContextMenuItem>
-                  )}
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    onSelect={() => {
-                      setRenaming(b.name);
-                      setRenameValue(b.name);
-                      setRenameRemote(false);
-                    }}
-                  >
-                    <PencilIcon className="size-3.5" />
-                    Rename
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    disabled={b.is_head}
-                    onSelect={() => mergeBranchMutation.mutate(b.name)}
-                  >
-                    <GitMergeIcon className="size-3.5" />
-                    Merge into Current
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    variant="destructive"
-                    disabled={allLocalBranches.length <= 1}
-                    onSelect={() => void requestDelete(b.name)}
-                  >
-                    <Trash2Icon className="size-3.5" />
-                    Delete
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
-            ))}
+                    {remoteInfo && (
+                      <ContextMenuItem
+                        onSelect={() =>
+                          void openUrl(
+                            remoteBranchUrl(remoteInfo.url, remoteInfo.provider, shortName),
+                          )
+                        }
+                      >
+                        {OPEN_BRANCH_ICON[remoteInfo.provider]}
+                        {OPEN_BRANCH_LABEL[remoteInfo.provider]}
+                      </ContextMenuItem>
+                    )}
+                    <ContextMenuSeparator />
+                    {!b.is_remote && (
+                      <ContextMenuItem
+                        onSelect={() => {
+                          setRenaming(b.name);
+                          setRenameValue(b.name);
+                          setRenameRemote(false);
+                        }}
+                      >
+                        <PencilIcon className="size-3.5" />
+                        Rename
+                      </ContextMenuItem>
+                    )}
+                    <ContextMenuItem
+                      disabled={b.is_head}
+                      onSelect={() => mergeBranchMutation.mutate(b.name)}
+                    >
+                      <GitMergeIcon className="size-3.5" />
+                      Merge into Current
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      variant="destructive"
+                      disabled={!b.is_remote && allLocalBranches.length <= 1}
+                      onSelect={() => void requestDelete(b.name, b.is_remote)}
+                    >
+                      <Trash2Icon className="size-3.5" />
+                      Delete
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+              );
+            })}
             {canCreate && (
               <div
                 className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"

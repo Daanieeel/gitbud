@@ -180,17 +180,12 @@ export function StashPanel({ hasChanges }: StashPanelProps) {
   return (
     <>
       <Popover open={open} onOpenChange={setOpen}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <PopoverTrigger asChild>
-              <Button variant="secondary" size="sm">
-                <ArchiveIcon className="size-3.5" />
-                Stash{stashes.length > 0 ? ` (${stashes.length})` : ""}
-              </Button>
-            </PopoverTrigger>
-          </TooltipTrigger>
-          <TooltipContent>Stash uncommitted changes, or apply a saved stash</TooltipContent>
-        </Tooltip>
+        <PopoverTrigger asChild>
+          <Button variant="secondary" size="sm">
+            <ArchiveIcon className="size-3.5" />
+            Stash{stashes.length > 0 ? ` (${stashes.length})` : ""}
+          </Button>
+        </PopoverTrigger>
         <PopoverContent className="w-72 p-0" align="start">
           <div className="border-b border-border p-2">
             <Button
