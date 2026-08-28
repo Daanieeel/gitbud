@@ -51,6 +51,7 @@ import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
 import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
 import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
 import { BlameDialog } from "./BlameDialog";
+import { DiscardDialogTitle } from "./DiscardDialogTitle";
 import { FilePathLabel } from "./FilePathLabel";
 import type { LfsFileInfo } from "@/lib/types";
 
@@ -491,7 +492,9 @@ export function FileList({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Discard changes to "{confirmDiscardPath}"?</DialogTitle>
+            <DialogTitle className="truncate">
+              <DiscardDialogTitle path={confirmDiscardPath ?? ""} />
+            </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             This permanently discards changes to this file. This can't be undone.
