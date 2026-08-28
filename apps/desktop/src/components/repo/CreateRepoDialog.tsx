@@ -13,13 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@gitbud/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@gitbud/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@gitbud/ui/select";
 import { api } from "@/lib/tauri";
 import { isSinglePath } from "@/lib/dialogPaths";
 import { buildGitignore } from "@/lib/gitignore-templates";

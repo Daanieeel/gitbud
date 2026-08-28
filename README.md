@@ -34,27 +34,7 @@ Your Git client shouldn't idle at a gigabyte of RAM just to show you a diff. Git
 
 ## Roadmap
 
-- [x] Auto-updater
-- [x] Bring uncommitted changes to other branch feature
-- [x] PR quick link on current branch
-- [x] GitHub profile pictures in commit history
-- [x] Delete branch on remote feature
-- [x] Open File in Editor
-- [x] Move to TanStack Query
-- [x] Live-syncing with git provider (PRs, commits etc)
-- [x] Commit signing setup wizard
-- [X] Fix add repository options' looks (clone, create new)
-- [ ] Full screen reclone/relocate/remove from gitbud prompt for repo paths that the app cant find anymroe (moved/deleted)
-- [ ] Better PR viewer (comments, files, commits) like on GitHub
-  - [ ] Detailed CI steps & logs in-app
-- [ ] GitLab and Bitbucket support
-- [ ] Pop-out merge conflict resolution editor
-- [ ] View releases in-app (Releases Tab next to Changes, History and Pull Requests)
-- [ ] .gitignore tab for managing gitignore rules in an interactive UI (.gitignore Tab next to Changes, History and Pull Requests)
-- [ ] Unit tests for frontend logic (lib/merge3, autosquash, compact-graph, fuzzy, gitSync)
-- [ ] Settings redesign
-- [ ] Improve git blame view
-- [ ] ...and more to come
+Tracked as [GitHub Issues](https://github.com/Daanieeel/gitbud/issues), grouped under [milestones](https://github.com/Daanieeel/gitbud/milestones). Open an issue to propose something new or pick one up.
 
 ## Features
 

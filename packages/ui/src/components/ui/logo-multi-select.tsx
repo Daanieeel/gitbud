@@ -108,7 +108,10 @@ export function LogoMultiSelect({
                   onClick={() => toggle(option.value)}
                   className="flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent"
                 >
-                  <Checkbox checked={selectedSet.has(option.value)} className="pointer-events-none" />
+                  <Checkbox
+                    checked={selectedSet.has(option.value)}
+                    className="pointer-events-none"
+                  />
                   {option.icon}
                   <span className="truncate">{option.label}</span>
                 </div>

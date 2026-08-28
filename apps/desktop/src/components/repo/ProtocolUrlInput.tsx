@@ -1,12 +1,6 @@
 import type { ClipboardEvent } from "react";
 import { Input } from "@gitbud/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@gitbud/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@gitbud/ui/select";
 
 export type CloneProtocol = "https" | "ssh";
 

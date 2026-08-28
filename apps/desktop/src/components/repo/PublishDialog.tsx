@@ -14,13 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@gitbud/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@gitbud/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@gitbud/ui/select";
 import { cn } from "@gitbud/ui/utils";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { api } from "@/lib/tauri";
@@ -31,7 +25,12 @@ import type { RemoteProvider } from "@/lib/remote-provider";
 
 /** Grows with typed content up to 4 lines (max-h-24), then scrolls instead of growing further,
  * and is never manually resizable (the Textarea primitive is already `resize-none`). */
-function AutoGrowTextarea({ value, onChange, className, ...rest }: ComponentProps<typeof Textarea>) {
+function AutoGrowTextarea({
+  value,
+  onChange,
+  className,
+  ...rest
+}: ComponentProps<typeof Textarea>) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -87,7 +86,12 @@ function repoNameFromPath(path: string): string {
   return path.split("/").filter(Boolean).pop() ?? "repository";
 }
 
-export function PublishDialog({ open: isOpen, onOpenChange, repoPath, onPublished }: PublishDialogProps) {
+export function PublishDialog({
+  open: isOpen,
+  onOpenChange,
+  repoPath,
+  onPublished,
+}: PublishDialogProps) {
   const accounts = useGitHubStore((s) => s.accounts);
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const openSignIn = useGitHubStore((s) => s.openSignIn);
@@ -197,7 +201,11 @@ export function PublishDialog({ open: isOpen, onOpenChange, repoPath, onPublishe
                   onChange={(v) => setIsPrivate(v === "private")}
                   options={[
                     { value: "private", label: "Private", description: "Only you can see it" },
-                    { value: "public", label: "Public", description: "Anyone on GitHub can see it" },
+                    {
+                      value: "public",
+                      label: "Public",
+                      description: "Anyone on GitHub can see it",
+                    },
                   ]}
                 />
               </div>

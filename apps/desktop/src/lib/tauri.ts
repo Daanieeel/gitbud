@@ -222,8 +222,7 @@ export const api = {
     invoke<void>("init_repo", { path, defaultBranch }),
   writeTextFile: (path: string, contents: string) =>
     invoke<void>("write_text_file", { path, contents }),
-  getGlobalGitIdentity: () =>
-    invoke<[string | null, string | null]>("get_global_git_identity"),
+  getGlobalGitIdentity: () => invoke<[string | null, string | null]>("get_global_git_identity"),
 
   listSshIdentities: () => invoke<SshIdentity[]>("list_ssh_identities"),
   addSshIdentity: (label: string, host: string, keyPath: string) =>

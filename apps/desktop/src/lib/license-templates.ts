@@ -2472,7 +2472,7 @@ Exhibit B - "Incompatible With Secondary Licenses" Notice
   },
   {
     id: "bsd-2-clause",
-    name: "BSD 2-Clause \"Simplified\" License",
+    name: 'BSD 2-Clause "Simplified" License',
     content: (fullName: string, year: number) =>
       `BSD 2-Clause License
 
@@ -2503,7 +2503,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`
   },
   {
     id: "bsd-3-clause",
-    name: "BSD 3-Clause \"New\" or \"Revised\" License",
+    name: 'BSD 3-Clause "New" or "Revised" License',
     content: (fullName: string, year: number) =>
       `BSD 3-Clause License
 
@@ -2539,7 +2539,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`
   {
     id: "unlicense",
     name: "The Unlicense",
-    content: (_fullName: string, _year: number) => `This is free and unencumbered software released into the public domain.
+    content: (
+      _fullName: string,
+      _year: number,
+    ) => `This is free and unencumbered software released into the public domain.
 
 Anyone is free to copy, modify, publish, use, compile, sell, or
 distribute this software, either in source code form or as a compiled
