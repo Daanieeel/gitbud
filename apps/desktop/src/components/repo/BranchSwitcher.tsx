@@ -369,7 +369,7 @@ export function BranchSwitcher() {
           </TooltipTrigger>
           <TooltipContent>Switch or create a branch</TooltipContent>
         </Tooltip>
-        <PopoverContent className="w-64 p-0">
+        <PopoverContent className="w-auto min-w-64 max-w-[35ch] p-0">
           <div className="border-b border-border p-2 flex gap-2">
             <Input
               autoFocus
@@ -419,7 +419,7 @@ export function BranchSwitcher() {
                         else highlightedRowRefs.current.delete(index);
                       }}
                       className={cn(
-                        "flex cursor-pointer items-center rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
+                        "flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm hover:bg-accent",
                         b.is_head && "bg-accent",
                         index === highlightedIndex && "ring-1 ring-inset ring-primary",
                       )}
