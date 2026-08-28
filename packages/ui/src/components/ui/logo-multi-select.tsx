@@ -87,7 +87,7 @@ export function LogoMultiSelect({
           // EditorPicker's popover, which has the identical Dialog-sibling-portal situation).
           onWheel={(e) => {
             // Manual scroll gets none of the browser's native deltaY damping, so it reads as
-            // too fast at 1:1 — scale it down to roughly match native trackpad/wheel feel.
+            // too fast at 1:1 - scale it down to roughly match native trackpad/wheel feel.
             e.currentTarget.scrollTop += e.deltaY * 0.5;
             e.stopPropagation();
           }}
