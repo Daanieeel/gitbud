@@ -6,6 +6,7 @@
   "exports": {
     "./avatar": "./src/components/ui/avatar.tsx",
     "./badge": "./src/components/ui/badge.tsx",
+    "./branch-name": "./src/components/ui/branch-name.tsx",
     "./brand-logo": "./src/components/ui/brand-logo.tsx",
     "./button": "./src/components/ui/button.tsx",
     "./card-picker": "./src/components/ui/card-picker.tsx",
