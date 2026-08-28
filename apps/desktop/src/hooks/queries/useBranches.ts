@@ -72,23 +72,39 @@ export function useDeleteBranch(repoPath: string | null) {
       const current = queryClient.getQueryData<{ branch: string; branches: BranchInfo[] }>(
         queryKeys.branches(path),
       );
+      // Normalize name if a full remote ref name (e.g. origin/foo) was passed
+      const isRemoteRef = current?.branches.some((b) => b.is_remote && b.name === name);
+      const branchName = isRemoteRef ? name.replace(/^[^/]+\//, "") : name;
+
+      const isLocal = current
+        ? current.branches.some((b) => !b.is_remote && b.name === branchName)
+        : await api
+            .listBranches(path)
+            .then((list) => list.some((b) => !b.is_remote && b.name === branchName))
+            .catch(() => false);
+
       // Deleting the checked-out branch: git refuses outright, so move off it first. Callers are
       // expected to have already confirmed there's somewhere else to go (disabling delete
       // entirely when this is the only local branch).
-      if (current?.branch === name) {
+      if (current?.branch === branchName) {
         const fallback =
           current.branches.find(
-            (b) => !b.is_remote && b.name !== name && (b.name === "main" || b.name === "master"),
-          ) ?? current.branches.find((b) => !b.is_remote && b.name !== name);
+            (b) =>
+              !b.is_remote && b.name !== branchName && (b.name === "main" || b.name === "master"),
+          ) ?? current.branches.find((b) => !b.is_remote && b.name !== branchName);
         if (!fallback) return;
         await api.checkoutBranch(path, fallback.name);
       }
-      await api.deleteBranch(path, name);
+      if (isLocal) {
+        await api.deleteBranch(path, branchName);
+      }
       if (opts?.deleteRemote) {
-        toast.success(`Deleted ${name} locally`);
-        await runGitSync(path, () => api.deleteBranchRemote(path, name), {
-          description: `Deleting ${name} on origin…`,
-          doneMessage: `Deleted ${name} on origin`,
+        if (isLocal) {
+          toast.success(`Deleted ${branchName} locally`);
+        }
+        await runGitSync(path, () => api.deleteBranchRemote(path, branchName), {
+          description: `Deleting ${branchName} on origin…`,
+          doneMessage: `Deleted ${branchName} on origin`,
         });
       }
     },
