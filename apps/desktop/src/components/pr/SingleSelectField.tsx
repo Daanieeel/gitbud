@@ -81,7 +81,20 @@ export function SingleSelectField({
             onChange={(e) => setFilter(e.target.value)}
             className="mb-1 h-7"
           />
-          <div className="max-h-48 overflow-auto">
+          <div
+            className="max-h-48 overflow-auto"
+            // Portalled straight to `body`, a DOM sibling of the enclosing Dialog rather than a
+            // descendant, so the Dialog's scroll lock (which only recognizes scrollable elements
+            // nested inside its own content) swallows wheel events over it and native scrolling
+            // silently does nothing. Scroll it manually instead of relying on that (same fix as
+            // LogoMultiSelect/EditorPicker).
+            onWheel={(e) => {
+              // Manual scroll gets none of the browser's native deltaY damping, so it reads as
+              // too fast at 1:1 - scale it down to roughly match native trackpad/wheel feel.
+              e.currentTarget.scrollTop += e.deltaY * 0.5;
+              e.stopPropagation();
+            }}
+          >
             {selected && (
               <button
                 type="button"
