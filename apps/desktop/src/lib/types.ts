@@ -278,6 +278,8 @@ export interface Label {
 export interface Milestone {
   number: number;
   title: string;
+  open_issues?: number;
+  closed_issues?: number;
 }
 
 export interface Project {

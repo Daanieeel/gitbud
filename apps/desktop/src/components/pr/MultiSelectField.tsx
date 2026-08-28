@@ -8,6 +8,8 @@ export interface MultiSelectOption {
   key: string;
   label: React.ReactNode;
   searchText?: string;
+  slotLeft?: React.ReactNode;
+  slotRight?: React.ReactNode;
 }
 
 interface MultiSelectFieldProps {
@@ -59,11 +61,19 @@ export function MultiSelectField({
                 return (
                   <span
                     key={key}
-                    className="flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground"
+                    className="flex max-w-full items-center gap-1.5 truncate rounded bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground"
                   >
-                    {opt?.label ?? key}
+                    {opt?.slotLeft && (
+                      <span className="flex shrink-0 items-center">{opt.slotLeft}</span>
+                    )}
+                    <span className="min-w-0 truncate">{opt?.label ?? key}</span>
+                    {opt?.slotRight && (
+                      <span className="flex shrink-0 items-center text-muted-foreground">
+                        {opt.slotRight}
+                      </span>
+                    )}
                     <XIcon
-                      className="size-3 hover:text-destructive"
+                      className="size-3 shrink-0 hover:text-destructive"
                       onClick={(e) => {
                         e.stopPropagation();
                         toggle(key);
@@ -84,7 +94,20 @@ export function MultiSelectField({
             onChange={(e) => setFilter(e.target.value)}
             className="mb-1 h-7"
           />
-          <div className="max-h-48 overflow-auto">
+          <div
+            className="max-h-48 overflow-auto"
+            // Portalled straight to `body`, a DOM sibling of the enclosing Dialog rather than a
+            // descendant, so the Dialog's scroll lock (which only recognizes scrollable elements
+            // nested inside its own content) swallows wheel events over it and native scrolling
+            // silently does nothing. Scroll it manually instead of relying on that (same fix as
+            // LogoMultiSelect/EditorPicker).
+            onWheel={(e) => {
+              // Manual scroll gets none of the browser's native deltaY damping, so it reads as
+              // too fast at 1:1 - scale it down to roughly match native trackpad/wheel feel.
+              e.currentTarget.scrollTop += e.deltaY * 0.5;
+              e.stopPropagation();
+            }}
+          >
             {filtered.length === 0 && (
               <div className="p-2 text-center text-xs text-muted-foreground">No matches</div>
             )}
@@ -95,7 +118,17 @@ export function MultiSelectField({
                 checked={selected.includes(o.key)}
                 onCheckedChange={() => toggle(o.key)}
               >
-                {o.label}
+                <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-1.5 truncate">
+                    {o.slotLeft && <span className="flex shrink-0 items-center">{o.slotLeft}</span>}
+                    <span className="min-w-0 truncate">{o.label}</span>
+                  </div>
+                  {o.slotRight && (
+                    <span className="flex shrink-0 items-center text-xs text-muted-foreground">
+                      {o.slotRight}
+                    </span>
+                  )}
+                </div>
               </CheckboxGroup>
             ))}
           </div>

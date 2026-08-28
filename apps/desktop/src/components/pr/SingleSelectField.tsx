@@ -8,15 +8,21 @@ export interface SingleSelectOption {
   key: string;
   label: React.ReactNode;
   searchText?: string;
+  slotLeft?: React.ReactNode;
+  slotRight?: React.ReactNode;
 }
 
 interface SingleSelectFieldProps {
-  label: string;
+  label?: string;
   placeholder?: string;
   clearLabel?: string;
+  clearable?: boolean;
   options: SingleSelectOption[];
   selected: string;
   onChange: (selected: string) => void;
+  className?: string;
+  triggerClassName?: string;
+  contentClassName?: string;
 }
 
 /** A filterable single-select list behind a trigger button, matching the popover UX of MultiSelectField. */
@@ -24,12 +30,18 @@ export function SingleSelectField({
   label,
   placeholder,
   clearLabel,
+  clearable,
   options,
   selected,
   onChange,
+  className,
+  triggerClassName,
+  contentClassName,
 }: SingleSelectFieldProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
+
+  const canClear = clearable ?? Boolean(clearLabel);
 
   const filtered = options.filter((o) => {
     const text = o.searchText ?? o.key;
@@ -42,8 +54,8 @@ export function SingleSelectField({
   const selectedOption = options.find((o) => o.key === selected);
 
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+    <div className={cn(label && "flex flex-col gap-1", className)}>
+      {label && <span className="text-xs font-medium text-muted-foreground">{label}</span>}
       <Popover
         open={open}
         onOpenChange={(next) => {
@@ -54,26 +66,36 @@ export function SingleSelectField({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex min-h-7 w-full flex-wrap items-center gap-1 rounded-md border border-input bg-transparent px-2 py-1 text-left text-sm hover:bg-accent"
-          >
-            {selected ? (
-              <span className="flex items-center gap-1 rounded bg-secondary px-1.5 py-0.5 text-xs text-secondary-foreground">
-                {selectedOption?.label ?? selected}
-                <XIcon
-                  className="size-3 hover:text-destructive"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onChange("");
-                  }}
-                />
-              </span>
-            ) : (
-              <span className="text-muted-foreground">{placeholder ?? "None"}</span>
+            className={cn(
+              "flex h-7 w-full min-w-0 max-w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-transparent px-2 text-left text-sm whitespace-nowrap hover:bg-accent focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-2 outline-none",
+              triggerClassName,
             )}
-            <ChevronDownIcon className="ml-auto size-3.5 shrink-0 text-muted-foreground" />
+          >
+            {selectedOption ? (
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-1.5 truncate">
+                  {selectedOption.slotLeft && (
+                    <span className="flex shrink-0 items-center">{selectedOption.slotLeft}</span>
+                  )}
+                  <span className="truncate">{selectedOption.label}</span>
+                </div>
+                {selectedOption.slotRight && (
+                  <span className="flex shrink-0 items-center text-xs text-muted-foreground">
+                    {selectedOption.slotRight}
+                  </span>
+                )}
+              </div>
+            ) : selected ? (
+              <span className="min-w-0 flex-1 truncate">{selected}</span>
+            ) : (
+              <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                {placeholder ?? "None"}
+              </span>
+            )}
+            <ChevronDownIcon className="size-3.5 shrink-0 opacity-50" />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-56 p-1">
+        <PopoverContent align="start" className={cn("w-56 p-1", contentClassName)}>
           <Input
             autoFocus
             placeholder="Filter…"
@@ -81,8 +103,21 @@ export function SingleSelectField({
             onChange={(e) => setFilter(e.target.value)}
             className="mb-1 h-7"
           />
-          <div className="max-h-48 overflow-auto">
-            {selected && (
+          <div
+            className="max-h-48 overflow-auto"
+            // Portalled straight to `body`, a DOM sibling of the enclosing Dialog rather than a
+            // descendant, so the Dialog's scroll lock (which only recognizes scrollable elements
+            // nested inside its own content) swallows wheel events over it and native scrolling
+            // silently does nothing. Scroll it manually instead of relying on that (same fix as
+            // LogoMultiSelect/EditorPicker).
+            onWheel={(e) => {
+              // Manual scroll gets none of the browser's native deltaY damping, so it reads as
+              // too fast at 1:1 - scale it down to roughly match native trackpad/wheel feel.
+              e.currentTarget.scrollTop += e.deltaY * 0.5;
+              e.stopPropagation();
+            }}
+          >
+            {canClear && selected && (
               <button
                 type="button"
                 className="flex w-full items-center gap-1.5 rounded-sm px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -105,15 +140,27 @@ export function SingleSelectField({
                   key={o.key}
                   type="button"
                   className={cn(
-                    "flex w-full items-center justify-between rounded-sm px-2 py-1 text-sm hover:bg-accent",
+                    "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1 text-sm hover:bg-accent",
                     isSelected && "bg-accent/50 font-medium",
                   )}
                   onClick={() => {
-                    onChange(isSelected ? "" : o.key);
+                    onChange(isSelected && canClear ? "" : o.key);
                     setOpen(false);
                   }}
                 >
-                  <span className="truncate">{o.label}</span>
+                  <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-1.5 truncate">
+                      {o.slotLeft && (
+                        <span className="flex shrink-0 items-center">{o.slotLeft}</span>
+                      )}
+                      <span className="truncate text-left">{o.label}</span>
+                    </div>
+                    {o.slotRight && (
+                      <span className="flex shrink-0 items-center text-xs text-muted-foreground">
+                        {o.slotRight}
+                      </span>
+                    )}
+                  </div>
                   {isSelected && <CheckIcon className="size-3.5 shrink-0 text-primary" />}
                 </button>
               );
