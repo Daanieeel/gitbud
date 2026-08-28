@@ -13,6 +13,7 @@ import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
 import { MultiSelectField } from "./MultiSelectField";
+import { SingleSelectField } from "./SingleSelectField";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
@@ -398,29 +399,27 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
               selected={selectedReviewers}
               onChange={setSelectedReviewers}
             />
-            <div className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-muted-foreground">Milestone</span>
-              <select
-                value={selectedMilestone}
-                onChange={(e) => setSelectedMilestone(e.target.value)}
-                className={cn(
-                  "h-7 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  !selectedMilestone && "text-muted-foreground",
-                )}
-              >
-                <option value="">No milestone</option>
-                {milestones.map((m) => (
-                  <option key={m.number} value={m.number}>
-                    {m.title}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SingleSelectField
+              label="Milestone"
+              placeholder="No milestone"
+              clearLabel="Clear milestone"
+              options={milestones.map((m) => ({
+                key: String(m.number),
+                label: m.title,
+                searchText: m.title,
+              }))}
+              selected={selectedMilestone}
+              onChange={setSelectedMilestone}
+            />
             {projects.length > 0 && (
               <MultiSelectField
                 label="Projects"
                 placeholder="No projects"
-                options={projects.map((p) => ({ key: p.id, label: p.title }))}
+                options={projects.map((p) => ({
+                  key: p.id,
+                  label: p.title,
+                  searchText: p.title,
+                }))}
                 selected={selectedProjects}
                 onChange={setSelectedProjects}
               />
