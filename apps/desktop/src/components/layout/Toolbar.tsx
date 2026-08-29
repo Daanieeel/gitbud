@@ -222,7 +222,13 @@ export function Toolbar() {
         </Tooltip>
       )}
       {currentLogin && existingPrNumber == null && (
-        <Popover open={pushConfirmOpen} onOpenChange={setPushConfirmOpen}>
+        <Popover
+          open={pushConfirmOpen}
+          onOpenChange={(open) => {
+            if (open && previewPrDisabledReason != null) return;
+            setPushConfirmOpen(open);
+          }}
+        >
           <Tooltip>
             <TooltipTrigger asChild>
               <PopoverTrigger asChild>
