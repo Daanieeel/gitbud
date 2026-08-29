@@ -56,6 +56,8 @@ export const api = {
   unstagePaths: (repoPath: string, paths: string[]) =>
     invoke<void>("unstage_paths", { repoPath, paths }),
   discardFile: (repoPath: string, path: string) => invoke<void>("discard_file", { repoPath, path }),
+  discardFiles: (repoPath: string, paths: string[]) =>
+    invoke<void>("discard_files", { repoPath, paths }),
   addToGitignore: (repoPath: string, paths: string[]) =>
     invoke<void>("add_to_gitignore", { repoPath, paths }),
   ignoreFolder: (repoPath: string, folderPath: string) =>
