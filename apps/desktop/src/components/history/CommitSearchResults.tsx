@@ -132,7 +132,9 @@ export function CommitSearchResults({
                   Create Fixup Commit
                 </span>
                 {!hasStagedChanges && (
-                  <span className="pl-[22px] text-xs text-muted-foreground">Stage changes to enable</span>
+                  <span className="pl-[22px] text-xs text-muted-foreground">
+                    Stage changes to enable
+                  </span>
                 )}
               </ContextMenuItem>
               <ContextMenuItem onSelect={() => onCreateBranchHere(commit.oid)}>
