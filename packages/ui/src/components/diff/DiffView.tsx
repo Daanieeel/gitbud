@@ -602,7 +602,7 @@ function DiffSection({
   return (
     <div>
       {label && (
-        <div className="sticky top-[29px] z-[9] bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground">
+        <div className="sticky top-[29px] left-0 z-[9] bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground">
           {label}
         </div>
       )}
@@ -769,7 +769,7 @@ function DiffViewImpl({
       className="h-full overflow-auto font-mono"
       style={{ fontSize: `${fontSize}px` }}
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-3 py-1.5 text-xs font-medium">
+      <div className="sticky top-0 left-0 z-10 flex items-center justify-between border-b border-border bg-card px-3 py-1.5 text-xs font-medium">
         <span>{diff.path}</span>
         {ViewToggle}
       </div>
