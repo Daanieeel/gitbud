@@ -45,6 +45,32 @@ export function usePullRequestMeta(
   });
 }
 
+/** Retargets the PR onto a different base branch — the sidebar's own base-branch select, using
+ * the same underlying endpoint `MergePRDialog`'s retarget-before-merge flow does. */
+export function useUpdatePullRequestBase(
+  repoPath: string | null,
+  login: string | null,
+  number: number | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (base: string) => {
+      if (!repoPath || !login || number === null) {
+        throw new Error("useUpdatePullRequestBase: repoPath/login/number not set");
+      }
+      return api.githubUpdatePullRequestBase(repoPath, login, number, base);
+    },
+    onSuccess: (_void, base) => {
+      if (!repoPath || !login || number === null) return;
+      queryClient.setQueryData<PullRequest | undefined>(
+        queryKeys.prMeta(repoPath, login, number),
+        (prev) => (prev ? { ...prev, base_ref: base } : prev),
+      );
+    },
+    onError: (err) => toast.error(String(err)),
+  });
+}
+
 export function useUpdatePullRequestBody(
   repoPath: string | null,
   login: string | null,

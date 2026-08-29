@@ -1,5 +1,6 @@
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
+import { PRSidebarBaseBranch } from "./PRSidebarBaseBranch";
 import { PRSidebarReviewers } from "./PRSidebarReviewers";
 import { PRSidebarAssignees } from "./PRSidebarAssignees";
 import { PRSidebarLabels } from "./PRSidebarLabels";
@@ -27,6 +28,7 @@ export function PRSidebar({ repoPath, login, pr, pollIntervalMs }: PRSidebarProp
     <div className="flex shrink-0" style={{ width }}>
       <ResizeHandle onPointerDown={onPointerDown} />
       <div className="flex min-w-0 flex-1 flex-col gap-4 overflow-y-auto border-l border-border p-3">
+        <PRSidebarBaseBranch repoPath={repoPath} login={login} pr={pr} />
         <PRSidebarReviewers
           repoPath={repoPath}
           login={login}
