@@ -1388,6 +1388,80 @@ async fn github_update_pull_request_base(
 }
 
 #[tauri::command]
+async fn github_update_pull_request_body(
+    repo_path: String,
+    login: String,
+    number: u64,
+    body: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::update_pull_request_body(&host, &token, &owner, &repo, number, &body).await
+}
+
+#[tauri::command]
+async fn github_close_pull_request(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::close_pull_request(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_reopen_pull_request(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::reopen_pull_request(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_lock_conversation(
+    repo_path: String,
+    login: String,
+    number: u64,
+    lock_reason: Option<String>,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::lock_conversation(&host, &token, &owner, &repo, number, lock_reason.as_deref())
+        .await
+}
+
+#[tauri::command]
+async fn github_unlock_conversation(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::unlock_conversation(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_update_pull_request_branch(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::update_pull_request_branch(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_compare_pull_request_base(
+    repo_path: String,
+    login: String,
+    base: String,
+    head: String,
+) -> Result<github::api::CompareResult, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::compare_commits(&host, &token, &owner, &repo, &base, &head).await
+}
+
+#[tauri::command]
 async fn github_list_labels(
     repo_path: String,
     login: String,
@@ -1428,14 +1502,76 @@ async fn github_add_assignees(
 }
 
 #[tauri::command]
+async fn github_remove_assignees(
+    repo_path: String,
+    login: String,
+    number: u64,
+    assignees: Vec<String>,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::remove_assignees(&host, &token, &owner, &repo, number, &assignees).await
+}
+
+#[tauri::command]
+async fn github_remove_label(
+    repo_path: String,
+    login: String,
+    number: u64,
+    name: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::remove_label(&host, &token, &owner, &repo, number, &name).await
+}
+
+#[tauri::command]
 async fn github_request_reviewers(
     repo_path: String,
     login: String,
     number: u64,
     reviewers: Vec<String>,
+    team_reviewers: Vec<String>,
 ) -> Result<(), String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::request_reviewers(&host, &token, &owner, &repo, number, &reviewers).await
+    github::api::request_reviewers(
+        &host,
+        &token,
+        &owner,
+        &repo,
+        number,
+        &reviewers,
+        &team_reviewers,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn github_list_repo_teams(
+    repo_path: String,
+    login: String,
+) -> Result<Vec<github::api::Team>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_repo_teams(&host, &token, &owner, &repo).await
+}
+
+#[tauri::command]
+async fn github_remove_requested_reviewers(
+    repo_path: String,
+    login: String,
+    number: u64,
+    reviewers: Vec<String>,
+    team_reviewers: Vec<String>,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::remove_requested_reviewers(
+        &host,
+        &token,
+        &owner,
+        &repo,
+        number,
+        &reviewers,
+        &team_reviewers,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -1456,6 +1592,16 @@ async fn github_set_milestone(
 ) -> Result<(), String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
     github::api::set_milestone(&host, &token, &owner, &repo, number, milestone).await
+}
+
+#[tauri::command]
+async fn github_clear_milestone(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::clear_milestone(&host, &token, &owner, &repo, number).await
 }
 
 #[tauri::command]
@@ -1504,6 +1650,68 @@ async fn get_cached_check_runs(
         .await
         .unwrap_or(Ok(None))
         .unwrap_or(None)
+}
+
+#[tauri::command]
+async fn github_list_pull_request_commits(
+    repo_path: String,
+    login: String,
+    number: u64,
+    head_sha: String,
+    page: u32,
+) -> Result<Vec<github::api::PullRequestCommit>, String> {
+    // Only the first page is mirrored to the SQLite cache — later pages are fetched live only,
+    // same convention `usePullRequestList`'s own cached-seed step already uses (it only seeds
+    // page 1 too). A PR with more than one page of commits is rare enough that "page 2+ needs a
+    // live connection" isn't worth a paginated cache schema.
+    if page == 1 {
+        if let Ok(key) = cache_key(&repo_path) {
+            let (lookup_key, sha) = (key.clone(), head_sha.clone());
+            if let Ok(Some(cached)) = tauri::async_runtime::spawn_blocking(move || {
+                pr_cache::get_cached_commits(&lookup_key, number, &sha)
+            })
+            .await
+            .unwrap_or(Ok(None))
+            {
+                return Ok(cached);
+            }
+        }
+    }
+
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    let commits = github::api::list_pull_request_commits_for_display(
+        &host, &token, &owner, &repo, number, page,
+    )
+    .await?;
+    if page == 1 {
+        if let Ok(key) = cache_key(&repo_path) {
+            let (sha, to_cache) = (head_sha.clone(), commits.clone());
+            cache_write(move || pr_cache::upsert_commits(&key, number, &sha, &to_cache)).await;
+        }
+    }
+    Ok(commits)
+}
+
+#[tauri::command]
+async fn get_cached_pull_request_commits(
+    repo_path: String,
+    number: u64,
+) -> Option<Vec<github::api::PullRequestCommit>> {
+    let key = cache_key(&repo_path).ok()?;
+    tauri::async_runtime::spawn_blocking(move || pr_cache::get_any_cached_commits(&key, number))
+        .await
+        .unwrap_or(Ok(None))
+        .unwrap_or(None)
+}
+
+#[tauri::command]
+async fn github_get_commit_diff_files(
+    repo_path: String,
+    login: String,
+    sha: String,
+) -> Result<Vec<(String, String, diff::FileDiff)>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_commit_diff_files(&host, &token, &owner, &repo, &sha).await
 }
 
 /// Pure local-cache read, for the offline fallback path; never touches the network.
@@ -1665,6 +1873,16 @@ async fn github_get_repo_merge_settings(
 }
 
 #[tauri::command]
+async fn github_branch_protection_requirements(
+    repo_path: String,
+    login: String,
+    branch: String,
+) -> Result<github::api::BranchProtectionRequirements, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    Ok(github::api::branch_protection_requirements(&host, &token, &owner, &repo, &branch).await)
+}
+
+#[tauri::command]
 async fn github_list_pull_request_files(
     repo_path: String,
     login: String,
@@ -1784,6 +2002,37 @@ async fn clear_avatar_cache() -> Result<(), String> {
         .map_err(|e| e.to_string())?
 }
 
+/// Purely local — no GitHub call, no `github_resolve`, since "archived" is a gitbud-only concept
+/// (see `pr_cache::is_pr_archived`'s doc comment).
+#[tauri::command]
+async fn get_pr_archived(repo_path: String, number: u64) -> Result<bool, String> {
+    let key = cache_key(&repo_path)?;
+    tauri::async_runtime::spawn_blocking(move || pr_cache::is_pr_archived(&key, number))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn set_pr_archived(repo_path: String, number: u64, archived: bool) -> Result<(), String> {
+    let key = cache_key(&repo_path)?;
+    tauri::async_runtime::spawn_blocking(move || pr_cache::set_pr_archived(&key, number, archived))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn github_reply_to_review_comment(
+    repo_path: String,
+    login: String,
+    number: u64,
+    in_reply_to: u64,
+    body: String,
+) -> Result<github::api::ReviewComment, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::reply_to_review_comment(&host, &token, &owner, &repo, number, in_reply_to, &body)
+        .await
+}
+
 #[tauri::command]
 #[allow(clippy::too_many_arguments)]
 async fn github_create_review_comment(
@@ -1801,6 +2050,192 @@ async fn github_create_review_comment(
         &host, &token, &owner, &repo, number, &commit_id, &path, line, &side, &body,
     )
     .await
+}
+
+#[tauri::command]
+async fn github_list_relevant_timeline_events(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<Vec<github::api::IssueTimelineEvent>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_relevant_timeline_events(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_list_issue_comments(
+    repo_path: String,
+    login: String,
+    number: u64,
+    page: u32,
+) -> Result<Vec<github::api::IssueComment>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    let comments =
+        github::api::list_issue_comments(&host, &token, &owner, &repo, number, page).await?;
+    // Only page 1 is mirrored to the SQLite cache — see `github_list_pull_request_commits`'s
+    // identical reasoning.
+    if page == 1 {
+        if let Ok(key) = cache_key(&repo_path) {
+            let to_cache = comments.clone();
+            cache_write(move || pr_cache::upsert_issue_comments(&key, number, &to_cache)).await;
+        }
+    }
+    Ok(comments)
+}
+
+#[tauri::command]
+async fn get_cached_issue_comments(
+    repo_path: String,
+    number: u64,
+) -> Option<Vec<github::api::IssueComment>> {
+    let key = cache_key(&repo_path).ok()?;
+    tauri::async_runtime::spawn_blocking(move || pr_cache::get_cached_issue_comments(&key, number))
+        .await
+        .unwrap_or(Ok(None))
+        .unwrap_or(None)
+}
+
+#[tauri::command]
+async fn github_create_issue_comment(
+    repo_path: String,
+    login: String,
+    number: u64,
+    body: String,
+) -> Result<github::api::IssueComment, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::create_issue_comment(&host, &token, &owner, &repo, number, &body).await
+}
+
+#[tauri::command]
+async fn github_delete_issue_comment(
+    repo_path: String,
+    login: String,
+    comment_id: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::delete_issue_comment(&host, &token, &owner, &repo, comment_id).await
+}
+
+#[tauri::command]
+async fn github_list_reviews(
+    repo_path: String,
+    login: String,
+    number: u64,
+    page: u32,
+) -> Result<Vec<github::api::Review>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    let reviews = github::api::list_reviews(&host, &token, &owner, &repo, number, page).await?;
+    // Only page 1 is mirrored to the SQLite cache — see `github_list_pull_request_commits`'s
+    // identical reasoning.
+    if page == 1 {
+        if let Ok(key) = cache_key(&repo_path) {
+            let to_cache = reviews.clone();
+            cache_write(move || pr_cache::upsert_reviews(&key, number, &to_cache)).await;
+        }
+    }
+    Ok(reviews)
+}
+
+#[tauri::command]
+async fn get_cached_reviews(repo_path: String, number: u64) -> Option<Vec<github::api::Review>> {
+    let key = cache_key(&repo_path).ok()?;
+    tauri::async_runtime::spawn_blocking(move || pr_cache::get_cached_reviews(&key, number))
+        .await
+        .unwrap_or(Ok(None))
+        .unwrap_or(None)
+}
+
+#[tauri::command]
+async fn github_submit_review(
+    repo_path: String,
+    login: String,
+    number: u64,
+    event: String,
+    body: String,
+) -> Result<github::api::Review, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::submit_review(&host, &token, &owner, &repo, number, &event, &body).await
+}
+
+#[tauri::command]
+async fn github_list_review_threads(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<Vec<github::api::ReviewThread>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_review_threads(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_resolve_review_thread(
+    repo_path: String,
+    login: String,
+    thread_id: String,
+) -> Result<(), String> {
+    let (host, token, ..) = github_resolve(&repo_path, &login)?;
+    github::api::resolve_review_thread(&host, &token, &thread_id).await
+}
+
+#[tauri::command]
+async fn github_unresolve_review_thread(
+    repo_path: String,
+    login: String,
+    thread_id: String,
+) -> Result<(), String> {
+    let (host, token, ..) = github_resolve(&repo_path, &login)?;
+    github::api::unresolve_review_thread(&host, &token, &thread_id).await
+}
+
+#[tauri::command]
+async fn github_list_viewed_files(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<Vec<(String, String)>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_viewed_files(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_mark_file_viewed(
+    repo_path: String,
+    login: String,
+    number: u64,
+    path: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::mark_file_as_viewed(&host, &token, &owner, &repo, number, &path).await
+}
+
+#[tauri::command]
+async fn github_unmark_file_viewed(
+    repo_path: String,
+    login: String,
+    number: u64,
+    path: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::unmark_file_as_viewed(&host, &token, &owner, &repo, number, &path).await
+}
+
+#[tauri::command]
+async fn github_list_repo_issues(
+    repo_path: String,
+    login: String,
+) -> Result<Vec<github::api::IssueSummary>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_repo_issues(&host, &token, &owner, &repo).await
+}
+
+#[tauri::command]
+async fn github_list_issue_states(
+    repo_path: String,
+    login: String,
+    numbers: Vec<u64>,
+) -> Result<std::collections::HashMap<u64, String>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_issue_states(&host, &token, &owner, &repo, &numbers).await
 }
 
 /// Whether `path` currently exists on disk — used to hide filesystem-dependent context menu
@@ -2251,13 +2686,45 @@ pub fn run() {
             github_get_pull_request,
             github_create_pull_request,
             github_update_pull_request_base,
+            github_update_pull_request_body,
+            github_update_pull_request_branch,
+            github_close_pull_request,
+            github_reopen_pull_request,
+            github_lock_conversation,
+            github_unlock_conversation,
+            github_compare_pull_request_base,
+            github_branch_protection_requirements,
+            github_list_pull_request_commits,
+            get_cached_pull_request_commits,
+            github_get_commit_diff_files,
+            github_list_relevant_timeline_events,
+            github_list_issue_comments,
+            get_cached_issue_comments,
+            github_create_issue_comment,
+            github_delete_issue_comment,
+            github_list_reviews,
+            get_cached_reviews,
+            github_submit_review,
+            github_list_review_threads,
+            github_resolve_review_thread,
+            github_unresolve_review_thread,
+            github_list_viewed_files,
+            github_mark_file_viewed,
+            github_unmark_file_viewed,
+            github_list_repo_issues,
+            github_list_issue_states,
             github_list_labels,
             github_list_assignable_users,
             github_add_labels,
+            github_remove_label,
             github_add_assignees,
+            github_remove_assignees,
             github_request_reviewers,
+            github_remove_requested_reviewers,
+            github_list_repo_teams,
             github_list_milestones,
             github_set_milestone,
+            github_clear_milestone,
             github_list_projects,
             github_add_pull_request_to_project,
             github_merge_pull_request,
@@ -2270,9 +2737,12 @@ pub fn run() {
             get_cache_dir_path,
             clear_repo_cache,
             clear_avatar_cache,
+            get_pr_archived,
+            set_pr_archived,
             github_get_pull_request_image_diff,
             github_list_review_comments,
             github_create_review_comment,
+            github_reply_to_review_comment,
             github_list_check_runs,
             get_cached_check_runs,
             cache_avatar,

@@ -4,6 +4,7 @@ import type {
   AssignableUser,
   BlameLine,
   BranchInfo,
+  BranchProtectionRequirements,
   CheckRun,
   CherryPickResult,
   CommitDetail,
@@ -11,17 +12,22 @@ import type {
   ConflictSides,
   CommitSearchResult,
   CommitVerification,
+  CompareResult,
   DeviceCodeResponse,
   FileDiff,
   GitHubAccount,
   GitHubRepo,
   ImageDiff,
+  IssueComment,
+  IssueSummary,
+  IssueTimelineEvent,
   Label,
   Milestone,
   Project,
   LfsFileInfo,
   PollResult,
   PullRequest,
+  PullRequestCommit,
   PullRequestFile,
   RebaseResult,
   RebaseTodoItem,
@@ -29,6 +35,8 @@ import type {
   RepoMergeSettings,
   ReflogEntry,
   RepoStatus,
+  Review,
+  ReviewThread,
   SigningStatus,
   ReviewComment,
   Settings,
@@ -36,6 +44,7 @@ import type {
   StashEntry,
   SubmoduleInfo,
   TagInfo,
+  Team,
   Workspace,
   WorktreeInfo,
 } from "./types";
@@ -319,20 +328,137 @@ export const api = {
   readPrTemplate: (repoPath: string) => invoke<string | null>("read_pr_template", { repoPath }),
   githubUpdatePullRequestBase: (repoPath: string, login: string, number: number, base: string) =>
     invoke<void>("github_update_pull_request_base", { repoPath, login, number, base }),
+  githubUpdatePullRequestBody: (repoPath: string, login: string, number: number, body: string) =>
+    invoke<void>("github_update_pull_request_body", { repoPath, login, number, body }),
+  githubUpdatePullRequestBranch: (repoPath: string, login: string, number: number) =>
+    invoke<void>("github_update_pull_request_branch", { repoPath, login, number }),
+  githubClosePullRequest: (repoPath: string, login: string, number: number) =>
+    invoke<void>("github_close_pull_request", { repoPath, login, number }),
+  githubReopenPullRequest: (repoPath: string, login: string, number: number) =>
+    invoke<void>("github_reopen_pull_request", { repoPath, login, number }),
+  githubLockConversation: (
+    repoPath: string,
+    login: string,
+    number: number,
+    lockReason: string | null,
+  ) => invoke<void>("github_lock_conversation", { repoPath, login, number, lockReason }),
+  githubUnlockConversation: (repoPath: string, login: string, number: number) =>
+    invoke<void>("github_unlock_conversation", { repoPath, login, number }),
+  githubComparePullRequestBase: (repoPath: string, login: string, base: string, head: string) =>
+    invoke<CompareResult>("github_compare_pull_request_base", { repoPath, login, base, head }),
+  githubBranchProtectionRequirements: (repoPath: string, login: string, branch: string) =>
+    invoke<BranchProtectionRequirements>("github_branch_protection_requirements", {
+      repoPath,
+      login,
+      branch,
+    }),
+  githubListPullRequestCommits: (
+    repoPath: string,
+    login: string,
+    number: number,
+    headSha: string,
+    page: number,
+  ) =>
+    invoke<PullRequestCommit[]>("github_list_pull_request_commits", {
+      repoPath,
+      login,
+      number,
+      page,
+      headSha,
+    }),
+  getCachedPullRequestCommits: (repoPath: string, number: number) =>
+    invoke<PullRequestCommit[] | null>("get_cached_pull_request_commits", { repoPath, number }),
+  githubGetCommitDiffFiles: (repoPath: string, login: string, sha: string) =>
+    invoke<[string, string, FileDiff][]>("github_get_commit_diff_files", {
+      repoPath,
+      login,
+      sha,
+    }).then((rows): PullRequestFile[] =>
+      rows.map(([filename, status, diff]) => ({ filename, status, diff })),
+    ),
+  githubListRelevantTimelineEvents: (repoPath: string, login: string, number: number) =>
+    invoke<IssueTimelineEvent[]>("github_list_relevant_timeline_events", {
+      repoPath,
+      login,
+      number,
+    }),
+  githubListIssueComments: (repoPath: string, login: string, number: number, page: number) =>
+    invoke<IssueComment[]>("github_list_issue_comments", { repoPath, login, number, page }),
+  getCachedIssueComments: (repoPath: string, number: number) =>
+    invoke<IssueComment[] | null>("get_cached_issue_comments", { repoPath, number }),
+  githubCreateIssueComment: (repoPath: string, login: string, number: number, body: string) =>
+    invoke<IssueComment>("github_create_issue_comment", { repoPath, login, number, body }),
+  githubDeleteIssueComment: (repoPath: string, login: string, commentId: number) =>
+    invoke<void>("github_delete_issue_comment", { repoPath, login, commentId }),
+  githubListReviews: (repoPath: string, login: string, number: number, page: number) =>
+    invoke<Review[]>("github_list_reviews", { repoPath, login, number, page }),
+  getCachedReviews: (repoPath: string, number: number) =>
+    invoke<Review[] | null>("get_cached_reviews", { repoPath, number }),
+  githubSubmitReview: (
+    repoPath: string,
+    login: string,
+    number: number,
+    event: "APPROVE" | "REQUEST_CHANGES" | "COMMENT",
+    body: string,
+  ) => invoke<Review>("github_submit_review", { repoPath, login, number, event, body }),
+  githubListReviewThreads: (repoPath: string, login: string, number: number) =>
+    invoke<ReviewThread[]>("github_list_review_threads", { repoPath, login, number }),
+  githubResolveReviewThread: (repoPath: string, login: string, threadId: string) =>
+    invoke<void>("github_resolve_review_thread", { repoPath, login, threadId }),
+  githubUnresolveReviewThread: (repoPath: string, login: string, threadId: string) =>
+    invoke<void>("github_unresolve_review_thread", { repoPath, login, threadId }),
+  githubListViewedFiles: (repoPath: string, login: string, number: number) =>
+    invoke<[string, string][]>("github_list_viewed_files", { repoPath, login, number }),
+  githubMarkFileViewed: (repoPath: string, login: string, number: number, path: string) =>
+    invoke<void>("github_mark_file_viewed", { repoPath, login, number, path }),
+  githubUnmarkFileViewed: (repoPath: string, login: string, number: number, path: string) =>
+    invoke<void>("github_unmark_file_viewed", { repoPath, login, number, path }),
+  githubListIssueStates: (repoPath: string, login: string, numbers: number[]) =>
+    invoke<Record<number, string>>("github_list_issue_states", { repoPath, login, numbers }),
   githubListLabels: (repoPath: string, login: string) =>
     invoke<Label[]>("github_list_labels", { repoPath, login }),
   githubListAssignableUsers: (repoPath: string, login: string) =>
     invoke<AssignableUser[]>("github_list_assignable_users", { repoPath, login }),
   githubAddLabels: (repoPath: string, login: string, number: number, labels: string[]) =>
     invoke<void>("github_add_labels", { repoPath, login, number, labels }),
+  githubRemoveLabel: (repoPath: string, login: string, number: number, name: string) =>
+    invoke<void>("github_remove_label", { repoPath, login, number, name }),
   githubAddAssignees: (repoPath: string, login: string, number: number, assignees: string[]) =>
     invoke<void>("github_add_assignees", { repoPath, login, number, assignees }),
-  githubRequestReviewers: (repoPath: string, login: string, number: number, reviewers: string[]) =>
-    invoke<void>("github_request_reviewers", { repoPath, login, number, reviewers }),
+  githubRemoveAssignees: (repoPath: string, login: string, number: number, assignees: string[]) =>
+    invoke<void>("github_remove_assignees", { repoPath, login, number, assignees }),
+  githubRequestReviewers: (
+    repoPath: string,
+    login: string,
+    number: number,
+    reviewers: string[],
+    teamReviewers: string[],
+  ) =>
+    invoke<void>("github_request_reviewers", { repoPath, login, number, reviewers, teamReviewers }),
+  githubRemoveRequestedReviewers: (
+    repoPath: string,
+    login: string,
+    number: number,
+    reviewers: string[],
+    teamReviewers: string[],
+  ) =>
+    invoke<void>("github_remove_requested_reviewers", {
+      repoPath,
+      login,
+      number,
+      reviewers,
+      teamReviewers,
+    }),
+  githubListRepoTeams: (repoPath: string, login: string) =>
+    invoke<Team[]>("github_list_repo_teams", { repoPath, login }),
+  githubListRepoIssues: (repoPath: string, login: string) =>
+    invoke<IssueSummary[]>("github_list_repo_issues", { repoPath, login }),
   githubListMilestones: (repoPath: string, login: string) =>
     invoke<Milestone[]>("github_list_milestones", { repoPath, login }),
   githubSetMilestone: (repoPath: string, login: string, number: number, milestone: number) =>
     invoke<void>("github_set_milestone", { repoPath, login, number, milestone }),
+  githubClearMilestone: (repoPath: string, login: string, number: number) =>
+    invoke<void>("github_clear_milestone", { repoPath, login, number }),
   githubListProjects: (repoPath: string, login: string) =>
     invoke<Project[]>("github_list_projects", { repoPath, login }),
   githubAddPullRequestToProject: (
@@ -403,6 +529,10 @@ export const api = {
   getCacheDirPath: () => invoke<string>("get_cache_dir_path"),
   clearRepoCache: () => invoke<void>("clear_repo_cache"),
   clearAvatarCache: () => invoke<void>("clear_avatar_cache"),
+  getPrArchived: (repoPath: string, number: number) =>
+    invoke<boolean>("get_pr_archived", { repoPath, number }),
+  setPrArchived: (repoPath: string, number: number, archived: boolean) =>
+    invoke<void>("set_pr_archived", { repoPath, number, archived }),
   githubGetPullRequestImageDiff: (
     repoPath: string,
     login: string,
@@ -419,6 +549,20 @@ export const api = {
     }),
   githubListReviewComments: (repoPath: string, login: string, number: number) =>
     invoke<ReviewComment[]>("github_list_review_comments", { repoPath, login, number }),
+  githubReplyToReviewComment: (
+    repoPath: string,
+    login: string,
+    number: number,
+    inReplyTo: number,
+    body: string,
+  ) =>
+    invoke<ReviewComment>("github_reply_to_review_comment", {
+      repoPath,
+      login,
+      number,
+      inReplyTo,
+      body,
+    }),
   githubCreateReviewComment: (
     repoPath: string,
     login: string,

@@ -18,6 +18,11 @@ interface MultiSelectFieldProps {
   options: MultiSelectOption[];
   selected: string[];
   onChange: (selected: string[]) => void;
+  /** Skips rendering the selected items as chips in the trigger button itself — for a caller
+   * that already renders the current selection its own way elsewhere (e.g. the sidebar's
+   * reviewer list, which shows each person with their own approve/pending status icon) and just
+   * wants this as the "add/remove" control, not a second redundant display of the same names. */
+  hideChips?: boolean;
 }
 
 /** A filterable checkbox list behind a chip-showing trigger button used for picking labels,
@@ -28,6 +33,7 @@ export function MultiSelectField({
   options,
   selected,
   onChange,
+  hideChips,
 }: MultiSelectFieldProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
@@ -53,7 +59,7 @@ export function MultiSelectField({
             type="button"
             className="flex min-h-7 w-full flex-wrap items-center gap-1 rounded-md border border-input bg-transparent px-2 py-1 text-left text-sm hover:bg-accent"
           >
-            {selected.length === 0 ? (
+            {selected.length === 0 || hideChips ? (
               <span className="text-muted-foreground">{placeholder ?? "None"}</span>
             ) : (
               selected.map((key) => {

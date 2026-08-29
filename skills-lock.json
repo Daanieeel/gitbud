@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "typescript": {
+      "source": "testdino-hq/google-styleguides-skills",
+      "sourceType": "github",
+      "skillPath": "typescript/SKILL.md",
+      "computedHash": "b3430736b34407ba4232683bf0f65ea08377d727e3869a841980a017f2d0f543"
+    }
+  }
+}

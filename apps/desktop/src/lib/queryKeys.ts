@@ -42,4 +42,34 @@ export const queryKeys = {
     ["pr-detail", repoPath, login, number] as const,
   checkRuns: (repoPath: string, login: string, sha: string) =>
     ["check-runs", repoPath, login, sha] as const,
+  prMeta: (repoPath: string, login: string, number: number) =>
+    ["pr-meta", repoPath, login, number] as const,
+  prCommits: (repoPath: string, login: string, number: number, headSha: string) =>
+    ["pr-commits", repoPath, login, number, headSha] as const,
+  commitDiffFiles: (repoPath: string, login: string, sha: string) =>
+    ["pr-commit-diff-files", repoPath, login, sha] as const,
+  prIssueComments: (repoPath: string, login: string, number: number) =>
+    ["pr-issue-comments", repoPath, login, number] as const,
+  prTimelineEvents: (repoPath: string, login: string, number: number) =>
+    ["pr-timeline-events", repoPath, login, number] as const,
+  prReviews: (repoPath: string, login: string, number: number) =>
+    ["pr-reviews", repoPath, login, number] as const,
+  reviewThreads: (repoPath: string, login: string, number: number) =>
+    ["review-threads", repoPath, login, number] as const,
+  viewedFiles: (repoPath: string, login: string, number: number) =>
+    ["viewed-files", repoPath, login, number] as const,
+  prLabels: (repoPath: string, login: string) => ["pr-labels", repoPath, login] as const,
+  assignableUsers: (repoPath: string, login: string) =>
+    ["assignable-users", repoPath, login] as const,
+  repoTeams: (repoPath: string, login: string) => ["repo-teams", repoPath, login] as const,
+  repoIssues: (repoPath: string, login: string) => ["repo-issues", repoPath, login] as const,
+  milestones: (repoPath: string, login: string) => ["milestones", repoPath, login] as const,
+  projects: (repoPath: string, login: string) => ["projects", repoPath, login] as const,
+  issueStates: (repoPath: string, login: string, numbers: number[]) =>
+    ["issue-states", repoPath, login, numbers] as const,
+  branchProtection: (repoPath: string, login: string, branch: string) =>
+    ["branch-protection", repoPath, login, branch] as const,
+  prArchived: (repoPath: string, number: number) => ["pr-archived", repoPath, number] as const,
+  compare: (repoPath: string, login: string, base: string, head: string) =>
+    ["pr-compare", repoPath, login, base, head] as const,
 };

@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
+  CheckCircle2Icon,
   ColumnsIcon,
   LinkIcon,
   MessageSquarePlusIcon,
@@ -24,6 +25,10 @@ import {
   highlightLine,
   languageForPath,
 } from "../../lib/highlight";
+import { groupCommentsIntoThreads } from "./threading";
+
+type ReplyHandler = (rootCommentId: number, body: string) => Promise<void> | void;
+type ResolveThreadHandler = (rootCommentId: number, resolved: boolean) => Promise<void> | void;
 
 interface HunkActions {
   /** Whether the diff being shown is the staged (HEAD->index) or unstaged (index->workdir) side. */
@@ -46,6 +51,15 @@ interface DiffViewProps {
   imageDiff?: ImageDiff | null;
   comments?: ReviewComment[];
   onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
+  /** Replies to an existing thread, keyed by that thread's root comment id — the desktop app
+   * resolves this id to a GraphQL thread id itself; this package has no GraphQL knowledge. */
+  onReply?: ReplyHandler;
+  /** Toggles a thread's resolved state, keyed by its root comment id, same reasoning as
+   * `onReply`. Only rendered when a comment actually carries a `resolved` value (see
+   * `ReviewComment.resolved`'s doc comment) — a thread this app hasn't reconciled against
+   * GitHub's GraphQL review-threads response yet has no resolve control at all, rather than one
+   * that might silently act on the wrong thread. */
+  onResolveThread?: ResolveThreadHandler;
   onCopyPermalink?: (line: number) => void;
   hunkActions?: HunkActions;
   /** The other side of the same file's changes (e.g. `diff` is unstaged, this is staged), shown
@@ -83,21 +97,118 @@ function commentsForLine(
   });
 }
 
-function CommentThread({ comments }: { comments: ReviewComment[] }) {
-  if (comments.length === 0) return null;
+/** One thread — a root comment plus its replies (see `groupCommentsIntoThreads`) — with a reply
+ * composer and a resolve/unresolve toggle. A resolved thread collapses to a one-line summary by
+ * default (each thread tracks its own "I clicked Show" override locally, independent of props,
+ * so it never gets stuck open/closed from a stale render — the moment `resolved` itself flips
+ * back to `false`, e.g. someone unresolves it, the summary disappears regardless of that flag). */
+function SingleCommentThread({
+  thread,
+  onReply,
+  onResolveThread,
+}: {
+  thread: ReviewComment[];
+  onReply?: ReplyHandler;
+  onResolveThread?: ResolveThreadHandler;
+}) {
+  const root = thread[0];
+  const [replying, setReplying] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [forceExpand, setForceExpand] = useState(false);
+  const isResolved = root.resolved === true;
+  const showCollapsedSummary = isResolved && !forceExpand;
+
   return (
     <div className="ml-16 flex flex-col gap-1 border-l-2 border-primary bg-card px-3 py-2">
-      {comments.map((c) => (
-        <div key={c.id} className="flex items-start gap-1.5 text-xs">
-          <Avatar src={c.user_avatar_url} alt={c.user_login} className="mt-0.5 size-4" />
-          <div>
-            <span className="font-medium">{c.user_login}</span>{" "}
-            <span className="text-muted-foreground">
-              {new Date(c.created_at).toLocaleDateString()}
-            </span>
-            <p className="whitespace-pre-wrap">{c.body}</p>
-          </div>
-        </div>
+      {showCollapsedSummary ? (
+        <button
+          type="button"
+          onClick={() => setForceExpand(true)}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <CheckCircle2Icon className="size-3.5 shrink-0 text-accent-green" />
+          <span>
+            Resolved — {thread.length} comment{thread.length > 1 ? "s" : ""}
+          </span>
+          <span className="underline">Show</span>
+        </button>
+      ) : (
+        <>
+          {thread.map((c) => (
+            <div key={c.id} className="flex items-start gap-1.5 text-xs">
+              <Avatar src={c.user_avatar_url} alt={c.user_login} className="mt-0.5 size-4" />
+              <div>
+                <span className="font-medium">{c.user_login}</span>{" "}
+                <span className="text-muted-foreground">
+                  {new Date(c.created_at).toLocaleDateString()}
+                </span>
+                <p className="whitespace-pre-wrap">{c.body}</p>
+              </div>
+            </div>
+          ))}
+          {replying && onReply ? (
+            <AddCommentComposer
+              onCancel={() => setReplying(false)}
+              onSubmit={(body) => onReply(root.id, body)}
+            />
+          ) : (
+            (onReply || (onResolveThread && root.resolved !== undefined)) && (
+              <div className="flex gap-3 pl-5 pt-0.5 text-xs">
+                {onReply && (
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => setReplying(true)}
+                  >
+                    Reply
+                  </button>
+                )}
+                {onResolveThread && root.resolved !== undefined && (
+                  <button
+                    type="button"
+                    disabled={resolving}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                    onClick={async () => {
+                      setResolving(true);
+                      try {
+                        await onResolveThread(root.id, !isResolved);
+                      } finally {
+                        setResolving(false);
+                      }
+                    }}
+                  >
+                    {isResolved ? "Unresolve" : "Resolve conversation"}
+                  </button>
+                )}
+              </div>
+            )
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function CommentThread({
+  comments,
+  onReply,
+  onResolveThread,
+}: {
+  comments: ReviewComment[];
+  onReply?: ReplyHandler;
+  onResolveThread?: ResolveThreadHandler;
+}) {
+  if (comments.length === 0) return null;
+  const threads = groupCommentsIntoThreads(comments);
+  return (
+    <div className="flex flex-col gap-2">
+      {threads.map((thread) => (
+        <SingleCommentThread
+          key={thread[0].id}
+          thread={thread}
+          onReply={onReply}
+          onResolveThread={onResolveThread}
+        />
       ))}
     </div>
   );
@@ -250,6 +361,8 @@ function UnifiedLine({
   language,
   comments,
   onAddComment,
+  onReply,
+  onResolveThread,
   onCopyPermalink,
   hunkActions,
   composerKey,
@@ -261,6 +374,8 @@ function UnifiedLine({
   language: string | undefined;
   comments: ReviewComment[] | undefined;
   onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
+  onReply?: ReplyHandler;
+  onResolveThread?: ResolveThreadHandler;
   onCopyPermalink?: (line: number) => void;
   hunkActions?: HunkActions;
   composerKey: string | null;
@@ -327,7 +442,7 @@ function UnifiedLine({
                     className="text-muted-foreground hover:text-foreground"
                     onClick={() => setComposerKey(composerKey === key ? null : key)}
                   >
-                    <MessageSquarePlusIcon className="size-3.5" />
+                    <MessageSquarePlusIcon className="size-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>Add comment</TooltipContent>
@@ -380,7 +495,7 @@ function UnifiedLine({
           </div>
         )}
       </div>
-      <CommentThread comments={lineComments} />
+      <CommentThread comments={lineComments} onReply={onReply} onResolveThread={onResolveThread} />
       {composerKey === key && onAddComment && (
         <AddCommentComposer
           onCancel={() => setComposerKey(null)}
@@ -396,29 +511,44 @@ function UnifiedLine({
 interface SplitRow {
   left: DiffLine | null;
   right: DiffLine | null;
+  /** Index into the hunk's own `lines[]` — every line produces exactly one `SplitRow` (a
+   * modified line's delete+add pair becomes two separate rows, not one merged row; see this
+   * function's doc comment), so this is the same index `UnifiedLine` would use for the
+   * equivalent line, keeping composer/comment keys consistent between the two view modes. */
+  lineIdx: number;
 }
 
 /** Structural (not LCS-aligned) pairing: context lines occupy both columns, deletions only
  * the left column, additions only the right — simple and correct, if not perfectly aligned
  * for large replaced blocks the way a full diff-alignment algorithm would be. */
 function toSplitRows(hunk: DiffHunk): SplitRow[] {
-  const rows: SplitRow[] = [];
-  for (const line of hunk.lines) {
-    if (line.kind === "deletion") rows.push({ left: line, right: null });
-    else if (line.kind === "addition") rows.push({ left: null, right: line });
-    else rows.push({ left: line, right: line });
-  }
-  return rows;
+  return hunk.lines.map((line, lineIdx) => {
+    if (line.kind === "deletion") return { left: line, right: null, lineIdx };
+    if (line.kind === "addition") return { left: null, right: line, lineIdx };
+    return { left: line, right: line, lineIdx };
+  });
 }
 
-function SplitCell({ line, language }: { line: DiffLine | null; language: string | undefined }) {
+function SplitCell({
+  line,
+  language,
+  canComment,
+  composerOpen,
+  onToggleComposer,
+}: {
+  line: DiffLine | null;
+  language: string | undefined;
+  canComment: boolean;
+  composerOpen: boolean;
+  onToggleComposer: () => void;
+}) {
   if (!line) {
     return <div className="w-max min-w-[50%] bg-muted/30 px-3 py-px" />;
   }
   return (
     <div
       className={cn(
-        "flex w-max min-w-[50%] px-3 py-px whitespace-pre",
+        "group flex w-max min-w-[50%] px-3 py-px whitespace-pre",
         line.kind === "addition" &&
           "bg-[color-mix(in_srgb,var(--accent-green)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--accent-green)_18%,transparent)]",
         line.kind === "deletion" &&
@@ -439,6 +569,91 @@ function SplitCell({ line, language }: { line: DiffLine | null; language: string
         {LINE_PREFIX[line.kind]}
       </span>
       <span dangerouslySetInnerHTML={{ __html: renderLineHtml(line, language) }} />
+      {canComment && (
+        <div className="sticky right-3 z-[7] ml-auto flex shrink-0 items-center rounded bg-card px-1.5 py-0.5 opacity-0 shadow-sm group-hover:opacity-100">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="text-muted-foreground hover:text-foreground"
+                onClick={onToggleComposer}
+              >
+                <MessageSquarePlusIcon className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{composerOpen ? "Cancel comment" : "Add comment"}</TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The split-mode counterpart to `UnifiedLine` — two side-by-side cells plus a full-width
+ * comment thread/composer underneath (GitHub's own split view doesn't split comments into two
+ * columns either). The "add comment" affordance only ever lives on the right cell, matching
+ * `UnifiedLine`'s existing restriction to `side: "RIGHT"` — a pure deletion row (no right line at
+ * all) shows any comment GitHub already returned for it, but isn't itself commentable-on here. */
+function SplitLineRow({
+  left,
+  right,
+  hunkIdx,
+  lineIdx,
+  language,
+  comments,
+  onAddComment,
+  onReply,
+  onResolveThread,
+  composerKey,
+  setComposerKey,
+}: {
+  left: DiffLine | null;
+  right: DiffLine | null;
+  hunkIdx: number;
+  lineIdx: number;
+  language: string | undefined;
+  comments: ReviewComment[] | undefined;
+  onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
+  onReply?: ReplyHandler;
+  onResolveThread?: ResolveThreadHandler;
+  composerKey: string | null;
+  setComposerKey: (key: string | null) => void;
+}) {
+  const key = `${hunkIdx}:${lineIdx}`;
+  const rowComments = commentsForLine(
+    comments,
+    left?.old_lineno ?? null,
+    right?.new_lineno ?? null,
+  );
+  const newLineno = right?.new_lineno ?? null;
+  const canComment = Boolean(onAddComment) && newLineno != null;
+  const composerOpen = composerKey === key;
+
+  return (
+    <div>
+      <div className="flex">
+        <SplitCell
+          line={left}
+          language={language}
+          canComment={false}
+          composerOpen={false}
+          onToggleComposer={() => {}}
+        />
+        <div className="w-px shrink-0 bg-border" />
+        <SplitCell
+          line={right}
+          language={language}
+          canComment={canComment}
+          composerOpen={composerOpen}
+          onToggleComposer={() => setComposerKey(composerOpen ? null : key)}
+        />
+      </div>
+      <CommentThread comments={rowComments} onReply={onReply} onResolveThread={onResolveThread} />
+      {composerOpen && onAddComment && newLineno != null && (
+        <AddCommentComposer
+          onCancel={() => setComposerKey(null)}
+          onSubmit={(body) => onAddComment(newLineno, "RIGHT", body)}
+        />
+      )}
     </div>
   );
 }
@@ -453,7 +668,13 @@ type DiffRow =
   | { kind: "header"; hunkIdx: number }
   | { kind: "actions"; hunkIdx: number }
   | { kind: "line"; hunkIdx: number; lineIdx: number }
-  | { kind: "split"; hunkIdx: number; left: DiffLine | null; right: DiffLine | null };
+  | {
+      kind: "split";
+      hunkIdx: number;
+      lineIdx: number;
+      left: DiffLine | null;
+      right: DiffLine | null;
+    };
 
 function buildDiffRows(hunks: DiffHunk[], mode: "unified" | "split"): DiffRow[] {
   const rows: DiffRow[] = [];
@@ -461,8 +682,8 @@ function buildDiffRows(hunks: DiffHunk[], mode: "unified" | "split"): DiffRow[] 
     rows.push({ kind: "header", hunkIdx });
     rows.push({ kind: "actions", hunkIdx });
     if (mode === "split") {
-      for (const { left, right } of toSplitRows(hunk))
-        rows.push({ kind: "split", hunkIdx, left, right });
+      for (const { left, right, lineIdx } of toSplitRows(hunk))
+        rows.push({ kind: "split", hunkIdx, lineIdx, left, right });
     } else {
       hunk.lines.forEach((_, lineIdx) => rows.push({ kind: "line", hunkIdx, lineIdx }));
     }
@@ -526,6 +747,8 @@ interface DiffSectionProps {
   label?: string;
   comments?: ReviewComment[];
   onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
+  onReply?: ReplyHandler;
+  onResolveThread?: ResolveThreadHandler;
   onCopyPermalink?: (line: number) => void;
   composerKey: string | null;
   setComposerKey: (key: string | null) => void;
@@ -553,6 +776,8 @@ function DiffSection({
   label,
   comments,
   onAddComment,
+  onReply,
+  onResolveThread,
   onCopyPermalink,
   composerKey,
   setComposerKey,
@@ -574,6 +799,25 @@ function DiffSection({
     estimateSize: (index) => estimateDiffRowSize(rows[index], fontSize),
     overscan: 60,
   });
+  // `virtualizer.measureElement`'s own ResizeObserver-driven remeasurement doesn't reliably
+  // re-fire once a row that's already mounted grows *after* its own initial measurement — e.g.
+  // opening the inline "Add comment" composer, or a thread's reply box — verified against a
+  // synthetic repro instrumenting ResizeObserver directly: the observer fires once at mount,
+  // then never again for that node despite its real, measured height changing. Left unfixed,
+  // every row *after* the one that grew keeps its stale (too-small) offset, so it visually and
+  // interactively overlaps whatever grew above it — the composer looks "see-through" and clicks
+  // land on the row on top of it instead. Tracking each rendered row's own node here lets us
+  // force a remeasure of everything currently on screen whenever something that changes a row's
+  // height happens (opening/closing a composer, a comment/reply being added) — via `resizeItem`
+  // with a height we read ourselves, since re-calling `virtualizer.measureElement(node)` outside
+  // of an actual ResizeObserver callback hits `virtual-core`'s own cache-hit shortcut (no
+  // `entry` argument + an existing cached size just returns that stale cached size verbatim,
+  // never touching the DOM) and so silently no-ops instead of re-reading anything.
+  const rowNodesRef = useRef(new Map<number, HTMLDivElement>());
+  useEffect(() => {
+    rowNodesRef.current.forEach((node, index) => virtualizer.resizeItem(index, node.offsetHeight));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composerKey, comments]);
   // The virtualizer's very first size measurement (in a layout effect, right as this mounts)
   // can land before an ancestor panel/split-view has settled into its final size — it still
   // subscribes a ResizeObserver for later corrections, but if the corrected range comes out
@@ -612,7 +856,11 @@ function DiffSection({
           return (
             <div
               key={vi.key}
-              ref={virtualizer.measureElement}
+              ref={(node) => {
+                virtualizer.measureElement(node);
+                if (node) rowNodesRef.current.set(vi.index, node);
+                else rowNodesRef.current.delete(vi.index);
+              }}
               data-index={vi.index}
               style={{
                 position: "absolute",
@@ -639,6 +887,8 @@ function DiffSection({
                     language={language}
                     comments={comments}
                     onAddComment={onAddComment}
+                    onReply={onReply}
+                    onResolveThread={onResolveThread}
                     onCopyPermalink={onCopyPermalink}
                     hunkActions={hunkActions}
                     composerKey={composerKey}
@@ -647,10 +897,20 @@ function DiffSection({
                 </div>
               )}
               {row.kind === "split" && (
-                <div className={cn("flex", tint)}>
-                  <SplitCell line={row.left} language={language} />
-                  <div className="w-px shrink-0 bg-border" />
-                  <SplitCell line={row.right} language={language} />
+                <div className={tint}>
+                  <SplitLineRow
+                    left={row.left}
+                    right={row.right}
+                    hunkIdx={row.hunkIdx}
+                    lineIdx={row.lineIdx}
+                    language={language}
+                    comments={comments}
+                    onAddComment={onAddComment}
+                    onReply={onReply}
+                    onResolveThread={onResolveThread}
+                    composerKey={composerKey}
+                    setComposerKey={setComposerKey}
+                  />
                 </div>
               )}
             </div>
@@ -667,6 +927,8 @@ function DiffViewImpl({
   imageDiff,
   comments,
   onAddComment,
+  onReply,
+  onResolveThread,
   onCopyPermalink,
   hunkActions,
   secondaryDiff,
@@ -789,6 +1051,8 @@ function DiffViewImpl({
           }
           comments={comments}
           onAddComment={onAddComment}
+          onReply={onReply}
+          onResolveThread={onResolveThread}
           onCopyPermalink={onCopyPermalink}
           composerKey={composerKey}
           setComposerKey={setComposerKey}
@@ -806,6 +1070,8 @@ function DiffViewImpl({
             label={secondaryHunkActions?.staged ? "Staged changes" : "Unstaged changes"}
             comments={comments}
             onAddComment={onAddComment}
+            onReply={onReply}
+            onResolveThread={onResolveThread}
             onCopyPermalink={onCopyPermalink}
             composerKey={composerKey}
             setComposerKey={setComposerKey}

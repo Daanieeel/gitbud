@@ -218,6 +218,31 @@ pub struct PullRequest {
     pub merged: bool,
     pub mergeable: Option<bool>,
     pub labels: Vec<String>,
+    // GitHub's list-pull-requests endpoint never populates any of these four (only
+    // get-a-single-pull-request computes/includes them) — always empty/None from
+    // `list_pull_requests`, populated from `get_pull_request`. See `usePullRequestMeta` on the
+    // frontend, which exists specifically to re-fetch a single PR for this reason.
+    #[serde(default)]
+    pub mergeable_state: Option<String>,
+    #[serde(default)]
+    pub requested_reviewers: Vec<AssignableUser>,
+    #[serde(default)]
+    pub requested_teams: Vec<Team>,
+    #[serde(default)]
+    pub assignees: Vec<AssignableUser>,
+    #[serde(default)]
+    pub milestone: Option<Milestone>,
+    #[serde(default)]
+    pub locked: bool,
+    #[serde(default)]
+    pub active_lock_reason: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Team {
+    pub slug: String,
+    pub name: String,
 }
 
 #[derive(Deserialize)]
@@ -311,6 +336,21 @@ struct RawPullRequest {
     mergeable: Option<bool>,
     #[serde(default)]
     labels: Vec<RawLabel>,
+    #[serde(default)]
+    mergeable_state: Option<String>,
+    #[serde(default)]
+    requested_reviewers: Vec<AssignableUser>,
+    #[serde(default)]
+    requested_teams: Vec<Team>,
+    #[serde(default)]
+    assignees: Vec<AssignableUser>,
+    #[serde(default)]
+    milestone: Option<Milestone>,
+    #[serde(default)]
+    locked: bool,
+    #[serde(default)]
+    active_lock_reason: Option<String>,
+    created_at: String,
 }
 
 impl From<RawPullRequest> for PullRequest {
@@ -331,6 +371,14 @@ impl From<RawPullRequest> for PullRequest {
             merged: raw.merged_at.is_some(),
             mergeable: raw.mergeable,
             labels: raw.labels.into_iter().map(|l| l.name).collect(),
+            mergeable_state: raw.mergeable_state,
+            requested_reviewers: raw.requested_reviewers,
+            requested_teams: raw.requested_teams,
+            assignees: raw.assignees,
+            milestone: raw.milestone,
+            locked: raw.locked,
+            active_lock_reason: raw.active_lock_reason,
+            created_at: raw.created_at,
         }
     }
 }
@@ -398,9 +446,64 @@ struct RawLinearHistorySetting {
 }
 
 #[derive(Deserialize, Default)]
+struct RawRequiredStatusChecks {
+    #[serde(default)]
+    contexts: Vec<String>,
+}
+
+#[derive(Deserialize, Default)]
+struct RawRequiredPullRequestReviews {
+    #[serde(default)]
+    required_approving_review_count: Option<u32>,
+}
+
+#[derive(Deserialize, Default)]
 struct RawBranchProtection {
     #[serde(default)]
     required_linear_history: RawLinearHistorySetting,
+    #[serde(default)]
+    required_status_checks: RawRequiredStatusChecks,
+    #[serde(default)]
+    required_pull_request_reviews: RawRequiredPullRequestReviews,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct BranchProtectionRequirements {
+    pub required_contexts: Vec<String>,
+    pub required_approving_review_count: Option<u32>,
+}
+
+/// Required status-check contexts and required-approving-review-count for `branch`, feeding the
+/// Checks tab's required/optional grouping and the merge-readiness panel's "reviews met" check.
+/// Best-effort like `requires_linear_history` above (reuses the same protection payload) — an
+/// unprotected branch or a token without permission to view protection settings just means "no
+/// requirements visible to us", not an error worth surfacing.
+pub async fn branch_protection_requirements(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    branch: &str,
+) -> BranchProtectionRequirements {
+    let Ok(gh) = GhClient::new(host, token) else {
+        return BranchProtectionRequirements::default();
+    };
+    let path = format!("/repos/{owner}/{repo}/branches/{branch}/protection");
+    let Ok(res) = gh.get(&path).send().await else {
+        return BranchProtectionRequirements::default();
+    };
+    if !res.status().is_success() {
+        return BranchProtectionRequirements::default();
+    }
+    res.json::<RawBranchProtection>()
+        .await
+        .map(|p| BranchProtectionRequirements {
+            required_contexts: p.required_status_checks.contexts,
+            required_approving_review_count: p
+                .required_pull_request_reviews
+                .required_approving_review_count,
+        })
+        .unwrap_or_default()
 }
 
 /// Whether `branch`'s protection rules require a linear history — the one branch-protection
@@ -584,6 +687,137 @@ pub async fn update_pull_request_base(
     Ok(())
 }
 
+#[derive(Debug, Serialize)]
+struct UpdatePrBodyBody<'a> {
+    body: &'a str,
+}
+
+/// Edits a PR's description — the author-only editing action in the Conversation tab.
+pub async fn update_pull_request_body(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    body: &str,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}");
+    send_checked(gh.patch(&path).json(&UpdatePrBodyBody { body })).await?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct UpdatePrStateBody<'a> {
+    state: &'a str,
+}
+
+/// Closes an open PR without merging it — GitHub's own "Close pull request" button is a single
+/// click with no confirmation and stays reversible (a closed-but-unmerged PR can be reopened
+/// from GitHub itself), so this mirrors that rather than adding an in-app confirm dialog.
+pub async fn close_pull_request(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}");
+    send_checked(gh.patch(&path).json(&UpdatePrStateBody { state: "closed" })).await?;
+    Ok(())
+}
+
+/// Reopens a closed-but-unmerged PR — the symmetric counterpart to `close_pull_request`. GitHub
+/// rejects this outright for an already-merged PR, so this is only ever wired up when the PR is
+/// closed and not merged.
+pub async fn reopen_pull_request(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}");
+    send_checked(gh.patch(&path).json(&UpdatePrStateBody { state: "open" })).await?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct LockBody<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lock_reason: Option<&'a str>,
+}
+
+/// Locks the conversation — `lock_reason` is one of GitHub's four (`off-topic`, `too heated`,
+/// `resolved`, `spam`) or `None` for "no reason given", both valid.
+pub async fn lock_conversation(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    lock_reason: Option<&str>,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/lock");
+    send_checked(gh.put(&path).json(&LockBody { lock_reason })).await?;
+    Ok(())
+}
+
+pub async fn unlock_conversation(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/lock");
+    send_checked(gh.delete(&path)).await?;
+    Ok(())
+}
+
+/// Fast-forwards a PR's head branch onto its base — the "Update branch" action shown when the
+/// merge-readiness panel reports `behind_by > 0`.
+pub async fn update_pull_request_branch(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/update-branch");
+    send_checked(gh.put(&path).json(&serde_json::json!({}))).await?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompareResult {
+    pub ahead_by: u32,
+    pub behind_by: u32,
+    pub status: String,
+}
+
+/// How far `head` has diverged from `base` — GitHub's PR object itself carries no ahead/behind
+/// counts, so the merge-readiness panel's "this branch is behind, Update branch" signal needs
+/// its own request via the compare endpoint.
+pub async fn compare_commits(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    base: &str,
+    head: &str,
+) -> Result<CompareResult, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/compare/{base}...{head}");
+    let res = send_checked(gh.get(&path)).await?;
+    res.json().await.map_err(|e| e.to_string())
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Label {
     pub name: String,
@@ -675,6 +909,37 @@ pub async fn add_labels(
     Ok(())
 }
 
+/// Removes one label from an issue/PR — GitHub's label-removal endpoint is per-label
+/// (`DELETE .../labels/{name}`, unlike the batch-add above), so the sidebar calls this once per
+/// deselected label. A 404 (already removed, e.g. by someone else) is swallowed rather than
+/// surfaced as an error.
+pub async fn remove_label(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    name: &str,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let encoded_name = urlencode(name);
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/labels/{encoded_name}");
+    let res = send_with_retry(gh.delete(&path)).await?;
+    if res.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(());
+    }
+    check(res).await?;
+    Ok(())
+}
+
+/// Percent-encodes a path segment (not a full URL) — used for label names, which can contain
+/// spaces and other characters `format!` alone wouldn't escape.
+fn urlencode(segment: &str) -> String {
+    let mut url = reqwest::Url::parse("https://x/").expect("static base always parses");
+    url.set_path(&format!("/{segment}"));
+    url.path().trim_start_matches('/').to_string()
+}
+
 #[derive(Debug, Serialize)]
 struct AssigneesBody<'a> {
     assignees: &'a [String],
@@ -694,9 +959,24 @@ pub async fn add_assignees(
     Ok(())
 }
 
+pub async fn remove_assignees(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    assignees: &[String],
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/assignees");
+    send_checked(gh.delete(&path).json(&AssigneesBody { assignees })).await?;
+    Ok(())
+}
+
 #[derive(Debug, Serialize)]
 struct ReviewersBody<'a> {
     reviewers: &'a [String],
+    team_reviewers: &'a [String],
 }
 
 pub async fn request_reviewers(
@@ -706,11 +986,49 @@ pub async fn request_reviewers(
     repo: &str,
     number: u64,
     reviewers: &[String],
+    team_reviewers: &[String],
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/requested_reviewers");
-    send_checked(gh.post(&path).json(&ReviewersBody { reviewers })).await?;
+    send_checked(gh.post(&path).json(&ReviewersBody {
+        reviewers,
+        team_reviewers,
+    }))
+    .await?;
     Ok(())
+}
+
+pub async fn remove_requested_reviewers(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    reviewers: &[String],
+    team_reviewers: &[String],
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/requested_reviewers");
+    send_checked(gh.delete(&path).json(&ReviewersBody {
+        reviewers,
+        team_reviewers,
+    }))
+    .await?;
+    Ok(())
+}
+
+/// Teams with review access to this repo — the candidate list for the sidebar's team-reviewer
+/// picker, alongside `list_assignable_users`' individual reviewers.
+pub async fn list_repo_teams(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<Vec<Team>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/teams?per_page=100");
+    let res = send_checked(gh.get(&path)).await?;
+    res.json().await.map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -751,6 +1069,29 @@ pub async fn set_milestone(
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/issues/{number}");
     send_checked(gh.patch(&path).json(&MilestoneBody { milestone })).await?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct ClearMilestoneBody {
+    milestone: Option<u64>,
+}
+
+/// Clears a PR's milestone — the sidebar's "Clear milestone" action in `SingleSelectField`.
+pub async fn clear_milestone(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}");
+    send_checked(
+        gh.patch(&path)
+            .json(&ClearMilestoneBody { milestone: None }),
+    )
+    .await?;
     Ok(())
 }
 
@@ -810,6 +1151,38 @@ query($owner: String!, $repo: String!, $number: Int!) {
 }
 "#;
 
+/// A PR's GraphQL node id — REST-only endpoints have no concept of this, so anything that needs
+/// to reach the GraphQL-only surface (Projects v2, review-thread resolution, viewed-files) has to
+/// look it up first. Shared by `add_pull_request_to_project`, `list_review_threads`/
+/// `list_viewed_files`'s mutation counterparts below.
+async fn pull_request_node_id(
+    gh: &GhClient,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<String, String> {
+    #[derive(Deserialize)]
+    struct PullRequestId {
+        id: String,
+    }
+    #[derive(Deserialize)]
+    struct RepositoryData {
+        #[serde(rename = "pullRequest")]
+        pull_request: PullRequestId,
+    }
+    #[derive(Deserialize)]
+    struct NodeIdData {
+        repository: RepositoryData,
+    }
+    let data: NodeIdData = gh
+        .graphql(
+            PR_NODE_ID_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "number": number }),
+        )
+        .await?;
+    Ok(data.repository.pull_request.id)
+}
+
 const ADD_PROJECT_ITEM_MUTATION: &str = r#"
 mutation($projectId: ID!, $contentId: ID!) {
   addProjectV2ItemById(input: { projectId: $projectId, contentId: $contentId }) {
@@ -827,19 +1200,6 @@ pub async fn add_pull_request_to_project(
     project_id: &str,
 ) -> Result<(), String> {
     #[derive(Deserialize)]
-    struct PullRequestId {
-        id: String,
-    }
-    #[derive(Deserialize)]
-    struct RepositoryData {
-        #[serde(rename = "pullRequest")]
-        pull_request: PullRequestId,
-    }
-    #[derive(Deserialize)]
-    struct NodeIdData {
-        repository: RepositoryData,
-    }
-    #[derive(Deserialize)]
     struct MutationData {
         #[allow(dead_code)]
         #[serde(rename = "addProjectV2ItemById")]
@@ -847,13 +1207,7 @@ pub async fn add_pull_request_to_project(
     }
 
     let gh = GhClient::new(host, token)?;
-    let node_id_data: NodeIdData = gh
-        .graphql(
-            PR_NODE_ID_QUERY,
-            serde_json::json!({ "owner": owner, "repo": repo, "number": number }),
-        )
-        .await?;
-    let content_id = node_id_data.repository.pull_request.id;
+    let content_id = pull_request_node_id(&gh, owner, repo, number).await?;
     let _: MutationData = gh
         .graphql(
             ADD_PROJECT_ITEM_MUTATION,
@@ -861,6 +1215,355 @@ pub async fn add_pull_request_to_project(
         )
         .await?;
     Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewThread {
+    pub id: String,
+    pub is_resolved: bool,
+    pub comment_database_ids: Vec<u64>,
+}
+
+const LIST_REVIEW_THREADS_QUERY: &str = r#"
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes {
+          id
+          isResolved
+          comments(first: 100) { nodes { databaseId } }
+        }
+      }
+    }
+  }
+}
+"#;
+
+/// Resolve/unresolve state per review-comment thread, joined back to REST comment ids via
+/// `databaseId` (which GitHub's GraphQL layer defines to *be* the REST `id` for a
+/// `PullRequestReviewComment` node) — the reconciliation itself happens on the frontend
+/// (`useReviewThreads`), this just returns GitHub's thread shape as-is.
+#[derive(Deserialize)]
+struct ReviewThreadCommentNode {
+    #[serde(rename = "databaseId")]
+    database_id: Option<u64>,
+}
+#[derive(Deserialize)]
+struct ReviewThreadCommentNodes {
+    nodes: Vec<ReviewThreadCommentNode>,
+}
+#[derive(Deserialize)]
+struct ReviewThreadNode {
+    id: String,
+    #[serde(rename = "isResolved")]
+    is_resolved: bool,
+    comments: ReviewThreadCommentNodes,
+}
+#[derive(Deserialize)]
+struct ReviewThreadNodes {
+    nodes: Vec<ReviewThreadNode>,
+}
+#[derive(Deserialize)]
+struct ReviewThreadsPullRequestData {
+    #[serde(rename = "reviewThreads")]
+    review_threads: ReviewThreadNodes,
+}
+#[derive(Deserialize)]
+struct ReviewThreadsRepositoryData {
+    #[serde(rename = "pullRequest")]
+    pull_request: ReviewThreadsPullRequestData,
+}
+#[derive(Deserialize)]
+struct ReviewThreadsData {
+    repository: ReviewThreadsRepositoryData,
+}
+
+impl From<ReviewThreadsData> for Vec<ReviewThread> {
+    fn from(data: ReviewThreadsData) -> Self {
+        data.repository
+            .pull_request
+            .review_threads
+            .nodes
+            .into_iter()
+            .map(|t| ReviewThread {
+                id: t.id,
+                is_resolved: t.is_resolved,
+                comment_database_ids: t
+                    .comments
+                    .nodes
+                    .into_iter()
+                    .filter_map(|c| c.database_id)
+                    .collect(),
+            })
+            .collect()
+    }
+}
+
+pub async fn list_review_threads(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<Vec<ReviewThread>, String> {
+    let gh = GhClient::new(host, token)?;
+    let data: ReviewThreadsData = gh
+        .graphql(
+            LIST_REVIEW_THREADS_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "number": number }),
+        )
+        .await?;
+    Ok(data.into())
+}
+
+const RESOLVE_THREAD_MUTATION: &str = r#"
+mutation($threadId: ID!) {
+  resolveReviewThread(input: { threadId: $threadId }) { thread { id } }
+}
+"#;
+
+const UNRESOLVE_THREAD_MUTATION: &str = r#"
+mutation($threadId: ID!) {
+  unresolveReviewThread(input: { threadId: $threadId }) { thread { id } }
+}
+"#;
+
+pub async fn resolve_review_thread(host: &str, token: &str, thread_id: &str) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let _: serde_json::Value = gh
+        .graphql(
+            RESOLVE_THREAD_MUTATION,
+            serde_json::json!({ "threadId": thread_id }),
+        )
+        .await?;
+    Ok(())
+}
+
+pub async fn unresolve_review_thread(
+    host: &str,
+    token: &str,
+    thread_id: &str,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let _: serde_json::Value = gh
+        .graphql(
+            UNRESOLVE_THREAD_MUTATION,
+            serde_json::json!({ "threadId": thread_id }),
+        )
+        .await?;
+    Ok(())
+}
+
+const LIST_VIEWED_FILES_QUERY: &str = r#"
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      files(first: 100) {
+        nodes { path viewerViewedState }
+      }
+    }
+  }
+}
+"#;
+
+/// Per-viewer "marked as viewed" state per file path — deliberately never written to the SQLite
+/// mirror (see `pr_cache.rs`), always fetched live: it's per-viewer, cheap to refetch, and wrong
+/// if stale in a way that actively misleads (looking un-viewed right after you viewed it, or
+/// vice versa after a rebase).
+#[derive(Deserialize)]
+struct ViewedFileNode {
+    path: String,
+    #[serde(rename = "viewerViewedState")]
+    viewer_viewed_state: String,
+}
+#[derive(Deserialize)]
+struct ViewedFileNodes {
+    nodes: Vec<ViewedFileNode>,
+}
+#[derive(Deserialize)]
+struct ViewedFilesPullRequestData {
+    files: ViewedFileNodes,
+}
+#[derive(Deserialize)]
+struct ViewedFilesRepositoryData {
+    #[serde(rename = "pullRequest")]
+    pull_request: ViewedFilesPullRequestData,
+}
+#[derive(Deserialize)]
+struct ViewedFilesData {
+    repository: ViewedFilesRepositoryData,
+}
+
+impl From<ViewedFilesData> for Vec<(String, String)> {
+    fn from(data: ViewedFilesData) -> Self {
+        data.repository
+            .pull_request
+            .files
+            .nodes
+            .into_iter()
+            .map(|f| (f.path, f.viewer_viewed_state))
+            .collect()
+    }
+}
+
+pub async fn list_viewed_files(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<Vec<(String, String)>, String> {
+    let gh = GhClient::new(host, token)?;
+    let data: ViewedFilesData = gh
+        .graphql(
+            LIST_VIEWED_FILES_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "number": number }),
+        )
+        .await?;
+    Ok(data.into())
+}
+
+const MARK_FILE_VIEWED_MUTATION: &str = r#"
+mutation($pullRequestId: ID!, $path: String!) {
+  markFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) { clientMutationId }
+}
+"#;
+
+const UNMARK_FILE_VIEWED_MUTATION: &str = r#"
+mutation($pullRequestId: ID!, $path: String!) {
+  unmarkFileAsViewed(input: { pullRequestId: $pullRequestId, path: $path }) { clientMutationId }
+}
+"#;
+
+pub async fn mark_file_as_viewed(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    path: &str,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let pr_id = pull_request_node_id(&gh, owner, repo, number).await?;
+    let _: serde_json::Value = gh
+        .graphql(
+            MARK_FILE_VIEWED_MUTATION,
+            serde_json::json!({ "pullRequestId": pr_id, "path": path }),
+        )
+        .await?;
+    Ok(())
+}
+
+pub async fn unmark_file_as_viewed(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    path: &str,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let pr_id = pull_request_node_id(&gh, owner, repo, number).await?;
+    let _: serde_json::Value = gh
+        .graphql(
+            UNMARK_FILE_VIEWED_MUTATION,
+            serde_json::json!({ "pullRequestId": pr_id, "path": path }),
+        )
+        .await?;
+    Ok(())
+}
+
+/// Open/closed state for a batch of issue numbers in one request (aliased per-number, since
+/// GraphQL has no "issue by number, list of numbers" batch field) — feeds the sidebar's linked-
+/// issues chips ("Closes #123" parsed out of the PR body).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueSummary {
+    pub number: u64,
+    pub title: String,
+    pub state: String,
+}
+
+#[derive(Deserialize)]
+struct RawIssueSummary {
+    number: u64,
+    title: String,
+    state: String,
+    // Present (non-null) only when this "issue" is actually a pull request — GitHub's issues
+    // endpoint returns both, unfiltered.
+    #[serde(default)]
+    pull_request: Option<serde_json::Value>,
+}
+
+/// Every issue in the repo (open and closed, PRs excluded) — the candidate list for the
+/// sidebar's/create-PR dialog's "link an issue" picker. A lean single page rather than full
+/// pagination: a repo with more than 100 issues just won't show every one of them in this
+/// picker, same "rare edge case" call already made for other option lists in this app.
+pub async fn list_repo_issues(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<Vec<IssueSummary>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues?state=all&per_page=100");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: Vec<RawIssueSummary> = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw
+        .into_iter()
+        .filter(|i| i.pull_request.is_none())
+        .map(|i| IssueSummary {
+            number: i.number,
+            title: i.title,
+            state: i.state,
+        })
+        .collect())
+}
+
+pub async fn list_issue_states(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    numbers: &[u64],
+) -> Result<std::collections::HashMap<u64, String>, String> {
+    if numbers.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let fields: Vec<String> = numbers
+        .iter()
+        .map(|n| format!(r#"i{n}: issue(number: {n}) {{ number state }}"#))
+        .collect();
+    let query = format!(
+        r#"query($owner: String!, $repo: String!) {{
+          repository(owner: $owner, name: $repo) {{ {} }}
+        }}"#,
+        fields.join("\n")
+    );
+
+    #[derive(Deserialize)]
+    struct IssueNode {
+        number: u64,
+        state: String,
+    }
+
+    let gh = GhClient::new(host, token)?;
+    let data: serde_json::Value = gh
+        .graphql(&query, serde_json::json!({ "owner": owner, "repo": repo }))
+        .await?;
+    let repository = data.get("repository").cloned().unwrap_or_default();
+    let mut result = std::collections::HashMap::new();
+    if let serde_json::Value::Object(fields) = repository {
+        for (_, value) in fields {
+            if value.is_null() {
+                continue;
+            }
+            if let Ok(node) = serde_json::from_value::<IssueNode>(value) {
+                result.insert(node.number, node.state);
+            }
+        }
+    }
+    Ok(result)
 }
 
 #[derive(Debug, Serialize)]
@@ -908,6 +1611,118 @@ async fn list_pull_request_commits(
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/commits?per_page=100");
     let res = send_checked(gh.get(&path)).await?;
     res.json().await.map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PullRequestCommit {
+    pub sha: String,
+    pub summary: String,
+    pub body: String,
+    pub author_login: Option<String>,
+    pub author_avatar_url: Option<String>,
+    pub author_name: Option<String>,
+    pub author_email: Option<String>,
+    pub authored_at: Option<String>,
+    pub html_url: String,
+}
+
+#[derive(Deserialize)]
+struct RawPullRequestCommitEntry {
+    sha: String,
+    commit: RawCommitDetail,
+    author: Option<RawUser>,
+    html_url: String,
+}
+
+#[derive(Deserialize)]
+struct RawCommitDetail {
+    message: String,
+    author: Option<RawCommitAuthorDetail>,
+}
+
+#[derive(Deserialize)]
+struct RawCommitAuthorDetail {
+    name: Option<String>,
+    email: Option<String>,
+    date: Option<String>,
+}
+
+impl From<RawPullRequestCommitEntry> for PullRequestCommit {
+    fn from(raw: RawPullRequestCommitEntry) -> Self {
+        let mut lines = raw.commit.message.splitn(2, '\n');
+        let summary = lines.next().unwrap_or_default().to_string();
+        let body = lines
+            .next()
+            .unwrap_or_default()
+            .trim_start_matches('\n')
+            .to_string();
+        PullRequestCommit {
+            sha: raw.sha,
+            summary,
+            body,
+            author_login: raw.author.as_ref().map(|a| a.login.clone()),
+            author_avatar_url: raw.author.as_ref().map(|a| a.avatar_url.clone()),
+            author_name: raw.commit.author.as_ref().and_then(|a| a.name.clone()),
+            author_email: raw.commit.author.as_ref().and_then(|a| a.email.clone()),
+            authored_at: raw.commit.author.and_then(|a| a.date),
+            html_url: raw.html_url,
+        }
+    }
+}
+
+/// Commits belonging to a PR, for the Commits tab — one page (GitHub's max `per_page=100`) at a
+/// time; the frontend pages through via `useInfiniteQuery` the same way `list_pull_requests`
+/// already does for the PR list itself.
+pub async fn list_pull_request_commits_for_display(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    page: u32,
+) -> Result<Vec<PullRequestCommit>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/commits?per_page=100&page={page}");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: Vec<RawPullRequestCommitEntry> = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw.into_iter().map(PullRequestCommit::from).collect())
+}
+
+#[derive(Deserialize)]
+struct RawCommitDetailResponse {
+    files: Vec<RawPullRequestFile>,
+}
+
+/// File-level diff for an arbitrary commit sha (used by the Commits tab, where a clicked commit
+/// may not exist in the local git repo at all) — reuses `parse_patch` exactly like
+/// `list_pull_request_files` since a single commit's `files[].patch` has the same unified-diff
+/// shape as a PR's aggregate file list.
+pub async fn get_commit_diff_files(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    sha: &str,
+) -> Result<Vec<PrFileEntry>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/commits/{sha}");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: RawCommitDetailResponse = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw
+        .files
+        .into_iter()
+        .map(|f| {
+            let hunks = f.patch.as_deref().map(parse_patch).unwrap_or_default();
+            let diff = FileDiff {
+                is_image: is_image_path(&f.filename),
+                path: f.filename.clone(),
+                old_path: None,
+                is_binary: f.patch.is_none(),
+                hunks,
+            };
+            (f.filename, f.status, diff)
+        })
+        .collect())
 }
 
 const COAUTHOR_PREFIX: &str = "co-authored-by:";
@@ -1268,6 +2083,35 @@ struct CreateReviewCommentBody<'a> {
     side: &'a str,
 }
 
+#[derive(Debug, Serialize)]
+struct ReplyToReviewCommentBody<'a> {
+    body: &'a str,
+    in_reply_to: u64,
+}
+
+/// Replies within an existing review-comment thread — GitHub's reply variant of the same
+/// endpoint `create_review_comment` posts to, just with `in_reply_to` instead of a
+/// path/line/side (both inherited from the comment being replied to).
+pub async fn reply_to_review_comment(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    in_reply_to: u64,
+    body: &str,
+) -> Result<ReviewComment, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/comments");
+    let res = send_checked(
+        gh.post(&path)
+            .json(&ReplyToReviewCommentBody { body, in_reply_to }),
+    )
+    .await?;
+    let raw: RawReviewComment = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw.into())
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn create_review_comment(
     host: &str,
@@ -1292,6 +2136,313 @@ pub async fn create_review_comment(
     }))
     .await?;
     let raw: RawReviewComment = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw.into())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueComment {
+    pub id: u64,
+    pub body: String,
+    pub user_login: String,
+    pub user_avatar_url: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub html_url: String,
+}
+
+#[derive(Deserialize)]
+struct RawIssueComment {
+    id: u64,
+    body: String,
+    user: RawUser,
+    created_at: String,
+    updated_at: String,
+    html_url: String,
+}
+
+impl From<RawIssueComment> for IssueComment {
+    fn from(raw: RawIssueComment) -> Self {
+        IssueComment {
+            id: raw.id,
+            body: raw.body,
+            user_login: raw.user.login,
+            user_avatar_url: raw.user.avatar_url,
+            created_at: raw.created_at,
+            updated_at: raw.updated_at,
+            html_url: raw.html_url,
+        }
+    }
+}
+
+/// Top-level (issue-style) comments on a PR — distinct from `list_review_comments`'s
+/// line-anchored diff comments. Feeds the Conversation tab's timeline.
+#[derive(Deserialize)]
+struct RawTimelineLabel {
+    name: String,
+    color: String,
+}
+
+#[derive(Deserialize)]
+struct RawTimelineEvent {
+    #[serde(default)]
+    id: Option<u64>,
+    event: String,
+    #[serde(default)]
+    created_at: Option<String>,
+    #[serde(default)]
+    actor: Option<RawUser>,
+    #[serde(default)]
+    label: Option<RawTimelineLabel>,
+    #[serde(default)]
+    assignee: Option<RawUser>,
+    #[serde(default)]
+    requested_reviewer: Option<RawUser>,
+    /// Only present on a `connected` event — GitHub's real field name for the linked issue/PR
+    /// is `subject`, not `source` (that name, and the `cross-referenced` event kind, describe a
+    /// different, far noisier concept: "something else mentions this issue/PR", which fires for
+    /// any plain mention, not a closing keyword). Verified against a live `connected` event's
+    /// JSON shape on this repo's own PR #81 (linked to issue #38 via `Closes #38`).
+    #[serde(default)]
+    subject: Option<RawConnectedSubject>,
+}
+
+#[derive(Deserialize)]
+struct RawConnectedSubject {
+    number: u64,
+    title: String,
+    state: String,
+    #[serde(default)]
+    repository: Option<RawRepoRef>,
+}
+
+#[derive(Deserialize)]
+struct RawRepoRef {
+    full_name: String,
+    #[serde(default)]
+    html_url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueTimelineEvent {
+    pub id: Option<u64>,
+    pub event: String,
+    pub created_at: Option<String>,
+    pub actor_login: Option<String>,
+    pub actor_avatar_url: Option<String>,
+    pub label_name: Option<String>,
+    pub label_color: Option<String>,
+    pub assignee_login: Option<String>,
+    pub assignee_avatar_url: Option<String>,
+    pub requested_reviewer_login: Option<String>,
+    pub requested_reviewer_avatar_url: Option<String>,
+    /// Populated only for a `connected` event — the "X linked an issue that may be closed by
+    /// this pull request" line. GitHub creates this event specifically for the closing-keyword
+    /// (or manual Development-panel) link, so unlike `cross-referenced` it never fires for a
+    /// plain mention — no extra client-side filtering against the PR body needed.
+    pub source_issue_number: Option<u64>,
+    pub source_issue_title: Option<String>,
+    pub source_issue_state: Option<String>,
+    pub source_issue_html_url: Option<String>,
+    pub source_issue_repo_full_name: Option<String>,
+}
+
+impl From<RawTimelineEvent> for IssueTimelineEvent {
+    fn from(raw: RawTimelineEvent) -> Self {
+        let subject = raw.subject;
+        let repo = subject.as_ref().and_then(|s| s.repository.as_ref());
+        let html_url = subject
+            .as_ref()
+            .zip(repo)
+            .map(|(s, r)| format!("{}/issues/{}", r.html_url, s.number));
+        IssueTimelineEvent {
+            id: raw.id,
+            event: raw.event,
+            created_at: raw.created_at,
+            actor_login: raw.actor.as_ref().map(|a| a.login.clone()),
+            actor_avatar_url: raw.actor.map(|a| a.avatar_url),
+            label_name: raw.label.as_ref().map(|l| l.name.clone()),
+            label_color: raw.label.map(|l| l.color),
+            assignee_login: raw.assignee.as_ref().map(|a| a.login.clone()),
+            assignee_avatar_url: raw.assignee.map(|a| a.avatar_url),
+            requested_reviewer_login: raw.requested_reviewer.as_ref().map(|a| a.login.clone()),
+            requested_reviewer_avatar_url: raw.requested_reviewer.map(|a| a.avatar_url),
+            source_issue_number: subject.as_ref().map(|s| s.number),
+            source_issue_title: subject.as_ref().map(|s| s.title.clone()),
+            source_issue_state: subject.as_ref().map(|s| s.state.clone()),
+            source_issue_html_url: html_url,
+            source_issue_repo_full_name: repo.map(|r| r.full_name.clone()),
+        }
+    }
+}
+
+/// The event kinds the Conversation tab's timeline renders — everything else GitHub's timeline
+/// API returns (commented/committed/reviewed/etc.) is already covered by our own issue-
+/// comments/reviews/commits fetches, so including them here would just duplicate entries rather
+/// than add information. `connected` is the exception: it's the only way to get "X linked an
+/// issue that may be closed by this pull request" (verified against a live event on this repo's
+/// own PR #81 — GitHub uses `connected`/`subject`, not the more commonly-guessed
+/// `cross-referenced`/`source`, for this specific line).
+const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
+    "labeled",
+    "unlabeled",
+    "assigned",
+    "unassigned",
+    "review_requested",
+    "review_request_removed",
+    "closed",
+    "reopened",
+    "merged",
+    "connected",
+];
+
+/// Label/assignee/reviewer-request/close/reopen/merge events for the Conversation tab's
+/// timeline — GitHub's PR object itself carries none of this history, only the issue timeline
+/// endpoint does. Deliberately not written to the SQLite mirror (unlike issue comments/reviews):
+/// this is supplementary history, not core review content, and keeping it simple (always live,
+/// no offline fallback) avoids one more cache table for a feature that degrades gracefully to
+/// "timeline just shows comments/reviews/commits" if the fetch fails.
+pub async fn list_relevant_timeline_events(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<Vec<IssueTimelineEvent>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/timeline?per_page=100");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: Vec<RawTimelineEvent> = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw
+        .into_iter()
+        .filter(|e| RELEVANT_TIMELINE_EVENTS.contains(&e.event.as_str()))
+        .map(IssueTimelineEvent::from)
+        .collect())
+}
+
+pub async fn list_issue_comments(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    page: u32,
+) -> Result<Vec<IssueComment>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/comments?per_page=100&page={page}");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: Vec<RawIssueComment> = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw.into_iter().map(IssueComment::from).collect())
+}
+
+#[derive(Debug, Serialize)]
+struct CreateIssueCommentBody<'a> {
+    body: &'a str,
+}
+
+pub async fn create_issue_comment(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    body: &str,
+) -> Result<IssueComment, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/comments");
+    let res = send_checked(gh.post(&path).json(&CreateIssueCommentBody { body })).await?;
+    let raw: RawIssueComment = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw.into())
+}
+
+pub async fn delete_issue_comment(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    comment_id: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/comments/{comment_id}");
+    send_checked(gh.delete(&path)).await?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Review {
+    pub id: u64,
+    pub user_login: String,
+    pub user_avatar_url: String,
+    pub state: String,
+    pub body: String,
+    pub submitted_at: Option<String>,
+    pub html_url: String,
+}
+
+#[derive(Deserialize)]
+struct RawReview {
+    id: u64,
+    user: RawUser,
+    state: String,
+    #[serde(default)]
+    body: String,
+    submitted_at: Option<String>,
+    #[serde(default)]
+    html_url: String,
+}
+
+impl From<RawReview> for Review {
+    fn from(raw: RawReview) -> Self {
+        Review {
+            id: raw.id,
+            user_login: raw.user.login,
+            user_avatar_url: raw.user.avatar_url,
+            state: raw.state,
+            body: raw.body,
+            submitted_at: raw.submitted_at,
+            html_url: raw.html_url,
+        }
+    }
+}
+
+/// Review submissions (approve/request-changes/comment) on a PR — per-reviewer status shown in
+/// the sidebar is derived client-side from this plus the PR's `requested_reviewers`, not a
+/// separate endpoint.
+pub async fn list_reviews(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    page: u32,
+) -> Result<Vec<Review>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/reviews?per_page=100&page={page}");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: Vec<RawReview> = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw.into_iter().map(Review::from).collect())
+}
+
+#[derive(Debug, Serialize)]
+struct SubmitReviewBody<'a> {
+    event: &'a str,
+    #[serde(skip_serializing_if = "str::is_empty")]
+    body: &'a str,
+}
+
+/// Submits a review — `event` is one of `APPROVE`, `REQUEST_CHANGES`, `COMMENT`.
+pub async fn submit_review(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    event: &str,
+    body: &str,
+) -> Result<Review, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/reviews");
+    let res = send_checked(gh.post(&path).json(&SubmitReviewBody { event, body })).await?;
+    let raw: RawReview = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into())
 }
 
@@ -1529,5 +2680,296 @@ mod tests {
             "Summary\n\nBody line.\nCo-authored-by: Someone <s@example.com>",
         );
         assert_eq!(stripped, "Summary\n\nBody line.");
+    }
+
+    fn raw_pull_request_json(extra: &str) -> String {
+        format!(
+            r#"{{
+                "number": 1, "title": "t", "body": null, "state": "open", "draft": false,
+                "html_url": "https://github.com/o/r/pull/1",
+                "user": {{"login": "alice", "avatar_url": "https://a"}},
+                "head": {{"ref": "feature", "sha": "abc"}},
+                "base": {{"ref": "main", "sha": "def"}},
+                "merged_at": null, "mergeable": null, "labels": [],
+                "created_at": "2024-01-01T00:00:00Z"
+                {extra}
+            }}"#
+        )
+    }
+
+    #[test]
+    fn pull_request_maps_get_single_pr_fields_when_present() {
+        let json = raw_pull_request_json(
+            r#",
+            "mergeable_state": "clean",
+            "requested_reviewers": [{"login": "bob", "avatar_url": "https://b"}],
+            "requested_teams": [{"slug": "backend", "name": "Backend"}],
+            "assignees": [{"login": "carol", "avatar_url": "https://c"}],
+            "milestone": {"number": 3, "title": "v1", "open_issues": 2, "closed_issues": 1},
+            "locked": true,
+            "active_lock_reason": "too heated"
+            "#,
+        );
+        let raw: RawPullRequest = serde_json::from_str(&json).unwrap();
+        let pr: PullRequest = raw.into();
+        assert_eq!(pr.mergeable_state, Some("clean".to_string()));
+        assert_eq!(pr.requested_reviewers.len(), 1);
+        assert_eq!(pr.requested_reviewers[0].login, "bob");
+        assert_eq!(pr.requested_teams.len(), 1);
+        assert_eq!(pr.requested_teams[0].slug, "backend");
+        assert_eq!(pr.assignees.len(), 1);
+        assert_eq!(pr.assignees[0].login, "carol");
+        assert_eq!(pr.milestone.as_ref().unwrap().title, "v1");
+        assert!(pr.locked);
+        assert_eq!(pr.active_lock_reason, Some("too heated".to_string()));
+    }
+
+    #[test]
+    fn pull_request_defaults_get_single_pr_fields_when_absent_like_list_prs_response() {
+        // GitHub's list-pull-requests endpoint never returns these four fields at all — this
+        // must still deserialize cleanly via #[serde(default)] rather than failing.
+        let json = raw_pull_request_json("");
+        let raw: RawPullRequest = serde_json::from_str(&json).unwrap();
+        let pr: PullRequest = raw.into();
+        assert_eq!(pr.mergeable_state, None);
+        assert!(pr.requested_reviewers.is_empty());
+        assert!(pr.requested_teams.is_empty());
+        assert!(pr.assignees.is_empty());
+        assert!(pr.milestone.is_none());
+        assert!(!pr.locked);
+        assert_eq!(pr.active_lock_reason, None);
+    }
+
+    #[test]
+    fn pull_request_commit_splits_summary_and_body_and_maps_author() {
+        let json = r#"{
+            "sha": "abc123",
+            "commit": {
+                "message": "Fix bug\n\nLonger explanation here.",
+                "author": {"name": "Alice", "email": "alice@example.com", "date": "2024-01-01T00:00:00Z"}
+            },
+            "author": {"login": "alice", "avatar_url": "https://a"},
+            "html_url": "https://github.com/o/r/commit/abc123"
+        }"#;
+        let raw: RawPullRequestCommitEntry = serde_json::from_str(json).unwrap();
+        let commit: PullRequestCommit = raw.into();
+        assert_eq!(commit.summary, "Fix bug");
+        assert_eq!(commit.body, "Longer explanation here.");
+        assert_eq!(commit.author_login, Some("alice".to_string()));
+        assert_eq!(commit.author_email, Some("alice@example.com".to_string()));
+    }
+
+    #[test]
+    fn pull_request_commit_with_no_body_has_empty_body() {
+        let json = r#"{
+            "sha": "abc123",
+            "commit": {"message": "Just a summary", "author": null},
+            "author": null,
+            "html_url": "https://github.com/o/r/commit/abc123"
+        }"#;
+        let raw: RawPullRequestCommitEntry = serde_json::from_str(json).unwrap();
+        let commit: PullRequestCommit = raw.into();
+        assert_eq!(commit.summary, "Just a summary");
+        assert_eq!(commit.body, "");
+        assert_eq!(commit.author_login, None);
+    }
+
+    #[test]
+    fn compare_result_parses_ahead_behind_status() {
+        let json = r#"{"ahead_by": 2, "behind_by": 5, "status": "diverged"}"#;
+        let parsed: CompareResult = serde_json::from_str(json).unwrap();
+        assert_eq!(parsed.ahead_by, 2);
+        assert_eq!(parsed.behind_by, 5);
+        assert_eq!(parsed.status, "diverged");
+    }
+
+    #[test]
+    fn branch_protection_captures_required_contexts_and_review_count() {
+        let json = r#"{
+            "required_linear_history": {"enabled": true},
+            "required_status_checks": {"contexts": ["ci/build", "ci/test"]},
+            "required_pull_request_reviews": {"required_approving_review_count": 2}
+        }"#;
+        let parsed: RawBranchProtection = serde_json::from_str(json).unwrap();
+        assert!(parsed.required_linear_history.enabled);
+        assert_eq!(
+            parsed.required_status_checks.contexts,
+            vec!["ci/build", "ci/test"]
+        );
+        assert_eq!(
+            parsed
+                .required_pull_request_reviews
+                .required_approving_review_count,
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn branch_protection_defaults_when_fields_absent() {
+        let parsed: RawBranchProtection = serde_json::from_str("{}").unwrap();
+        assert!(!parsed.required_linear_history.enabled);
+        assert!(parsed.required_status_checks.contexts.is_empty());
+        assert_eq!(
+            parsed
+                .required_pull_request_reviews
+                .required_approving_review_count,
+            None
+        );
+    }
+
+    #[test]
+    fn review_threads_response_joins_database_ids_and_resolved_state() {
+        let json = r#"{
+            "repository": {
+                "pullRequest": {
+                    "reviewThreads": {
+                        "nodes": [
+                            {
+                                "id": "thread1",
+                                "isResolved": true,
+                                "comments": {"nodes": [{"databaseId": 111}, {"databaseId": 222}]}
+                            },
+                            {
+                                "id": "thread2",
+                                "isResolved": false,
+                                "comments": {"nodes": [{"databaseId": 333}]}
+                            }
+                        ]
+                    }
+                }
+            }
+        }"#;
+        let data: ReviewThreadsData = serde_json::from_str(json).unwrap();
+        let threads: Vec<ReviewThread> = data.into();
+        assert_eq!(threads.len(), 2);
+        assert!(threads[0].is_resolved);
+        assert_eq!(threads[0].comment_database_ids, vec![111, 222]);
+        assert!(!threads[1].is_resolved);
+    }
+
+    #[test]
+    fn viewed_files_response_maps_path_to_viewer_state() {
+        let json = r#"{
+            "repository": {
+                "pullRequest": {
+                    "files": {
+                        "nodes": [
+                            {"path": "src/a.rs", "viewerViewedState": "VIEWED"},
+                            {"path": "src/b.rs", "viewerViewedState": "UNVIEWED"}
+                        ]
+                    }
+                }
+            }
+        }"#;
+        let data: ViewedFilesData = serde_json::from_str(json).unwrap();
+        let files: Vec<(String, String)> = data.into();
+        assert_eq!(
+            files,
+            vec![
+                ("src/a.rs".to_string(), "VIEWED".to_string()),
+                ("src/b.rs".to_string(), "UNVIEWED".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn raw_issue_summary_excludes_entries_that_are_actually_pull_requests() {
+        let json = r#"[
+            {"number": 1, "title": "A real issue", "state": "open"},
+            {"number": 2, "title": "Actually a PR", "state": "open", "pull_request": {"url": "https://x"}}
+        ]"#;
+        let raw: Vec<RawIssueSummary> = serde_json::from_str(json).unwrap();
+        let filtered: Vec<IssueSummary> = raw
+            .into_iter()
+            .filter(|i| i.pull_request.is_none())
+            .map(|i| IssueSummary {
+                number: i.number,
+                title: i.title,
+                state: i.state,
+            })
+            .collect();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].number, 1);
+    }
+
+    #[test]
+    fn timeline_event_maps_labeled_event_fields() {
+        let json = r#"{
+            "id": 1,
+            "event": "labeled",
+            "created_at": "2024-01-01T00:00:00Z",
+            "actor": {"login": "alice", "avatar_url": "https://a"},
+            "label": {"name": "bug", "color": "d73a4a"}
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.event, "labeled");
+        assert_eq!(event.actor_login, Some("alice".to_string()));
+        assert_eq!(event.label_name, Some("bug".to_string()));
+        assert_eq!(event.label_color, Some("d73a4a".to_string()));
+    }
+
+    #[test]
+    fn timeline_event_maps_review_requested_event_fields() {
+        let json = r#"{
+            "event": "review_requested",
+            "actor": {"login": "alice", "avatar_url": "https://a"},
+            "requested_reviewer": {"login": "bob", "avatar_url": "https://b"}
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.id, None);
+        assert_eq!(event.requested_reviewer_login, Some("bob".to_string()));
+        assert_eq!(event.label_name, None);
+    }
+
+    #[test]
+    fn timeline_event_maps_connected_subject_fields() {
+        // Shape verified against a live `connected` event from this repo's own PR #81 (linked
+        // to issue #38 via `Closes #38`) — GitHub's real field names are `subject`/`connected`,
+        // not the more commonly-guessed `source`/`cross-referenced`.
+        let json = r#"{
+            "event": "connected",
+            "actor": {"login": "alice", "avatar_url": "https://a"},
+            "subject": {
+                "number": 24,
+                "title": "Fix the thing",
+                "state": "open",
+                "repository": {"full_name": "Daanieeel/gitbud", "html_url": "https://github.com/Daanieeel/gitbud"}
+            }
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.source_issue_number, Some(24));
+        assert_eq!(event.source_issue_title, Some("Fix the thing".to_string()));
+        assert_eq!(event.source_issue_state, Some("open".to_string()));
+        assert_eq!(
+            event.source_issue_html_url,
+            Some("https://github.com/Daanieeel/gitbud/issues/24".to_string())
+        );
+        assert_eq!(
+            event.source_issue_repo_full_name,
+            Some("Daanieeel/gitbud".to_string())
+        );
+    }
+
+    #[test]
+    fn timeline_event_leaves_source_issue_fields_none_for_other_event_kinds() {
+        let json = r#"{"event": "labeled", "label": {"name": "bug", "color": "d73a4a"}}"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.source_issue_number, None);
+    }
+
+    #[test]
+    fn relevant_timeline_events_excludes_comment_and_review_kinds() {
+        // These are already covered by list_issue_comments/list_reviews — including them here
+        // too would duplicate timeline entries rather than add information.
+        assert!(!RELEVANT_TIMELINE_EVENTS.contains(&"commented"));
+        assert!(!RELEVANT_TIMELINE_EVENTS.contains(&"reviewed"));
+        assert!(!RELEVANT_TIMELINE_EVENTS.contains(&"committed"));
+        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"labeled"));
+        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"merged"));
+        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"connected"));
     }
 }

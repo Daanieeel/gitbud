@@ -9,6 +9,7 @@ import { useNetworkStore } from "@/store/useNetworkStore";
 import { usePRStore, type PRFilter } from "@/store/usePRStore";
 import { isBrokenTokenError, usePullRequestList } from "@/hooks/queries/usePullRequests";
 import { queryKeys } from "@/lib/queryKeys";
+import { evictRepoScopedPrQueries, evictSelectedPrQueries } from "@/lib/prCacheEviction";
 import { PRList } from "./PRList";
 import { PRDetail } from "./PRDetail";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
@@ -51,9 +52,7 @@ export function PRTab() {
   useEffect(() => {
     return () => {
       if (!repoPath) return;
-      queryClient.removeQueries({ queryKey: ["pr-list", repoPath] });
-      queryClient.removeQueries({ queryKey: ["pr-detail", repoPath] });
-      queryClient.removeQueries({ queryKey: ["check-runs", repoPath] });
+      evictRepoScopedPrQueries(queryClient, repoPath);
     };
   }, [repoPath, queryClient]);
 
@@ -66,9 +65,7 @@ export function PRTab() {
   useEffect(() => {
     return () => {
       if (!repoPath || selectedNumber === null) return;
-      queryClient.removeQueries({
-        queryKey: queryKeys.prDetail(repoPath, currentLogin ?? "", selectedNumber),
-      });
+      evictSelectedPrQueries(queryClient, repoPath, currentLogin ?? "", selectedNumber);
     };
   }, [selectedNumber, repoPath, currentLogin, queryClient]);
 
