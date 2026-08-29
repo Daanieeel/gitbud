@@ -290,9 +290,17 @@ export function CommitList({
                 <ContextMenuItem
                   disabled={!hasStagedChanges}
                   onSelect={() => createFixupCommitMutation.mutate(commit.oid)}
+                  className={!hasStagedChanges ? "flex-col items-start gap-0.5" : undefined}
                 >
-                  <WrenchIcon className="size-3.5" />
-                  Create Fixup Commit
+                  <span className="flex items-center gap-2">
+                    <WrenchIcon className="size-3.5" />
+                    Create Fixup Commit
+                  </span>
+                  {!hasStagedChanges && (
+                    <span className="pl-[22px] text-xs text-muted-foreground">
+                      Stage changes to enable
+                    </span>
+                  )}
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => onCreateBranchHere(commit.oid)}>
                   <GitBranchPlusIcon className="size-3.5" />
