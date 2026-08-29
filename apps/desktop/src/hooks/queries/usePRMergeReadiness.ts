@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 
@@ -53,5 +54,6 @@ export function useUpdatePullRequestBranch(
       if (!repoPath || !login || number === null) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.prMeta(repoPath, login, number) });
     },
+    onError: (err) => toast.error(String(err)),
   });
 }

@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 import { useNetworkStore } from "@/store/useNetworkStore";
@@ -106,6 +107,7 @@ export function useAddIssueComment(
         (prev) => (prev ? [...prev, comment] : prev),
       );
     },
+    onError: (err) => toast.error(String(err)),
   });
 }
 
@@ -135,5 +137,6 @@ export function useSubmitReview(
         (prev) => (prev ? [...prev, review] : prev),
       );
     },
+    onError: (err) => toast.error(String(err)),
   });
 }

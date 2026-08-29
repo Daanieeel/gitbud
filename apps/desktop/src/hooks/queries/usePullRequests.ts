@@ -291,6 +291,7 @@ export function useAddReviewComment(
         (prev) => (prev ? { ...prev, comments: [...prev.comments, comment] } : prev),
       );
     },
+    onError: (err) => toast.error(String(err)),
   });
 }
 
@@ -313,6 +314,7 @@ export function useReplyToReviewComment(
         (prev) => (prev ? { ...prev, comments: [...prev.comments, comment] } : prev),
       );
     },
+    onError: (err) => toast.error(String(err)),
   });
 }
 

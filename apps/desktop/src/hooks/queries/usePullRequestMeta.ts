@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 import { useNetworkStore } from "@/store/useNetworkStore";
@@ -64,5 +65,6 @@ export function useUpdatePullRequestBody(
         (prev) => (prev ? { ...prev, body } : prev),
       );
     },
+    onError: (err) => toast.error(String(err)),
   });
 }

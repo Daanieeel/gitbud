@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 import type { PullRequest } from "@/lib/types";
@@ -103,6 +104,7 @@ export function useSyncLabels(
       if (!repoPath || !login || number === null) return;
       patchPrMeta(queryClient, repoPath, login, number, (pr) => ({ ...pr, labels: next }));
     },
+    onError: (err) => toast.error(String(err)),
   });
 }
 
@@ -135,6 +137,7 @@ export function useSyncAssignees(
       if (!repoPath || !login || number === null) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.prMeta(repoPath, login, number) });
     },
+    onError: (err) => toast.error(String(err)),
   });
 }
 
@@ -167,6 +170,7 @@ export function useSyncReviewers(
       if (!repoPath || !login || number === null) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.prMeta(repoPath, login, number) });
     },
+    onError: (err) => toast.error(String(err)),
   });
 }
 
@@ -191,6 +195,7 @@ export function useSetMilestone(
       if (!repoPath || !login || number === null) return;
       void queryClient.invalidateQueries({ queryKey: queryKeys.prMeta(repoPath, login, number) });
     },
+    onError: (err) => toast.error(String(err)),
   });
 }
 
@@ -206,5 +211,6 @@ export function useAddToProject(
       }
       return api.githubAddPullRequestToProject(repoPath, login, number, projectId);
     },
+    onError: (err) => toast.error(String(err)),
   });
 }

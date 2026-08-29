@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 import { useNetworkStore } from "@/store/useNetworkStore";
@@ -60,6 +61,7 @@ export function useResolveThread(
         (prev) => prev?.map((t) => (t.id === threadId ? { ...t, is_resolved: resolved } : t)),
       );
     },
+    onError: (err) => toast.error(String(err)),
   });
 }
 
@@ -119,5 +121,6 @@ export function useMarkFileViewed(
         },
       );
     },
+    onError: (err) => toast.error(String(err)),
   });
 }
