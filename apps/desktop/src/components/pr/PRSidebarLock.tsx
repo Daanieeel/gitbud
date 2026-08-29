@@ -49,7 +49,7 @@ export function PRSidebarLock({ repoPath, login, pr }: PRSidebarLockProps) {
     <div className="border-t border-border pt-3">
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button size="sm" variant="ghost" className="w-full text-muted-foreground">
+          <Button size="sm" variant="ghost" className="w-full justify-start text-muted-foreground">
             <LockIcon className="size-3.5" />
             Lock conversation
           </Button>

@@ -1,6 +1,6 @@
 [package]
 name = "gitbud"
-version = "0.3.38"
+version = "0.3.39"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
