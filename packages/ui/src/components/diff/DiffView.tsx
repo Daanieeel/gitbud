@@ -511,29 +511,44 @@ function UnifiedLine({
 interface SplitRow {
   left: DiffLine | null;
   right: DiffLine | null;
+  /** Index into the hunk's own `lines[]` — every line produces exactly one `SplitRow` (a
+   * modified line's delete+add pair becomes two separate rows, not one merged row; see this
+   * function's doc comment), so this is the same index `UnifiedLine` would use for the
+   * equivalent line, keeping composer/comment keys consistent between the two view modes. */
+  lineIdx: number;
 }
 
 /** Structural (not LCS-aligned) pairing: context lines occupy both columns, deletions only
  * the left column, additions only the right — simple and correct, if not perfectly aligned
  * for large replaced blocks the way a full diff-alignment algorithm would be. */
 function toSplitRows(hunk: DiffHunk): SplitRow[] {
-  const rows: SplitRow[] = [];
-  for (const line of hunk.lines) {
-    if (line.kind === "deletion") rows.push({ left: line, right: null });
-    else if (line.kind === "addition") rows.push({ left: null, right: line });
-    else rows.push({ left: line, right: line });
-  }
-  return rows;
+  return hunk.lines.map((line, lineIdx) => {
+    if (line.kind === "deletion") return { left: line, right: null, lineIdx };
+    if (line.kind === "addition") return { left: null, right: line, lineIdx };
+    return { left: line, right: line, lineIdx };
+  });
 }
 
-function SplitCell({ line, language }: { line: DiffLine | null; language: string | undefined }) {
+function SplitCell({
+  line,
+  language,
+  canComment,
+  composerOpen,
+  onToggleComposer,
+}: {
+  line: DiffLine | null;
+  language: string | undefined;
+  canComment: boolean;
+  composerOpen: boolean;
+  onToggleComposer: () => void;
+}) {
   if (!line) {
     return <div className="w-max min-w-[50%] bg-muted/30 px-3 py-px" />;
   }
   return (
     <div
       className={cn(
-        "flex w-max min-w-[50%] px-3 py-px whitespace-pre",
+        "group flex w-max min-w-[50%] px-3 py-px whitespace-pre",
         line.kind === "addition" &&
           "bg-[color-mix(in_srgb,var(--accent-green)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--accent-green)_18%,transparent)]",
         line.kind === "deletion" &&
@@ -554,6 +569,91 @@ function SplitCell({ line, language }: { line: DiffLine | null; language: string
         {LINE_PREFIX[line.kind]}
       </span>
       <span dangerouslySetInnerHTML={{ __html: renderLineHtml(line, language) }} />
+      {canComment && (
+        <div className="sticky right-3 z-[7] ml-auto flex shrink-0 items-center rounded bg-card px-1.5 py-0.5 opacity-0 shadow-sm group-hover:opacity-100">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                className="text-muted-foreground hover:text-foreground"
+                onClick={onToggleComposer}
+              >
+                <MessageSquarePlusIcon className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{composerOpen ? "Cancel comment" : "Add comment"}</TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The split-mode counterpart to `UnifiedLine` — two side-by-side cells plus a full-width
+ * comment thread/composer underneath (GitHub's own split view doesn't split comments into two
+ * columns either). The "add comment" affordance only ever lives on the right cell, matching
+ * `UnifiedLine`'s existing restriction to `side: "RIGHT"` — a pure deletion row (no right line at
+ * all) shows any comment GitHub already returned for it, but isn't itself commentable-on here. */
+function SplitLineRow({
+  left,
+  right,
+  hunkIdx,
+  lineIdx,
+  language,
+  comments,
+  onAddComment,
+  onReply,
+  onResolveThread,
+  composerKey,
+  setComposerKey,
+}: {
+  left: DiffLine | null;
+  right: DiffLine | null;
+  hunkIdx: number;
+  lineIdx: number;
+  language: string | undefined;
+  comments: ReviewComment[] | undefined;
+  onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
+  onReply?: ReplyHandler;
+  onResolveThread?: ResolveThreadHandler;
+  composerKey: string | null;
+  setComposerKey: (key: string | null) => void;
+}) {
+  const key = `${hunkIdx}:${lineIdx}`;
+  const rowComments = commentsForLine(
+    comments,
+    left?.old_lineno ?? null,
+    right?.new_lineno ?? null,
+  );
+  const newLineno = right?.new_lineno ?? null;
+  const canComment = Boolean(onAddComment) && newLineno != null;
+  const composerOpen = composerKey === key;
+
+  return (
+    <div>
+      <div className="flex">
+        <SplitCell
+          line={left}
+          language={language}
+          canComment={false}
+          composerOpen={false}
+          onToggleComposer={() => {}}
+        />
+        <div className="w-px shrink-0 bg-border" />
+        <SplitCell
+          line={right}
+          language={language}
+          canComment={canComment}
+          composerOpen={composerOpen}
+          onToggleComposer={() => setComposerKey(composerOpen ? null : key)}
+        />
+      </div>
+      <CommentThread comments={rowComments} onReply={onReply} onResolveThread={onResolveThread} />
+      {composerOpen && onAddComment && newLineno != null && (
+        <AddCommentComposer
+          onCancel={() => setComposerKey(null)}
+          onSubmit={(body) => onAddComment(newLineno, "RIGHT", body)}
+        />
+      )}
     </div>
   );
 }
@@ -568,7 +668,13 @@ type DiffRow =
   | { kind: "header"; hunkIdx: number }
   | { kind: "actions"; hunkIdx: number }
   | { kind: "line"; hunkIdx: number; lineIdx: number }
-  | { kind: "split"; hunkIdx: number; left: DiffLine | null; right: DiffLine | null };
+  | {
+      kind: "split";
+      hunkIdx: number;
+      lineIdx: number;
+      left: DiffLine | null;
+      right: DiffLine | null;
+    };
 
 function buildDiffRows(hunks: DiffHunk[], mode: "unified" | "split"): DiffRow[] {
   const rows: DiffRow[] = [];
@@ -576,8 +682,8 @@ function buildDiffRows(hunks: DiffHunk[], mode: "unified" | "split"): DiffRow[] 
     rows.push({ kind: "header", hunkIdx });
     rows.push({ kind: "actions", hunkIdx });
     if (mode === "split") {
-      for (const { left, right } of toSplitRows(hunk))
-        rows.push({ kind: "split", hunkIdx, left, right });
+      for (const { left, right, lineIdx } of toSplitRows(hunk))
+        rows.push({ kind: "split", hunkIdx, lineIdx, left, right });
     } else {
       hunk.lines.forEach((_, lineIdx) => rows.push({ kind: "line", hunkIdx, lineIdx }));
     }
@@ -768,10 +874,20 @@ function DiffSection({
                 </div>
               )}
               {row.kind === "split" && (
-                <div className={cn("flex", tint)}>
-                  <SplitCell line={row.left} language={language} />
-                  <div className="w-px shrink-0 bg-border" />
-                  <SplitCell line={row.right} language={language} />
+                <div className={tint}>
+                  <SplitLineRow
+                    left={row.left}
+                    right={row.right}
+                    hunkIdx={row.hunkIdx}
+                    lineIdx={row.lineIdx}
+                    language={language}
+                    comments={comments}
+                    onAddComment={onAddComment}
+                    onReply={onReply}
+                    onResolveThread={onResolveThread}
+                    composerKey={composerKey}
+                    setComposerKey={setComposerKey}
+                  />
                 </div>
               )}
             </div>
