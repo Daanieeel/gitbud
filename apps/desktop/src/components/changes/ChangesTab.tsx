@@ -9,7 +9,7 @@ import {
   useDiscardHunk,
 } from "@/hooks/queries/useRepoStatus";
 import { useFileDiff } from "@/hooks/queries/useFileDiff";
-import { FileList } from "./FileList";
+import { FileList, type FileListHandle } from "./FileList";
 import { ConflictResolutionPanel } from "./ConflictResolutionPanel";
 import { DiffView } from "@gitbud/ui/diff-view";
 import { CommitBox } from "@/components/commit/CommitBox";
@@ -57,6 +57,11 @@ export function ChangesTab() {
   const filePaths = useMemo(() => filtered.map((f) => f.path), [filtered]);
   const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, selectFile);
   const fileListRef = useRef<HTMLDivElement>(null);
+  const fileListApiRef = useRef<FileListHandle>(null);
+  // Whether the file-list wrapper (or something inside it, e.g. an open context menu) holds
+  // focus — drives blue-vs-grey highlighting in FileList. Starts true since the effect below
+  // focuses the wrapper on mount.
+  const [hasFocus, setHasFocus] = useState(true);
 
   useEffect(() => {
     fileListRef.current?.focus();
@@ -106,16 +111,29 @@ export function ChangesTab() {
             <div
               ref={fileListRef}
               tabIndex={0}
-              onKeyDown={handleArrowNav}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "a") {
+                  e.preventDefault();
+                  fileListApiRef.current?.selectAll();
+                  return;
+                }
+                handleArrowNav(e);
+              }}
+              onFocus={() => setHasFocus(true)}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) setHasFocus(false);
+              }}
               className="min-h-0 flex-1 outline-none"
             >
               <FileList
+                ref={fileListApiRef}
                 files={filtered}
                 selectedPath={selectedFilePath}
                 onSelect={selectFile}
                 onToggle={(path, staged) => toggleStagedMutation.mutate({ paths: [path], staged })}
                 onToggleMany={(paths, staged) => toggleStagedMutation.mutate({ paths, staged })}
                 onDiscardMany={(paths) => discardFilesMutation.mutate(paths)}
+                hasFocus={hasFocus}
               />
             </div>
           </>
