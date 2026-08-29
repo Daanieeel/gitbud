@@ -186,11 +186,10 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex w-[36rem] max-w-none flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex min-w-0 items-center gap-2">
             <GitMergeIcon className="size-4 shrink-0" />
-            <span className="truncate">
-              {pr.title} <span className="text-muted-foreground">#{pr.number}</span>
-            </span>
+            <span className="min-w-0 truncate">{pr.title}</span>
+            <span className="shrink-0 pr-4 text-muted-foreground">#{pr.number}</span>
           </DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-3">
