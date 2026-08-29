@@ -25,8 +25,12 @@ function pr(overrides: Partial<PullRequest> = {}): PullRequest {
     labels: [],
     mergeable_state: null,
     requested_reviewers: [],
+    requested_teams: [],
     assignees: [],
     milestone: null,
+    locked: false,
+    active_lock_reason: null,
+    created_at: "2024-01-01T00:00:00Z",
     ...overrides,
   };
 }

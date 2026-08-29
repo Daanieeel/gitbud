@@ -47,3 +47,25 @@ export function mergeTimeline(
   events.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
   return events;
 }
+
+/** A `cross-referenced` timeline event fires for *any* mention of the PR elsewhere, not just a
+ * closing one — GitHub's own "may be closed by this pull request" wording is specifically for
+ * the closing case, so this keeps a cross-referenced event only when its source issue's number
+ * also appears among the PR body's own closing-keyword references (`parseLinkedIssues`).
+ * Every other event kind passes through untouched. */
+export function filterRelevantGhEvents(
+  ghEvents: IssueTimelineEvent[],
+  closingIssueNumbers: number[],
+): IssueTimelineEvent[] {
+  return ghEvents.filter((e) => {
+    if (e.event !== "cross-referenced") return true;
+    return e.source_issue_number !== null && closingIssueNumbers.includes(e.source_issue_number);
+  });
+}
+
+/** Index of the "merged" event in a chronologically-sorted event list, or -1 if there isn't
+ * one — the timeline's connecting line stops right after this row (see `PRTimeline.tsx`'s
+ * per-row line-visibility logic and item 13's design ask). */
+export function findMergedEventIndex(events: TimelineEvent[]): number {
+  return events.findIndex((e) => e.kind === "github_event" && e.ghEvent.event === "merged");
+}

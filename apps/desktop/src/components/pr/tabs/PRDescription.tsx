@@ -4,6 +4,7 @@ import { Button } from "@gitbud/ui/button";
 import { Textarea } from "@gitbud/ui/textarea";
 import { Avatar } from "@gitbud/ui/avatar";
 import { Markdown } from "@gitbud/ui/markdown";
+import { RelativeTime } from "../RelativeTime";
 import { useUpdatePullRequestBody } from "@/hooks/queries/usePullRequestMeta";
 import type { PullRequest } from "@/lib/types";
 
@@ -30,7 +31,8 @@ export function PRDescription({ repoPath, login, pr }: PRDescriptionProps) {
       <div className="min-w-0 flex-1">
         <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            <span className="font-medium text-foreground">{pr.author_login}</span> opened this PR
+            <span className="font-medium text-foreground">{pr.author_login}</span> opened this PR{" "}
+            <RelativeTime iso={pr.created_at} />
           </span>
           {canEdit && !editing && (
             <button

@@ -236,6 +236,7 @@ pub struct PullRequest {
     pub locked: bool,
     #[serde(default)]
     pub active_lock_reason: Option<String>,
+    pub created_at: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -349,6 +350,7 @@ struct RawPullRequest {
     locked: bool,
     #[serde(default)]
     active_lock_reason: Option<String>,
+    created_at: String,
 }
 
 impl From<RawPullRequest> for PullRequest {
@@ -376,6 +378,7 @@ impl From<RawPullRequest> for PullRequest {
             milestone: raw.milestone,
             locked: raw.locked,
             active_lock_reason: raw.active_lock_reason,
+            created_at: raw.created_at,
         }
     }
 }
@@ -2157,6 +2160,29 @@ struct RawTimelineEvent {
     assignee: Option<RawUser>,
     #[serde(default)]
     requested_reviewer: Option<RawUser>,
+    #[serde(default)]
+    source: Option<RawCrossReferenceSource>,
+}
+
+#[derive(Deserialize)]
+struct RawCrossReferenceSource {
+    #[serde(default)]
+    issue: Option<RawCrossReferencedIssue>,
+}
+
+#[derive(Deserialize)]
+struct RawCrossReferencedIssue {
+    number: u64,
+    title: String,
+    state: String,
+    html_url: String,
+    #[serde(default)]
+    repository: Option<RawRepoRef>,
+}
+
+#[derive(Deserialize)]
+struct RawRepoRef {
+    full_name: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2172,10 +2198,22 @@ pub struct IssueTimelineEvent {
     pub assignee_avatar_url: Option<String>,
     pub requested_reviewer_login: Option<String>,
     pub requested_reviewer_avatar_url: Option<String>,
+    /// Populated only for a `cross-referenced` event whose source is an issue (as opposed to
+    /// another PR) — the "X linked an issue that may be closed by this pull request" line. Only
+    /// rendered by the frontend when this issue's number also appears among the PR body's own
+    /// closing-keyword references (`parseLinkedIssues`) — a `cross-referenced` event fires for
+    /// *any* mention, not just a closing one, and GitHub's own UI only shows this specific
+    /// wording for the closing case.
+    pub source_issue_number: Option<u64>,
+    pub source_issue_title: Option<String>,
+    pub source_issue_state: Option<String>,
+    pub source_issue_html_url: Option<String>,
+    pub source_issue_repo_full_name: Option<String>,
 }
 
 impl From<RawTimelineEvent> for IssueTimelineEvent {
     fn from(raw: RawTimelineEvent) -> Self {
+        let source_issue = raw.source.and_then(|s| s.issue);
         IssueTimelineEvent {
             id: raw.id,
             event: raw.event,
@@ -2188,14 +2226,23 @@ impl From<RawTimelineEvent> for IssueTimelineEvent {
             assignee_avatar_url: raw.assignee.map(|a| a.avatar_url),
             requested_reviewer_login: raw.requested_reviewer.as_ref().map(|a| a.login.clone()),
             requested_reviewer_avatar_url: raw.requested_reviewer.map(|a| a.avatar_url),
+            source_issue_number: source_issue.as_ref().map(|i| i.number),
+            source_issue_title: source_issue.as_ref().map(|i| i.title.clone()),
+            source_issue_state: source_issue.as_ref().map(|i| i.state.clone()),
+            source_issue_html_url: source_issue.as_ref().map(|i| i.html_url.clone()),
+            source_issue_repo_full_name: source_issue
+                .and_then(|i| i.repository)
+                .map(|r| r.full_name),
         }
     }
 }
 
 /// The event kinds the Conversation tab's timeline renders — everything else GitHub's timeline
-/// API returns (commented/committed/reviewed/cross-referenced/etc.) is already covered by our
-/// own issue-comments/reviews/commits fetches, so including them here would just duplicate
-/// entries rather than add information.
+/// API returns (commented/committed/reviewed/etc.) is already covered by our own issue-
+/// comments/reviews/commits fetches, so including them here would just duplicate entries rather
+/// than add information. `cross-referenced` is the exception: it's the only way to get "X linked
+/// an issue that may be closed by this pull request" (see `IssueTimelineEvent`'s doc comment for
+/// how it's filtered down to genuine closing references on the frontend).
 const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
     "labeled",
     "unlabeled",
@@ -2206,6 +2253,7 @@ const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
     "closed",
     "reopened",
     "merged",
+    "cross-referenced",
 ];
 
 /// Label/assignee/reviewer-request/close/reopen/merge events for the Conversation tab's
@@ -2275,6 +2323,7 @@ pub struct Review {
     pub state: String,
     pub body: String,
     pub submitted_at: Option<String>,
+    pub html_url: String,
 }
 
 #[derive(Deserialize)]
@@ -2285,6 +2334,8 @@ struct RawReview {
     #[serde(default)]
     body: String,
     submitted_at: Option<String>,
+    #[serde(default)]
+    html_url: String,
 }
 
 impl From<RawReview> for Review {
@@ -2296,6 +2347,7 @@ impl From<RawReview> for Review {
             state: raw.state,
             body: raw.body,
             submitted_at: raw.submitted_at,
+            html_url: raw.html_url,
         }
     }
 }
@@ -2586,7 +2638,8 @@ mod tests {
                 "user": {{"login": "alice", "avatar_url": "https://a"}},
                 "head": {{"ref": "feature", "sha": "abc"}},
                 "base": {{"ref": "main", "sha": "def"}},
-                "merged_at": null, "mergeable": null, "labels": []
+                "merged_at": null, "mergeable": null, "labels": [],
+                "created_at": "2024-01-01T00:00:00Z"
                 {extra}
             }}"#
         )
@@ -2819,6 +2872,40 @@ mod tests {
     }
 
     #[test]
+    fn timeline_event_maps_cross_referenced_source_issue_fields() {
+        let json = r#"{
+            "event": "cross-referenced",
+            "actor": {"login": "alice", "avatar_url": "https://a"},
+            "source": {
+                "issue": {
+                    "number": 24,
+                    "title": "Fix the thing",
+                    "state": "open",
+                    "html_url": "https://github.com/Daanieeel/gitbud/issues/24",
+                    "repository": {"full_name": "Daanieeel/gitbud"}
+                }
+            }
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.source_issue_number, Some(24));
+        assert_eq!(event.source_issue_title, Some("Fix the thing".to_string()));
+        assert_eq!(event.source_issue_state, Some("open".to_string()));
+        assert_eq!(
+            event.source_issue_repo_full_name,
+            Some("Daanieeel/gitbud".to_string())
+        );
+    }
+
+    #[test]
+    fn timeline_event_leaves_source_issue_fields_none_for_other_event_kinds() {
+        let json = r#"{"event": "labeled", "label": {"name": "bug", "color": "d73a4a"}}"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.source_issue_number, None);
+    }
+
+    #[test]
     fn relevant_timeline_events_excludes_comment_and_review_kinds() {
         // These are already covered by list_issue_comments/list_reviews — including them here
         // too would duplicate timeline entries rather than add information.
@@ -2827,5 +2914,6 @@ mod tests {
         assert!(!RELEVANT_TIMELINE_EVENTS.contains(&"committed"));
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"labeled"));
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"merged"));
+        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"cross-referenced"));
     }
 }

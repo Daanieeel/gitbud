@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { mergeTimeline } from "./prTimeline";
+import { filterRelevantGhEvents, findMergedEventIndex, mergeTimeline } from "./prTimeline";
 import type { IssueComment, IssueTimelineEvent, PullRequestCommit, Review } from "./types";
 
 function comment(id: number, created_at: string): IssueComment {
@@ -15,7 +15,7 @@ function comment(id: number, created_at: string): IssueComment {
 }
 
 function review(id: number, submitted_at: string | null, state = "APPROVED", body = ""): Review {
-  return { id, user_login: "u", user_avatar_url: "", state, body, submitted_at };
+  return { id, user_login: "u", user_avatar_url: "", state, body, submitted_at, html_url: "" };
 }
 
 function commit(sha: string, authored_at: string | null): PullRequestCommit {
@@ -45,6 +45,11 @@ function ghEvent(event: string, created_at: string): IssueTimelineEvent {
     assignee_avatar_url: null,
     requested_reviewer_login: null,
     requested_reviewer_avatar_url: null,
+    source_issue_number: null,
+    source_issue_title: null,
+    source_issue_state: null,
+    source_issue_html_url: null,
+    source_issue_repo_full_name: null,
   };
 }
 
@@ -95,5 +100,50 @@ describe("mergeTimeline", () => {
 
   it("defaults ghEvents to empty when omitted", () => {
     expect(mergeTimeline([], [], [])).toEqual([]);
+  });
+});
+
+describe("filterRelevantGhEvents", () => {
+  function crossRef(sourceIssueNumber: number | null): IssueTimelineEvent {
+    return {
+      ...ghEvent("cross-referenced", "2024-01-01T00:00:00Z"),
+      source_issue_number: sourceIssueNumber,
+    };
+  }
+
+  it("passes through every non-cross-referenced event unchanged", () => {
+    const events = [ghEvent("labeled", "2024-01-01T00:00:00Z")];
+    expect(filterRelevantGhEvents(events, [])).toEqual(events);
+  });
+
+  it("keeps a cross-referenced event whose source issue is a genuine closing reference", () => {
+    const events = [crossRef(24)];
+    expect(filterRelevantGhEvents(events, [24])).toEqual(events);
+  });
+
+  it("drops a cross-referenced event that's just a plain mention, not a closing reference", () => {
+    expect(filterRelevantGhEvents([crossRef(24)], [])).toEqual([]);
+    expect(filterRelevantGhEvents([crossRef(24)], [99])).toEqual([]);
+  });
+
+  it("drops a cross-referenced event with no source issue at all", () => {
+    expect(filterRelevantGhEvents([crossRef(null)], [24])).toEqual([]);
+  });
+});
+
+describe("findMergedEventIndex", () => {
+  it("finds the index of the merged event among mixed timeline kinds", () => {
+    const events = mergeTimeline(
+      [comment(1, "2024-01-01T00:00:00Z")],
+      [],
+      [],
+      [ghEvent("merged", "2024-01-02T00:00:00Z")],
+    );
+    expect(findMergedEventIndex(events)).toBe(1);
+  });
+
+  it("returns -1 when there's no merged event", () => {
+    const events = mergeTimeline([comment(1, "2024-01-01T00:00:00Z")], [], []);
+    expect(findMergedEventIndex(events)).toBe(-1);
   });
 });

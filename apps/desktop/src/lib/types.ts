@@ -278,6 +278,7 @@ export interface PullRequest {
   milestone: Milestone | null;
   locked: boolean;
   active_lock_reason: string | null;
+  created_at: string;
 }
 
 export interface Label {
@@ -378,6 +379,7 @@ export interface Review {
   state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "PENDING" | "DISMISSED" | string;
   body: string;
   submitted_at: string | null;
+  html_url: string;
 }
 
 export interface ReviewThread {
@@ -415,4 +417,9 @@ export interface IssueTimelineEvent {
   assignee_avatar_url: string | null;
   requested_reviewer_login: string | null;
   requested_reviewer_avatar_url: string | null;
+  source_issue_number: number | null;
+  source_issue_title: string | null;
+  source_issue_state: string | null;
+  source_issue_html_url: string | null;
+  source_issue_repo_full_name: string | null;
 }

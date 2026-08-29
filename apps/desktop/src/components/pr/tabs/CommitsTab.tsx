@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { format, formatDistanceToNow } from "date-fns";
-import { ShieldCheckIcon } from "lucide-react";
 import { Avatar } from "@gitbud/ui/avatar";
 import { Button } from "@gitbud/ui/button";
 import { CopyButton } from "@gitbud/ui/copy-button";
@@ -9,12 +8,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { usePullRequestCommits, useCommitDiffFiles } from "@/hooks/queries/usePRCommits";
+import { usePRStore } from "@/store/usePRStore";
 import { CIBadge } from "../CIBadge";
+import { CommitVerificationBadge } from "../CommitVerificationBadge";
 import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
 import { diffStats } from "@/lib/diffStats";
-import { api } from "@/lib/tauri";
 import { cn } from "@gitbud/ui/utils";
 import type { PullRequest, PullRequestCommit } from "@/lib/types";
 
@@ -22,44 +22,6 @@ interface CommitsTabProps {
   repoPath: string;
   login: string;
   pr: PullRequest;
-}
-
-/** Same idea as History's private `VerificationBadge` (`CommitList.tsx`), just against a PR
- * commit's sha instead of a local `CommitEntry`'s — the two views have no shared row component
- * to reuse, only the same underlying `githubGetCommitVerification` call. */
-function PRCommitVerificationBadge({
-  repoPath,
-  login,
-  sha,
-}: {
-  repoPath: string;
-  login: string;
-  sha: string;
-}) {
-  const [verified, setVerified] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    void api.githubGetCommitVerification(repoPath, login, sha).then(
-      (v) => !cancelled && setVerified(v.verified),
-      () => !cancelled && setVerified(null),
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [repoPath, login, sha]);
-
-  if (!verified) return null;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span>
-          <ShieldCheckIcon className="size-3 shrink-0 text-accent-green" />
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>Verified signature</TooltipContent>
-    </Tooltip>
-  );
 }
 
 /** Sits above the file list + diff, mirroring History's `CommitHeader`: full message, author,
@@ -133,6 +95,18 @@ export function CommitsTab({ repoPath, login, pr }: CommitsTabProps) {
     480,
   );
 
+  // A sha clicked outside this tab (the Conversation timeline's commit-pushed rows) lands here
+  // via the store rather than a prop, since the click happens from a sibling tab that isn't
+  // mounted alongside this one — consumed once, then cleared so a later click *inside* this tab
+  // isn't immediately overridden by a stale store value on the next render.
+  const navigatedSha = usePRStore((s) => s.selectedCommitSha);
+  const clearSelectedCommit = usePRStore((s) => s.clearSelectedCommit);
+  useEffect(() => {
+    if (navigatedSha === null) return;
+    setSelectedSha(navigatedSha);
+    clearSelectedCommit();
+  }, [navigatedSha, clearSelectedCommit]);
+
   useEffect(() => {
     if (commits.length > 0 && selectedSha === null) setSelectedSha(commits[0].sha);
   }, [commits, selectedSha]);
@@ -184,7 +158,7 @@ export function CommitsTab({ repoPath, login, pr }: CommitsTabProps) {
                 </span>
               )}
               <CIBadge repoPath={repoPath} login={login} sha={c.sha} />
-              <PRCommitVerificationBadge repoPath={repoPath} login={login} sha={c.sha} />
+              <CommitVerificationBadge repoPath={repoPath} login={login} sha={c.sha} />
               <span className="ml-auto shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-secondary-foreground">
                 {c.sha.slice(0, 7)}
               </span>

@@ -14,6 +14,7 @@ function review(login: string, state: string, submitted_at: string | null): Revi
     state,
     body: "",
     submitted_at,
+    html_url: "",
   };
 }
 

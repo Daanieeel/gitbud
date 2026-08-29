@@ -21,6 +21,21 @@ interface PRState {
   /** Switching to Files auto-collapses the sidebar every time (not sticky across visits) to
    * give the file list + diff full width, since that's this app's heaviest-use view. */
   setActiveTab: (tab: PRDetailTab) => void;
+
+  /** Set by clicking a commit sha anywhere outside the Commits tab itself (e.g. the
+   * Conversation timeline's commit-pushed rows) — jumps to the Commits tab with that commit
+   * already selected. `CommitsTab` reads this once then manages its own selection locally from
+   * then on, same as it always has. */
+  selectedCommitSha: string | null;
+  selectCommit: (sha: string) => void;
+  clearSelectedCommit: () => void;
+
+  /** Text queued by a timeline comment's "Quote reply" action — `PRCommentCompose` picks this up
+   * (prefixing it as a markdown quote) and clears it once consumed, rather than the two
+   * components needing a direct reference to each other. */
+  quotedReplyText: string | null;
+  setQuotedReply: (text: string) => void;
+  clearQuotedReply: () => void;
 }
 
 export const usePRStore = create<PRState>((set) => ({
@@ -30,11 +45,25 @@ export const usePRStore = create<PRState>((set) => ({
   selectedNumber: null,
   selectedFilePath: null,
   selectPR: (number) =>
-    set({ selectedNumber: number, selectedFilePath: null, activeTab: "conversation" }),
+    set({
+      selectedNumber: number,
+      selectedFilePath: null,
+      activeTab: "conversation",
+      selectedCommitSha: null,
+      quotedReplyText: null,
+    }),
   selectFile: (path) => set({ selectedFilePath: path }),
 
   activeTab: "conversation",
   sidebarCollapsed: false,
   setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
   setActiveTab: (tab) => set({ activeTab: tab, sidebarCollapsed: tab === "files" }),
+
+  selectedCommitSha: null,
+  selectCommit: (sha) => set({ selectedCommitSha: sha, activeTab: "commits" }),
+  clearSelectedCommit: () => set({ selectedCommitSha: null }),
+
+  quotedReplyText: null,
+  setQuotedReply: (text) => set({ quotedReplyText: text, activeTab: "conversation" }),
+  clearQuotedReply: () => set({ quotedReplyText: null }),
 }));

@@ -80,6 +80,7 @@ describe("useSubmitReview", () => {
       state: "APPROVED",
       body: "lgtm",
       submitted_at: "2024-01-01T00:00:00Z",
+      html_url: "",
     };
     spyOn(api, "githubSubmitReview").mockResolvedValue(created);
 
