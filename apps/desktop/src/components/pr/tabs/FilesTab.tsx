@@ -18,6 +18,8 @@ import {
   useReviewThreads,
   useViewedFiles,
 } from "@/hooks/queries/usePRReviewThreads";
+import { useSubmitReview } from "@/hooks/queries/usePRConversation";
+import { PRFilesReviewBar } from "../PRFilesReviewBar";
 import { joinCommentsWithThreads, threadIdForComment } from "@/lib/reviewThreadJoin";
 import { api } from "@/lib/tauri";
 import type { ImageDiff, PullRequest } from "@/lib/types";
@@ -48,7 +50,25 @@ export function FilesTab({ repoPath, login, pr }: FilesTabProps) {
   const resolveThreadMutation = useResolveThread(repoPath, login, pr.number);
   const { data: viewedFiles = new Set<string>() } = useViewedFiles(repoPath, login, pr.number);
   const markViewedMutation = useMarkFileViewed(repoPath, login, pr.number);
+  const submitReviewMutation = useSubmitReview(repoPath, login, pr.number);
   const [hideViewed, setHideViewed] = useState(false);
+
+  // "Mark as viewed" checkboxes don't send anything the moment they're clicked — every tick is
+  // collected here first, and only flushed (alongside a review verdict) when the bar at the
+  // bottom of the list is used, mirroring GitHub's own "finish your review" flow rather than
+  // firing one GraphQL mutation per checkbox click.
+  const [pendingViewed, setPendingViewed] = useState<Map<string, boolean>>(new Map());
+  const isFileViewed = (path: string): boolean => pendingViewed.get(path) ?? viewedFiles.has(path);
+  const pendingViewedCount = useMemo(
+    () =>
+      Array.from(pendingViewed.entries()).filter(
+        ([path, viewed]) => viewed !== viewedFiles.has(path),
+      ).length,
+    [pendingViewed, viewedFiles],
+  );
+  // GitHub rejects a new review submission on a closed/merged PR outright — same gate the
+  // Conversation tab's review flow uses.
+  const canReview = !pr.merged && pr.state === "open";
 
   const [selectedImageDiff, setSelectedImageDiff] = useState<ImageDiff | null>(null);
 
@@ -77,7 +97,7 @@ export function FilesTab({ repoPath, login, pr }: FilesTabProps) {
       .then(setSelectedImageDiff);
   }, [repoPath, login, selectedFile, pr.base_sha, pr.head_sha]);
 
-  const visibleFiles = hideViewed ? files.filter((f) => !viewedFiles.has(f.filename)) : files;
+  const visibleFiles = hideViewed ? files.filter((f) => !isFileViewed(f.filename)) : files;
   const filePaths = useMemo(() => visibleFiles.map((f) => f.filename), [visibleFiles]);
   const handleArrowNav = useArrowKeyFileNav(filePaths, selectedFilePath, (path) =>
     selectFile(path),
@@ -89,6 +109,17 @@ export function FilesTab({ repoPath, login, pr }: FilesTabProps) {
   useEffect(() => {
     fileListRef.current?.focus();
   }, []);
+
+  const submitReview = async (event: "APPROVE" | "REQUEST_CHANGES" | "COMMENT", body: string) => {
+    const toFlush = Array.from(pendingViewed.entries()).filter(
+      ([path, viewed]) => viewed !== viewedFiles.has(path),
+    );
+    await Promise.all(
+      toFlush.map(([path, viewed]) => markViewedMutation.mutateAsync({ path, viewed })),
+    );
+    await submitReviewMutation.mutateAsync({ event, body });
+    setPendingViewed(new Map());
+  };
 
   return (
     <div className="flex min-h-0 flex-1">
@@ -120,44 +151,60 @@ export function FilesTab({ repoPath, login, pr }: FilesTabProps) {
             </TooltipContent>
           </Tooltip>
         </div>
-        <div className="min-h-0 flex-1 overflow-auto">
-          {visibleFiles.map((f) => (
-            <ContextMenu key={f.filename}>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <ContextMenuTrigger asChild>
-                    <div
-                      className={cn(
-                        "flex cursor-pointer select-none items-center gap-2 px-2 py-1 text-sm hover:bg-accent",
-                        selectedFilePath === f.filename && "bg-accent",
-                      )}
-                      onClick={() => selectFile(f.filename)}
-                    >
-                      <Checkbox
-                        checked={viewedFiles.has(f.filename)}
-                        onClick={(e) => e.stopPropagation()}
-                        onCheckedChange={(checked) =>
-                          markViewedMutation.mutate({ path: f.filename, viewed: checked === true })
-                        }
-                      />
-                      <FileTypeIcon path={f.filename} className="size-3.5 shrink-0" />
-                      <FilePathLabel path={f.filename} />
-                      <FileStatusIcon status={f.status} className="size-3.5" />
-                    </div>
-                  </ContextMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent>{`${f.filename} (${f.status})`}</TooltipContent>
-              </Tooltip>
-              <ContextMenuContent>
-                <GenericFileMenuItems
-                  repoPath={repoPath}
-                  path={f.filename}
-                  providerRef={pr.head_sha}
-                  remoteInfo={remoteInfo}
-                />
-              </ContextMenuContent>
-            </ContextMenu>
-          ))}
+        <div className="flex min-h-0 flex-1 flex-col overflow-auto">
+          {/* Bottom padding matches the sticky review bar's height so it never visually covers
+           * the last file row — see PRFilesReviewBar's own doc comment. */}
+          <div className={canReview ? "pb-12" : undefined}>
+            {visibleFiles.map((f) => (
+              <ContextMenu key={f.filename}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <ContextMenuTrigger asChild>
+                      <div
+                        className={cn(
+                          "flex cursor-pointer select-none items-center gap-2 px-2 py-1 text-sm hover:bg-accent",
+                          selectedFilePath === f.filename && "bg-accent",
+                        )}
+                        onClick={() => selectFile(f.filename)}
+                      >
+                        <Checkbox
+                          checked={isFileViewed(f.filename)}
+                          onClick={(e) => e.stopPropagation()}
+                          onCheckedChange={(checked) =>
+                            setPendingViewed((prev) => {
+                              const next = new Map(prev);
+                              next.set(f.filename, checked === true);
+                              return next;
+                            })
+                          }
+                        />
+                        <FileTypeIcon path={f.filename} className="size-3.5 shrink-0" />
+                        <FilePathLabel path={f.filename} />
+                        <FileStatusIcon status={f.status} className="size-3.5" />
+                      </div>
+                    </ContextMenuTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>{`${f.filename} (${f.status})`}</TooltipContent>
+                </Tooltip>
+                <ContextMenuContent>
+                  <GenericFileMenuItems
+                    repoPath={repoPath}
+                    path={f.filename}
+                    providerRef={pr.head_sha}
+                    remoteInfo={remoteInfo}
+                  />
+                </ContextMenuContent>
+              </ContextMenu>
+            ))}
+          </div>
+          {canReview && (
+            <PRFilesReviewBar
+              pendingViewedCount={pendingViewedCount}
+              isOwnPr={pr.author_login === login}
+              submitting={submitReviewMutation.isPending || markViewedMutation.isPending}
+              onSubmit={submitReview}
+            />
+          )}
         </div>
       </div>
       <ResizeHandle onPointerDown={onPointerDown} />

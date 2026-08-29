@@ -1,6 +1,6 @@
 {
   "name": "@gitbud/desktop",
-  "version": "0.3.35",
+  "version": "0.3.36",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "type": "module",
