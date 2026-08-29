@@ -392,6 +392,12 @@ export interface CompareResult {
   status: string;
 }
 
+export interface IssueSummary {
+  number: number;
+  title: string;
+  state: string;
+}
+
 export interface BranchProtectionRequirements {
   required_contexts: string[];
   required_approving_review_count: number | null;

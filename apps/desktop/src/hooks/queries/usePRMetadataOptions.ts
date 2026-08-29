@@ -63,6 +63,16 @@ export function teamReviewerKey(slug: string): string {
   return `${TEAM_REVIEWER_PREFIX}${slug}`;
 }
 
+/** Every issue in the repo (PRs excluded), for the "link an issue" picker in the sidebar and the
+ * create-PR dialog. */
+export function useRepoIssues(repoPath: string | null, login: string | null) {
+  return useQuery({
+    queryKey: queryKeys.repoIssues(repoPath ?? "", login ?? ""),
+    queryFn: () => api.githubListRepoIssues(repoPath!, login!),
+    enabled: !!repoPath && !!login,
+  });
+}
+
 export function useIssueStates(repoPath: string | null, login: string | null, numbers: number[]) {
   return useQuery({
     queryKey: queryKeys.issueStates(repoPath ?? "", login ?? "", numbers),

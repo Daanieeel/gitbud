@@ -17,13 +17,16 @@ import { FilePathLabel } from "@/components/changes/FilePathLabel";
 import { MultiSelectField } from "./MultiSelectField";
 import { LabelChip } from "./LabelChip";
 import { SingleSelectField } from "./SingleSelectField";
+import { buildIssuePickerOptions } from "./issuePickerOptions";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useBranches } from "@/hooks/queries/useBranches";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useCreatePullRequest } from "@/hooks/queries/usePullRequests";
+import { useRepoIssues } from "@/hooks/queries/usePRMetadataOptions";
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { usePRStore } from "@/store/usePRStore";
+import { useRepoFullName } from "@/hooks/useRepoFullName";
 import { api } from "@/lib/tauri";
 import { cn } from "@gitbud/ui/utils";
 import type {
@@ -55,6 +58,8 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const branches = branchData?.branches ?? [];
   const currentLogin = useGitHubStore((s) => s.currentLogin);
   const createPRMutation = useCreatePullRequest(repoPath, currentLogin);
+  const { data: repoIssues = [] } = useRepoIssues(repoPath, currentLogin);
+  const repoFullName = useRepoFullName(repoPath);
   const openPrAfterCreation = useSettingsStore((s) => s.settings.open_pr_after_creation);
   const setActiveTab = useRepoStore((s) => s.setActiveTab);
   const setPRFilter = usePRStore((s) => s.setFilter);
@@ -422,6 +427,22 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
                 selected={selectedProjects}
                 onChange={setSelectedProjects}
               />
+            )}
+            {repoIssues.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-muted-foreground">Linked issues</span>
+                <SingleSelectField
+                  placeholder="Link an issue…"
+                  selected=""
+                  options={buildIssuePickerOptions(repoIssues, repoFullName ?? "")}
+                  onChange={(key) => {
+                    if (!key) return;
+                    const closesLine = `Closes #${key}`;
+                    if (body.includes(closesLine)) return;
+                    setBody((prev) => (prev ? `${prev}\n\n${closesLine}` : closesLine));
+                  }}
+                />
+              </div>
             )}
           </div>
         </div>

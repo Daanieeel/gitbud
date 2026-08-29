@@ -1437,6 +1437,49 @@ pub async fn unmark_file_as_viewed(
 /// Open/closed state for a batch of issue numbers in one request (aliased per-number, since
 /// GraphQL has no "issue by number, list of numbers" batch field) — feeds the sidebar's linked-
 /// issues chips ("Closes #123" parsed out of the PR body).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueSummary {
+    pub number: u64,
+    pub title: String,
+    pub state: String,
+}
+
+#[derive(Deserialize)]
+struct RawIssueSummary {
+    number: u64,
+    title: String,
+    state: String,
+    // Present (non-null) only when this "issue" is actually a pull request — GitHub's issues
+    // endpoint returns both, unfiltered.
+    #[serde(default)]
+    pull_request: Option<serde_json::Value>,
+}
+
+/// Every issue in the repo (open and closed, PRs excluded) — the candidate list for the
+/// sidebar's/create-PR dialog's "link an issue" picker. A lean single page rather than full
+/// pagination: a repo with more than 100 issues just won't show every one of them in this
+/// picker, same "rare edge case" call already made for other option lists in this app.
+pub async fn list_repo_issues(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<Vec<IssueSummary>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues?state=all&per_page=100");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: Vec<RawIssueSummary> = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw
+        .into_iter()
+        .filter(|i| i.pull_request.is_none())
+        .map(|i| IssueSummary {
+            number: i.number,
+            title: i.title,
+            state: i.state,
+        })
+        .collect())
+}
+
 pub async fn list_issue_states(
     host: &str,
     token: &str,
@@ -2722,6 +2765,26 @@ mod tests {
                 ("src/b.rs".to_string(), "UNVIEWED".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn raw_issue_summary_excludes_entries_that_are_actually_pull_requests() {
+        let json = r#"[
+            {"number": 1, "title": "A real issue", "state": "open"},
+            {"number": 2, "title": "Actually a PR", "state": "open", "pull_request": {"url": "https://x"}}
+        ]"#;
+        let raw: Vec<RawIssueSummary> = serde_json::from_str(json).unwrap();
+        let filtered: Vec<IssueSummary> = raw
+            .into_iter()
+            .filter(|i| i.pull_request.is_none())
+            .map(|i| IssueSummary {
+                number: i.number,
+                title: i.title,
+                state: i.state,
+            })
+            .collect();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].number, 1);
     }
 
     #[test]

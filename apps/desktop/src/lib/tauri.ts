@@ -19,6 +19,7 @@ import type {
   GitHubRepo,
   ImageDiff,
   IssueComment,
+  IssueSummary,
   IssueTimelineEvent,
   Label,
   Milestone,
@@ -444,6 +445,8 @@ export const api = {
     }),
   githubListRepoTeams: (repoPath: string, login: string) =>
     invoke<Team[]>("github_list_repo_teams", { repoPath, login }),
+  githubListRepoIssues: (repoPath: string, login: string) =>
+    invoke<IssueSummary[]>("github_list_repo_issues", { repoPath, login }),
   githubListMilestones: (repoPath: string, login: string) =>
     invoke<Milestone[]>("github_list_milestones", { repoPath, login }),
   githubSetMilestone: (repoPath: string, login: string, number: number, milestone: number) =>

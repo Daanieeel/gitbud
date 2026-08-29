@@ -25,6 +25,7 @@ const REPO_SCOPED_SEED_KEYS = [
   ["pr-labels", repoPath, login],
   ["assignable-users", repoPath, login],
   ["repo-teams", repoPath, login],
+  ["repo-issues", repoPath, login],
   ["milestones", repoPath, login],
   ["projects", repoPath, login],
   ["issue-states", repoPath, login, [1, 2]],

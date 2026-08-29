@@ -2172,6 +2172,15 @@ async fn github_unmark_file_viewed(
 }
 
 #[tauri::command]
+async fn github_list_repo_issues(
+    repo_path: String,
+    login: String,
+) -> Result<Vec<github::api::IssueSummary>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_repo_issues(&host, &token, &owner, &repo).await
+}
+
+#[tauri::command]
 async fn github_list_issue_states(
     repo_path: String,
     login: String,
@@ -2651,6 +2660,7 @@ pub fn run() {
             github_list_viewed_files,
             github_mark_file_viewed,
             github_unmark_file_viewed,
+            github_list_repo_issues,
             github_list_issue_states,
             github_list_labels,
             github_list_assignable_users,

@@ -20,6 +20,7 @@ const REPO_SCOPED_PR_PREFIXES = [
   "pr-labels",
   "assignable-users",
   "repo-teams",
+  "repo-issues",
   "milestones",
   "projects",
   "issue-states",
