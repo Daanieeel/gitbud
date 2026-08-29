@@ -531,6 +531,8 @@ interface DiffSectionProps {
   setComposerKey: (key: string | null) => void;
   fontSize: number;
   scrollElementRef: React.RefObject<HTMLDivElement | null>;
+  /** The scroll viewport's own visible width, in px — see `DiffSection`'s `width` calc below. */
+  minWidthPx: number;
 }
 
 /** One side's hunks (all of `diff`), optionally under its own "Staged changes"/"Unstaged
@@ -556,17 +558,21 @@ function DiffSection({
   setComposerKey,
   fontSize,
   scrollElementRef,
+  minWidthPx,
 }: DiffSectionProps) {
   const rows = useMemo(() => buildDiffRows(diff.hunks, diffViewMode), [diff, diffViewMode]);
+  // Never narrower than the scroll viewport itself — otherwise a file whose visible lines are all
+  // short (see the bug this guards against) leaves row backgrounds/hover-highlights stopping short
+  // of the panel's right edge instead of filling it, even though the panel has room to spare.
   const width = useMemo(
-    () => contentWidthPx(diff.hunks, diffViewMode, fontSize),
-    [diff, diffViewMode, fontSize],
+    () => Math.max(contentWidthPx(diff.hunks, diffViewMode, fontSize), minWidthPx),
+    [diff, diffViewMode, fontSize, minWidthPx],
   );
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => scrollElementRef.current,
     estimateSize: (index) => estimateDiffRowSize(rows[index], fontSize),
-    overscan: 16,
+    overscan: 60,
   });
   // The virtualizer's very first size measurement (in a layout effect, right as this mounts)
   // can land before an ancestor panel/split-view has settled into its final size — it still
@@ -596,7 +602,7 @@ function DiffSection({
   return (
     <div>
       {label && (
-        <div className="sticky top-[29px] z-[9] bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground">
+        <div className="sticky top-[29px] left-0 z-[9] bg-card px-3 py-1 text-[11px] font-medium text-muted-foreground">
           {label}
         </div>
       )}
@@ -670,6 +676,26 @@ function DiffViewImpl({
   const { fontSize, diffViewMode, setDiffViewMode } = useDiffSettings();
   const language = useMemo(() => (diff ? languageForPath(diff.path) : undefined), [diff]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // The scroll viewport's own width, kept in sync so DiffSection can force its content at least
+  // this wide even when every visible line is short (see contentWidthPx's caller). Tracked via a
+  // callback ref (rather than an effect keyed on mount) because the scrollable div doesn't exist
+  // yet on the "Loading diff…" render — it only appears once `diff` arrives, at which point a
+  // mount-only effect would already have fired and found nothing to observe.
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const [scrollNode, setScrollNode] = useState<HTMLDivElement | null>(null);
+  const setScrollRef = (el: HTMLDivElement | null) => {
+    scrollRef.current = el;
+    setScrollNode(el);
+  };
+  useEffect(() => {
+    if (!scrollNode) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) setViewportWidth(entry.contentRect.width);
+    });
+    observer.observe(scrollNode);
+    return () => observer.disconnect();
+  }, [scrollNode]);
   // The language's grammar loads lazily on first use (see highlight.ts), so force a re-render once
   // it's ready so this file's lines pick up highlighting instead of staying plain forever.
   const [, forceHighlightRerender] = useState(0);
@@ -739,11 +765,11 @@ function DiffViewImpl({
 
   return (
     <div
-      ref={scrollRef}
+      ref={setScrollRef}
       className="h-full overflow-auto font-mono"
       style={{ fontSize: `${fontSize}px` }}
     >
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-3 py-1.5 text-xs font-medium">
+      <div className="sticky top-0 left-0 z-10 flex items-center justify-between border-b border-border bg-card px-3 py-1.5 text-xs font-medium">
         <span>{diff.path}</span>
         {ViewToggle}
       </div>
@@ -768,6 +794,7 @@ function DiffViewImpl({
           setComposerKey={setComposerKey}
           fontSize={fontSize}
           scrollElementRef={scrollRef}
+          minWidthPx={viewportWidth}
         />
         {secondaryDiff && (
           <DiffSection
@@ -784,6 +811,7 @@ function DiffViewImpl({
             setComposerKey={setComposerKey}
             fontSize={fontSize}
             scrollElementRef={scrollRef}
+            minWidthPx={viewportWidth}
           />
         )}
       </div>
