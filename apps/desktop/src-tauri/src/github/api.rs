@@ -232,6 +232,10 @@ pub struct PullRequest {
     pub assignees: Vec<AssignableUser>,
     #[serde(default)]
     pub milestone: Option<Milestone>,
+    #[serde(default)]
+    pub locked: bool,
+    #[serde(default)]
+    pub active_lock_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -341,6 +345,10 @@ struct RawPullRequest {
     assignees: Vec<AssignableUser>,
     #[serde(default)]
     milestone: Option<Milestone>,
+    #[serde(default)]
+    locked: bool,
+    #[serde(default)]
+    active_lock_reason: Option<String>,
 }
 
 impl From<RawPullRequest> for PullRequest {
@@ -366,6 +374,8 @@ impl From<RawPullRequest> for PullRequest {
             requested_teams: raw.requested_teams,
             assignees: raw.assignees,
             milestone: raw.milestone,
+            locked: raw.locked,
+            active_lock_reason: raw.active_lock_reason,
         }
     }
 }
@@ -691,6 +701,41 @@ pub async fn update_pull_request_body(
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}");
     send_checked(gh.patch(&path).json(&UpdatePrBodyBody { body })).await?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct LockBody<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    lock_reason: Option<&'a str>,
+}
+
+/// Locks the conversation — `lock_reason` is one of GitHub's four (`off-topic`, `too heated`,
+/// `resolved`, `spam`) or `None` for "no reason given", both valid.
+pub async fn lock_conversation(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    lock_reason: Option<&str>,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/lock");
+    send_checked(gh.put(&path).json(&LockBody { lock_reason })).await?;
+    Ok(())
+}
+
+pub async fn unlock_conversation(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/lock");
+    send_checked(gh.delete(&path)).await?;
     Ok(())
 }
 
@@ -2512,7 +2557,9 @@ mod tests {
             "requested_reviewers": [{"login": "bob", "avatar_url": "https://b"}],
             "requested_teams": [{"slug": "backend", "name": "Backend"}],
             "assignees": [{"login": "carol", "avatar_url": "https://c"}],
-            "milestone": {"number": 3, "title": "v1", "open_issues": 2, "closed_issues": 1}
+            "milestone": {"number": 3, "title": "v1", "open_issues": 2, "closed_issues": 1},
+            "locked": true,
+            "active_lock_reason": "too heated"
             "#,
         );
         let raw: RawPullRequest = serde_json::from_str(&json).unwrap();
@@ -2525,6 +2572,8 @@ mod tests {
         assert_eq!(pr.assignees.len(), 1);
         assert_eq!(pr.assignees[0].login, "carol");
         assert_eq!(pr.milestone.as_ref().unwrap().title, "v1");
+        assert!(pr.locked);
+        assert_eq!(pr.active_lock_reason, Some("too heated".to_string()));
     }
 
     #[test]
@@ -2539,6 +2588,8 @@ mod tests {
         assert!(pr.requested_teams.is_empty());
         assert!(pr.assignees.is_empty());
         assert!(pr.milestone.is_none());
+        assert!(!pr.locked);
+        assert_eq!(pr.active_lock_reason, None);
     }
 
     #[test]

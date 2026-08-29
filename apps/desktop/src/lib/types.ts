@@ -276,6 +276,8 @@ export interface PullRequest {
   requested_teams: Team[];
   assignees: AssignableUser[];
   milestone: Milestone | null;
+  locked: boolean;
+  active_lock_reason: string | null;
 }
 
 export interface Label {

@@ -68,3 +68,33 @@ export function useUpdatePullRequestBody(
     onError: (err) => toast.error(String(err)),
   });
 }
+
+/** Toggles the conversation's locked state — `lockReason` is one of GitHub's four
+ * (`off-topic`/`too heated`/`resolved`/`spam`) or `null` for "no reason given"; ignored entirely
+ * when unlocking. */
+export function useSetConversationLocked(
+  repoPath: string | null,
+  login: string | null,
+  number: number | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ locked, lockReason }: { locked: boolean; lockReason: string | null }) => {
+      if (!repoPath || !login || number === null) {
+        throw new Error("useSetConversationLocked: repoPath/login/number not set");
+      }
+      return locked
+        ? api.githubLockConversation(repoPath, login, number, lockReason)
+        : api.githubUnlockConversation(repoPath, login, number);
+    },
+    onSuccess: (_void, { locked, lockReason }) => {
+      if (!repoPath || !login || number === null) return;
+      queryClient.setQueryData<PullRequest | undefined>(
+        queryKeys.prMeta(repoPath, login, number),
+        (prev) =>
+          prev ? { ...prev, locked, active_lock_reason: locked ? lockReason : null } : prev,
+      );
+    },
+    onError: (err) => toast.error(String(err)),
+  });
+}

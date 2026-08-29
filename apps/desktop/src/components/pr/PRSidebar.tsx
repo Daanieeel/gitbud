@@ -4,6 +4,7 @@ import { PRSidebarLabels } from "./PRSidebarLabels";
 import { PRSidebarMilestone } from "./PRSidebarMilestone";
 import { PRSidebarProjects } from "./PRSidebarProjects";
 import { PRSidebarLinkedIssues } from "./PRSidebarLinkedIssues";
+import { PRSidebarLock } from "./PRSidebarLock";
 import type { PullRequest } from "@/lib/types";
 
 interface PRSidebarProps {
@@ -29,6 +30,7 @@ export function PRSidebar({ repoPath, login, pr, pollIntervalMs }: PRSidebarProp
       <PRSidebarMilestone repoPath={repoPath} login={login} pr={pr} />
       <PRSidebarProjects repoPath={repoPath} login={login} pr={pr} />
       <PRSidebarLinkedIssues repoPath={repoPath} login={login} pr={pr} />
+      <PRSidebarLock repoPath={repoPath} login={login} pr={pr} />
     </div>
   );
 }

@@ -331,6 +331,14 @@ export const api = {
     invoke<void>("github_update_pull_request_body", { repoPath, login, number, body }),
   githubUpdatePullRequestBranch: (repoPath: string, login: string, number: number) =>
     invoke<void>("github_update_pull_request_branch", { repoPath, login, number }),
+  githubLockConversation: (
+    repoPath: string,
+    login: string,
+    number: number,
+    lockReason: string | null,
+  ) => invoke<void>("github_lock_conversation", { repoPath, login, number, lockReason }),
+  githubUnlockConversation: (repoPath: string, login: string, number: number) =>
+    invoke<void>("github_unlock_conversation", { repoPath, login, number }),
   githubComparePullRequestBase: (repoPath: string, login: string, base: string, head: string) =>
     invoke<CompareResult>("github_compare_pull_request_base", { repoPath, login, base, head }),
   githubBranchProtectionRequirements: (repoPath: string, login: string, branch: string) =>
