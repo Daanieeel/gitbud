@@ -43,6 +43,7 @@ import type {
   StashEntry,
   SubmoduleInfo,
   TagInfo,
+  Team,
   Workspace,
   WorktreeInfo,
 } from "./types";
@@ -343,11 +344,13 @@ export const api = {
     login: string,
     number: number,
     headSha: string,
+    page: number,
   ) =>
     invoke<PullRequestCommit[]>("github_list_pull_request_commits", {
       repoPath,
       login,
       number,
+      page,
       headSha,
     }),
   getCachedPullRequestCommits: (repoPath: string, number: number) =>
@@ -366,14 +369,14 @@ export const api = {
       login,
       number,
     }),
-  githubListIssueComments: (repoPath: string, login: string, number: number) =>
-    invoke<IssueComment[]>("github_list_issue_comments", { repoPath, login, number }),
+  githubListIssueComments: (repoPath: string, login: string, number: number, page: number) =>
+    invoke<IssueComment[]>("github_list_issue_comments", { repoPath, login, number, page }),
   getCachedIssueComments: (repoPath: string, number: number) =>
     invoke<IssueComment[] | null>("get_cached_issue_comments", { repoPath, number }),
   githubCreateIssueComment: (repoPath: string, login: string, number: number, body: string) =>
     invoke<IssueComment>("github_create_issue_comment", { repoPath, login, number, body }),
-  githubListReviews: (repoPath: string, login: string, number: number) =>
-    invoke<Review[]>("github_list_reviews", { repoPath, login, number }),
+  githubListReviews: (repoPath: string, login: string, number: number, page: number) =>
+    invoke<Review[]>("github_list_reviews", { repoPath, login, number, page }),
   getCachedReviews: (repoPath: string, number: number) =>
     invoke<Review[] | null>("get_cached_reviews", { repoPath, number }),
   githubSubmitReview: (
@@ -409,14 +412,30 @@ export const api = {
     invoke<void>("github_add_assignees", { repoPath, login, number, assignees }),
   githubRemoveAssignees: (repoPath: string, login: string, number: number, assignees: string[]) =>
     invoke<void>("github_remove_assignees", { repoPath, login, number, assignees }),
-  githubRequestReviewers: (repoPath: string, login: string, number: number, reviewers: string[]) =>
-    invoke<void>("github_request_reviewers", { repoPath, login, number, reviewers }),
+  githubRequestReviewers: (
+    repoPath: string,
+    login: string,
+    number: number,
+    reviewers: string[],
+    teamReviewers: string[],
+  ) =>
+    invoke<void>("github_request_reviewers", { repoPath, login, number, reviewers, teamReviewers }),
   githubRemoveRequestedReviewers: (
     repoPath: string,
     login: string,
     number: number,
     reviewers: string[],
-  ) => invoke<void>("github_remove_requested_reviewers", { repoPath, login, number, reviewers }),
+    teamReviewers: string[],
+  ) =>
+    invoke<void>("github_remove_requested_reviewers", {
+      repoPath,
+      login,
+      number,
+      reviewers,
+      teamReviewers,
+    }),
+  githubListRepoTeams: (repoPath: string, login: string) =>
+    invoke<Team[]>("github_list_repo_teams", { repoPath, login }),
   githubListMilestones: (repoPath: string, login: string) =>
     invoke<Milestone[]>("github_list_milestones", { repoPath, login }),
   githubSetMilestone: (repoPath: string, login: string, number: number, milestone: number) =>

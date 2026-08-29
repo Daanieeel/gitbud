@@ -227,9 +227,17 @@ pub struct PullRequest {
     #[serde(default)]
     pub requested_reviewers: Vec<AssignableUser>,
     #[serde(default)]
+    pub requested_teams: Vec<Team>,
+    #[serde(default)]
     pub assignees: Vec<AssignableUser>,
     #[serde(default)]
     pub milestone: Option<Milestone>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Team {
+    pub slug: String,
+    pub name: String,
 }
 
 #[derive(Deserialize)]
@@ -328,6 +336,8 @@ struct RawPullRequest {
     #[serde(default)]
     requested_reviewers: Vec<AssignableUser>,
     #[serde(default)]
+    requested_teams: Vec<Team>,
+    #[serde(default)]
     assignees: Vec<AssignableUser>,
     #[serde(default)]
     milestone: Option<Milestone>,
@@ -353,6 +363,7 @@ impl From<RawPullRequest> for PullRequest {
             labels: raw.labels.into_iter().map(|l| l.name).collect(),
             mergeable_state: raw.mergeable_state,
             requested_reviewers: raw.requested_reviewers,
+            requested_teams: raw.requested_teams,
             assignees: raw.assignees,
             milestone: raw.milestone,
         }
@@ -880,6 +891,7 @@ pub async fn remove_assignees(
 #[derive(Debug, Serialize)]
 struct ReviewersBody<'a> {
     reviewers: &'a [String],
+    team_reviewers: &'a [String],
 }
 
 pub async fn request_reviewers(
@@ -889,10 +901,15 @@ pub async fn request_reviewers(
     repo: &str,
     number: u64,
     reviewers: &[String],
+    team_reviewers: &[String],
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/requested_reviewers");
-    send_checked(gh.post(&path).json(&ReviewersBody { reviewers })).await?;
+    send_checked(gh.post(&path).json(&ReviewersBody {
+        reviewers,
+        team_reviewers,
+    }))
+    .await?;
     Ok(())
 }
 
@@ -903,11 +920,30 @@ pub async fn remove_requested_reviewers(
     repo: &str,
     number: u64,
     reviewers: &[String],
+    team_reviewers: &[String],
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/requested_reviewers");
-    send_checked(gh.delete(&path).json(&ReviewersBody { reviewers })).await?;
+    send_checked(gh.delete(&path).json(&ReviewersBody {
+        reviewers,
+        team_reviewers,
+    }))
+    .await?;
     Ok(())
+}
+
+/// Teams with review access to this repo — the candidate list for the sidebar's team-reviewer
+/// picker, alongside `list_assignable_users`' individual reviewers.
+pub async fn list_repo_teams(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<Vec<Team>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/teams?per_page=100");
+    let res = send_checked(gh.get(&path)).await?;
+    res.json().await.map_err(|e| e.to_string())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1506,18 +1542,19 @@ impl From<RawPullRequestCommitEntry> for PullRequestCommit {
     }
 }
 
-/// Commits belonging to a PR, for the Commits tab — a lean single page (GitHub's max
-/// `per_page=100`) rather than full pagination; a PR with more than 100 commits is a rare edge
-/// case better served by a "view all on GitHub" link than by building pagination for it.
+/// Commits belonging to a PR, for the Commits tab — one page (GitHub's max `per_page=100`) at a
+/// time; the frontend pages through via `useInfiniteQuery` the same way `list_pull_requests`
+/// already does for the PR list itself.
 pub async fn list_pull_request_commits_for_display(
     host: &str,
     token: &str,
     owner: &str,
     repo: &str,
     number: u64,
+    page: u32,
 ) -> Result<Vec<PullRequestCommit>, String> {
     let gh = GhClient::new(host, token)?;
-    let path = format!("/repos/{owner}/{repo}/pulls/{number}/commits?per_page=100");
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/commits?per_page=100&page={page}");
     let res = send_checked(gh.get(&path)).await?;
     let raw: Vec<RawPullRequestCommitEntry> = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into_iter().map(PullRequestCommit::from).collect())
@@ -2113,9 +2150,10 @@ pub async fn list_issue_comments(
     owner: &str,
     repo: &str,
     number: u64,
+    page: u32,
 ) -> Result<Vec<IssueComment>, String> {
     let gh = GhClient::new(host, token)?;
-    let path = format!("/repos/{owner}/{repo}/issues/{number}/comments?per_page=100");
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/comments?per_page=100&page={page}");
     let res = send_checked(gh.get(&path)).await?;
     let raw: Vec<RawIssueComment> = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into_iter().map(IssueComment::from).collect())
@@ -2183,9 +2221,10 @@ pub async fn list_reviews(
     owner: &str,
     repo: &str,
     number: u64,
+    page: u32,
 ) -> Result<Vec<Review>, String> {
     let gh = GhClient::new(host, token)?;
-    let path = format!("/repos/{owner}/{repo}/pulls/{number}/reviews?per_page=100");
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/reviews?per_page=100&page={page}");
     let res = send_checked(gh.get(&path)).await?;
     let raw: Vec<RawReview> = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into_iter().map(Review::from).collect())
@@ -2471,6 +2510,7 @@ mod tests {
             r#",
             "mergeable_state": "clean",
             "requested_reviewers": [{"login": "bob", "avatar_url": "https://b"}],
+            "requested_teams": [{"slug": "backend", "name": "Backend"}],
             "assignees": [{"login": "carol", "avatar_url": "https://c"}],
             "milestone": {"number": 3, "title": "v1", "open_issues": 2, "closed_issues": 1}
             "#,
@@ -2480,6 +2520,8 @@ mod tests {
         assert_eq!(pr.mergeable_state, Some("clean".to_string()));
         assert_eq!(pr.requested_reviewers.len(), 1);
         assert_eq!(pr.requested_reviewers[0].login, "bob");
+        assert_eq!(pr.requested_teams.len(), 1);
+        assert_eq!(pr.requested_teams[0].slug, "backend");
         assert_eq!(pr.assignees.len(), 1);
         assert_eq!(pr.assignees[0].login, "carol");
         assert_eq!(pr.milestone.as_ref().unwrap().title, "v1");
@@ -2494,6 +2536,7 @@ mod tests {
         let pr: PullRequest = raw.into();
         assert_eq!(pr.mergeable_state, None);
         assert!(pr.requested_reviewers.is_empty());
+        assert!(pr.requested_teams.is_empty());
         assert!(pr.assignees.is_empty());
         assert!(pr.milestone.is_none());
     }

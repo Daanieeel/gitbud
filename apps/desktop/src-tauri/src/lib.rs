@@ -1487,9 +1487,28 @@ async fn github_request_reviewers(
     login: String,
     number: u64,
     reviewers: Vec<String>,
+    team_reviewers: Vec<String>,
 ) -> Result<(), String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::request_reviewers(&host, &token, &owner, &repo, number, &reviewers).await
+    github::api::request_reviewers(
+        &host,
+        &token,
+        &owner,
+        &repo,
+        number,
+        &reviewers,
+        &team_reviewers,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn github_list_repo_teams(
+    repo_path: String,
+    login: String,
+) -> Result<Vec<github::api::Team>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_repo_teams(&host, &token, &owner, &repo).await
 }
 
 #[tauri::command]
@@ -1498,9 +1517,19 @@ async fn github_remove_requested_reviewers(
     login: String,
     number: u64,
     reviewers: Vec<String>,
+    team_reviewers: Vec<String>,
 ) -> Result<(), String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::remove_requested_reviewers(&host, &token, &owner, &repo, number, &reviewers).await
+    github::api::remove_requested_reviewers(
+        &host,
+        &token,
+        &owner,
+        &repo,
+        number,
+        &reviewers,
+        &team_reviewers,
+    )
+    .await
 }
 
 #[tauri::command]
@@ -1587,26 +1616,36 @@ async fn github_list_pull_request_commits(
     login: String,
     number: u64,
     head_sha: String,
+    page: u32,
 ) -> Result<Vec<github::api::PullRequestCommit>, String> {
-    if let Ok(key) = cache_key(&repo_path) {
-        let (lookup_key, sha) = (key.clone(), head_sha.clone());
-        if let Ok(Some(cached)) = tauri::async_runtime::spawn_blocking(move || {
-            pr_cache::get_cached_commits(&lookup_key, number, &sha)
-        })
-        .await
-        .unwrap_or(Ok(None))
-        {
-            return Ok(cached);
+    // Only the first page is mirrored to the SQLite cache — later pages are fetched live only,
+    // same convention `usePullRequestList`'s own cached-seed step already uses (it only seeds
+    // page 1 too). A PR with more than one page of commits is rare enough that "page 2+ needs a
+    // live connection" isn't worth a paginated cache schema.
+    if page == 1 {
+        if let Ok(key) = cache_key(&repo_path) {
+            let (lookup_key, sha) = (key.clone(), head_sha.clone());
+            if let Ok(Some(cached)) = tauri::async_runtime::spawn_blocking(move || {
+                pr_cache::get_cached_commits(&lookup_key, number, &sha)
+            })
+            .await
+            .unwrap_or(Ok(None))
+            {
+                return Ok(cached);
+            }
         }
     }
 
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    let commits =
-        github::api::list_pull_request_commits_for_display(&host, &token, &owner, &repo, number)
-            .await?;
-    if let Ok(key) = cache_key(&repo_path) {
-        let (sha, to_cache) = (head_sha.clone(), commits.clone());
-        cache_write(move || pr_cache::upsert_commits(&key, number, &sha, &to_cache)).await;
+    let commits = github::api::list_pull_request_commits_for_display(
+        &host, &token, &owner, &repo, number, page,
+    )
+    .await?;
+    if page == 1 {
+        if let Ok(key) = cache_key(&repo_path) {
+            let (sha, to_cache) = (head_sha.clone(), commits.clone());
+            cache_write(move || pr_cache::upsert_commits(&key, number, &sha, &to_cache)).await;
+        }
     }
     Ok(commits)
 }
@@ -1968,12 +2007,18 @@ async fn github_list_issue_comments(
     repo_path: String,
     login: String,
     number: u64,
+    page: u32,
 ) -> Result<Vec<github::api::IssueComment>, String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    let comments = github::api::list_issue_comments(&host, &token, &owner, &repo, number).await?;
-    if let Ok(key) = cache_key(&repo_path) {
-        let to_cache = comments.clone();
-        cache_write(move || pr_cache::upsert_issue_comments(&key, number, &to_cache)).await;
+    let comments =
+        github::api::list_issue_comments(&host, &token, &owner, &repo, number, page).await?;
+    // Only page 1 is mirrored to the SQLite cache — see `github_list_pull_request_commits`'s
+    // identical reasoning.
+    if page == 1 {
+        if let Ok(key) = cache_key(&repo_path) {
+            let to_cache = comments.clone();
+            cache_write(move || pr_cache::upsert_issue_comments(&key, number, &to_cache)).await;
+        }
     }
     Ok(comments)
 }
@@ -2006,12 +2051,17 @@ async fn github_list_reviews(
     repo_path: String,
     login: String,
     number: u64,
+    page: u32,
 ) -> Result<Vec<github::api::Review>, String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    let reviews = github::api::list_reviews(&host, &token, &owner, &repo, number).await?;
-    if let Ok(key) = cache_key(&repo_path) {
-        let to_cache = reviews.clone();
-        cache_write(move || pr_cache::upsert_reviews(&key, number, &to_cache)).await;
+    let reviews = github::api::list_reviews(&host, &token, &owner, &repo, number, page).await?;
+    // Only page 1 is mirrored to the SQLite cache — see `github_list_pull_request_commits`'s
+    // identical reasoning.
+    if page == 1 {
+        if let Ok(key) = cache_key(&repo_path) {
+            let to_cache = reviews.clone();
+            cache_write(move || pr_cache::upsert_reviews(&key, number, &to_cache)).await;
+        }
     }
     Ok(reviews)
 }
@@ -2586,6 +2636,7 @@ pub fn run() {
             github_remove_assignees,
             github_request_reviewers,
             github_remove_requested_reviewers,
+            github_list_repo_teams,
             github_list_milestones,
             github_set_milestone,
             github_clear_milestone,

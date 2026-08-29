@@ -45,6 +45,24 @@ export function useProjects(repoPath: string | null, login: string | null) {
   });
 }
 
+export function useRepoTeams(repoPath: string | null, login: string | null) {
+  return useQuery({
+    queryKey: queryKeys.repoTeams(repoPath ?? "", login ?? ""),
+    // A personal-account repo (no org, so no teams at all) 404s/403s here depending on host —
+    // degrade to "no teams" rather than an error toast, mirroring `useProjects`.
+    queryFn: () => api.githubListRepoTeams(repoPath!, login!).catch(() => []),
+    enabled: !!repoPath && !!login,
+  });
+}
+
+/** `MultiSelectField`'s `selected`/`onChange` only carry one flat `string[]`, so a team reviewer
+ * is distinguished from a user reviewer by this key prefix rather than a second array — kept in
+ * one place so the sidebar's picker and `useSyncReviewers`'s diffing agree on the convention. */
+export const TEAM_REVIEWER_PREFIX = "team:";
+export function teamReviewerKey(slug: string): string {
+  return `${TEAM_REVIEWER_PREFIX}${slug}`;
+}
+
 export function useIssueStates(repoPath: string | null, login: string | null, numbers: number[]) {
   return useQuery({
     queryKey: queryKeys.issueStates(repoPath ?? "", login ?? "", numbers),
@@ -141,6 +159,18 @@ export function useSyncAssignees(
   });
 }
 
+/** Splits a flat `MultiSelectField` selection back into plain user logins and team slugs, per
+ * the `TEAM_REVIEWER_PREFIX` convention above. */
+function splitReviewerKeys(keys: string[]) {
+  const users: string[] = [];
+  const teams: string[] = [];
+  for (const key of keys) {
+    if (key.startsWith(TEAM_REVIEWER_PREFIX)) teams.push(key.slice(TEAM_REVIEWER_PREFIX.length));
+    else users.push(key);
+  }
+  return { users, teams };
+}
+
 export function useSyncReviewers(
   repoPath: string | null,
   login: string | null,
@@ -155,14 +185,25 @@ export function useSyncReviewers(
       const prevPr = queryClient.getQueryData<PullRequest>(
         queryKeys.prMeta(repoPath, login, number),
       );
-      const prevLogins = prevPr?.requested_reviewers.map((r) => r.login) ?? [];
-      const { added, removed } = diff(prevLogins, next);
+      const prevKeys = [
+        ...(prevPr?.requested_reviewers.map((r) => r.login) ?? []),
+        ...(prevPr?.requested_teams.map((t) => teamReviewerKey(t.slug)) ?? []),
+      ];
+      const { added, removed } = diff(prevKeys, next);
+      const addedSplit = splitReviewerKeys(added);
+      const removedSplit = splitReviewerKeys(removed);
       await Promise.all([
-        added.length > 0
-          ? api.githubRequestReviewers(repoPath, login, number, added)
+        addedSplit.users.length > 0 || addedSplit.teams.length > 0
+          ? api.githubRequestReviewers(repoPath, login, number, addedSplit.users, addedSplit.teams)
           : Promise.resolve(),
-        removed.length > 0
-          ? api.githubRemoveRequestedReviewers(repoPath, login, number, removed)
+        removedSplit.users.length > 0 || removedSplit.teams.length > 0
+          ? api.githubRemoveRequestedReviewers(
+              repoPath,
+              login,
+              number,
+              removedSplit.users,
+              removedSplit.teams,
+            )
           : Promise.resolve(),
       ]);
     },

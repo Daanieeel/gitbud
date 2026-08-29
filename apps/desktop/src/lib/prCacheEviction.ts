@@ -19,6 +19,7 @@ const REPO_SCOPED_PR_PREFIXES = [
   "viewed-files",
   "pr-labels",
   "assignable-users",
+  "repo-teams",
   "milestones",
   "projects",
   "issue-states",

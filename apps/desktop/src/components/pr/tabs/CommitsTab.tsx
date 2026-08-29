@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { format, formatDistanceToNow } from "date-fns";
-import { openUrl } from "@tauri-apps/plugin-opener";
 import { ShieldCheckIcon } from "lucide-react";
 import { Avatar } from "@gitbud/ui/avatar";
+import { Button } from "@gitbud/ui/button";
 import { CopyButton } from "@gitbud/ui/copy-button";
 import { DiffView } from "@gitbud/ui/diff-view";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
@@ -23,8 +23,6 @@ interface CommitsTabProps {
   login: string;
   pr: PullRequest;
 }
-
-const MAX_COMMITS_PER_PAGE = 100;
 
 /** Same idea as History's private `VerificationBadge` (`CommitList.tsx`), just against a PR
  * commit's sha instead of a local `CommitEntry`'s — the two views have no shared row component
@@ -123,12 +121,8 @@ function PRCommitHeader({
 }
 
 export function CommitsTab({ repoPath, login, pr }: CommitsTabProps) {
-  const { data: commits = [], isLoading } = usePullRequestCommits(
-    repoPath,
-    login,
-    pr.number,
-    pr.head_sha,
-  );
+  const { commits, isLoading, hasNextPage, isFetchingNextPage, fetchNextPage } =
+    usePullRequestCommits(repoPath, login, pr.number, pr.head_sha);
   const [selectedSha, setSelectedSha] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const { data: commitFiles = [] } = useCommitDiffFiles(repoPath, login, selectedSha);
@@ -169,22 +163,6 @@ export function CommitsTab({ repoPath, login, pr }: CommitsTabProps) {
         style={{ width: commitsWidth }}
         className="shrink-0 overflow-auto border-r border-border"
       >
-        {commits.length === MAX_COMMITS_PER_PAGE && (
-          <div className="border-b border-border p-2 text-xs text-muted-foreground">
-            Showing the first {MAX_COMMITS_PER_PAGE} commits —{" "}
-            <a
-              href="#"
-              className="underline hover:text-foreground"
-              onClick={(e) => {
-                e.preventDefault();
-                void openUrl(pr.html_url);
-              }}
-            >
-              view all on GitHub
-            </a>
-            .
-          </div>
-        )}
         {commits.map((c) => (
           <div
             key={c.sha}
@@ -213,6 +191,17 @@ export function CommitsTab({ repoPath, login, pr }: CommitsTabProps) {
             </div>
           </div>
         ))}
+        {hasNextPage && (
+          <Button
+            size="sm"
+            variant="ghost"
+            className="w-full"
+            disabled={isFetchingNextPage}
+            onClick={() => void fetchNextPage()}
+          >
+            {isFetchingNextPage ? "Loading…" : "Load more commits"}
+          </Button>
+        )}
       </div>
       <ResizeHandle onPointerDown={onCommitsResize} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">

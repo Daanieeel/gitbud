@@ -32,7 +32,7 @@ export function PRDetail({ repoPath, login, pr: listPr }: PRDetailProps) {
 
   const { data: pr = listPr } = usePullRequestMeta(repoPath, login, listPr, pollIntervalMs);
   const { data: detail } = usePullRequestDetail(repoPath, login, pr.number, pr.head_sha);
-  const { data: commits = [] } = usePullRequestCommits(repoPath, login, pr.number, pr.head_sha);
+  const { commits } = usePullRequestCommits(repoPath, login, pr.number, pr.head_sha);
   const { data: checkRuns = null } = useCheckRuns(repoPath, login, pr.head_sha, pollIntervalMs);
 
   return (

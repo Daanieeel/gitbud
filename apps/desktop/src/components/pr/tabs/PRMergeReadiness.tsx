@@ -42,7 +42,7 @@ export function PRMergeReadiness({ repoPath, login, pr }: PRMergeReadinessProps)
   const isPrTabActive = useIsPrTabActive();
   const pollIntervalMs = prPollIntervalMs(pr, isPrTabActive, true);
   const { data: runs = null } = useCheckRuns(repoPath, login, pr.head_sha, pollIntervalMs);
-  const { data: reviews = [] } = useReviews(repoPath, login, pr.number, pollIntervalMs);
+  const { reviews } = useReviews(repoPath, login, pr.number, pollIntervalMs);
   const { data: requirements } = useBranchProtectionRequirements(repoPath, login, pr.base_ref);
   const { data: compare } = useComparePullRequestBase(repoPath, login, pr.base_ref, pr.head_ref);
   const updateBranch = useUpdatePullRequestBranch(repoPath, login, pr.number);

@@ -165,8 +165,10 @@ export function useCreatePullRequest(repoPath: string | null, login: string | nu
         assignees.length > 0
           ? api.githubAddAssignees(repoPath, login, pr.number, assignees)
           : Promise.resolve(),
+        // Team reviewers aren't offered at create-PR time (a separate, smaller picker than the
+        // sidebar's post-creation one) — always an empty array here.
         reviewers.length > 0
-          ? api.githubRequestReviewers(repoPath, login, pr.number, reviewers)
+          ? api.githubRequestReviewers(repoPath, login, pr.number, reviewers, [])
           : Promise.resolve(),
       ]);
       return pr;

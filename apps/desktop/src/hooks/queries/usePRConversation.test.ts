@@ -1,5 +1,5 @@
 import { describe, expect, it, mock, spyOn, beforeEach } from "bun:test";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, type InfiniteData } from "@tanstack/react-query";
 import React from "react";
 import { renderToString } from "react-dom/server";
 import { useAddIssueComment, useSubmitReview } from "./usePRConversation";
@@ -53,14 +53,17 @@ describe("useAddIssueComment", () => {
     spyOn(api, "githubCreateIssueComment").mockResolvedValue(created);
 
     const { qc, result } = setupHook(() => useAddIssueComment(repoPath, login, number));
-    qc.setQueryData(queryKeys.prIssueComments(repoPath, login, number), [existing]);
+    qc.setQueryData(queryKeys.prIssueComments(repoPath, login, number), {
+      pages: [[existing]],
+      pageParams: [1],
+    });
 
     await result.mutateAsync("second");
 
-    const data = qc.getQueryData<IssueComment[]>(
+    const data = qc.getQueryData<InfiniteData<IssueComment[], number>>(
       queryKeys.prIssueComments(repoPath, login, number),
     );
-    expect(data).toEqual([existing, created]);
+    expect(data?.pages.flat()).toEqual([existing, created]);
   });
 });
 
@@ -81,11 +84,13 @@ describe("useSubmitReview", () => {
     spyOn(api, "githubSubmitReview").mockResolvedValue(created);
 
     const { qc, result } = setupHook(() => useSubmitReview(repoPath, login, number));
-    qc.setQueryData(queryKeys.prReviews(repoPath, login, number), []);
+    qc.setQueryData(queryKeys.prReviews(repoPath, login, number), { pages: [[]], pageParams: [1] });
 
     await result.mutateAsync({ event: "APPROVE", body: "lgtm" });
 
-    const data = qc.getQueryData<Review[]>(queryKeys.prReviews(repoPath, login, number));
-    expect(data).toEqual([created]);
+    const data = qc.getQueryData<InfiniteData<Review[], number>>(
+      queryKeys.prReviews(repoPath, login, number),
+    );
+    expect(data?.pages.flat()).toEqual([created]);
   });
 });

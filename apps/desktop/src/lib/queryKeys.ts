@@ -61,6 +61,7 @@ export const queryKeys = {
   prLabels: (repoPath: string, login: string) => ["pr-labels", repoPath, login] as const,
   assignableUsers: (repoPath: string, login: string) =>
     ["assignable-users", repoPath, login] as const,
+  repoTeams: (repoPath: string, login: string) => ["repo-teams", repoPath, login] as const,
   milestones: (repoPath: string, login: string) => ["milestones", repoPath, login] as const,
   projects: (repoPath: string, login: string) => ["projects", repoPath, login] as const,
   issueStates: (repoPath: string, login: string, numbers: number[]) =>

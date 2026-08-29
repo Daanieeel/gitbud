@@ -273,6 +273,7 @@ export interface PullRequest {
   // See `usePullRequestMeta`, which exists specifically to keep these fresh for the open PR.
   mergeable_state: string | null;
   requested_reviewers: AssignableUser[];
+  requested_teams: Team[];
   assignees: AssignableUser[];
   milestone: Milestone | null;
 }
@@ -297,6 +298,11 @@ export interface Project {
 export interface AssignableUser {
   login: string;
   avatar_url: string;
+}
+
+export interface Team {
+  slug: string;
+  name: string;
 }
 
 export interface PullRequestFile {
