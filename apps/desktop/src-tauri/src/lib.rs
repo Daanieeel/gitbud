@@ -1982,6 +1982,24 @@ async fn clear_avatar_cache() -> Result<(), String> {
         .map_err(|e| e.to_string())?
 }
 
+/// Purely local — no GitHub call, no `github_resolve`, since "archived" is a gitbud-only concept
+/// (see `pr_cache::is_pr_archived`'s doc comment).
+#[tauri::command]
+async fn get_pr_archived(repo_path: String, number: u64) -> Result<bool, String> {
+    let key = cache_key(&repo_path)?;
+    tauri::async_runtime::spawn_blocking(move || pr_cache::is_pr_archived(&key, number))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn set_pr_archived(repo_path: String, number: u64, archived: bool) -> Result<(), String> {
+    let key = cache_key(&repo_path)?;
+    tauri::async_runtime::spawn_blocking(move || pr_cache::set_pr_archived(&key, number, archived))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 async fn github_reply_to_review_comment(
     repo_path: String,
@@ -2686,6 +2704,8 @@ pub fn run() {
             get_cache_dir_path,
             clear_repo_cache,
             clear_avatar_cache,
+            get_pr_archived,
+            set_pr_archived,
             github_get_pull_request_image_diff,
             github_list_review_comments,
             github_create_review_comment,

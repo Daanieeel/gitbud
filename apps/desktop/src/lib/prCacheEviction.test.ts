@@ -22,6 +22,7 @@ const REPO_SCOPED_SEED_KEYS = [
   ["pr-reviews", repoPath, login, number],
   ["review-threads", repoPath, login, number],
   ["viewed-files", repoPath, login, number],
+  ["pr-archived", repoPath, number],
   ["pr-labels", repoPath, login],
   ["assignable-users", repoPath, login],
   ["repo-teams", repoPath, login],
@@ -64,6 +65,7 @@ describe("evictSelectedPrQueries", () => {
     qc.setQueryData(queryKeys.prReviews(repoPath, login, number), "data");
     qc.setQueryData(queryKeys.reviewThreads(repoPath, login, number), "data");
     qc.setQueryData(queryKeys.viewedFiles(repoPath, login, number), "data");
+    qc.setQueryData(queryKeys.prArchived(repoPath, number), "data");
 
     evictSelectedPrQueries(qc, repoPath, login, number);
 
@@ -75,6 +77,7 @@ describe("evictSelectedPrQueries", () => {
     expect(qc.getQueryData(queryKeys.prReviews(repoPath, login, number))).toBeUndefined();
     expect(qc.getQueryData(queryKeys.reviewThreads(repoPath, login, number))).toBeUndefined();
     expect(qc.getQueryData(queryKeys.viewedFiles(repoPath, login, number))).toBeUndefined();
+    expect(qc.getQueryData(queryKeys.prArchived(repoPath, number))).toBeUndefined();
   });
 
   it("leaves a different PR number's cache untouched", () => {

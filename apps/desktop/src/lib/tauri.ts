@@ -523,6 +523,10 @@ export const api = {
   getCacheDirPath: () => invoke<string>("get_cache_dir_path"),
   clearRepoCache: () => invoke<void>("clear_repo_cache"),
   clearAvatarCache: () => invoke<void>("clear_avatar_cache"),
+  getPrArchived: (repoPath: string, number: number) =>
+    invoke<boolean>("get_pr_archived", { repoPath, number }),
+  setPrArchived: (repoPath: string, number: number, archived: boolean) =>
+    invoke<void>("set_pr_archived", { repoPath, number, archived }),
   githubGetPullRequestImageDiff: (
     repoPath: string,
     login: string,

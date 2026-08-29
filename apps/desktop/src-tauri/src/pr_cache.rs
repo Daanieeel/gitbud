@@ -84,6 +84,11 @@ fn pool() -> Result<&'static Pool<SqliteConnectionManager>, String> {
                     reviews_json TEXT NOT NULL, synced_at INTEGER NOT NULL,
                     PRIMARY KEY (repo_key, number)
                 );
+                CREATE TABLE IF NOT EXISTS pr_archived (
+                    repo_key TEXT NOT NULL, number INTEGER NOT NULL,
+                    archived_at INTEGER NOT NULL,
+                    PRIMARY KEY (repo_key, number)
+                );
                 ",
             )
             .map_err(|e| e.to_string())?;
@@ -442,6 +447,43 @@ pub fn upsert_avatar(url: &str, data_uri: &str) -> Result<(), String> {
         params![url, data_uri, now()],
     )
     .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Whether `number` has been archived — a purely local, gitbud-only bookkeeping flag (GitHub has
+/// no "archive a pull request" concept at all) for decluttering the open-PR list of ones you're
+/// deliberately setting aside. Deliberately not pruned by `prune()` and not touched by
+/// `clear_repo_data()` — unlike everything else in this file, this is durable user intent, not a
+/// disposable mirror of something GitHub will just hand back again on the next fetch.
+pub fn is_pr_archived(repo_key: &str, number: u64) -> Result<bool, String> {
+    let conn = conn()?;
+    let found: Option<i64> = conn
+        .query_row(
+            "SELECT 1 FROM pr_archived WHERE repo_key = ?1 AND number = ?2",
+            params![repo_key, number as i64],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    Ok(found.is_some())
+}
+
+pub fn set_pr_archived(repo_key: &str, number: u64, archived: bool) -> Result<(), String> {
+    let conn = conn()?;
+    if archived {
+        conn.execute(
+            "INSERT INTO pr_archived (repo_key, number, archived_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(repo_key, number) DO NOTHING",
+            params![repo_key, number as i64, now()],
+        )
+        .map_err(|e| e.to_string())?;
+    } else {
+        conn.execute(
+            "DELETE FROM pr_archived WHERE repo_key = ?1 AND number = ?2",
+            params![repo_key, number as i64],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 

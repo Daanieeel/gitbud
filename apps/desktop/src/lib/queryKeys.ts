@@ -69,6 +69,7 @@ export const queryKeys = {
     ["issue-states", repoPath, login, numbers] as const,
   branchProtection: (repoPath: string, login: string, branch: string) =>
     ["branch-protection", repoPath, login, branch] as const,
+  prArchived: (repoPath: string, number: number) => ["pr-archived", repoPath, number] as const,
   compare: (repoPath: string, login: string, base: string, head: string) =>
     ["pr-compare", repoPath, login, base, head] as const,
 };

@@ -17,6 +17,7 @@ const REPO_SCOPED_PR_PREFIXES = [
   "pr-reviews",
   "review-threads",
   "viewed-files",
+  "pr-archived",
   "pr-labels",
   "assignable-users",
   "repo-teams",
@@ -51,4 +52,5 @@ export function evictSelectedPrQueries(
   queryClient.removeQueries({ queryKey: queryKeys.prReviews(repoPath, login, number) });
   queryClient.removeQueries({ queryKey: queryKeys.reviewThreads(repoPath, login, number) });
   queryClient.removeQueries({ queryKey: queryKeys.viewedFiles(repoPath, login, number) });
+  queryClient.removeQueries({ queryKey: queryKeys.prArchived(repoPath, number) });
 }
