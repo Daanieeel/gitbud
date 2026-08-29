@@ -41,6 +41,7 @@
     "build": "turbo run build",
     "check": "turbo run check",
     "test": "bun test",
+    "test:all": "bun test && cargo test --quiet --manifest-path apps/desktop/src-tauri/Cargo.toml",
     "lint:js": "NODE_OPTIONS=--experimental-strip-types oxlint .",
     "lint:rust": "cargo clippy --quiet --manifest-path apps/desktop/src-tauri/Cargo.toml -- -D warnings",
     "lint": "bun run lint:js && bun run lint:rust",
