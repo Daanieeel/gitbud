@@ -1,6 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { runIcon, runStatusLabel } from "../CIBadge";
 import { CheckRunsRefresh } from "../CheckRunsRefresh";
+import { PRMergeReadiness } from "./PRMergeReadiness";
 import { useCheckRuns, prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
 import { useBranchProtectionRequirements } from "@/hooks/queries/usePRMergeReadiness";
 import type { CheckRun, PullRequest } from "@/lib/types";
@@ -59,7 +60,8 @@ export function ChecksTab({ repoPath, login, pr }: ChecksTabProps) {
   const optional = runs.filter((r) => !requiredContexts.includes(r.name));
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-auto p-3">
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
+      <PRMergeReadiness repoPath={repoPath} login={login} pr={pr} />
       <div className="mb-2 flex items-center justify-between">
         <span className="text-sm font-medium">Checks</span>
         <CheckRunsRefresh

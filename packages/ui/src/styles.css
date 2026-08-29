@@ -144,8 +144,8 @@
     user-select: none;
   }
   code:not(pre code) {
+    @apply bg-accent;
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    background: var(--muted);
     border-radius: 0.25rem;
     padding: 0.1em 0.4em;
     font-size: 0.85em;

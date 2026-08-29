@@ -1,15 +1,22 @@
 import { useState } from "react";
-import { CheckIcon, MessageSquareIcon, XIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { Textarea } from "@gitbud/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
+import { ReviewVerdictPicker } from "./ReviewVerdictPicker";
+import type { ReviewEvent } from "./reviewOptions";
 
 interface PRFilesReviewBarProps {
   pendingViewedCount: number;
   isOwnPr: boolean;
   submitting: boolean;
-  onSubmit: (event: "APPROVE" | "REQUEST_CHANGES" | "COMMENT", body: string) => Promise<void>;
+  onSubmit: (event: ReviewEvent, body: string) => Promise<void>;
 }
+
+const SUBMIT_VARIANT = {
+  COMMENT: "secondary",
+  APPROVE: "positive",
+  REQUEST_CHANGES: "destructive",
+} as const;
 
 /** Sticky footer pinned to the bottom of the Files tab's file list — batches every "mark as
  * viewed" checkbox tick locally (see `FilesTab.tsx`) rather than sending each one the moment
@@ -17,7 +24,9 @@ interface PRFilesReviewBarProps {
  * is used, matching GitHub's own "finish your review" flow instead of firing a viewed-state
  * mutation per checkbox click. Always visible (`sticky bottom-0` as the list's last child, with
  * matching bottom padding on the list itself so it never covers the last row) rather than
- * requiring a scroll to the end to find it. */
+ * requiring a scroll to the end to find it. The popover itself mirrors GitHub's own "Finish your
+ * review" panel: a single radio choice (`ReviewVerdictPicker`), not three separate verdict
+ * buttons, followed by one "Submit review" action. */
 export function PRFilesReviewBar({
   pendingViewedCount,
   isOwnPr,
@@ -26,10 +35,12 @@ export function PRFilesReviewBar({
 }: PRFilesReviewBarProps) {
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
+  const [event, setEvent] = useState<ReviewEvent>("COMMENT");
 
-  const submit = async (event: "APPROVE" | "REQUEST_CHANGES" | "COMMENT") => {
+  const submit = async () => {
     await onSubmit(event, body.trim());
     setBody("");
+    setEvent("COMMENT");
     setOpen(false);
   };
 
@@ -46,7 +57,7 @@ export function PRFilesReviewBar({
             {submitting ? "Submitting…" : "Finish review"}
           </Button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-72 space-y-2 p-3">
+        <PopoverContent align="end" className="w-80 space-y-3 p-3">
           <Textarea
             rows={3}
             value={body}
@@ -54,39 +65,16 @@ export function PRFilesReviewBar({
             placeholder="Leave a review comment (optional for Approve/Request changes)"
             className="text-sm"
           />
-          <div className="flex justify-end gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              disabled={submitting}
-              onClick={() => void submit("COMMENT")}
-            >
-              <MessageSquareIcon className="size-3.5" />
-              Comment
-            </Button>
-            {!isOwnPr && (
-              <>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  disabled={submitting}
-                  onClick={() => void submit("REQUEST_CHANGES")}
-                >
-                  <XIcon className="size-3.5" />
-                  Request changes
-                </Button>
-                <Button
-                  size="sm"
-                  variant="positive"
-                  disabled={submitting}
-                  onClick={() => void submit("APPROVE")}
-                >
-                  <CheckIcon className="size-3.5" />
-                  Approve
-                </Button>
-              </>
-            )}
-          </div>
+          <ReviewVerdictPicker value={event} onChange={setEvent} isOwnPr={isOwnPr} />
+          <Button
+            size="sm"
+            variant={SUBMIT_VARIANT[event]}
+            className="w-full"
+            disabled={submitting}
+            onClick={() => void submit()}
+          >
+            {submitting ? "Submitting…" : "Submit review"}
+          </Button>
         </PopoverContent>
       </Popover>
     </div>

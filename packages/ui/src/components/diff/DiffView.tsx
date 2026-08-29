@@ -442,7 +442,7 @@ function UnifiedLine({
                     className="text-muted-foreground hover:text-foreground"
                     onClick={() => setComposerKey(composerKey === key ? null : key)}
                   >
-                    <MessageSquarePlusIcon className="size-3.5" />
+                    <MessageSquarePlusIcon className="size-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>Add comment</TooltipContent>
@@ -799,6 +799,25 @@ function DiffSection({
     estimateSize: (index) => estimateDiffRowSize(rows[index], fontSize),
     overscan: 60,
   });
+  // `virtualizer.measureElement`'s own ResizeObserver-driven remeasurement doesn't reliably
+  // re-fire once a row that's already mounted grows *after* its own initial measurement — e.g.
+  // opening the inline "Add comment" composer, or a thread's reply box — verified against a
+  // synthetic repro instrumenting ResizeObserver directly: the observer fires once at mount,
+  // then never again for that node despite its real, measured height changing. Left unfixed,
+  // every row *after* the one that grew keeps its stale (too-small) offset, so it visually and
+  // interactively overlaps whatever grew above it — the composer looks "see-through" and clicks
+  // land on the row on top of it instead. Tracking each rendered row's own node here lets us
+  // force a remeasure of everything currently on screen whenever something that changes a row's
+  // height happens (opening/closing a composer, a comment/reply being added) — via `resizeItem`
+  // with a height we read ourselves, since re-calling `virtualizer.measureElement(node)` outside
+  // of an actual ResizeObserver callback hits `virtual-core`'s own cache-hit shortcut (no
+  // `entry` argument + an existing cached size just returns that stale cached size verbatim,
+  // never touching the DOM) and so silently no-ops instead of re-reading anything.
+  const rowNodesRef = useRef(new Map<number, HTMLDivElement>());
+  useEffect(() => {
+    rowNodesRef.current.forEach((node, index) => virtualizer.resizeItem(index, node.offsetHeight));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [composerKey, comments]);
   // The virtualizer's very first size measurement (in a layout effect, right as this mounts)
   // can land before an ancestor panel/split-view has settled into its final size — it still
   // subscribes a ResizeObserver for later corrections, but if the corrected range comes out
@@ -837,7 +856,11 @@ function DiffSection({
           return (
             <div
               key={vi.key}
-              ref={virtualizer.measureElement}
+              ref={(node) => {
+                virtualizer.measureElement(node);
+                if (node) rowNodesRef.current.set(vi.index, node);
+                else rowNodesRef.current.delete(vi.index);
+              }}
               data-index={vi.index}
               style={{
                 position: "absolute",

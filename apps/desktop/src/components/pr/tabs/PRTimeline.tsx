@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { findMergedEventIndex, mergeTimeline } from "@/lib/prTimeline";
+import { findClosedEventIndex, findMergedEventIndex, mergeTimeline } from "@/lib/prTimeline";
 import { PRTimelineEvent } from "./PRTimelineEvent";
 import type { IssueComment, IssueTimelineEvent, PullRequestCommit, Review } from "@/lib/types";
 
@@ -11,6 +11,8 @@ interface PRTimelineProps {
   commits: PullRequestCommit[];
   ghEvents: IssueTimelineEvent[];
   onDeleteComment: (commentId: number) => void;
+  isMerged: boolean;
+  isClosedNotMerged: boolean;
 }
 
 export function PRTimeline({
@@ -21,12 +23,25 @@ export function PRTimeline({
   commits,
   ghEvents,
   onDeleteComment,
+  isMerged,
+  isClosedNotMerged,
 }: PRTimelineProps) {
   const events = useMemo(
     () => mergeTimeline(comments, reviews, commits, ghEvents),
     [comments, reviews, commits, ghEvents],
   );
   const mergedIndex = useMemo(() => findMergedEventIndex(events), [events]);
+  // A closed-then-reopened PR's earlier "closed" event isn't the terminal state, so this is
+  // only computed (and only ever wins over `mergedIndex` being -1) while the PR is *currently*
+  // closed without merging — `findClosedEventIndex` alone can't tell an old close apart from
+  // the current one, it just finds the last "closed" row in the list.
+  const closedIndex = useMemo(
+    () => (!isMerged && isClosedNotMerged ? findClosedEventIndex(events) : -1),
+    [events, isMerged, isClosedNotMerged],
+  );
+  const terminalIndex = mergedIndex !== -1 ? mergedIndex : closedIndex;
+  const terminalKind: "merged" | "closed" | null =
+    mergedIndex !== -1 ? "merged" : closedIndex !== -1 ? "closed" : null;
 
   if (events.length === 0) {
     return <p className="text-sm text-muted-foreground">No activity yet.</p>;
@@ -43,11 +58,11 @@ export function PRTimeline({
               : event.kind === "github_event"
                 ? `gh:${event.ghEvent.id ?? `${event.ghEvent.event}:${event.timestamp}`}`
                 : `comment:${event.comment.id}`;
-        // The connecting line runs normally up through (and into) the merged row, then stops —
-        // a thicker separator takes its place right after that row instead, and nothing after
-        // it is connected to anything (see `findMergedEventIndex`'s doc comment).
-        const showTopLine = i > 0 && (mergedIndex === -1 || i <= mergedIndex);
-        const showBottomLine = i < events.length - 1 && (mergedIndex === -1 || i < mergedIndex);
+        // The connecting line runs normally up through (and into) the terminal row (merged, or
+        // closed-without-merging), then stops — a thicker separator takes its place right after
+        // that row instead, and nothing after it is connected to anything.
+        const showTopLine = i > 0 && (terminalIndex === -1 || i <= terminalIndex);
+        const showBottomLine = i < events.length - 1 && (terminalIndex === -1 || i < terminalIndex);
         return (
           <div key={key}>
             <PRTimelineEvent
@@ -57,9 +72,12 @@ export function PRTimeline({
               showTopLine={showTopLine}
               showBottomLine={showBottomLine}
               onDeleteComment={onDeleteComment}
+              isTerminalClosed={i === terminalIndex && terminalKind === "closed"}
             />
-            {i === mergedIndex && i < events.length - 1 && (
-              <div className="my-2 border-t-2 border-accent-purple/40" />
+            {i === terminalIndex && i < events.length - 1 && (
+              <div
+                className={`my-2 border-t-2 ${terminalKind === "closed" ? "border-destructive/40" : "border-accent-purple/40"}`}
+              />
             )}
           </div>
         );

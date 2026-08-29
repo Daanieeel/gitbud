@@ -5,9 +5,14 @@ interface TimelineRowProps {
   showTopLine: boolean;
   showBottomLine: boolean;
   children: ReactNode;
-  /** The merged event renders larger with a purple icon and a thicker separator right after it
-   * (see `PRTimeline.tsx`'s merge-index logic) — everything else uses the plain small rail. */
+  /** The merged/terminal-closed event renders larger with a colored icon and a thicker
+   * separator right after it (see `PRTimeline.tsx`'s terminal-index logic) — everything else
+   * uses the plain small rail. */
   emphasized?: boolean;
+  /** Overrides the icon circle's own background — used to give the terminal "closed" row a
+   * destructive-tinted circle instead of the plain neutral one every other row (merged
+   * included, which only tints the icon glyph, not its background) uses. */
+  iconBgClassName?: string;
 }
 
 /** The shared left rail every timeline row uses — a vertical connecting line that runs behind
@@ -22,10 +27,17 @@ interface TimelineRowProps {
  *
  * The row's stretched height includes the fixed 16px `pb-4` gap down to the next row, but the
  * content itself only fills the top portion of that height (the gap is trailing blank space) —
- * centering the icon on the *full* stretched height would sit it visibly lower than the
- * content's own first line. The top filler is shortened by half that gap (8px) plus half the
- * icon's own height so the icon lands on the content's actual vertical center instead; the
- * exact split point doesn't otherwise matter since it's fully hidden behind the icon's opaque
+ * centering the icon on the *full* stretched height (equal-height top/bottom fillers) would sit
+ * it visibly lower than the content's own first line by half that gap (8px). Correcting for this
+ * with a *shorter top filler* instead of a margin doesn't generalize: an emphasized row's 32px
+ * icon is taller than its ~24px single-line content, so the filler would need to go negative to
+ * compensate — CSS clamps a negative height to 0 instead, silently reintroducing the same
+ * misalignment (verified against a live measurement: icon 4px low for the emphasized case, only
+ * 2px for the plain case — small enough there to look "close enough," not there). A negative
+ * `margin-top` on the icon itself has no such floor, so it's applied there instead: the equal
+ * fillers put the icon dead center on the *full* stretched height, then the margin nudges it up
+ * by exactly the constant 8px regardless of icon or content size. The split point between the
+ * two fillers doesn't otherwise matter since it's fully hidden behind the icon's opaque
  * background either way. */
 export function TimelineRow({
   icon,
@@ -33,19 +45,16 @@ export function TimelineRow({
   showBottomLine,
   children,
   emphasized,
+  iconBgClassName,
 }: TimelineRowProps) {
   const iconBoxSize = emphasized ? "size-8" : "size-6";
   const railWidth = emphasized ? "w-8" : "w-6";
-  const topFillerHeight = emphasized ? "calc(50% - 24px)" : "calc(50% - 20px)";
   return (
     <div className="flex gap-3">
       <div className={`flex shrink-0 flex-col items-center ${railWidth}`}>
+        <div className={`w-px flex-1 ${showTopLine ? "bg-border" : ""}`} />
         <div
-          className={`w-px ${showTopLine ? "bg-border" : ""}`}
-          style={{ height: topFillerHeight }}
-        />
-        <div
-          className={`z-10 flex shrink-0 items-center justify-center rounded-full bg-accent ${iconBoxSize}`}
+          className={`z-10 -mt-2 mb-2 flex shrink-0 items-center justify-center rounded-full ${iconBgClassName ?? "bg-accent"} ${iconBoxSize}`}
         >
           {icon}
         </div>

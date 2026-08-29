@@ -54,3 +54,15 @@ export function mergeTimeline(
 export function findMergedEventIndex(events: TimelineEvent[]): number {
   return events.findIndex((e) => e.kind === "github_event" && e.ghEvent.event === "merged");
 }
+
+/** Index of the *last* "closed" event in a chronologically-sorted event list, or -1 if there
+ * isn't one — used only when the PR is currently closed-without-merging (`PRTimeline.tsx` gates
+ * this against that live state), since a closed-then-reopened PR's earlier "closed" event isn't
+ * the terminal state and shouldn't get the destructive line-stop treatment. */
+export function findClosedEventIndex(events: TimelineEvent[]): number {
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (e.kind === "github_event" && e.ghEvent.event === "closed") return i;
+  }
+  return -1;
+}

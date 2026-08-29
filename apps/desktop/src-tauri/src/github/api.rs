@@ -708,6 +708,43 @@ pub async fn update_pull_request_body(
 }
 
 #[derive(Debug, Serialize)]
+struct UpdatePrStateBody<'a> {
+    state: &'a str,
+}
+
+/// Closes an open PR without merging it — GitHub's own "Close pull request" button is a single
+/// click with no confirmation and stays reversible (a closed-but-unmerged PR can be reopened
+/// from GitHub itself), so this mirrors that rather than adding an in-app confirm dialog.
+pub async fn close_pull_request(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}");
+    send_checked(gh.patch(&path).json(&UpdatePrStateBody { state: "closed" })).await?;
+    Ok(())
+}
+
+/// Reopens a closed-but-unmerged PR — the symmetric counterpart to `close_pull_request`. GitHub
+/// rejects this outright for an already-merged PR, so this is only ever wired up when the PR is
+/// closed and not merged.
+pub async fn reopen_pull_request(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}");
+    send_checked(gh.patch(&path).json(&UpdatePrStateBody { state: "open" })).await?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
 struct LockBody<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     lock_reason: Option<&'a str>,

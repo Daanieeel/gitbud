@@ -4,6 +4,7 @@ import { Avatar } from "@gitbud/ui/avatar";
 import { Button } from "@gitbud/ui/button";
 import { CopyButton } from "@gitbud/ui/copy-button";
 import { DiffView } from "@gitbud/ui/diff-view";
+import { Input } from "@gitbud/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
@@ -87,6 +88,7 @@ export function CommitsTab({ repoPath, login, pr }: CommitsTabProps) {
     usePullRequestCommits(repoPath, login, pr.number, pr.head_sha);
   const [selectedSha, setSelectedSha] = useState<string | null>(null);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const { data: commitFiles = [] } = useCommitDiffFiles(repoPath, login, selectedSha);
   const { width: commitsWidth, onPointerDown: onCommitsResize } = useResizableWidth(
     "panel-width:pr-commits",
@@ -123,6 +125,21 @@ export function CommitsTab({ repoPath, login, pr }: CommitsTabProps) {
   const selectedCommit = commits.find((c) => c.sha === selectedSha);
   const { insertions, deletions } = diffStats(commitFiles);
 
+  // Client-side, over whichever pages have loaded so far (see `usePullRequestCommits`'s own
+  // "load more" pagination) — mirrors History tab's search bar, but there's no equivalent
+  // GitHub endpoint to search a PR's own commit list server-side the way local `searchCommits`
+  // does against the full repo history.
+  const query = searchQuery.trim().toLowerCase();
+  const filteredCommits = query
+    ? commits.filter(
+        (c) =>
+          c.summary.toLowerCase().includes(query) ||
+          c.sha.toLowerCase().includes(query) ||
+          (c.author_login?.toLowerCase().includes(query) ?? false) ||
+          (c.author_name?.toLowerCase().includes(query) ?? false),
+      )
+    : commits;
+
   if (!isLoading && commits.length === 0) {
     return (
       <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
@@ -135,47 +152,64 @@ export function CommitsTab({ repoPath, login, pr }: CommitsTabProps) {
     <div className="flex min-h-0 flex-1">
       <div
         style={{ width: commitsWidth }}
-        className="shrink-0 overflow-auto border-r border-border"
+        className="flex shrink-0 flex-col border-r border-border"
       >
-        {commits.map((c) => (
-          <div
-            key={c.sha}
-            onClick={() => setSelectedSha(c.sha)}
-            className={cn(
-              "flex cursor-pointer flex-col gap-0.5 border-b border-border/50 px-2 py-1.5 text-sm hover:bg-accent",
-              selectedSha === c.sha && "bg-accent",
-            )}
-          >
-            <span className="truncate font-medium">{c.summary}</span>
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              {c.author_avatar_url && (
-                <Avatar src={c.author_avatar_url} alt={c.author_login ?? ""} className="size-3.5" />
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-2 py-1">
+          <Input
+            placeholder="Search by author, SHA, or message"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-7 flex-1"
+          />
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          {filteredCommits.length === 0 && (
+            <p className="p-3 text-sm text-muted-foreground">No commits match your search.</p>
+          )}
+          {filteredCommits.map((c) => (
+            <div
+              key={c.sha}
+              onClick={() => setSelectedSha(c.sha)}
+              className={cn(
+                "flex cursor-pointer flex-col gap-0.5 border-b border-border/50 px-2 py-1.5 text-sm hover:bg-accent",
+                selectedSha === c.sha && "bg-accent",
               )}
-              <span className="truncate">{c.author_login ?? c.author_name ?? "unknown"}</span>
-              {c.authored_at && (
-                <span className="shrink-0">
-                  {formatDistanceToNow(new Date(c.authored_at), { addSuffix: true })}
+            >
+              <span className="truncate font-medium">{c.summary}</span>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                {c.author_avatar_url && (
+                  <Avatar
+                    src={c.author_avatar_url}
+                    alt={c.author_login ?? ""}
+                    className="size-3.5"
+                  />
+                )}
+                <span className="truncate">{c.author_login ?? c.author_name ?? "unknown"}</span>
+                {c.authored_at && (
+                  <span className="shrink-0">
+                    {formatDistanceToNow(new Date(c.authored_at), { addSuffix: true })}
+                  </span>
+                )}
+                <CIBadge repoPath={repoPath} login={login} sha={c.sha} />
+                <CommitVerificationBadge repoPath={repoPath} login={login} sha={c.sha} />
+                <span className="ml-auto shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-secondary-foreground">
+                  {c.sha.slice(0, 7)}
                 </span>
-              )}
-              <CIBadge repoPath={repoPath} login={login} sha={c.sha} />
-              <CommitVerificationBadge repoPath={repoPath} login={login} sha={c.sha} />
-              <span className="ml-auto shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-secondary-foreground">
-                {c.sha.slice(0, 7)}
-              </span>
+              </div>
             </div>
-          </div>
-        ))}
-        {hasNextPage && (
-          <Button
-            size="sm"
-            variant="ghost"
-            className="w-full"
-            disabled={isFetchingNextPage}
-            onClick={() => void fetchNextPage()}
-          >
-            {isFetchingNextPage ? "Loading…" : "Load more commits"}
-          </Button>
-        )}
+          ))}
+          {hasNextPage && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="w-full"
+              disabled={isFetchingNextPage}
+              onClick={() => void fetchNextPage()}
+            >
+              {isFetchingNextPage ? "Loading…" : "Load more commits"}
+            </Button>
+          )}
+        </div>
       </div>
       <ResizeHandle onPointerDown={onCommitsResize} />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">

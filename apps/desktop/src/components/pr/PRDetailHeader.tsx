@@ -1,12 +1,21 @@
 import { useState } from "react";
-import { ExternalLinkIcon, GitBranchIcon, GitMergeIcon, PanelRightIcon } from "lucide-react";
+import {
+  ExternalLinkIcon,
+  GitBranchIcon,
+  GitMergeIcon,
+  GitPullRequestArrowIcon,
+  GitPullRequestClosedIcon,
+  PanelRightIcon,
+} from "lucide-react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@gitbud/ui/button";
 import { Avatar } from "@gitbud/ui/avatar";
 import { BranchName } from "@gitbud/ui/branch-name";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { CIBadge } from "./CIBadge";
+import { PRAddReviewButton } from "./PRAddReviewButton";
 import { prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
+import { useClosePullRequest, useReopenPullRequest } from "@/hooks/queries/usePullRequestMeta";
 import { usePRStore } from "@/store/usePRStore";
 import { api } from "@/lib/tauri";
 import type { PullRequest } from "@/lib/types";
@@ -23,6 +32,10 @@ export function PRDetailHeader({ repoPath, login, pr, onMergeClick }: PRDetailHe
   const isPrTabActive = useIsPrTabActive();
   const sidebarCollapsed = usePRStore((s) => s.sidebarCollapsed);
   const setSidebarCollapsed = usePRStore((s) => s.setSidebarCollapsed);
+  const closePr = useClosePullRequest(repoPath, login, pr.number);
+  const reopenPr = useReopenPullRequest(repoPath, login, pr.number);
+  const isOpen = !pr.merged && pr.state === "open";
+  const isClosedNotMerged = !pr.merged && pr.state !== "open";
 
   const checkout = async () => {
     setCheckingOut(true);
@@ -79,9 +92,36 @@ export function PRDetailHeader({ repoPath, login, pr, onMergeClick }: PRDetailHe
             {checkingOut ? "Checking out…" : "Checkout"}
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{`Fetch and check out as local branch pr-${pr.number}`}</TooltipContent>
+        <TooltipContent>
+          {`Fetch and check out as local branch `}
+          <code>{`pr-${pr.number}`}</code>{" "}
+        </TooltipContent>
       </Tooltip>
-      {!pr.merged && pr.state === "open" && (
+      {isOpen && (
+        <PRAddReviewButton
+          repoPath={repoPath}
+          login={login}
+          number={pr.number}
+          isOwnPr={pr.author_login === login}
+        />
+      )}
+      {isOpen && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={closePr.isPending}
+              onClick={() => closePr.mutate()}
+            >
+              <GitPullRequestClosedIcon className="size-3.5" />
+              {closePr.isPending ? "Closing…" : "Close PR"}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Close this pull request without merging</TooltipContent>
+        </Tooltip>
+      )}
+      {isOpen && (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button size="sm" onClick={onMergeClick}>
@@ -90,6 +130,22 @@ export function PRDetailHeader({ repoPath, login, pr, onMergeClick }: PRDetailHe
             </Button>
           </TooltipTrigger>
           <TooltipContent>Merge this pull request</TooltipContent>
+        </Tooltip>
+      )}
+      {isClosedNotMerged && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="positive"
+              size="sm"
+              disabled={reopenPr.isPending}
+              onClick={() => reopenPr.mutate()}
+            >
+              <GitPullRequestArrowIcon className="size-3.5" />
+              {reopenPr.isPending ? "Reopening…" : "Reopen"}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>Reopen this pull request</TooltipContent>
         </Tooltip>
       )}
       <Tooltip>

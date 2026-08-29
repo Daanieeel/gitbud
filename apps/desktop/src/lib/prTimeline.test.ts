@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { findMergedEventIndex, mergeTimeline } from "./prTimeline";
+import { findClosedEventIndex, findMergedEventIndex, mergeTimeline } from "./prTimeline";
 import type { IssueComment, IssueTimelineEvent, PullRequestCommit, Review } from "./types";
 
 function comment(id: number, created_at: string): IssueComment {
@@ -117,5 +117,36 @@ describe("findMergedEventIndex", () => {
   it("returns -1 when there's no merged event", () => {
     const events = mergeTimeline([comment(1, "2024-01-01T00:00:00Z")], [], []);
     expect(findMergedEventIndex(events)).toBe(-1);
+  });
+});
+
+describe("findClosedEventIndex", () => {
+  it("finds the index of the closed event among mixed timeline kinds", () => {
+    const events = mergeTimeline(
+      [comment(1, "2024-01-01T00:00:00Z")],
+      [],
+      [],
+      [ghEvent("closed", "2024-01-02T00:00:00Z")],
+    );
+    expect(findClosedEventIndex(events)).toBe(1);
+  });
+
+  it("finds the *last* closed event when the PR was closed more than once", () => {
+    const events = mergeTimeline(
+      [],
+      [],
+      [],
+      [
+        ghEvent("closed", "2024-01-01T00:00:00Z"),
+        ghEvent("reopened", "2024-01-02T00:00:00Z"),
+        ghEvent("closed", "2024-01-03T00:00:00Z"),
+      ],
+    );
+    expect(findClosedEventIndex(events)).toBe(2);
+  });
+
+  it("returns -1 when there's no closed event", () => {
+    const events = mergeTimeline([comment(1, "2024-01-01T00:00:00Z")], [], []);
+    expect(findClosedEventIndex(events)).toBe(-1);
   });
 });

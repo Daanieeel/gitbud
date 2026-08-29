@@ -3,8 +3,6 @@ import { Button } from "@gitbud/ui/button";
 import { PRDescription } from "./PRDescription";
 import { PRTimeline } from "./PRTimeline";
 import { PRCommentCompose } from "./PRCommentCompose";
-import { PRReviewSubmit } from "./PRReviewSubmit";
-import { PRMergeReadiness } from "./PRMergeReadiness";
 import {
   useDeleteIssueComment,
   useIssueComments,
@@ -30,10 +28,6 @@ export function ConversationTab({ repoPath, login, pr }: ConversationTabProps) {
   const { data: ghEvents = [] } = useTimelineEvents(repoPath, login, pr.number, pollIntervalMs);
   const deleteComment = useDeleteIssueComment(repoPath, login, pr.number);
 
-  // GitHub rejects a new review submission on a closed/merged PR outright — same gate the
-  // header already uses for the Merge button.
-  const canReview = !pr.merged && pr.state === "open";
-
   // Comments/reviews/commits each page independently (see usePRConversation.ts/usePRCommits.ts)
   // but the timeline merges them into one feed, so "load more" has to mean "load whichever of
   // the three still has more" rather than three separate buttons for one visual list.
@@ -57,6 +51,8 @@ export function ConversationTab({ repoPath, login, pr }: ConversationTabProps) {
         commits={commits.commits}
         ghEvents={ghEvents}
         onDeleteComment={(id) => deleteComment.mutate(id)}
+        isMerged={pr.merged}
+        isClosedNotMerged={!pr.merged && pr.state !== "open"}
       />
       {hasMoreActivity && (
         // GitHub's comment/review/commit list endpoints return oldest-first, so the *next* page
@@ -72,15 +68,6 @@ export function ConversationTab({ repoPath, login, pr }: ConversationTabProps) {
         </Button>
       )}
       <PRCommentCompose repoPath={repoPath} login={login} number={pr.number} />
-      {canReview && (
-        <PRReviewSubmit
-          repoPath={repoPath}
-          login={login}
-          number={pr.number}
-          isOwnPr={pr.author_login === login}
-        />
-      )}
-      <PRMergeReadiness repoPath={repoPath} login={login} pr={pr} />
       {pr.merged && (
         <div className="flex items-center gap-2 rounded-md bg-accent-purple/15 p-3 text-sm font-medium text-accent-purple">
           <CheckCircle2Icon className="size-4 shrink-0" />

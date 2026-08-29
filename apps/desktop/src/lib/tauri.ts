@@ -332,6 +332,10 @@ export const api = {
     invoke<void>("github_update_pull_request_body", { repoPath, login, number, body }),
   githubUpdatePullRequestBranch: (repoPath: string, login: string, number: number) =>
     invoke<void>("github_update_pull_request_branch", { repoPath, login, number }),
+  githubClosePullRequest: (repoPath: string, login: string, number: number) =>
+    invoke<void>("github_close_pull_request", { repoPath, login, number }),
+  githubReopenPullRequest: (repoPath: string, login: string, number: number) =>
+    invoke<void>("github_reopen_pull_request", { repoPath, login, number }),
   githubLockConversation: (
     repoPath: string,
     login: string,

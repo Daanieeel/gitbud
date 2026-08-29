@@ -95,6 +95,62 @@ export function useUpdatePullRequestBody(
   });
 }
 
+/** Closes an open PR without merging it — GitHub's own "Close pull request" button is a single
+ * click with no confirmation, reversible from GitHub itself (reopen), so this matches that
+ * rather than adding an in-app confirm dialog. The list query is invalidated (not optimistically
+ * patched) since which `prList` filter this PR now belongs to depends on that filter's own value,
+ * not something this mutation can compute generically. */
+export function useClosePullRequest(
+  repoPath: string | null,
+  login: string | null,
+  number: number | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => {
+      if (!repoPath || !login || number === null) {
+        throw new Error("useClosePullRequest: repoPath/login/number not set");
+      }
+      return api.githubClosePullRequest(repoPath, login, number);
+    },
+    onSuccess: () => {
+      if (!repoPath || !login || number === null) return;
+      queryClient.setQueryData<PullRequest | undefined>(
+        queryKeys.prMeta(repoPath, login, number),
+        (prev) => (prev ? { ...prev, state: "closed" } : prev),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["pr-list", repoPath, login] });
+    },
+    onError: (err) => toast.error(String(err)),
+  });
+}
+
+/** Reopens a closed-but-unmerged PR — the symmetric counterpart to `useClosePullRequest`. */
+export function useReopenPullRequest(
+  repoPath: string | null,
+  login: string | null,
+  number: number | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => {
+      if (!repoPath || !login || number === null) {
+        throw new Error("useReopenPullRequest: repoPath/login/number not set");
+      }
+      return api.githubReopenPullRequest(repoPath, login, number);
+    },
+    onSuccess: () => {
+      if (!repoPath || !login || number === null) return;
+      queryClient.setQueryData<PullRequest | undefined>(
+        queryKeys.prMeta(repoPath, login, number),
+        (prev) => (prev ? { ...prev, state: "open" } : prev),
+      );
+      void queryClient.invalidateQueries({ queryKey: ["pr-list", repoPath, login] });
+    },
+    onError: (err) => toast.error(String(err)),
+  });
+}
+
 /** Toggles the conversation's locked state — `lockReason` is one of GitHub's four
  * (`off-topic`/`too heated`/`resolved`/`spam`) or `null` for "no reason given"; ignored entirely
  * when unlocking. */

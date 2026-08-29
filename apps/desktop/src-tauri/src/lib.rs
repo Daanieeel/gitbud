@@ -1399,6 +1399,26 @@ async fn github_update_pull_request_body(
 }
 
 #[tauri::command]
+async fn github_close_pull_request(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::close_pull_request(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_reopen_pull_request(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::reopen_pull_request(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
 async fn github_lock_conversation(
     repo_path: String,
     login: String,
@@ -2668,6 +2688,8 @@ pub fn run() {
             github_update_pull_request_base,
             github_update_pull_request_body,
             github_update_pull_request_branch,
+            github_close_pull_request,
+            github_reopen_pull_request,
             github_lock_conversation,
             github_unlock_conversation,
             github_compare_pull_request_base,

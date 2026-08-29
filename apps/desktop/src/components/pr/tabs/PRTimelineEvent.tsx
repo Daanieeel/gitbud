@@ -3,6 +3,7 @@ import {
   CheckCircle2Icon,
   GitCommitHorizontalIcon,
   GitMergeIcon,
+  GitPullRequestArrowIcon,
   GitPullRequestClosedIcon,
   LinkIcon,
   MessageSquareIcon,
@@ -55,9 +56,19 @@ const GITHUB_EVENT_ICON = {
   review_requested: UserPlusIcon,
   review_request_removed: UserMinusIcon,
   closed: GitPullRequestClosedIcon,
-  reopened: GitPullRequestClosedIcon,
+  reopened: GitPullRequestArrowIcon,
   merged: GitMergeIcon,
 } satisfies Record<string, typeof CheckCircle2Icon>;
+
+/** Icon glyph color per event kind — always applied, independent of `isEmphasized` (which only
+ * controls the larger size + colored circle background reserved for the merged/terminal-closed
+ * row, see `PRTimeline.tsx`'s terminal-index logic). A non-terminal "closed" or any "reopened"
+ * event still gets its color, just at the plain small size. */
+const GITHUB_EVENT_COLOR = {
+  merged: "text-accent-purple",
+  closed: "text-destructive",
+  reopened: "text-accent-green",
+} satisfies Record<string, string>;
 
 /** Looks up an open string key against a known-literal lookup table without widening the
  * table's own declared type — the table stays `satisfies`-checked against its value type, and
@@ -73,6 +84,11 @@ interface PRTimelineEventProps {
   showTopLine: boolean;
   showBottomLine: boolean;
   onDeleteComment: (commentId: number) => void;
+  /** True only for the specific "closed" row `PRTimeline` picked as the current terminal state
+   * (see its own doc comment) — a `closed` event fires every time the PR was ever closed, but
+   * only the live-current one (PR closed and not merged, with no later reopen) gets the
+   * destructive emphasis + line-stop treatment. */
+  isTerminalClosed: boolean;
 }
 
 export function PRTimelineEvent({
@@ -82,6 +98,7 @@ export function PRTimelineEvent({
   showTopLine,
   showBottomLine,
   onDeleteComment,
+  isTerminalClosed,
 }: PRTimelineEventProps) {
   const selectCommit = usePRStore((s) => s.selectCommit);
 
@@ -194,21 +211,20 @@ export function PRTimelineEvent({
     }
 
     const isMerged = ghEvent.event === "merged";
+    const isEmphasized = isMerged || isTerminalClosed;
+    const iconColor = lookup(GITHUB_EVENT_COLOR, ghEvent.event, "text-muted-foreground");
     const label = lookup(GITHUB_EVENT_LABEL, ghEvent.event, () => ghEvent.event)(ghEvent);
     const Icon = lookup(GITHUB_EVENT_ICON, ghEvent.event, MessageSquareIcon);
     return (
       <TimelineRow
-        icon={
-          <Icon
-            className={isMerged ? "size-4 text-accent-purple" : "size-3.5 text-muted-foreground"}
-          />
-        }
+        icon={<Icon className={`${isEmphasized ? "size-4" : "size-3.5"} ${iconColor}`} />}
         showTopLine={showTopLine}
         showBottomLine={showBottomLine}
-        emphasized={isMerged}
+        emphasized={isEmphasized}
+        iconBgClassName={isTerminalClosed ? "bg-destructive/15" : undefined}
       >
         <div
-          className={`flex items-center gap-2 py-0.5 ${isMerged ? "text-sm" : "text-xs text-muted-foreground"}`}
+          className={`flex items-center gap-2 py-0.5 ${isEmphasized ? "text-sm" : "text-xs text-muted-foreground"}`}
         >
           {ghEvent.actor_avatar_url && (
             <Avatar
@@ -218,10 +234,10 @@ export function PRTimelineEvent({
             />
           )}
           <span className="min-w-0 flex-1 truncate">
-            <span className={`font-medium ${isMerged ? "" : "text-foreground"}`}>
+            <span className={`font-medium ${isEmphasized ? "" : "text-foreground"}`}>
               {ghEvent.actor_login ?? "someone"}
             </span>{" "}
-            <span className={isMerged ? "text-accent-purple" : undefined}>{label}</span>
+            <span className={isEmphasized ? iconColor : undefined}>{label}</span>
           </span>
           {event.timestamp && <RelativeTime iso={event.timestamp} className="shrink-0" />}
         </div>
