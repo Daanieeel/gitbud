@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { PRDetailHeader } from "./PRDetailHeader";
 import { PRTabBar } from "./PRTabBar";
 import { PRSidebar } from "./PRSidebar";
@@ -12,6 +12,7 @@ import { usePullRequestMeta } from "@/hooks/queries/usePullRequestMeta";
 import { usePullRequestDetail } from "@/hooks/queries/usePullRequests";
 import { usePullRequestCommits } from "@/hooks/queries/usePRCommits";
 import { useCheckRuns, prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
+import { diffStats } from "@/lib/diffStats";
 import type { PullRequest } from "@/lib/types";
 
 interface PRDetailProps {
@@ -34,6 +35,7 @@ export function PRDetail({ repoPath, login, pr: listPr }: PRDetailProps) {
   const { data: detail } = usePullRequestDetail(repoPath, login, pr.number, pr.head_sha);
   const { commits } = usePullRequestCommits(repoPath, login, pr.number, pr.head_sha);
   const { data: checkRuns = null } = useCheckRuns(repoPath, login, pr.head_sha, pollIntervalMs);
+  const { insertions, deletions } = useMemo(() => diffStats(detail?.files ?? []), [detail?.files]);
 
   return (
     <div className="flex h-full min-w-0 flex-1 flex-col">
@@ -47,6 +49,8 @@ export function PRDetail({ repoPath, login, pr: listPr }: PRDetailProps) {
         filesCount={detail?.files.length ?? 0}
         commitsCount={commits.length}
         checksCount={checkRuns?.length ?? 0}
+        insertions={insertions}
+        deletions={deletions}
       />
       <div className="flex min-h-0 flex-1">
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
