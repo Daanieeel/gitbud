@@ -487,16 +487,17 @@ pub fn discard_files(repo_path: &str, paths: &[String]) -> Result<(), String> {
         }
     }
 
-    let remove_from_disk_and_index = |index: &mut git2::Index, paths: &[&String]| -> Result<(), String> {
-        for path in paths {
-            let full_path = std::path::Path::new(repo_path).join(path);
-            if full_path.exists() {
-                std::fs::remove_file(&full_path).map_err(|e| e.to_string())?;
+    let remove_from_disk_and_index =
+        |index: &mut git2::Index, paths: &[&String]| -> Result<(), String> {
+            for path in paths {
+                let full_path = std::path::Path::new(repo_path).join(path);
+                if full_path.exists() {
+                    std::fs::remove_file(&full_path).map_err(|e| e.to_string())?;
+                }
+                index.remove_path(std::path::Path::new(path.as_str())).ok();
             }
-            index.remove_path(std::path::Path::new(path.as_str())).ok();
-        }
-        Ok(())
-    };
+            Ok(())
+        };
 
     let head_commit = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
 
@@ -520,8 +521,11 @@ pub fn discard_files(repo_path: &str, paths: &[String]) -> Result<(), String> {
     }
 
     let head_obj = head_commit.unwrap().as_object().clone();
-    repo.reset_default(Some(&head_obj), tracked.iter().map(|p| std::path::Path::new(p.as_str())))
-        .map_err(|e| e.message().to_string())?;
+    repo.reset_default(
+        Some(&head_obj),
+        tracked.iter().map(|p| std::path::Path::new(p.as_str())),
+    )
+    .map_err(|e| e.message().to_string())?;
     let mut checkout = git2::build::CheckoutBuilder::new();
     checkout.force();
     for path in &tracked {
