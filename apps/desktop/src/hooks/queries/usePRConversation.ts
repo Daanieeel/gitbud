@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 import { useNetworkStore } from "@/store/useNetworkStore";
-import type { IssueComment, Review } from "@/lib/types";
+import type { IssueComment, IssueTimelineEvent, Review } from "@/lib/types";
 
 export function useIssueComments(
   repoPath: string | null,
@@ -77,6 +77,39 @@ export function useReviews(
         const reviews = await api.githubListReviews(repoPath, login, number);
         useNetworkStore.getState().noteSuccess();
         return reviews;
+      } catch (err) {
+        useNetworkStore.getState().noteError(String(err));
+        throw err;
+      }
+    },
+    enabled: !!repoPath && !!login && number !== null,
+    refetchInterval: pollIntervalMs ?? false,
+  });
+}
+
+/** Label/assignee/reviewer-request/close/reopen/merge events for the timeline — not cached to
+ * the SQLite mirror (see `list_relevant_timeline_events`'s doc comment) and not seeded from a
+ * cached-mirror read, so a fetch failure just means the timeline falls back to showing only
+ * comments/reviews/commits rather than blocking the whole tab. */
+export function useTimelineEvents(
+  repoPath: string | null,
+  login: string | null,
+  number: number | null,
+  pollIntervalMs: number | null,
+) {
+  return useQuery({
+    queryKey: queryKeys.prTimelineEvents(repoPath ?? "", login ?? "", number ?? -1),
+    queryFn: async (): Promise<IssueTimelineEvent[]> => {
+      if (!repoPath || !login || number === null) {
+        throw new Error("useTimelineEvents: query ran while disabled");
+      }
+      if (useNetworkStore.getState().shouldSkip()) {
+        throw new Error("Skipping GitHub request: already offline.");
+      }
+      try {
+        const events = await api.githubListRelevantTimelineEvents(repoPath, login, number);
+        useNetworkStore.getState().noteSuccess();
+        return events;
       } catch (err) {
         useNetworkStore.getState().noteError(String(err));
         throw err;

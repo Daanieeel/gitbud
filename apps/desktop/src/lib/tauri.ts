@@ -19,6 +19,7 @@ import type {
   GitHubRepo,
   ImageDiff,
   IssueComment,
+  IssueTimelineEvent,
   Label,
   Milestone,
   Project,
@@ -359,6 +360,12 @@ export const api = {
     }).then((rows): PullRequestFile[] =>
       rows.map(([filename, status, diff]) => ({ filename, status, diff })),
     ),
+  githubListRelevantTimelineEvents: (repoPath: string, login: string, number: number) =>
+    invoke<IssueTimelineEvent[]>("github_list_relevant_timeline_events", {
+      repoPath,
+      login,
+      number,
+    }),
   githubListIssueComments: (repoPath: string, login: string, number: number) =>
     invoke<IssueComment[]>("github_list_issue_comments", { repoPath, login, number }),
   getCachedIssueComments: (repoPath: string, number: number) =>

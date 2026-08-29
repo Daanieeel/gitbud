@@ -13,6 +13,7 @@ const REPO_SCOPED_PR_PREFIXES = [
   "pr-meta",
   "pr-commits",
   "pr-issue-comments",
+  "pr-timeline-events",
   "pr-reviews",
   "review-threads",
   "viewed-files",
@@ -44,6 +45,7 @@ export function evictSelectedPrQueries(
   queryClient.removeQueries({ queryKey: ["pr-meta", repoPath, login, number] });
   queryClient.removeQueries({ queryKey: ["pr-commits", repoPath, login, number] });
   queryClient.removeQueries({ queryKey: queryKeys.prIssueComments(repoPath, login, number) });
+  queryClient.removeQueries({ queryKey: queryKeys.prTimelineEvents(repoPath, login, number) });
   queryClient.removeQueries({ queryKey: queryKeys.prReviews(repoPath, login, number) });
   queryClient.removeQueries({ queryKey: queryKeys.reviewThreads(repoPath, login, number) });
   queryClient.removeQueries({ queryKey: queryKeys.viewedFiles(repoPath, login, number) });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { mergeTimeline } from "./prTimeline";
-import type { IssueComment, PullRequestCommit, Review } from "./types";
+import type { IssueComment, IssueTimelineEvent, PullRequestCommit, Review } from "./types";
 
 function comment(id: number, created_at: string): IssueComment {
   return {
@@ -29,6 +29,22 @@ function commit(sha: string, authored_at: string | null): PullRequestCommit {
     author_email: null,
     authored_at,
     html_url: "",
+  };
+}
+
+function ghEvent(event: string, created_at: string): IssueTimelineEvent {
+  return {
+    id: null,
+    event,
+    created_at,
+    actor_login: "u",
+    actor_avatar_url: "",
+    label_name: null,
+    label_color: null,
+    assignee_login: null,
+    assignee_avatar_url: null,
+    requested_reviewer_login: null,
+    requested_reviewer_avatar_url: null,
   };
 }
 
@@ -64,6 +80,20 @@ describe("mergeTimeline", () => {
   });
 
   it("returns an empty list for no activity at all", () => {
+    expect(mergeTimeline([], [], [])).toEqual([]);
+  });
+
+  it("interleaves GitHub label/reviewer/close events chronologically with the rest", () => {
+    const events = mergeTimeline(
+      [comment(1, "2024-01-02T00:00:00Z")],
+      [],
+      [],
+      [ghEvent("labeled", "2024-01-01T00:00:00Z"), ghEvent("merged", "2024-01-03T00:00:00Z")],
+    );
+    expect(events.map((e) => e.kind)).toEqual(["github_event", "comment", "github_event"]);
+  });
+
+  it("defaults ghEvents to empty when omitted", () => {
     expect(mergeTimeline([], [], [])).toEqual([]);
   });
 });

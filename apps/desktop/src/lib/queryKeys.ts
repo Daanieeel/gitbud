@@ -50,6 +50,8 @@ export const queryKeys = {
     ["pr-commit-diff-files", repoPath, login, sha] as const,
   prIssueComments: (repoPath: string, login: string, number: number) =>
     ["pr-issue-comments", repoPath, login, number] as const,
+  prTimelineEvents: (repoPath: string, login: string, number: number) =>
+    ["pr-timeline-events", repoPath, login, number] as const,
   prReviews: (repoPath: string, login: string, number: number) =>
     ["pr-reviews", repoPath, login, number] as const,
   reviewThreads: (repoPath: string, login: string, number: number) =>

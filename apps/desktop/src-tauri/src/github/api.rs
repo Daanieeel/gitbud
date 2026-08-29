@@ -2011,6 +2011,102 @@ impl From<RawIssueComment> for IssueComment {
 
 /// Top-level (issue-style) comments on a PR — distinct from `list_review_comments`'s
 /// line-anchored diff comments. Feeds the Conversation tab's timeline.
+#[derive(Deserialize)]
+struct RawTimelineLabel {
+    name: String,
+    color: String,
+}
+
+#[derive(Deserialize)]
+struct RawTimelineEvent {
+    #[serde(default)]
+    id: Option<u64>,
+    event: String,
+    #[serde(default)]
+    created_at: Option<String>,
+    #[serde(default)]
+    actor: Option<RawUser>,
+    #[serde(default)]
+    label: Option<RawTimelineLabel>,
+    #[serde(default)]
+    assignee: Option<RawUser>,
+    #[serde(default)]
+    requested_reviewer: Option<RawUser>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueTimelineEvent {
+    pub id: Option<u64>,
+    pub event: String,
+    pub created_at: Option<String>,
+    pub actor_login: Option<String>,
+    pub actor_avatar_url: Option<String>,
+    pub label_name: Option<String>,
+    pub label_color: Option<String>,
+    pub assignee_login: Option<String>,
+    pub assignee_avatar_url: Option<String>,
+    pub requested_reviewer_login: Option<String>,
+    pub requested_reviewer_avatar_url: Option<String>,
+}
+
+impl From<RawTimelineEvent> for IssueTimelineEvent {
+    fn from(raw: RawTimelineEvent) -> Self {
+        IssueTimelineEvent {
+            id: raw.id,
+            event: raw.event,
+            created_at: raw.created_at,
+            actor_login: raw.actor.as_ref().map(|a| a.login.clone()),
+            actor_avatar_url: raw.actor.map(|a| a.avatar_url),
+            label_name: raw.label.as_ref().map(|l| l.name.clone()),
+            label_color: raw.label.map(|l| l.color),
+            assignee_login: raw.assignee.as_ref().map(|a| a.login.clone()),
+            assignee_avatar_url: raw.assignee.map(|a| a.avatar_url),
+            requested_reviewer_login: raw.requested_reviewer.as_ref().map(|a| a.login.clone()),
+            requested_reviewer_avatar_url: raw.requested_reviewer.map(|a| a.avatar_url),
+        }
+    }
+}
+
+/// The event kinds the Conversation tab's timeline renders — everything else GitHub's timeline
+/// API returns (commented/committed/reviewed/cross-referenced/etc.) is already covered by our
+/// own issue-comments/reviews/commits fetches, so including them here would just duplicate
+/// entries rather than add information.
+const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
+    "labeled",
+    "unlabeled",
+    "assigned",
+    "unassigned",
+    "review_requested",
+    "review_request_removed",
+    "closed",
+    "reopened",
+    "merged",
+];
+
+/// Label/assignee/reviewer-request/close/reopen/merge events for the Conversation tab's
+/// timeline — GitHub's PR object itself carries none of this history, only the issue timeline
+/// endpoint does. Deliberately not written to the SQLite mirror (unlike issue comments/reviews):
+/// this is supplementary history, not core review content, and keeping it simple (always live,
+/// no offline fallback) avoids one more cache table for a feature that degrades gracefully to
+/// "timeline just shows comments/reviews/commits" if the fetch fails.
+pub async fn list_relevant_timeline_events(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<Vec<IssueTimelineEvent>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}/timeline?per_page=100");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: Vec<RawTimelineEvent> = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw
+        .into_iter()
+        .filter(|e| RELEVANT_TIMELINE_EVENTS.contains(&e.event.as_str()))
+        .map(IssueTimelineEvent::from)
+        .collect())
+}
+
 pub async fn list_issue_comments(
     host: &str,
     token: &str,
@@ -2532,5 +2628,47 @@ mod tests {
                 ("src/b.rs".to_string(), "UNVIEWED".to_string()),
             ]
         );
+    }
+
+    #[test]
+    fn timeline_event_maps_labeled_event_fields() {
+        let json = r#"{
+            "id": 1,
+            "event": "labeled",
+            "created_at": "2024-01-01T00:00:00Z",
+            "actor": {"login": "alice", "avatar_url": "https://a"},
+            "label": {"name": "bug", "color": "d73a4a"}
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.event, "labeled");
+        assert_eq!(event.actor_login, Some("alice".to_string()));
+        assert_eq!(event.label_name, Some("bug".to_string()));
+        assert_eq!(event.label_color, Some("d73a4a".to_string()));
+    }
+
+    #[test]
+    fn timeline_event_maps_review_requested_event_fields() {
+        let json = r#"{
+            "event": "review_requested",
+            "actor": {"login": "alice", "avatar_url": "https://a"},
+            "requested_reviewer": {"login": "bob", "avatar_url": "https://b"}
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.id, None);
+        assert_eq!(event.requested_reviewer_login, Some("bob".to_string()));
+        assert_eq!(event.label_name, None);
+    }
+
+    #[test]
+    fn relevant_timeline_events_excludes_comment_and_review_kinds() {
+        // These are already covered by list_issue_comments/list_reviews — including them here
+        // too would duplicate timeline entries rather than add information.
+        assert!(!RELEVANT_TIMELINE_EVENTS.contains(&"commented"));
+        assert!(!RELEVANT_TIMELINE_EVENTS.contains(&"reviewed"));
+        assert!(!RELEVANT_TIMELINE_EVENTS.contains(&"committed"));
+        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"labeled"));
+        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"merged"));
     }
 }

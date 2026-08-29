@@ -1,12 +1,18 @@
 import {
   CheckCircle2Icon,
   GitCommitHorizontalIcon,
+  GitMergeIcon,
+  GitPullRequestClosedIcon,
   MessageSquareIcon,
+  TagIcon,
+  UserMinusIcon,
+  UserPlusIcon,
   XCircleIcon,
 } from "lucide-react";
 import { Avatar } from "@gitbud/ui/avatar";
 import { Markdown } from "@gitbud/ui/markdown";
 import type { TimelineEvent } from "@/lib/prTimeline";
+import type { IssueTimelineEvent } from "@/lib/types";
 
 const REVIEW_VERDICT = {
   APPROVED: { label: "approved these changes", Icon: CheckCircle2Icon, color: "text-accent-green" },
@@ -19,8 +25,35 @@ const REVIEW_VERDICT = {
   DISMISSED: { label: "review dismissed", Icon: MessageSquareIcon, color: "text-muted-foreground" },
 } satisfies Record<string, { label: string; Icon: typeof CheckCircle2Icon; color: string }>;
 
+const GITHUB_EVENT_LABEL = {
+  labeled: (e: IssueTimelineEvent) => `added the ${e.label_name ?? "?"} label`,
+  unlabeled: (e: IssueTimelineEvent) => `removed the ${e.label_name ?? "?"} label`,
+  assigned: (e: IssueTimelineEvent) => `assigned ${e.assignee_login ?? "someone"}`,
+  unassigned: (e: IssueTimelineEvent) => `unassigned ${e.assignee_login ?? "someone"}`,
+  review_requested: (e: IssueTimelineEvent) =>
+    `requested review from ${e.requested_reviewer_login ?? "someone"}`,
+  review_request_removed: (e: IssueTimelineEvent) =>
+    `removed the review request for ${e.requested_reviewer_login ?? "someone"}`,
+  closed: () => "closed this pull request",
+  reopened: () => "reopened this pull request",
+  merged: () => "merged this pull request",
+} satisfies Record<string, (e: IssueTimelineEvent) => string>;
+
+const GITHUB_EVENT_ICON = {
+  labeled: TagIcon,
+  unlabeled: TagIcon,
+  assigned: UserPlusIcon,
+  unassigned: UserMinusIcon,
+  review_requested: UserPlusIcon,
+  review_request_removed: UserMinusIcon,
+  closed: GitPullRequestClosedIcon,
+  reopened: GitPullRequestClosedIcon,
+  merged: GitMergeIcon,
+} satisfies Record<string, typeof CheckCircle2Icon>;
+
 /** Looks up an open string key against a known-literal lookup table without widening the
- * table's own declared type (see `CIBadge.tsx`'s identical helper). */
+ * table's own declared type — the table stays `satisfies`-checked against its value type, and
+ * only this generic boundary (not the table itself) admits an arbitrary `string` key. */
 function lookup<T>(map: Record<string, T>, key: string, fallback: T): T {
   return Object.hasOwn(map, key) ? map[key] : fallback;
 }
@@ -71,6 +104,29 @@ export function PRTimelineEvent({ event }: { event: TimelineEvent }) {
           </div>
           {review.body && <Markdown content={review.body} />}
         </div>
+      </div>
+    );
+  }
+
+  if (event.kind === "github_event") {
+    const { ghEvent } = event;
+    const label = lookup(GITHUB_EVENT_LABEL, ghEvent.event, () => ghEvent.event)(ghEvent);
+    const Icon = lookup(GITHUB_EVENT_ICON, ghEvent.event, MessageSquareIcon);
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Icon className="size-3.5 shrink-0" />
+        {ghEvent.actor_avatar_url && (
+          <Avatar
+            src={ghEvent.actor_avatar_url}
+            alt={ghEvent.actor_login ?? ""}
+            className="size-4"
+          />
+        )}
+        <span className="min-w-0 flex-1 truncate">
+          <span className="font-medium text-foreground">{ghEvent.actor_login ?? "someone"}</span>{" "}
+          {label}
+        </span>
+        {event.timestamp && <span className="shrink-0">{formatTimestamp(event.timestamp)}</span>}
       </div>
     );
   }

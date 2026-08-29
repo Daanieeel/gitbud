@@ -1,18 +1,19 @@
 import { useMemo } from "react";
 import { mergeTimeline } from "@/lib/prTimeline";
 import { PRTimelineEvent } from "./PRTimelineEvent";
-import type { IssueComment, PullRequestCommit, Review } from "@/lib/types";
+import type { IssueComment, IssueTimelineEvent, PullRequestCommit, Review } from "@/lib/types";
 
 interface PRTimelineProps {
   comments: IssueComment[];
   reviews: Review[];
   commits: PullRequestCommit[];
+  ghEvents: IssueTimelineEvent[];
 }
 
-export function PRTimeline({ comments, reviews, commits }: PRTimelineProps) {
+export function PRTimeline({ comments, reviews, commits, ghEvents }: PRTimelineProps) {
   const events = useMemo(
-    () => mergeTimeline(comments, reviews, commits),
-    [comments, reviews, commits],
+    () => mergeTimeline(comments, reviews, commits, ghEvents),
+    [comments, reviews, commits, ghEvents],
   );
 
   if (events.length === 0) {
@@ -27,7 +28,9 @@ export function PRTimeline({ comments, reviews, commits }: PRTimelineProps) {
             ? `commit:${event.commit.sha}`
             : event.kind === "review"
               ? `review:${event.review.id}`
-              : `comment:${event.comment.id}`;
+              : event.kind === "github_event"
+                ? `gh:${event.ghEvent.id ?? `${event.ghEvent.event}:${event.timestamp}`}`
+                : `comment:${event.comment.id}`;
         return <PRTimelineEvent key={key} event={event} />;
       })}
     </div>

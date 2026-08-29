@@ -1954,6 +1954,16 @@ async fn github_create_review_comment(
 }
 
 #[tauri::command]
+async fn github_list_relevant_timeline_events(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<Vec<github::api::IssueTimelineEvent>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::list_relevant_timeline_events(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
 async fn github_list_issue_comments(
     repo_path: String,
     login: String,
@@ -2554,6 +2564,7 @@ pub fn run() {
             github_list_pull_request_commits,
             get_cached_pull_request_commits,
             github_get_commit_diff_files,
+            github_list_relevant_timeline_events,
             github_list_issue_comments,
             get_cached_issue_comments,
             github_create_issue_comment,

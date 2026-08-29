@@ -18,6 +18,7 @@ const REPO_SCOPED_SEED_KEYS = [
   ["pr-meta", repoPath, login, number],
   ["pr-commits", repoPath, login, number, "sha"],
   ["pr-issue-comments", repoPath, login, number],
+  ["pr-timeline-events", repoPath, login, number],
   ["pr-reviews", repoPath, login, number],
   ["review-threads", repoPath, login, number],
   ["viewed-files", repoPath, login, number],
@@ -57,6 +58,7 @@ describe("evictSelectedPrQueries", () => {
     qc.setQueryData(["pr-meta", repoPath, login, number], "data");
     qc.setQueryData(["pr-commits", repoPath, login, number, "sha"], "data");
     qc.setQueryData(queryKeys.prIssueComments(repoPath, login, number), "data");
+    qc.setQueryData(queryKeys.prTimelineEvents(repoPath, login, number), "data");
     qc.setQueryData(queryKeys.prReviews(repoPath, login, number), "data");
     qc.setQueryData(queryKeys.reviewThreads(repoPath, login, number), "data");
     qc.setQueryData(queryKeys.viewedFiles(repoPath, login, number), "data");
@@ -67,6 +69,7 @@ describe("evictSelectedPrQueries", () => {
     expect(qc.getQueryData(["pr-meta", repoPath, login, number])).toBeUndefined();
     expect(qc.getQueryData(["pr-commits", repoPath, login, number, "sha"])).toBeUndefined();
     expect(qc.getQueryData(queryKeys.prIssueComments(repoPath, login, number))).toBeUndefined();
+    expect(qc.getQueryData(queryKeys.prTimelineEvents(repoPath, login, number))).toBeUndefined();
     expect(qc.getQueryData(queryKeys.prReviews(repoPath, login, number))).toBeUndefined();
     expect(qc.getQueryData(queryKeys.reviewThreads(repoPath, login, number))).toBeUndefined();
     expect(qc.getQueryData(queryKeys.viewedFiles(repoPath, login, number))).toBeUndefined();

@@ -388,3 +388,17 @@ export interface BranchProtectionRequirements {
   required_contexts: string[];
   required_approving_review_count: number | null;
 }
+
+export interface IssueTimelineEvent {
+  id: number | null;
+  event: string;
+  created_at: string | null;
+  actor_login: string | null;
+  actor_avatar_url: string | null;
+  label_name: string | null;
+  label_color: string | null;
+  assignee_login: string | null;
+  assignee_avatar_url: string | null;
+  requested_reviewer_login: string | null;
+  requested_reviewer_avatar_url: string | null;
+}
