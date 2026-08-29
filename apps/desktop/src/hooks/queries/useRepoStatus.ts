@@ -102,7 +102,7 @@ export function useDiscardFiles(repoPath: string | null) {
   return useMutation({
     mutationFn: (paths: string[]) => {
       if (!repoPath) throw new Error("no repo selected");
-      return Promise.all(paths.map((path) => api.discardFile(repoPath, path)));
+      return api.discardFiles(repoPath, paths);
     },
     onSuccess: invalidate,
   });

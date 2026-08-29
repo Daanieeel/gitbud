@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   CheckIcon,
@@ -97,16 +97,23 @@ interface FileListProps {
   onToggle: (path: string, staged: boolean) => void;
   onToggleMany: (paths: string[], staged: boolean) => void;
   onDiscardMany: (paths: string[]) => void;
+  /** Whether the focusable list container (or something inside it) currently holds keyboard
+   * focus — distinguishes "this file is selected" (blue) from "this file is open in the diff
+   * viewer, but the user's focus has moved elsewhere in the app" (grey). */
+  hasFocus: boolean;
 }
 
-export function FileList({
-  files,
-  selectedPath,
-  onSelect,
-  onToggle,
-  onToggleMany,
-  onDiscardMany,
-}: FileListProps) {
+export interface FileListHandle {
+  /** Select every file for batch actions (stage/unstage/discard), without touching which
+   * file is open in the diff viewer. Used to wire up Cmd/Ctrl+A from the focusable wrapper
+   * that actually holds keyboard focus around this list. */
+  selectAll: () => void;
+}
+
+export const FileList = forwardRef<FileListHandle, FileListProps>(function FileList(
+  { files, selectedPath, onSelect, onToggle, onToggleMany, onDiscardMany, hasFocus },
+  ref,
+) {
   const parentRef = useRef<HTMLDivElement>(null);
   const repoPath = useRepoStore((s) => s.selectedRepo);
   const { data: branchData } = useBranches(repoPath);
@@ -150,6 +157,21 @@ export function FileList({
   // file-explorer behavior.
   const [selectedPaths, setSelectedPaths] = useState<Set<string>>(new Set());
   const [anchorIndex, setAnchorIndex] = useState<number | null>(null);
+  // Which row's context menu is currently open, if any — that row stays "focused" (blue) for
+  // as long as its menu is open even though opening the menu can itself steal DOM focus away
+  // from the list (into the menu's portal), which would otherwise read as `!hasFocus`.
+  const [contextMenuPath, setContextMenuPath] = useState<string | null>(null);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      selectAll: () => {
+        setSelectedPaths(new Set(files.map((f) => f.path)));
+        setAnchorIndex(files.length - 1);
+      },
+    }),
+    [files],
+  );
 
   // Drop any selected paths that no longer exist (staged/discarded out from under the list)
   // rather than silently batch-acting on stale entries next time.
@@ -234,10 +256,24 @@ export function FileList({
           const file = files[row.index];
           const rowSelected = selectedPaths.has(file.path);
           const showBatchMenu = isBatch && rowSelected;
+          const isDiffOpen = selectedPath === file.path;
+          // Blue: this row is selected (or is the diff-open file) while the list has focus, or
+          // its own context menu is open. Grey: reserved for the one file open in the diff
+          // viewer once focus has moved elsewhere in the app — never for a merely-selected file.
+          const isFocused = contextMenuPath
+            ? contextMenuPath === file.path
+            : hasFocus && (rowSelected || isDiffOpen);
           return (
             <ContextMenu
               key={file.path}
-              onOpenChange={(open) => open && handleContextMenu(file.path, row.index)}
+              onOpenChange={(open) => {
+                if (open) {
+                  handleContextMenu(file.path, row.index);
+                  setContextMenuPath(file.path);
+                } else if (contextMenuPath === file.path) {
+                  setContextMenuPath(null);
+                }
+              }}
             >
               <ContextMenuTrigger asChild>
                 <div
@@ -251,7 +287,8 @@ export function FileList({
                   }}
                   className={cn(
                     "flex items-center gap-2 px-2 text-sm cursor-pointer select-none hover:bg-accent",
-                    (selectedPath === file.path || rowSelected) && "bg-accent",
+                    isDiffOpen && !isFocused && "bg-accent",
+                    isFocused && "bg-primary/15",
                     file.status === "conflicted" && "text-destructive",
                   )}
                   onClick={(e) => handleRowClick(e, file.path, row.index)}
@@ -542,4 +579,4 @@ export function FileList({
       </Dialog>
     </div>
   );
-}
+});

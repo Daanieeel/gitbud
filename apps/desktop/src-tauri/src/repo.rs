@@ -463,44 +463,76 @@ pub fn unstage_paths(repo_path: &str, paths: &[String]) -> Result<(), String> {
 /// files are deleted, tracked files are reset to their HEAD content in both the index
 /// and the working tree.
 pub fn discard_file(repo_path: &str, path: &str) -> Result<(), String> {
+    discard_files(repo_path, std::slice::from_ref(&path.to_string()))
+}
+
+/// Discards all uncommitted changes to the given files in one pass. Each file individually
+/// does what `discard_file` does, but batching the index read/write and the working-tree
+/// checkout into a single `Repository` transaction matters: discarding files one-at-a-time
+/// via concurrent calls each open their own snapshot of the index, so one call's
+/// `index.write()` can clobber another's, silently losing all but one file's reset.
+pub fn discard_files(repo_path: &str, paths: &[String]) -> Result<(), String> {
     let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
-    let full_path = std::path::Path::new(repo_path).join(path);
 
-    let status = repo
-        .status_file(std::path::Path::new(path))
-        .map_err(|e| e.message().to_string())?;
-
-    if status.is_wt_new() {
-        if full_path.exists() {
-            std::fs::remove_file(&full_path).map_err(|e| e.to_string())?;
+    let mut untracked = Vec::new();
+    let mut tracked = Vec::new();
+    for path in paths {
+        let status = repo
+            .status_file(std::path::Path::new(path))
+            .map_err(|e| e.message().to_string())?;
+        if status.is_wt_new() {
+            untracked.push(path);
+        } else {
+            tracked.push(path);
         }
+    }
+
+    let remove_from_disk_and_index =
+        |index: &mut git2::Index, paths: &[&String]| -> Result<(), String> {
+            for path in paths {
+                let full_path = std::path::Path::new(repo_path).join(path);
+                if full_path.exists() {
+                    std::fs::remove_file(&full_path).map_err(|e| e.to_string())?;
+                }
+                index.remove_path(std::path::Path::new(path.as_str())).ok();
+            }
+            Ok(())
+        };
+
+    let head_commit = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
+
+    if head_commit.is_none() {
+        // No HEAD yet — nothing to restore tracked files to either, so everything just
+        // drops out of the index and working tree.
         let mut index = repo.index().map_err(|e| e.message().to_string())?;
-        index.remove_path(std::path::Path::new(path)).ok();
+        remove_from_disk_and_index(&mut index, &untracked)?;
+        remove_from_disk_and_index(&mut index, &tracked)?;
         return index.write().map_err(|e| e.message().to_string());
     }
 
-    let head_commit = repo.head().ok().and_then(|h| h.peel_to_commit().ok());
-    match head_commit {
-        Some(head_commit) => {
-            let head_obj = head_commit.as_object();
-            repo.reset_default(Some(head_obj), [std::path::Path::new(path)])
-                .map_err(|e| e.message().to_string())?;
-            let mut checkout = git2::build::CheckoutBuilder::new();
-            checkout.path(path).force();
-            repo.checkout_tree(head_obj, Some(&mut checkout))
-                .map_err(|e| e.message().to_string())
-        }
-        None => {
-            // No HEAD yet — nothing to restore to; discarding a tracked-in-index-only
-            // file just means dropping it entirely.
-            if full_path.exists() {
-                std::fs::remove_file(&full_path).map_err(|e| e.to_string())?;
-            }
-            let mut index = repo.index().map_err(|e| e.message().to_string())?;
-            index.remove_path(std::path::Path::new(path)).ok();
-            index.write().map_err(|e| e.message().to_string())
-        }
+    if !untracked.is_empty() {
+        let mut index = repo.index().map_err(|e| e.message().to_string())?;
+        remove_from_disk_and_index(&mut index, &untracked)?;
+        index.write().map_err(|e| e.message().to_string())?;
     }
+
+    if tracked.is_empty() {
+        return Ok(());
+    }
+
+    let head_obj = head_commit.unwrap().as_object().clone();
+    repo.reset_default(
+        Some(&head_obj),
+        tracked.iter().map(|p| std::path::Path::new(p.as_str())),
+    )
+    .map_err(|e| e.message().to_string())?;
+    let mut checkout = git2::build::CheckoutBuilder::new();
+    checkout.force();
+    for path in &tracked {
+        checkout.path(path.as_str());
+    }
+    repo.checkout_tree(&head_obj, Some(&mut checkout))
+        .map_err(|e| e.message().to_string())
 }
 
 /// Appends the given already-formatted entries (e.g. `/path/to/file`, `/path/to/folder/**`,
@@ -887,6 +919,31 @@ mod tests {
 
         let contents = std::fs::read_to_string(scratch.path.join("a.txt")).unwrap();
         assert_eq!(contents, "original\n");
+        let status = get_status(&repo_path).unwrap();
+        assert!(status.files.is_empty());
+    }
+
+    #[test]
+    fn discard_files_restores_all_tracked_files_to_head() {
+        let scratch = ScratchRepo::new("discard-files-batch");
+        let repo_path = scratch.path_str();
+        scratch.write_and_commit("a.txt", "a original\n", "base");
+        scratch.write_and_commit("b.txt", "b original\n", "b");
+
+        std::fs::write(scratch.path.join("a.txt"), "a modified\n").unwrap();
+        std::fs::write(scratch.path.join("b.txt"), "b modified\n").unwrap();
+        stage_paths(&repo_path, &["a.txt".to_string(), "b.txt".to_string()]).unwrap();
+
+        discard_files(&repo_path, &["a.txt".to_string(), "b.txt".to_string()]).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(scratch.path.join("a.txt")).unwrap(),
+            "a original\n"
+        );
+        assert_eq!(
+            std::fs::read_to_string(scratch.path.join("b.txt")).unwrap(),
+            "b original\n"
+        );
         let status = get_status(&repo_path).unwrap();
         assert!(status.files.is_empty());
     }

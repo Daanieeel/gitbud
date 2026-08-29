@@ -13,7 +13,7 @@ import { useCommitLog } from "@/hooks/queries/useCommitLog";
 import { useAheadBehind, DEFAULT_AHEAD_BEHIND } from "@/hooks/queries/useAheadBehind";
 import { useCommit, useAmendCommit, useUndoLastCommit } from "@/hooks/queries/useCommitActions";
 import { cn } from "@gitbud/ui/utils";
-import { isProtectedBranch } from "@/lib/utils";
+import { isProtectedBranch, isWhitespaceOnlyDiff } from "@/lib/utils";
 import { notify } from "@/lib/notify";
 import { useBusyAction } from "@/hooks/useBusyAction";
 import { api } from "@/lib/tauri";
@@ -38,6 +38,9 @@ export function CommitBox() {
 
   const [committing, runCommit] = useBusyAction();
   const [undoing, runUndo] = useBusyAction();
+  // Tracks whether `summary` currently holds text we generated (vs. the user's own words), so
+  // the staged-set effect below knows it's safe to replace or clear it.
+  const [summaryAutoFilled, setSummaryAutoFilled] = useState(false);
   const [signingEnabled, setSigningEnabled] = useState(true);
   const [signingBannerDismissed, setSigningBannerDismissed] = useState(false);
   const [signingDialogOpen, setSigningDialogOpen] = useState(false);
@@ -53,14 +56,56 @@ export function CommitBox() {
   // this new branch itself has no upstream yet.
   const hasUnpushedCommit = !!lastCommit && !aheadBehind.head_on_remote;
 
-  // Pre-fill a sensible summary for the common single-file-change case, without
-  // clobbering anything the user has already typed.
+  // Pre-fill a sensible summary for the common single-file-change case, without ever touching
+  // a message the user typed themselves. Only text we generated (summaryAutoFilled) gets
+  // replaced or cleared when the staged set changes underneath it.
   useEffect(() => {
-    if (summary.trim() || amending) return;
-    if (stagedFiles.length === 1) {
-      const name = stagedFiles[0].path.split("/").pop();
-      setSummary(`Update ${name}`);
+    if (amending) return;
+    if (summary.trim() && !summaryAutoFilled) return;
+
+    if (stagedFiles.length !== 1 || !repoPath) {
+      if (summaryAutoFilled) {
+        setSummary("");
+        setSummaryAutoFilled(false);
+      }
+      return;
     }
+
+    const file = stagedFiles[0];
+    const name = file.path.split("/").pop();
+    const fill = (text: string) => {
+      setSummary(text);
+      setSummaryAutoFilled(true);
+    };
+
+    if (file.status === "added" || file.status === "untracked") {
+      fill(`Create ${name}`);
+      return;
+    }
+    if (file.status === "deleted") {
+      fill(`Delete ${name}`);
+      return;
+    }
+    if (file.status === "renamed") {
+      fill(`Move ${name}`);
+      return;
+    }
+
+    // Modified/type-changed: fetch the staged diff to tell a pure reformat ("Format") apart
+    // from a real content edit ("Update").
+    let cancelled = false;
+    void api
+      .getFileDiff(repoPath, file.path, true)
+      .then((diff) => {
+        if (cancelled) return;
+        fill(isWhitespaceOnlyDiff(diff) ? `Format ${name}` : `Update ${name}`);
+      })
+      .catch(() => {
+        if (!cancelled) fill(`Update ${name}`);
+      });
+    return () => {
+      cancelled = true;
+    };
     // Only re-run when the staged set changes, not on every keystroke.
   }, [stagedFiles.map((f) => f.path).join("|")]);
 
@@ -74,6 +119,7 @@ export function CommitBox() {
 
   const toggleAmend = (next: boolean) => {
     setAmending(next);
+    setSummaryAutoFilled(false);
     if (next && lastCommit) {
       setSummary(lastCommit.summary);
     } else if (!next) {
@@ -138,7 +184,10 @@ export function CommitBox() {
       <Input
         placeholder="Summary (required)"
         value={summary}
-        onChange={(e) => setSummary(e.target.value)}
+        onChange={(e) => {
+          setSummary(e.target.value);
+          setSummaryAutoFilled(false);
+        }}
         onKeyDown={(e) => {
           if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submit();
         }}
