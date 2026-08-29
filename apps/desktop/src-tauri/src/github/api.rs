@@ -877,6 +877,98 @@ struct MergeBody<'a> {
     sha: Option<&'a str>,
 }
 
+#[derive(Deserialize)]
+struct RawCommitIdentity {
+    name: Option<String>,
+    email: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RawCommitInner {
+    author: Option<RawCommitIdentity>,
+    message: String,
+}
+
+#[derive(Deserialize)]
+struct RawPullRequestCommit {
+    commit: RawCommitInner,
+    // The linked GitHub account for this commit, already resolved by GitHub itself (including
+    // via noreply emails) — null when the commit's author has no linked/matchable account.
+    author: Option<RawUser>,
+}
+
+async fn list_pull_request_commits(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<Vec<RawPullRequestCommit>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/pulls/{number}/commits?per_page=100");
+    let res = send_checked(gh.get(&path)).await?;
+    res.json().await.map_err(|e| e.to_string())
+}
+
+const COAUTHOR_PREFIX: &str = "co-authored-by:";
+
+fn strip_coauthor_trailers(message: &str) -> String {
+    message
+        .lines()
+        .filter(|line| !line.trim().to_lowercase().starts_with(COAUTHOR_PREFIX))
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim_end()
+        .to_string()
+}
+
+/// GitHub's default squash-merge commit message credits every squashed commit's author as a
+/// `Co-authored-by` trailer — including the person doing the merge, so a branch with only one
+/// contributor still shows that same person as both author and co-author of the squash commit
+/// (a long-standing GitHub limitation: https://github.com/orgs/community/discussions/33311).
+/// We build the message ourselves instead of leaving `commit_message` unset, so the merging user
+/// is never listed as their own co-author, while other contributors still get credited.
+fn build_squash_commit_message(commits: &[RawPullRequestCommit], merger_login: &str) -> String {
+    let mut seen = std::collections::HashSet::new();
+    let mut coauthors = Vec::new();
+    for c in commits {
+        let is_merger = c
+            .author
+            .as_ref()
+            .map(|a| a.login.eq_ignore_ascii_case(merger_login))
+            .unwrap_or(false);
+        if is_merger {
+            continue;
+        }
+        let Some(identity) = &c.commit.author else {
+            continue;
+        };
+        let (Some(name), Some(email)) = (identity.name.as_deref(), identity.email.as_deref())
+        else {
+            continue;
+        };
+        if seen.insert(email.to_lowercase()) {
+            coauthors.push(format!("Co-authored-by: {name} <{email}>"));
+        }
+    }
+
+    let body = if commits.len() == 1 {
+        strip_coauthor_trailers(&commits[0].commit.message)
+    } else {
+        commits
+            .iter()
+            .map(|c| format!("* {}", c.commit.message.lines().next().unwrap_or("")))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+
+    if coauthors.is_empty() {
+        body
+    } else {
+        format!("{body}\n\n{}", coauthors.join("\n"))
+    }
+}
+
 // host/token/owner/repo is this file's consistent first-four-args calling convention (see
 // every other function below) — a one-off params struct for just this function would diverge
 // from that, not simplify it.
@@ -887,12 +979,31 @@ pub async fn merge_pull_request(
     owner: &str,
     repo: &str,
     number: u64,
+    merger_login: &str,
     merge_method: &str,
     commit_title: Option<&str>,
     commit_message: Option<&str>,
     sha: Option<&str>,
 ) -> Result<(), String> {
     let gh = GhClient::new(host, token)?;
+
+    // Only squash merges are affected (merge commits and rebase merges keep each original
+    // commit's own author, so GitHub never synthesizes a co-author trailer for them) — and only
+    // when the user left the message blank, i.e. they want GitHub's default rather than something
+    // they typed themselves.
+    let computed_message;
+    let commit_message = if merge_method == "squash" && commit_message.is_none() {
+        match list_pull_request_commits(host, token, owner, repo, number).await {
+            Ok(commits) => {
+                computed_message = build_squash_commit_message(&commits, merger_login);
+                Some(computed_message.as_str())
+            }
+            Err(_) => commit_message,
+        }
+    } else {
+        commit_message
+    };
+
     let path = format!("/repos/{owner}/{repo}/pulls/{number}/merge");
     send_checked(gh.put(&path).json(&MergeBody {
         merge_method,
@@ -1319,5 +1430,74 @@ mod tests {
         assert_eq!(lines[2].kind, LineKind::Addition);
         assert_eq!(lines[2].new_lineno, Some(2));
         assert_eq!(lines[3].content, "added line");
+    }
+
+    fn commit(login: Option<&str>, name: &str, email: &str, message: &str) -> RawPullRequestCommit {
+        RawPullRequestCommit {
+            commit: RawCommitInner {
+                author: Some(RawCommitIdentity {
+                    name: Some(name.to_string()),
+                    email: Some(email.to_string()),
+                }),
+                message: message.to_string(),
+            },
+            author: login.map(|l| RawUser {
+                login: l.to_string(),
+                avatar_url: String::new(),
+            }),
+        }
+    }
+
+    #[test]
+    fn squash_message_omits_merger_as_their_own_coauthor() {
+        let commits = vec![
+            commit(Some("daniel"), "Daniel", "daniel@example.com", "First commit"),
+            commit(Some("daniel"), "Daniel", "daniel@example.com", "Second commit"),
+        ];
+        let message = build_squash_commit_message(&commits, "daniel");
+        assert!(!message.to_lowercase().contains("co-authored-by"));
+    }
+
+    #[test]
+    fn squash_message_keeps_a_genuinely_different_coauthor() {
+        let commits = vec![
+            commit(Some("daniel"), "Daniel", "daniel@example.com", "First commit"),
+            commit(Some("helper"), "Helper", "helper@example.com", "Second commit"),
+        ];
+        let message = build_squash_commit_message(&commits, "daniel");
+        assert_eq!(
+            message,
+            "* First commit\n* Second commit\n\nCo-authored-by: Helper <helper@example.com>"
+        );
+    }
+
+    #[test]
+    fn squash_message_dedupes_same_coauthor_across_commits() {
+        let commits = vec![
+            commit(Some("helper"), "Helper", "helper@example.com", "First commit"),
+            commit(Some("helper"), "Helper", "helper@example.com", "Second commit"),
+        ];
+        let message = build_squash_commit_message(&commits, "daniel");
+        assert_eq!(message.matches("Co-authored-by").count(), 1);
+    }
+
+    #[test]
+    fn squash_message_for_single_commit_strips_its_own_self_coauthor_trailer() {
+        let commits = vec![commit(
+            Some("daniel"),
+            "Daniel",
+            "daniel@example.com",
+            "Add feature\n\nCo-authored-by: Daniel <daniel@example.com>",
+        )];
+        let message = build_squash_commit_message(&commits, "daniel");
+        assert_eq!(message, "Add feature");
+    }
+
+    #[test]
+    fn strip_coauthor_trailers_removes_only_trailer_lines() {
+        let stripped = strip_coauthor_trailers(
+            "Summary\n\nBody line.\nCo-authored-by: Someone <s@example.com>",
+        );
+        assert_eq!(stripped, "Summary\n\nBody line.");
     }
 }

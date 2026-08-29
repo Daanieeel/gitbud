@@ -1608,6 +1608,7 @@ async fn github_merge_pull_request(
         &owner,
         &repo,
         number,
+        &login,
         &merge_method,
         commit_title.as_deref(),
         commit_message.as_deref(),
