@@ -40,7 +40,7 @@ export function PRDetailHeader({ repoPath, login, pr, onMergeClick }: PRDetailHe
         <div className="truncate text-base font-medium">
           {pr.title} <span className="text-muted-foreground">#{pr.number}</span>
         </div>
-        <div className="flex min-w-0 items-center gap-1.5 pt-0.5 text-xs text-muted-foreground">
+        <div className="flex min-w-0 items-center gap-1.5 pt-2 text-xs text-muted-foreground">
           <BranchName className="h-5 px-1.5 text-xs">{pr.base_ref}</BranchName>
           <span className="shrink-0">←</span>
           <BranchName className="h-5 px-1.5 text-xs">{pr.head_ref}</BranchName>
