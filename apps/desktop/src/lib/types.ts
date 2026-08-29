@@ -268,6 +268,13 @@ export interface PullRequest {
   merged: boolean;
   mergeable: boolean | null;
   labels: string[];
+  // Only ever populated from `githubGetPullRequest` (a single-PR fetch) — GitHub's list-PRs
+  // endpoint never returns these, so a list-sourced `PullRequest` always has them empty/null.
+  // See `usePullRequestMeta`, which exists specifically to keep these fresh for the open PR.
+  mergeable_state: string | null;
+  requested_reviewers: AssignableUser[];
+  assignees: AssignableUser[];
+  milestone: Milestone | null;
 }
 
 export interface Label {
@@ -332,4 +339,52 @@ export interface GitHubRepo {
   fork: boolean;
   updated_at: string;
   owner: GitHubRepoOwner;
+}
+
+export interface PullRequestCommit {
+  sha: string;
+  summary: string;
+  body: string;
+  author_login: string | null;
+  author_avatar_url: string | null;
+  author_name: string | null;
+  author_email: string | null;
+  authored_at: string | null;
+  html_url: string;
+}
+
+export interface IssueComment {
+  id: number;
+  body: string;
+  user_login: string;
+  user_avatar_url: string;
+  created_at: string;
+  updated_at: string;
+  html_url: string;
+}
+
+export interface Review {
+  id: number;
+  user_login: string;
+  user_avatar_url: string;
+  state: "APPROVED" | "CHANGES_REQUESTED" | "COMMENTED" | "PENDING" | "DISMISSED" | string;
+  body: string;
+  submitted_at: string | null;
+}
+
+export interface ReviewThread {
+  id: string;
+  is_resolved: boolean;
+  comment_database_ids: number[];
+}
+
+export interface CompareResult {
+  ahead_by: number;
+  behind_by: number;
+  status: string;
+}
+
+export interface BranchProtectionRequirements {
+  required_contexts: string[];
+  required_approving_review_count: number | null;
 }

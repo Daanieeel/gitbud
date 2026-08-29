@@ -19,6 +19,7 @@ import { runIcon, runStatusLabel } from "./CIBadge";
 import { api } from "@/lib/tauri";
 import { queryKeys } from "@/lib/queryKeys";
 import { takePrefetchedMergeSettings } from "@/lib/mergeSettingsPrefetch";
+import { mergeReadiness } from "@/lib/mergeReadiness";
 import { cn } from "@gitbud/ui/utils";
 import type { PullRequest, RepoMergeSettings } from "@/lib/types";
 
@@ -147,16 +148,16 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
     };
   }, [open, repoPath, login, targetBase, pr.base_ref]);
 
-  // Vacuously true for no checks at all (nothing to block on) and false while still loading —
-  // we don't want to flash the confident "default" color before we actually know.
+  // Routed through the shared `mergeReadiness()` (also used by the Conversation tab's merge-
+  // readiness panel) rather than a second hand-rolled "are the checks green" check — passed no
+  // required-contexts/reviewer/compare data here since this dialog doesn't fetch any of that,
+  // so `checksState` alone (not the full `canMerge`) drives this button, preserving the exact
+  // prior behavior: vacuously true for no checks at all (nothing to block on), false while
+  // `runs` is still loading (`null`) so this doesn't flash the confident "default" color before
+  // actually knowing.
+  const readiness = mergeReadiness(pr, runs, [], [], null, null);
   const allChecksPassing =
-    runs !== null &&
-    runs.every(
-      (r) =>
-        r.status === "completed" &&
-        r.conclusion &&
-        ["success", "neutral", "skipped"].includes(r.conclusion),
-    );
+    runs !== null && (readiness.checksState === "passing" || readiness.checksState === "none");
 
   const submit = async () => {
     setMerging(true);
@@ -217,7 +218,7 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
             </div>
           )}
 
-          {pr.mergeable === false && targetBase === pr.base_ref && (
+          {readiness.conflictState === "conflicted" && targetBase === pr.base_ref && (
             <div className="flex items-center gap-1.5 rounded-md bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
               <TriangleAlertIcon className="size-3.5 shrink-0" />
               This branch has conflicts with {pr.base_ref} and may not be mergeable.

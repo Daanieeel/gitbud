@@ -1,6 +1,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
+  CheckCircle2Icon,
   ColumnsIcon,
   LinkIcon,
   MessageSquarePlusIcon,
@@ -24,6 +25,10 @@ import {
   highlightLine,
   languageForPath,
 } from "../../lib/highlight";
+import { groupCommentsIntoThreads } from "./threading";
+
+type ReplyHandler = (rootCommentId: number, body: string) => Promise<void> | void;
+type ResolveThreadHandler = (rootCommentId: number, resolved: boolean) => Promise<void> | void;
 
 interface HunkActions {
   /** Whether the diff being shown is the staged (HEAD->index) or unstaged (index->workdir) side. */
@@ -46,6 +51,15 @@ interface DiffViewProps {
   imageDiff?: ImageDiff | null;
   comments?: ReviewComment[];
   onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
+  /** Replies to an existing thread, keyed by that thread's root comment id — the desktop app
+   * resolves this id to a GraphQL thread id itself; this package has no GraphQL knowledge. */
+  onReply?: ReplyHandler;
+  /** Toggles a thread's resolved state, keyed by its root comment id, same reasoning as
+   * `onReply`. Only rendered when a comment actually carries a `resolved` value (see
+   * `ReviewComment.resolved`'s doc comment) — a thread this app hasn't reconciled against
+   * GitHub's GraphQL review-threads response yet has no resolve control at all, rather than one
+   * that might silently act on the wrong thread. */
+  onResolveThread?: ResolveThreadHandler;
   onCopyPermalink?: (line: number) => void;
   hunkActions?: HunkActions;
   /** The other side of the same file's changes (e.g. `diff` is unstaged, this is staged), shown
@@ -83,21 +97,118 @@ function commentsForLine(
   });
 }
 
-function CommentThread({ comments }: { comments: ReviewComment[] }) {
-  if (comments.length === 0) return null;
+/** One thread — a root comment plus its replies (see `groupCommentsIntoThreads`) — with a reply
+ * composer and a resolve/unresolve toggle. A resolved thread collapses to a one-line summary by
+ * default (each thread tracks its own "I clicked Show" override locally, independent of props,
+ * so it never gets stuck open/closed from a stale render — the moment `resolved` itself flips
+ * back to `false`, e.g. someone unresolves it, the summary disappears regardless of that flag). */
+function SingleCommentThread({
+  thread,
+  onReply,
+  onResolveThread,
+}: {
+  thread: ReviewComment[];
+  onReply?: ReplyHandler;
+  onResolveThread?: ResolveThreadHandler;
+}) {
+  const root = thread[0];
+  const [replying, setReplying] = useState(false);
+  const [resolving, setResolving] = useState(false);
+  const [forceExpand, setForceExpand] = useState(false);
+  const isResolved = root.resolved === true;
+  const showCollapsedSummary = isResolved && !forceExpand;
+
   return (
     <div className="ml-16 flex flex-col gap-1 border-l-2 border-primary bg-card px-3 py-2">
-      {comments.map((c) => (
-        <div key={c.id} className="flex items-start gap-1.5 text-xs">
-          <Avatar src={c.user_avatar_url} alt={c.user_login} className="mt-0.5 size-4" />
-          <div>
-            <span className="font-medium">{c.user_login}</span>{" "}
-            <span className="text-muted-foreground">
-              {new Date(c.created_at).toLocaleDateString()}
-            </span>
-            <p className="whitespace-pre-wrap">{c.body}</p>
-          </div>
-        </div>
+      {showCollapsedSummary ? (
+        <button
+          type="button"
+          onClick={() => setForceExpand(true)}
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+        >
+          <CheckCircle2Icon className="size-3.5 shrink-0 text-accent-green" />
+          <span>
+            Resolved — {thread.length} comment{thread.length > 1 ? "s" : ""}
+          </span>
+          <span className="underline">Show</span>
+        </button>
+      ) : (
+        <>
+          {thread.map((c) => (
+            <div key={c.id} className="flex items-start gap-1.5 text-xs">
+              <Avatar src={c.user_avatar_url} alt={c.user_login} className="mt-0.5 size-4" />
+              <div>
+                <span className="font-medium">{c.user_login}</span>{" "}
+                <span className="text-muted-foreground">
+                  {new Date(c.created_at).toLocaleDateString()}
+                </span>
+                <p className="whitespace-pre-wrap">{c.body}</p>
+              </div>
+            </div>
+          ))}
+          {replying && onReply ? (
+            <AddCommentComposer
+              onCancel={() => setReplying(false)}
+              onSubmit={(body) => onReply(root.id, body)}
+            />
+          ) : (
+            (onReply || (onResolveThread && root.resolved !== undefined)) && (
+              <div className="flex gap-3 pl-5 pt-0.5 text-xs">
+                {onReply && (
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground"
+                    onClick={() => setReplying(true)}
+                  >
+                    Reply
+                  </button>
+                )}
+                {onResolveThread && root.resolved !== undefined && (
+                  <button
+                    type="button"
+                    disabled={resolving}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-50"
+                    onClick={async () => {
+                      setResolving(true);
+                      try {
+                        await onResolveThread(root.id, !isResolved);
+                      } finally {
+                        setResolving(false);
+                      }
+                    }}
+                  >
+                    {isResolved ? "Unresolve" : "Resolve conversation"}
+                  </button>
+                )}
+              </div>
+            )
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function CommentThread({
+  comments,
+  onReply,
+  onResolveThread,
+}: {
+  comments: ReviewComment[];
+  onReply?: ReplyHandler;
+  onResolveThread?: ResolveThreadHandler;
+}) {
+  if (comments.length === 0) return null;
+  const threads = groupCommentsIntoThreads(comments);
+  return (
+    <div className="flex flex-col gap-2">
+      {threads.map((thread) => (
+        <SingleCommentThread
+          key={thread[0].id}
+          thread={thread}
+          onReply={onReply}
+          onResolveThread={onResolveThread}
+        />
       ))}
     </div>
   );
@@ -250,6 +361,8 @@ function UnifiedLine({
   language,
   comments,
   onAddComment,
+  onReply,
+  onResolveThread,
   onCopyPermalink,
   hunkActions,
   composerKey,
@@ -261,6 +374,8 @@ function UnifiedLine({
   language: string | undefined;
   comments: ReviewComment[] | undefined;
   onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
+  onReply?: ReplyHandler;
+  onResolveThread?: ResolveThreadHandler;
   onCopyPermalink?: (line: number) => void;
   hunkActions?: HunkActions;
   composerKey: string | null;
@@ -380,7 +495,7 @@ function UnifiedLine({
           </div>
         )}
       </div>
-      <CommentThread comments={lineComments} />
+      <CommentThread comments={lineComments} onReply={onReply} onResolveThread={onResolveThread} />
       {composerKey === key && onAddComment && (
         <AddCommentComposer
           onCancel={() => setComposerKey(null)}
@@ -526,6 +641,8 @@ interface DiffSectionProps {
   label?: string;
   comments?: ReviewComment[];
   onAddComment?: (line: number, side: "LEFT" | "RIGHT", body: string) => Promise<void> | void;
+  onReply?: ReplyHandler;
+  onResolveThread?: ResolveThreadHandler;
   onCopyPermalink?: (line: number) => void;
   composerKey: string | null;
   setComposerKey: (key: string | null) => void;
@@ -553,6 +670,8 @@ function DiffSection({
   label,
   comments,
   onAddComment,
+  onReply,
+  onResolveThread,
   onCopyPermalink,
   composerKey,
   setComposerKey,
@@ -639,6 +758,8 @@ function DiffSection({
                     language={language}
                     comments={comments}
                     onAddComment={onAddComment}
+                    onReply={onReply}
+                    onResolveThread={onResolveThread}
                     onCopyPermalink={onCopyPermalink}
                     hunkActions={hunkActions}
                     composerKey={composerKey}
@@ -667,6 +788,8 @@ function DiffViewImpl({
   imageDiff,
   comments,
   onAddComment,
+  onReply,
+  onResolveThread,
   onCopyPermalink,
   hunkActions,
   secondaryDiff,
@@ -789,6 +912,8 @@ function DiffViewImpl({
           }
           comments={comments}
           onAddComment={onAddComment}
+          onReply={onReply}
+          onResolveThread={onResolveThread}
           onCopyPermalink={onCopyPermalink}
           composerKey={composerKey}
           setComposerKey={setComposerKey}
@@ -806,6 +931,8 @@ function DiffViewImpl({
             label={secondaryHunkActions?.staged ? "Staged changes" : "Unstaged changes"}
             comments={comments}
             onAddComment={onAddComment}
+            onReply={onReply}
+            onResolveThread={onResolveThread}
             onCopyPermalink={onCopyPermalink}
             composerKey={composerKey}
             setComposerKey={setComposerKey}

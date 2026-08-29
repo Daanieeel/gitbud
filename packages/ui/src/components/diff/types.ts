@@ -39,4 +39,9 @@ export interface ReviewComment {
   user_avatar_url: string;
   created_at: string;
   in_reply_to_id: number | null;
+  /** Whether this comment's thread is resolved — populated by the desktop app after joining the
+   * GraphQL review-threads response against this REST comment's `id`; `DiffView` itself has no
+   * GraphQL knowledge, it only renders whatever's already set here. `undefined` (not `false`)
+   * means "resolution status not known yet" — renders as unresolved-looking, never crashes. */
+  resolved?: boolean;
 }

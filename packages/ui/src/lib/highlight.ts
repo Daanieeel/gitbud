@@ -99,6 +99,17 @@ export function languageForPath(path: string): string | undefined {
   return ext ? lookup(EXT_TO_LANG, ext) : undefined;
 }
 
+/** Resolves a markdown fenced-code-block info string (e.g. the "ts" in ` ```ts `) to a
+ * highlight.js grammar name — these tokens are conventionally the same short names as file
+ * extensions, so this reuses the same lookup table `languageForPath` does, falling back to the
+ * token itself when it already names one of `LANGUAGE_LOADERS`' keys directly (e.g. "typescript",
+ * "python" — markdown fences commonly spell out the full name instead of the short extension). */
+export function languageForToken(token: string | undefined): string | undefined {
+  if (!token) return undefined;
+  const lowered = token.toLowerCase();
+  return lookup(EXT_TO_LANG, lowered) ?? (lowered in LANGUAGE_LOADERS ? lowered : undefined);
+}
+
 function escapeHtml(text: string): string {
   return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
@@ -113,6 +124,18 @@ export function highlightLine(content: string, language: string | undefined): st
     return hljs.highlight(content, { language, ignoreIllegals: true }).value;
   } catch {
     return escapeHtml(content);
+  }
+}
+
+/** Same idea as `highlightLine`, but for a whole fenced code block at once (markdown rendering)
+ * rather than one diff line in isolation — keeps cross-line grammar state, unlike the per-line
+ * version. Renders as plain escaped text until `language`'s grammar finishes loading. */
+export function highlightBlock(code: string, language: string | undefined): string {
+  if (!language || !loadedLanguages.has(language)) return escapeHtml(code);
+  try {
+    return hljs.highlight(code, { language, ignoreIllegals: true }).value;
+  } catch {
+    return escapeHtml(code);
   }
 }
 

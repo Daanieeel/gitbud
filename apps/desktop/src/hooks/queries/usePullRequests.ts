@@ -294,4 +294,26 @@ export function useAddReviewComment(
   });
 }
 
+export function useReplyToReviewComment(
+  repoPath: string | null,
+  login: string | null,
+  number: number | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ inReplyTo, body }: { inReplyTo: number; body: string }) => {
+      if (!repoPath || !login || number === null)
+        throw new Error("useReplyToReviewComment: repoPath/login/number not set");
+      return api.githubReplyToReviewComment(repoPath, login, number, inReplyTo, body);
+    },
+    onSuccess: (comment) => {
+      if (!repoPath || !login || number === null) return;
+      queryClient.setQueryData<PullRequestDetail | undefined>(
+        queryKeys.prDetail(repoPath, login, number),
+        (prev) => (prev ? { ...prev, comments: [...prev.comments, comment] } : prev),
+      );
+    },
+  });
+}
+
 export { isBrokenTokenError };

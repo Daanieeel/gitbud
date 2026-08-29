@@ -7,7 +7,9 @@ use std::path::PathBuf;
 use std::sync::OnceLock;
 
 use crate::diff::PrFileEntry;
-use crate::github::api::{CheckRun, PullRequest, ReviewComment};
+use crate::github::api::{
+    CheckRun, IssueComment, PullRequest, PullRequestCommit, Review, ReviewComment,
+};
 
 /// Rows older than this are opportunistically pruned on each write, so a long-lived app session
 /// doesn't grow this file forever on disk. Doesn't apply to `avatars` — those are kept
@@ -66,6 +68,21 @@ fn pool() -> Result<&'static Pool<SqliteConnectionManager>, String> {
                     url TEXT PRIMARY KEY,
                     data_uri TEXT NOT NULL,
                     cached_at INTEGER NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS pr_commits (
+                    repo_key TEXT NOT NULL, number INTEGER NOT NULL,
+                    head_sha TEXT NOT NULL, commits_json TEXT NOT NULL, synced_at INTEGER NOT NULL,
+                    PRIMARY KEY (repo_key, number)
+                );
+                CREATE TABLE IF NOT EXISTS pr_issue_comments (
+                    repo_key TEXT NOT NULL, number INTEGER NOT NULL,
+                    comments_json TEXT NOT NULL, synced_at INTEGER NOT NULL,
+                    PRIMARY KEY (repo_key, number)
+                );
+                CREATE TABLE IF NOT EXISTS pr_reviews (
+                    repo_key TEXT NOT NULL, number INTEGER NOT NULL,
+                    reviews_json TEXT NOT NULL, synced_at INTEGER NOT NULL,
+                    PRIMARY KEY (repo_key, number)
                 );
                 ",
             )
@@ -245,6 +262,133 @@ pub fn upsert_comments(
     Ok(())
 }
 
+/// `None` when there's no cached copy or the cached copy's `head_sha` no longer matches —
+/// mirrors `get_cached_files`'s freshness-checked-by-sha convention, since a PR's commit list is
+/// likewise immutable for a given head commit.
+pub fn get_cached_commits(
+    repo_key: &str,
+    number: u64,
+    head_sha: &str,
+) -> Result<Option<Vec<PullRequestCommit>>, String> {
+    let conn = conn()?;
+    let result: Option<(String, String)> = conn
+        .query_row(
+            "SELECT head_sha, commits_json FROM pr_commits WHERE repo_key = ?1 AND number = ?2",
+            params![repo_key, number as i64],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    match result {
+        Some((cached_sha, commits_json)) if cached_sha == head_sha => {
+            serde_json::from_str(&commits_json).map_err(|e| e.to_string())
+        }
+        _ => Ok(None),
+    }
+}
+
+/// Whatever's cached for this PR's commits, regardless of whether `head_sha` is still current —
+/// mirrors `get_any_cached_files`, for instant-paint seeding (and the offline fallback) while a
+/// live, freshness-checked fetch is in flight or unreachable.
+pub fn get_any_cached_commits(
+    repo_key: &str,
+    number: u64,
+) -> Result<Option<Vec<PullRequestCommit>>, String> {
+    let conn = conn()?;
+    let commits_json: Option<String> = conn
+        .query_row(
+            "SELECT commits_json FROM pr_commits WHERE repo_key = ?1 AND number = ?2",
+            params![repo_key, number as i64],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    commits_json
+        .map(|json| serde_json::from_str(&json).map_err(|e| e.to_string()))
+        .transpose()
+}
+
+pub fn upsert_commits(
+    repo_key: &str,
+    number: u64,
+    head_sha: &str,
+    commits: &[PullRequestCommit],
+) -> Result<(), String> {
+    let conn = conn()?;
+    let commits_json = serde_json::to_string(commits).map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO pr_commits (repo_key, number, head_sha, commits_json, synced_at) VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(repo_key, number) DO UPDATE SET head_sha = excluded.head_sha, commits_json = excluded.commits_json, synced_at = excluded.synced_at",
+        params![repo_key, number as i64, head_sha, commits_json, now()],
+    )
+    .map_err(|e| e.to_string())?;
+    prune(&conn, "pr_commits", repo_key);
+    Ok(())
+}
+
+pub fn get_cached_issue_comments(
+    repo_key: &str,
+    number: u64,
+) -> Result<Option<Vec<IssueComment>>, String> {
+    let conn = conn()?;
+    let result: Option<String> = conn
+        .query_row(
+            "SELECT comments_json FROM pr_issue_comments WHERE repo_key = ?1 AND number = ?2",
+            params![repo_key, number as i64],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    result
+        .map(|json| serde_json::from_str(&json).map_err(|e| e.to_string()))
+        .transpose()
+}
+
+pub fn upsert_issue_comments(
+    repo_key: &str,
+    number: u64,
+    comments: &[IssueComment],
+) -> Result<(), String> {
+    let conn = conn()?;
+    let comments_json = serde_json::to_string(comments).map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO pr_issue_comments (repo_key, number, comments_json, synced_at) VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(repo_key, number) DO UPDATE SET comments_json = excluded.comments_json, synced_at = excluded.synced_at",
+        params![repo_key, number as i64, comments_json, now()],
+    )
+    .map_err(|e| e.to_string())?;
+    prune(&conn, "pr_issue_comments", repo_key);
+    Ok(())
+}
+
+pub fn get_cached_reviews(repo_key: &str, number: u64) -> Result<Option<Vec<Review>>, String> {
+    let conn = conn()?;
+    let result: Option<String> = conn
+        .query_row(
+            "SELECT reviews_json FROM pr_reviews WHERE repo_key = ?1 AND number = ?2",
+            params![repo_key, number as i64],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    result
+        .map(|json| serde_json::from_str(&json).map_err(|e| e.to_string()))
+        .transpose()
+}
+
+pub fn upsert_reviews(repo_key: &str, number: u64, reviews: &[Review]) -> Result<(), String> {
+    let conn = conn()?;
+    let reviews_json = serde_json::to_string(reviews).map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO pr_reviews (repo_key, number, reviews_json, synced_at) VALUES (?1, ?2, ?3, ?4)
+         ON CONFLICT(repo_key, number) DO UPDATE SET reviews_json = excluded.reviews_json, synced_at = excluded.synced_at",
+        params![repo_key, number as i64, reviews_json, now()],
+    )
+    .map_err(|e| e.to_string())?;
+    prune(&conn, "pr_reviews", repo_key);
+    Ok(())
+}
+
 pub fn get_cached_check_runs(repo_key: &str, sha: &str) -> Result<Option<Vec<CheckRun>>, String> {
     let conn = conn()?;
     let result: Option<String> = conn
@@ -321,7 +465,7 @@ pub fn cache_sizes() -> Result<(u64, u64), String> {
     let conn = conn()?;
     let repo_bytes: i64 = conn
         .query_row(
-            "SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name IN ('pr_list', 'pr_files', 'pr_comments', 'check_runs')",
+            "SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name IN ('pr_list', 'pr_files', 'pr_comments', 'check_runs', 'pr_commits', 'pr_issue_comments', 'pr_reviews')",
             [],
             |row| row.get(0),
         )
@@ -348,6 +492,9 @@ pub fn clear_repo_data() -> Result<(), String> {
         DELETE FROM pr_files;
         DELETE FROM pr_comments;
         DELETE FROM check_runs;
+        DELETE FROM pr_commits;
+        DELETE FROM pr_issue_comments;
+        DELETE FROM pr_reviews;
         VACUUM;
         ",
     )
