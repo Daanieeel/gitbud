@@ -15,6 +15,7 @@ import { FileTypeIcon } from "@/lib/file-icons";
 import { FileStatusIcon } from "@/lib/file-status";
 import { FilePathLabel } from "@/components/changes/FilePathLabel";
 import { MultiSelectField } from "./MultiSelectField";
+import { LabelChip } from "./LabelChip";
 import { SingleSelectField } from "./SingleSelectField";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { useRepoStore } from "@/store/useRepoStore";
@@ -371,13 +372,8 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
               placeholder="No labels"
               options={labels.map((l) => ({
                 key: l.name,
-                label: l.name,
-                slotLeft: (
-                  <span
-                    className="inline-block size-2 shrink-0 rounded-full"
-                    style={{ backgroundColor: `#${l.color}` }}
-                  />
-                ),
+                label: <LabelChip name={l.name} color={l.color} />,
+                searchText: l.name,
               }))}
               selected={selectedLabels}
               onChange={setSelectedLabels}
