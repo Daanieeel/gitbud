@@ -2087,6 +2087,16 @@ async fn github_create_issue_comment(
 }
 
 #[tauri::command]
+async fn github_delete_issue_comment(
+    repo_path: String,
+    login: String,
+    comment_id: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::delete_issue_comment(&host, &token, &owner, &repo, comment_id).await
+}
+
+#[tauri::command]
 async fn github_list_reviews(
     repo_path: String,
     login: String,
@@ -2669,6 +2679,7 @@ pub fn run() {
             github_list_issue_comments,
             get_cached_issue_comments,
             github_create_issue_comment,
+            github_delete_issue_comment,
             github_list_reviews,
             get_cached_reviews,
             github_submit_review,

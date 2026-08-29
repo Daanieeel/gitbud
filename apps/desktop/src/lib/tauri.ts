@@ -384,6 +384,8 @@ export const api = {
     invoke<IssueComment[] | null>("get_cached_issue_comments", { repoPath, number }),
   githubCreateIssueComment: (repoPath: string, login: string, number: number, body: string) =>
     invoke<IssueComment>("github_create_issue_comment", { repoPath, login, number, body }),
+  githubDeleteIssueComment: (repoPath: string, login: string, commentId: number) =>
+    invoke<void>("github_delete_issue_comment", { repoPath, login, commentId }),
   githubListReviews: (repoPath: string, login: string, number: number, page: number) =>
     invoke<Review[]>("github_list_reviews", { repoPath, login, number, page }),
   getCachedReviews: (repoPath: string, number: number) =>

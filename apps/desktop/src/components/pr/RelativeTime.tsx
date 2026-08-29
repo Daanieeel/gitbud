@@ -13,12 +13,13 @@ interface RelativeTimeProps {
 export function RelativeTime({ iso, className }: RelativeTimeProps) {
   if (!iso) return null;
   const date = new Date(iso);
+  // date-fns prefixes imprecise distances with "about " (e.g. "about 1 hour ago") — "~" reads
+  // the same but stays out of the way in the tight timeline/label spots this renders in.
+  const distance = formatDistanceToNow(date, { addSuffix: true }).replace(/^about /, "~");
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <span className={`underline decoration-dotted ${className ?? ""}`}>
-          {formatDistanceToNow(date, { addSuffix: true })}
-        </span>
+        <span className={`underline decoration-dotted ${className ?? ""}`}>{distance}</span>
       </TooltipTrigger>
       <TooltipContent>{format(date, "PPp")}</TooltipContent>
     </Tooltip>

@@ -184,6 +184,34 @@ export function useAddIssueComment(
   });
 }
 
+export function useDeleteIssueComment(
+  repoPath: string | null,
+  login: string | null,
+  number: number | null,
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: number) => {
+      if (!repoPath || !login) {
+        throw new Error("useDeleteIssueComment: repoPath/login not set");
+      }
+      return api.githubDeleteIssueComment(repoPath, login, commentId);
+    },
+    onSuccess: (_data, commentId) => {
+      if (!repoPath || !login || number === null) return;
+      queryClient.setQueryData<InfiniteData<IssueComment[], number> | undefined>(
+        queryKeys.prIssueComments(repoPath, login, number),
+        (prev) =>
+          prev && {
+            ...prev,
+            pages: prev.pages.map((page) => page.filter((c) => c.id !== commentId)),
+          },
+      );
+    },
+    onError: (err) => toast.error(String(err)),
+  });
+}
+
 export function useSubmitReview(
   repoPath: string | null,
   login: string | null,

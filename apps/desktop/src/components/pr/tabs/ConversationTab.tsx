@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { CheckCircle2Icon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { PRDescription } from "./PRDescription";
@@ -6,11 +5,14 @@ import { PRTimeline } from "./PRTimeline";
 import { PRCommentCompose } from "./PRCommentCompose";
 import { PRReviewSubmit } from "./PRReviewSubmit";
 import { PRMergeReadiness } from "./PRMergeReadiness";
-import { useIssueComments, useReviews, useTimelineEvents } from "@/hooks/queries/usePRConversation";
+import {
+  useDeleteIssueComment,
+  useIssueComments,
+  useReviews,
+  useTimelineEvents,
+} from "@/hooks/queries/usePRConversation";
 import { usePullRequestCommits } from "@/hooks/queries/usePRCommits";
 import { prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
-import { filterRelevantGhEvents } from "@/lib/prTimeline";
-import { parseLinkedIssues } from "@/lib/linkedIssues";
 import type { PullRequest } from "@/lib/types";
 
 interface ConversationTabProps {
@@ -25,18 +27,8 @@ export function ConversationTab({ repoPath, login, pr }: ConversationTabProps) {
   const comments = useIssueComments(repoPath, login, pr.number, pollIntervalMs);
   const reviews = useReviews(repoPath, login, pr.number, pollIntervalMs);
   const commits = usePullRequestCommits(repoPath, login, pr.number, pr.head_sha);
-  const { data: rawGhEvents = [] } = useTimelineEvents(repoPath, login, pr.number, pollIntervalMs);
-  const closingIssueNumbers = useMemo(
-    () =>
-      parseLinkedIssues(pr.body)
-        .filter((r) => r.owner === null)
-        .map((r) => r.number),
-    [pr.body],
-  );
-  const ghEvents = useMemo(
-    () => filterRelevantGhEvents(rawGhEvents, closingIssueNumbers),
-    [rawGhEvents, closingIssueNumbers],
-  );
+  const { data: ghEvents = [] } = useTimelineEvents(repoPath, login, pr.number, pollIntervalMs);
+  const deleteComment = useDeleteIssueComment(repoPath, login, pr.number);
 
   // GitHub rejects a new review submission on a closed/merged PR outright — same gate the
   // header already uses for the Merge button.
@@ -64,6 +56,7 @@ export function ConversationTab({ repoPath, login, pr }: ConversationTabProps) {
         reviews={reviews.reviews}
         commits={commits.commits}
         ghEvents={ghEvents}
+        onDeleteComment={(id) => deleteComment.mutate(id)}
       />
       {hasMoreActivity && (
         // GitHub's comment/review/commit list endpoints return oldest-first, so the *next* page

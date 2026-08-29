@@ -41,8 +41,10 @@ export function PRSidebar({ repoPath, login, pr, pollIntervalMs }: PRSidebarProp
         <PRSidebarMilestone repoPath={repoPath} login={login} pr={pr} />
         <PRSidebarProjects repoPath={repoPath} login={login} pr={pr} />
         <PRSidebarLinkedIssues repoPath={repoPath} login={login} pr={pr} />
-        <PRSidebarLock repoPath={repoPath} login={login} pr={pr} />
-        <PRSidebarArchive repoPath={repoPath} pr={pr} />
+        <div className="flex flex-col gap-1">
+          <PRSidebarLock repoPath={repoPath} login={login} pr={pr} />
+          <PRSidebarArchive repoPath={repoPath} pr={pr} />
+        </div>
       </div>
     </div>
   );

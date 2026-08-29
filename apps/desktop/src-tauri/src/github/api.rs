@@ -2160,22 +2160,20 @@ struct RawTimelineEvent {
     assignee: Option<RawUser>,
     #[serde(default)]
     requested_reviewer: Option<RawUser>,
+    /// Only present on a `connected` event — GitHub's real field name for the linked issue/PR
+    /// is `subject`, not `source` (that name, and the `cross-referenced` event kind, describe a
+    /// different, far noisier concept: "something else mentions this issue/PR", which fires for
+    /// any plain mention, not a closing keyword). Verified against a live `connected` event's
+    /// JSON shape on this repo's own PR #81 (linked to issue #38 via `Closes #38`).
     #[serde(default)]
-    source: Option<RawCrossReferenceSource>,
+    subject: Option<RawConnectedSubject>,
 }
 
 #[derive(Deserialize)]
-struct RawCrossReferenceSource {
-    #[serde(default)]
-    issue: Option<RawCrossReferencedIssue>,
-}
-
-#[derive(Deserialize)]
-struct RawCrossReferencedIssue {
+struct RawConnectedSubject {
     number: u64,
     title: String,
     state: String,
-    html_url: String,
     #[serde(default)]
     repository: Option<RawRepoRef>,
 }
@@ -2183,6 +2181,8 @@ struct RawCrossReferencedIssue {
 #[derive(Deserialize)]
 struct RawRepoRef {
     full_name: String,
+    #[serde(default)]
+    html_url: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2198,12 +2198,10 @@ pub struct IssueTimelineEvent {
     pub assignee_avatar_url: Option<String>,
     pub requested_reviewer_login: Option<String>,
     pub requested_reviewer_avatar_url: Option<String>,
-    /// Populated only for a `cross-referenced` event whose source is an issue (as opposed to
-    /// another PR) — the "X linked an issue that may be closed by this pull request" line. Only
-    /// rendered by the frontend when this issue's number also appears among the PR body's own
-    /// closing-keyword references (`parseLinkedIssues`) — a `cross-referenced` event fires for
-    /// *any* mention, not just a closing one, and GitHub's own UI only shows this specific
-    /// wording for the closing case.
+    /// Populated only for a `connected` event — the "X linked an issue that may be closed by
+    /// this pull request" line. GitHub creates this event specifically for the closing-keyword
+    /// (or manual Development-panel) link, so unlike `cross-referenced` it never fires for a
+    /// plain mention — no extra client-side filtering against the PR body needed.
     pub source_issue_number: Option<u64>,
     pub source_issue_title: Option<String>,
     pub source_issue_state: Option<String>,
@@ -2213,7 +2211,12 @@ pub struct IssueTimelineEvent {
 
 impl From<RawTimelineEvent> for IssueTimelineEvent {
     fn from(raw: RawTimelineEvent) -> Self {
-        let source_issue = raw.source.and_then(|s| s.issue);
+        let subject = raw.subject;
+        let repo = subject.as_ref().and_then(|s| s.repository.as_ref());
+        let html_url = subject
+            .as_ref()
+            .zip(repo)
+            .map(|(s, r)| format!("{}/issues/{}", r.html_url, s.number));
         IssueTimelineEvent {
             id: raw.id,
             event: raw.event,
@@ -2226,13 +2229,11 @@ impl From<RawTimelineEvent> for IssueTimelineEvent {
             assignee_avatar_url: raw.assignee.map(|a| a.avatar_url),
             requested_reviewer_login: raw.requested_reviewer.as_ref().map(|a| a.login.clone()),
             requested_reviewer_avatar_url: raw.requested_reviewer.map(|a| a.avatar_url),
-            source_issue_number: source_issue.as_ref().map(|i| i.number),
-            source_issue_title: source_issue.as_ref().map(|i| i.title.clone()),
-            source_issue_state: source_issue.as_ref().map(|i| i.state.clone()),
-            source_issue_html_url: source_issue.as_ref().map(|i| i.html_url.clone()),
-            source_issue_repo_full_name: source_issue
-                .and_then(|i| i.repository)
-                .map(|r| r.full_name),
+            source_issue_number: subject.as_ref().map(|s| s.number),
+            source_issue_title: subject.as_ref().map(|s| s.title.clone()),
+            source_issue_state: subject.as_ref().map(|s| s.state.clone()),
+            source_issue_html_url: html_url,
+            source_issue_repo_full_name: repo.map(|r| r.full_name.clone()),
         }
     }
 }
@@ -2240,9 +2241,10 @@ impl From<RawTimelineEvent> for IssueTimelineEvent {
 /// The event kinds the Conversation tab's timeline renders — everything else GitHub's timeline
 /// API returns (commented/committed/reviewed/etc.) is already covered by our own issue-
 /// comments/reviews/commits fetches, so including them here would just duplicate entries rather
-/// than add information. `cross-referenced` is the exception: it's the only way to get "X linked
-/// an issue that may be closed by this pull request" (see `IssueTimelineEvent`'s doc comment for
-/// how it's filtered down to genuine closing references on the frontend).
+/// than add information. `connected` is the exception: it's the only way to get "X linked an
+/// issue that may be closed by this pull request" (verified against a live event on this repo's
+/// own PR #81 — GitHub uses `connected`/`subject`, not the more commonly-guessed
+/// `cross-referenced`/`source`, for this specific line).
 const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
     "labeled",
     "unlabeled",
@@ -2253,7 +2255,7 @@ const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
     "closed",
     "reopened",
     "merged",
-    "cross-referenced",
+    "connected",
 ];
 
 /// Label/assignee/reviewer-request/close/reopen/merge events for the Conversation tab's
@@ -2313,6 +2315,19 @@ pub async fn create_issue_comment(
     let res = send_checked(gh.post(&path).json(&CreateIssueCommentBody { body })).await?;
     let raw: RawIssueComment = res.json().await.map_err(|e| e.to_string())?;
     Ok(raw.into())
+}
+
+pub async fn delete_issue_comment(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    comment_id: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/comments/{comment_id}");
+    send_checked(gh.delete(&path)).await?;
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -2872,18 +2887,18 @@ mod tests {
     }
 
     #[test]
-    fn timeline_event_maps_cross_referenced_source_issue_fields() {
+    fn timeline_event_maps_connected_subject_fields() {
+        // Shape verified against a live `connected` event from this repo's own PR #81 (linked
+        // to issue #38 via `Closes #38`) — GitHub's real field names are `subject`/`connected`,
+        // not the more commonly-guessed `source`/`cross-referenced`.
         let json = r#"{
-            "event": "cross-referenced",
+            "event": "connected",
             "actor": {"login": "alice", "avatar_url": "https://a"},
-            "source": {
-                "issue": {
-                    "number": 24,
-                    "title": "Fix the thing",
-                    "state": "open",
-                    "html_url": "https://github.com/Daanieeel/gitbud/issues/24",
-                    "repository": {"full_name": "Daanieeel/gitbud"}
-                }
+            "subject": {
+                "number": 24,
+                "title": "Fix the thing",
+                "state": "open",
+                "repository": {"full_name": "Daanieeel/gitbud", "html_url": "https://github.com/Daanieeel/gitbud"}
             }
         }"#;
         let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
@@ -2891,6 +2906,10 @@ mod tests {
         assert_eq!(event.source_issue_number, Some(24));
         assert_eq!(event.source_issue_title, Some("Fix the thing".to_string()));
         assert_eq!(event.source_issue_state, Some("open".to_string()));
+        assert_eq!(
+            event.source_issue_html_url,
+            Some("https://github.com/Daanieeel/gitbud/issues/24".to_string())
+        );
         assert_eq!(
             event.source_issue_repo_full_name,
             Some("Daanieeel/gitbud".to_string())
@@ -2914,6 +2933,6 @@ mod tests {
         assert!(!RELEVANT_TIMELINE_EVENTS.contains(&"committed"));
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"labeled"));
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"merged"));
-        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"cross-referenced"));
+        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"connected"));
     }
 }

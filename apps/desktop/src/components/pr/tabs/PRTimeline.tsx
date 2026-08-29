@@ -10,6 +10,7 @@ interface PRTimelineProps {
   reviews: Review[];
   commits: PullRequestCommit[];
   ghEvents: IssueTimelineEvent[];
+  onDeleteComment: (commentId: number) => void;
 }
 
 export function PRTimeline({
@@ -19,6 +20,7 @@ export function PRTimeline({
   reviews,
   commits,
   ghEvents,
+  onDeleteComment,
 }: PRTimelineProps) {
   const events = useMemo(
     () => mergeTimeline(comments, reviews, commits, ghEvents),
@@ -54,6 +56,7 @@ export function PRTimeline({
               login={login}
               showTopLine={showTopLine}
               showBottomLine={showBottomLine}
+              onDeleteComment={onDeleteComment}
             />
             {i === mergedIndex && i < events.length - 1 && (
               <div className="my-2 border-t-2 border-accent-purple/40" />

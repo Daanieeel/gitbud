@@ -72,6 +72,7 @@ interface PRTimelineEventProps {
   login: string;
   showTopLine: boolean;
   showBottomLine: boolean;
+  onDeleteComment: (commentId: number) => void;
 }
 
 export function PRTimelineEvent({
@@ -80,6 +81,7 @@ export function PRTimelineEvent({
   login,
   showTopLine,
   showBottomLine,
+  onDeleteComment,
 }: PRTimelineEventProps) {
   const selectCommit = usePRStore((s) => s.selectCommit);
 
@@ -91,7 +93,7 @@ export function PRTimelineEvent({
         showTopLine={showTopLine}
         showBottomLine={showBottomLine}
       >
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex items-center gap-2 py-0.5 text-xs text-muted-foreground">
           {commit.author_avatar_url && (
             <Avatar
               src={commit.author_avatar_url}
@@ -125,7 +127,7 @@ export function PRTimelineEvent({
         showTopLine={showTopLine}
         showBottomLine={showBottomLine}
       >
-        <div className="rounded-md border border-border p-3">
+        <div className="rounded-md border border-border px-3 pt-3.5 pb-3.5">
           <div className="mb-1 flex items-center gap-1.5 text-xs">
             <span className="font-medium">{review.user_login}</span>
             <Icon className={`size-3.5 shrink-0 ${verdict.color}`} />
@@ -144,7 +146,7 @@ export function PRTimelineEvent({
   if (event.kind === "github_event") {
     const { ghEvent } = event;
 
-    if (ghEvent.event === "cross-referenced") {
+    if (ghEvent.event === "connected") {
       // "X linked an issue that may be closed by this pull request" — a two-line layout, per
       // the design ask: first line is the sentence + relative time, second line is the linked
       // issue's own title (as a link) + its open/closed state.
@@ -155,7 +157,7 @@ export function PRTimelineEvent({
           showTopLine={showTopLine}
           showBottomLine={showBottomLine}
         >
-          <div className="flex flex-col gap-1 text-xs">
+          <div className="flex flex-col gap-1 rounded-md border border-dashed border-border px-3 pt-3.5 pb-3.5 text-xs">
             <div className="flex items-center justify-between gap-2">
               <span className="min-w-0 truncate text-muted-foreground">
                 <span className="font-medium text-foreground">
@@ -206,7 +208,7 @@ export function PRTimelineEvent({
         emphasized={isMerged}
       >
         <div
-          className={`flex items-center gap-2 ${isMerged ? "text-sm" : "text-xs text-muted-foreground"}`}
+          className={`flex items-center gap-2 py-0.5 ${isMerged ? "text-sm" : "text-xs text-muted-foreground"}`}
         >
           {ghEvent.actor_avatar_url && (
             <Avatar
@@ -240,7 +242,13 @@ export function PRTimelineEvent({
           <span className="text-muted-foreground">commented</span>
           <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground">
             <RelativeTime iso={event.timestamp} />
-            <TimelineCommentMenu htmlUrl={comment.html_url} body={comment.body} />
+            <TimelineCommentMenu
+              htmlUrl={comment.html_url}
+              body={comment.body}
+              onDelete={
+                comment.user_login === login ? () => onDeleteComment(comment.id) : undefined
+              }
+            />
           </span>
         </div>
         <Markdown content={comment.body} />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { filterRelevantGhEvents, findMergedEventIndex, mergeTimeline } from "./prTimeline";
+import { findMergedEventIndex, mergeTimeline } from "./prTimeline";
 import type { IssueComment, IssueTimelineEvent, PullRequestCommit, Review } from "./types";
 
 function comment(id: number, created_at: string): IssueComment {
@@ -100,34 +100,6 @@ describe("mergeTimeline", () => {
 
   it("defaults ghEvents to empty when omitted", () => {
     expect(mergeTimeline([], [], [])).toEqual([]);
-  });
-});
-
-describe("filterRelevantGhEvents", () => {
-  function crossRef(sourceIssueNumber: number | null): IssueTimelineEvent {
-    return {
-      ...ghEvent("cross-referenced", "2024-01-01T00:00:00Z"),
-      source_issue_number: sourceIssueNumber,
-    };
-  }
-
-  it("passes through every non-cross-referenced event unchanged", () => {
-    const events = [ghEvent("labeled", "2024-01-01T00:00:00Z")];
-    expect(filterRelevantGhEvents(events, [])).toEqual(events);
-  });
-
-  it("keeps a cross-referenced event whose source issue is a genuine closing reference", () => {
-    const events = [crossRef(24)];
-    expect(filterRelevantGhEvents(events, [24])).toEqual(events);
-  });
-
-  it("drops a cross-referenced event that's just a plain mention, not a closing reference", () => {
-    expect(filterRelevantGhEvents([crossRef(24)], [])).toEqual([]);
-    expect(filterRelevantGhEvents([crossRef(24)], [99])).toEqual([]);
-  });
-
-  it("drops a cross-referenced event with no source issue at all", () => {
-    expect(filterRelevantGhEvents([crossRef(null)], [24])).toEqual([]);
   });
 });
 

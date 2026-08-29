@@ -42,7 +42,7 @@ export function PRFilesReviewBar({
       </span>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <Button size="sm" disabled={submitting}>
+          <Button size="sm" variant="positive" disabled={submitting}>
             {submitting ? "Submitting…" : "Finish review"}
           </Button>
         </PopoverTrigger>
