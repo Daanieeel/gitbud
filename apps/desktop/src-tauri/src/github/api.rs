@@ -1451,8 +1451,18 @@ mod tests {
     #[test]
     fn squash_message_omits_merger_as_their_own_coauthor() {
         let commits = vec![
-            commit(Some("daniel"), "Daniel", "daniel@example.com", "First commit"),
-            commit(Some("daniel"), "Daniel", "daniel@example.com", "Second commit"),
+            commit(
+                Some("daniel"),
+                "Daniel",
+                "daniel@example.com",
+                "First commit",
+            ),
+            commit(
+                Some("daniel"),
+                "Daniel",
+                "daniel@example.com",
+                "Second commit",
+            ),
         ];
         let message = build_squash_commit_message(&commits, "daniel");
         assert!(!message.to_lowercase().contains("co-authored-by"));
@@ -1461,8 +1471,18 @@ mod tests {
     #[test]
     fn squash_message_keeps_a_genuinely_different_coauthor() {
         let commits = vec![
-            commit(Some("daniel"), "Daniel", "daniel@example.com", "First commit"),
-            commit(Some("helper"), "Helper", "helper@example.com", "Second commit"),
+            commit(
+                Some("daniel"),
+                "Daniel",
+                "daniel@example.com",
+                "First commit",
+            ),
+            commit(
+                Some("helper"),
+                "Helper",
+                "helper@example.com",
+                "Second commit",
+            ),
         ];
         let message = build_squash_commit_message(&commits, "daniel");
         assert_eq!(
@@ -1474,8 +1494,18 @@ mod tests {
     #[test]
     fn squash_message_dedupes_same_coauthor_across_commits() {
         let commits = vec![
-            commit(Some("helper"), "Helper", "helper@example.com", "First commit"),
-            commit(Some("helper"), "Helper", "helper@example.com", "Second commit"),
+            commit(
+                Some("helper"),
+                "Helper",
+                "helper@example.com",
+                "First commit",
+            ),
+            commit(
+                Some("helper"),
+                "Helper",
+                "helper@example.com",
+                "Second commit",
+            ),
         ];
         let message = build_squash_commit_message(&commits, "daniel");
         assert_eq!(message.matches("Co-authored-by").count(), 1);
