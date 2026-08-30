@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { marked } from "marked";
+import { marked, type Tokens } from "marked";
 import DOMPurify from "dompurify";
 import { cn } from "../../lib/utils";
 import { ensureLanguageLoaded, highlightBlock, languageForToken } from "../../lib/highlight";
@@ -13,6 +13,9 @@ interface MarkdownProps {
  * WYSIWYG editor can look pixel-identical to this read-only renderer rather than maintaining a
  * second hand-tuned copy of the same selector list. */
 export const proseClassName = [
+  // Plain marker class (not a Tailwind utility) — hooks the hand-rolled `input[type="checkbox"]`
+  // reskin in styles.css, which needs a stable selector a `::after` pseudo-element can attach to.
+  "gitbud-prose",
   "max-w-none text-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
   "[&_h1]:mb-2 [&_h1]:mt-4 [&_h1]:text-lg [&_h1]:font-semibold",
   "[&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-base [&_h2]:font-semibold",
@@ -38,7 +41,11 @@ export const proseClassName = [
   // Task-list items (GFM `- [ ] x`) and underline have no counterpart in the pre-editor renderer
   // — added here (rather than left unstyled) since the live editor shares this same class list.
   "[&_ul.task-list]:list-none [&_ul.task-list]:pl-0",
-  "[&_li[data-checked]]:flex [&_li[data-checked]]:list-none [&_li[data-checked]]:items-start [&_li[data-checked]]:gap-1.5",
+  // `items-start` (not `items-center`) — a task item can wrap onto multiple lines, and the
+  // checkbox should stay pinned to the first line rather than drift toward the vertical center
+  // of the whole wrapped block. The checkbox's own small top margin (`.gitbud-prose
+  // input[type="checkbox"]` in styles.css) is what centers it against that first line specifically.
+  "[&_li[data-checked]]:flex [&_li[data-checked]]:list-none [&_li[data-checked]]:items-start [&_li[data-checked]]:gap-2 [&_li[data-checked]]:pl-1",
   "[&_u]:underline",
 ].join(" ");
 
@@ -53,6 +60,26 @@ renderer.code = ({ text, lang }) => {
   if (language) pendingLanguages.add(language);
   const classAttr = language ? ` class="language-${language} hljs"` : "";
   return `<pre><code${classAttr}>${highlighted}</code></pre>`;
+};
+
+// marked's own `list`/`listitem` renderers emit plain `<ul>`/`<li>` with no marker at all for a
+// GFM task-list item (`- [ ] x`) — no class, no `data-checked`, nothing `proseClassName`'s
+// `[&_ul.task-list]`/`[&_li[data-checked]]` rules (shared with the live editor, whose Tiptap
+// `taskList` node does carry those) can key off, so a task item rendered here still gets a
+// plain bullet marker next to its checkbox instead of the editor's flex layout. `this.parser`
+// (not available to an arrow function) is why these are regular functions, not arrows like
+// `code` above.
+renderer.list = function list(token: Tokens.List): string {
+  const tag = token.ordered ? "ol" : "ul";
+  const startAttr = token.ordered && token.start !== 1 ? ` start="${token.start}"` : "";
+  const classAttr = token.items.some((item) => item.task) ? ' class="task-list"' : "";
+  const body = token.items.map((item) => this.listitem(item)).join("");
+  return `<${tag}${startAttr}${classAttr}>\n${body}</${tag}>\n`;
+};
+
+renderer.listitem = function listitem(item: Tokens.ListItem): string {
+  const checkedAttr = item.task ? " data-checked" : "";
+  return `<li${checkedAttr}>${this.parser.parse(item.tokens)}</li>\n`;
 };
 
 marked.use({ renderer });

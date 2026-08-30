@@ -293,6 +293,57 @@
   border-radius: 2px;
 }
 
+/* Task-list checkboxes (GFM `- [ ] x`) inside `proseClassName`-styled content — both the
+ * read-only `Markdown` renderer and the live WYSIWYG editor render an actual native
+ * `<input type="checkbox">` (marked.js for the former, Tiptap's `TaskItem` for the latter), so
+ * this reskins that native element to match the `Checkbox` primitive (`ui/checkbox.tsx`)
+ * instead of leaving the browser's own default checkbox style — same size/radius/border, same
+ * primary-color checked state, same checkmark. Plain CSS rather than Tailwind arbitrary-variant
+ * utilities: the checked-state checkmark needs a `::after` pseudo-element, which doesn't
+ * combine cleanly with the `[&_input[type="checkbox"]]:checked:after:...` chain this file
+ * otherwise uses for prose selectors. */
+.gitbud-prose input[type="checkbox"] {
+  appearance: none;
+  position: relative;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  /* Centers the checkbox against the *first line* of its (possibly wrapped) label text —
+   * the parent `li[data-checked]` is `items-start` so a multi-line item keeps the checkbox
+   * pinned to line one instead of drifting toward the whole block's vertical center. */
+  margin-top: 0.1875rem;
+  border-radius: 4px;
+  border: 1px solid var(--input);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  cursor: pointer;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+.gitbud-prose input[type="checkbox"]:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+.gitbud-prose input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 2px;
+  width: 8px;
+  height: 5px;
+  border-left: 2px solid var(--primary-foreground);
+  border-bottom: 2px solid var(--primary-foreground);
+  transform: rotate(-45deg);
+}
+.gitbud-prose input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.gitbud-prose input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 /* Hand-rolled markdown typography for remark/rehype-rendered content (license, docs,
  * changelog, etc). No @tailwindcss/typography plugin in this monorepo, so any page that
  * renders markdown to HTML can opt into consistent styling via `.markdown-body`. */
