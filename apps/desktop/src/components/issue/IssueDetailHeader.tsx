@@ -3,6 +3,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { Button } from "@gitbud/ui/button";
 import { Avatar } from "@gitbud/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
+import { CopyButton } from "@gitbud/ui/copy-button";
 import { useCloseIssue, useReopenIssue } from "@/hooks/queries/useIssueMeta";
 import { useIssueStore } from "@/store/useIssueStore";
 import type { Issue } from "@/lib/types";
@@ -36,67 +37,78 @@ export function IssueDetailHeader({ repoPath, login, issue }: IssueDetailHeaderP
           <span>{isOpen ? "Open" : "Closed"}</span>
         </div>
       </div>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              void openUrl(issue.html_url);
-            }}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <ExternalLinkIcon className="size-4" />
-          </a>
-        </TooltipTrigger>
-        <TooltipContent>Open on GitHub</TooltipContent>
-      </Tooltip>
-      {isOpen ? (
+      <div className="flex items-center gap-3">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <a
+              href="#"
+              onClick={(e) => {
+                e.preventDefault();
+                void openUrl(issue.html_url);
+              }}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <ExternalLinkIcon className="size-4" />
+            </a>
+          </TooltipTrigger>
+          <TooltipContent>Open on GitHub</TooltipContent>
+        </Tooltip>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <CopyButton
+              value={issue.html_url}
+              className="text-muted-foreground hover:text-foreground"
+            />
+          </TooltipTrigger>
+          <TooltipContent>Copy link</TooltipContent>
+        </Tooltip>
+        {isOpen ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={closeIssue.isPending}
+                onClick={() => closeIssue.mutate()}
+              >
+                <CircleCheckIcon className="size-3.5" />
+                {closeIssue.isPending ? "Closing…" : "Close"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Close this issue</TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="positive"
+                size="sm"
+                disabled={reopenIssue.isPending}
+                onClick={() => reopenIssue.mutate()}
+              >
+                <CircleDotIcon className="size-3.5" />
+                {reopenIssue.isPending ? "Reopening…" : "Reopen"}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Reopen this issue</TooltipContent>
+          </Tooltip>
+        )}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant="destructive"
+              variant="ghost"
               size="sm"
-              disabled={closeIssue.isPending}
-              onClick={() => closeIssue.mutate()}
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="text-muted-foreground"
             >
-              <CircleCheckIcon className="size-3.5" />
-              {closeIssue.isPending ? "Closing…" : "Close"}
+              <PanelRightIcon className="size-3.5" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Close this issue</TooltipContent>
+          <TooltipContent>
+            {sidebarCollapsed ? "Show details panel" : "Hide details panel"}
+          </TooltipContent>
         </Tooltip>
-      ) : (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="positive"
-              size="sm"
-              disabled={reopenIssue.isPending}
-              onClick={() => reopenIssue.mutate()}
-            >
-              <CircleDotIcon className="size-3.5" />
-              {reopenIssue.isPending ? "Reopening…" : "Reopen"}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Reopen this issue</TooltipContent>
-        </Tooltip>
-      )}
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="text-muted-foreground"
-          >
-            <PanelRightIcon className="size-3.5" />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>
-          {sidebarCollapsed ? "Show details panel" : "Hide details panel"}
-        </TooltipContent>
-      </Tooltip>
+      </div>
     </div>
   );
 }
