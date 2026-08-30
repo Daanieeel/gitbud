@@ -97,9 +97,9 @@ jobs:
             chmod 700 ~/.gnupg
             echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
             gpgconf --reload gpg-agent 2>/dev/null || true
-            python3 -c '
-            import base64, os, sys, textwrap
-            code = """
+            python3 -c "import sys, textwrap; exec(textwrap.dedent(sys.stdin.read()))" <<'PY' | gpg --batch --import
+            import base64, os, sys
+
             key = os.environ.get("GPG_SIGNING_KEY", "").strip()
             if not key:
                 sys.exit(0)
@@ -124,9 +124,7 @@ jobs:
                     sys.stdout.buffer.write(decoded)
                 except Exception:
                     sys.stdout.buffer.write(key.encode("utf-8") + b"\n")
-            """
-            exec(textwrap.dedent(code))
-            ' | gpg --batch --import
+          PY
 
             gpg_opts=(--batch --yes)
             if [ -n "${GPG_PASSPHRASE:-}" ]; then
