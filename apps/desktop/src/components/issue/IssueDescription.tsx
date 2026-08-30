@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { PencilIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
-import { Textarea } from "@gitbud/ui/textarea";
+import { MarkdownEditor } from "@gitbud/markdown/editor";
 import { Avatar } from "@gitbud/ui/avatar";
 import { Markdown } from "@gitbud/ui/markdown";
 import { RelativeTime } from "@/components/pr/RelativeTime";
 import { useUpdateIssueBody } from "@/hooks/queries/useIssueMeta";
+import { api } from "@/lib/tauri";
 import type { Issue } from "@/lib/types";
 
 interface IssueDescriptionProps {
@@ -23,6 +24,11 @@ export function IssueDescription({ repoPath, login, issue }: IssueDescriptionPro
   const save = async () => {
     await updateBody.mutateAsync(body);
     setEditing(false);
+  };
+
+  const uploadImage = async (file: File): Promise<string> => {
+    const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
+    return api.githubUploadAttachment(repoPath, login, file.name, file.type, bytes);
   };
 
   return (
@@ -48,12 +54,12 @@ export function IssueDescription({ repoPath, login, issue }: IssueDescriptionPro
         </div>
         {editing ? (
           <div className="flex flex-col gap-2">
-            <Textarea
+            <MarkdownEditor
               autoFocus
-              rows={6}
               value={body}
-              onChange={(e) => setBody(e.target.value)}
-              className="text-sm"
+              onChange={setBody}
+              onUploadImage={uploadImage}
+              className="min-h-[160px]"
             />
             <div className="flex gap-2">
               <Button size="sm" disabled={updateBody.isPending} onClick={() => void save()}>

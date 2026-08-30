@@ -8,6 +8,7 @@ import type { AnyExtension } from "@tiptap/core";
 import { lowlight } from "./lowlight";
 import { buildSlashCommands, createSlashCommandExtension } from "./slashCommand";
 import { createSlashMenuRenderer } from "./SlashMenu";
+import { EmptyCodeIndicator } from "./emptyCodeIndicator";
 
 export function buildExtensions(options: {
   placeholder?: string;
@@ -27,6 +28,7 @@ export function buildExtensions(options: {
     // can't be placed inside a paragraph's content, so `createAndFill` was silently dropping it.
     Image.configure({ inline: true }),
     CodeBlockLowlight.configure({ lowlight }),
+    EmptyCodeIndicator,
     createSlashCommandExtension(
       buildSlashCommands(options.onRequestImage),
       createSlashMenuRenderer(),

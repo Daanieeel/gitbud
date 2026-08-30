@@ -4,6 +4,10 @@
  * package is consumed by other workspaces via a `node_modules` symlink, so its own component
  * class usage would otherwise be missed. */
 @source "./components";
+/* Same reasoning for `@gitbud/markdown` — it's this stylesheet's own consumer too (the editor
+ * uses `proseClassName` from this package), also symlinked via `node_modules`, so its class
+ * usage needs its own explicit source. */
+@source "../../markdown/src";
 
 @custom-variant dark (&:where(.dark, .dark *));
 

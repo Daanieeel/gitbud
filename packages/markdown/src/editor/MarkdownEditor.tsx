@@ -25,6 +25,10 @@ export interface MarkdownEditorHandle {
    * itself (in the host dialog's own chrome) can trigger the same path the editor's own
    * paste/drop handling and its `/` "Image" command use internally. */
   insertImage: (file: File) => Promise<void>;
+  /** Focuses the editor at the end of its content — for a caller that just changed `value`
+   * programmatically (e.g. queuing a "quote reply") and wants the cursor to land somewhere
+   * sensible afterward, the same way a plain `<textarea>`'s `.focus()` would. */
+  focus: () => void;
 }
 
 interface MarkdownEditorProps {
@@ -80,6 +84,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     // effect is skipped entirely rather than re-parsing (and resetting undo history) on every
     // keystroke nobody's looking at the rendered result of yet.
     const [mode, setMode] = useState<EditorMode>("rich");
+    const rawTextareaRef = useRef<HTMLTextAreaElement>(null);
 
     const extensions = useMemo(
       () => buildExtensions({ placeholder, onRequestImage: () => fileInputRef.current?.click() }),
@@ -159,7 +164,17 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       editor.commands.setContent(markdownToDoc(value, editor.schema).toJSON());
     }, [value, editor, mode]);
 
-    useImperativeHandle(ref, () => ({ insertImage }), [insertImage]);
+    useImperativeHandle(
+      ref,
+      () => ({
+        insertImage,
+        focus: () => {
+          if (mode === "raw") rawTextareaRef.current?.focus();
+          else editor?.commands.focus("end");
+        },
+      }),
+      [insertImage, editor, mode],
+    );
 
     return (
       <div
@@ -194,6 +209,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
           </div>
         ) : (
           <Textarea
+            ref={rawTextareaRef}
             autoFocus
             value={value}
             onChange={(e) => onChange(e.target.value)}
