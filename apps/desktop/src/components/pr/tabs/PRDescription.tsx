@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { PencilIcon } from "lucide-react";
+import { useRef, useState } from "react";
+import { PaperclipIcon, PencilIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
-import { MarkdownEditor } from "@gitbud/markdown/editor";
+import { MarkdownEditor, type MarkdownEditorHandle } from "@gitbud/markdown/editor";
 import { Avatar } from "@gitbud/ui/avatar";
 import { Markdown } from "@gitbud/ui/markdown";
 import { RelativeTime } from "../RelativeTime";
@@ -20,6 +20,8 @@ export function PRDescription({ repoPath, login, pr }: PRDescriptionProps) {
   const [body, setBody] = useState(pr.body ?? "");
   const updateBody = useUpdatePullRequestBody(repoPath, login, pr.number);
   const canEdit = pr.author_login === login;
+  const editorRef = useRef<MarkdownEditorHandle>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const save = async () => {
     await updateBody.mutateAsync(body);
@@ -55,19 +57,45 @@ export function PRDescription({ repoPath, login, pr }: PRDescriptionProps) {
         {editing ? (
           <div className="flex flex-col gap-2">
             <MarkdownEditor
+              ref={editorRef}
               autoFocus
               value={body}
               onChange={setBody}
               onUploadImage={uploadImage}
               className="min-h-[160px]"
             />
-            <div className="flex gap-2">
-              <Button size="sm" disabled={updateBody.isPending} onClick={() => void save()}>
-                {updateBody.isPending ? "Saving…" : "Save"}
+            <div className="flex items-center justify-between">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => fileInputRef.current?.click()}
+                className="text-muted-foreground"
+              >
+                <PaperclipIcon className="size-3.5" />
+                Paste, drop or click to add files
               </Button>
-              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-                Cancel
-              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => {
+                  for (const file of Array.from(e.target.files ?? [])) {
+                    void editorRef.current?.insertImage(file);
+                  }
+                  e.target.value = "";
+                }}
+              />
+              <div className="flex gap-2">
+                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" disabled={updateBody.isPending} onClick={() => void save()}>
+                  {updateBody.isPending ? "Saving…" : "Save"}
+                </Button>
+              </div>
             </div>
           </div>
         ) : pr.body ? (
