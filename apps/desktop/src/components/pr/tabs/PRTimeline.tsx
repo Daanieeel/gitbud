@@ -63,7 +63,9 @@ export function PRTimeline({
               ? `review:${event.review.id}`
               : event.kind === "github_event"
                 ? `gh:${event.ghEvent.id ?? `${event.ghEvent.event}:${event.timestamp}`}`
-                : `comment:${event.comment.id}`;
+                : event.kind === "cross_referenced_group"
+                  ? `xref:${event.actorLogin}:${event.timestamp}`
+                  : `comment:${event.comment.id}`;
         // The connecting line runs normally up through (and into) the terminal row (merged, or
         // closed-without-merging), then stops — a thicker separator takes its place right after
         // that row instead, and nothing after it is connected to anything.

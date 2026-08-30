@@ -2838,12 +2838,15 @@ struct RawTimelineEvent {
     #[serde(default)]
     requested_reviewer: Option<RawUser>,
     /// Only present on a `connected` event — GitHub's real field name for the linked issue/PR
-    /// is `subject`, not `source` (that name, and the `cross-referenced` event kind, describe a
-    /// different, far noisier concept: "something else mentions this issue/PR", which fires for
-    /// any plain mention, not a closing keyword). Verified against a live `connected` event's
-    /// JSON shape on this repo's own PR #81 (linked to issue #38 via `Closes #38`).
+    /// is `subject`, not `source` (that's the field `cross-referenced` uses, for a different
+    /// concept: "something else mentions this issue/PR"). Verified against a live `connected`
+    /// event's JSON shape on this repo's own PR #81 (linked to issue #38 via `Closes #38`).
     #[serde(default)]
     subject: Option<RawConnectedSubject>,
+    /// Only present on a `cross-referenced` event — the issue/PR that mentioned this one
+    /// (via a plain `#123` reference, not necessarily a closing keyword).
+    #[serde(default)]
+    source: Option<RawCrossReferenceSource>,
 }
 
 #[derive(Deserialize)]
@@ -2853,6 +2856,27 @@ struct RawConnectedSubject {
     state: String,
     #[serde(default)]
     repository: Option<RawRepoRef>,
+}
+
+#[derive(Deserialize)]
+struct RawCrossReferenceSource {
+    #[serde(default)]
+    issue: Option<RawCrossReferenceIssue>,
+}
+
+#[derive(Deserialize)]
+struct RawCrossReferenceIssue {
+    number: u64,
+    title: String,
+    state: String,
+    #[serde(default)]
+    html_url: String,
+    #[serde(default)]
+    repository: Option<RawRepoRef>,
+    /// Present (as an object) only when the mentioning item is a pull request — GitHub's issue
+    /// timeline represents PRs as issues, this field is the only way to tell them apart.
+    #[serde(default)]
+    pull_request: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -2884,16 +2908,43 @@ pub struct IssueTimelineEvent {
     pub source_issue_state: Option<String>,
     pub source_issue_html_url: Option<String>,
     pub source_issue_repo_full_name: Option<String>,
+    /// Populated only for a `cross-referenced` event — set when the mentioning item is itself
+    /// a pull request, so the UI can say "N pull requests" vs "N issues" when grouping several
+    /// of these together.
+    pub source_issue_is_pull_request: Option<bool>,
 }
 
 impl From<RawTimelineEvent> for IssueTimelineEvent {
     fn from(raw: RawTimelineEvent) -> Self {
         let subject = raw.subject;
-        let repo = subject.as_ref().and_then(|s| s.repository.as_ref());
-        let html_url = subject
+        let subject_repo = subject.as_ref().and_then(|s| s.repository.as_ref());
+        let subject_html_url = subject
             .as_ref()
-            .zip(repo)
+            .zip(subject_repo)
             .map(|(s, r)| format!("{}/issues/{}", r.html_url, s.number));
+
+        let cross_ref_issue = raw.source.and_then(|s| s.issue);
+        let cross_ref_repo = cross_ref_issue.as_ref().and_then(|i| i.repository.as_ref());
+        let cross_ref_repo_full_name = cross_ref_repo.map(|r| r.full_name.clone());
+        let cross_ref_is_pr = cross_ref_issue.as_ref().map(|i| i.pull_request.is_some());
+
+        let source_issue_number = subject.as_ref().map(|s| s.number).or(cross_ref_issue
+            .as_ref()
+            .map(|i| i.number));
+        let source_issue_title = subject
+            .as_ref()
+            .map(|s| s.title.clone())
+            .or(cross_ref_issue.as_ref().map(|i| i.title.clone()));
+        let source_issue_state = subject
+            .as_ref()
+            .map(|s| s.state.clone())
+            .or(cross_ref_issue.as_ref().map(|i| i.state.clone()));
+        let source_issue_html_url = subject_html_url
+            .or(cross_ref_issue.as_ref().map(|i| i.html_url.clone()));
+        let source_issue_repo_full_name = subject_repo
+            .map(|r| r.full_name.clone())
+            .or(cross_ref_repo_full_name);
+
         IssueTimelineEvent {
             id: raw.id,
             event: raw.event,
@@ -2906,11 +2957,12 @@ impl From<RawTimelineEvent> for IssueTimelineEvent {
             assignee_avatar_url: raw.assignee.map(|a| a.avatar_url),
             requested_reviewer_login: raw.requested_reviewer.as_ref().map(|a| a.login.clone()),
             requested_reviewer_avatar_url: raw.requested_reviewer.map(|a| a.avatar_url),
-            source_issue_number: subject.as_ref().map(|s| s.number),
-            source_issue_title: subject.as_ref().map(|s| s.title.clone()),
-            source_issue_state: subject.as_ref().map(|s| s.state.clone()),
-            source_issue_html_url: html_url,
-            source_issue_repo_full_name: repo.map(|r| r.full_name.clone()),
+            source_issue_number,
+            source_issue_title,
+            source_issue_state,
+            source_issue_html_url,
+            source_issue_repo_full_name,
+            source_issue_is_pull_request: cross_ref_is_pr,
         }
     }
 }
@@ -2918,10 +2970,12 @@ impl From<RawTimelineEvent> for IssueTimelineEvent {
 /// The event kinds the Conversation tab's timeline renders — everything else GitHub's timeline
 /// API returns (commented/committed/reviewed/etc.) is already covered by our own issue-
 /// comments/reviews/commits fetches, so including them here would just duplicate entries rather
-/// than add information. `connected` is the exception: it's the only way to get "X linked an
-/// issue that may be closed by this pull request" (verified against a live event on this repo's
-/// own PR #81 — GitHub uses `connected`/`subject`, not the more commonly-guessed
-/// `cross-referenced`/`source`, for this specific line).
+/// than add information. `connected` is the only way to get "X linked an issue that may be
+/// closed by this pull request" (verified against a live event on this repo's own PR #81 —
+/// GitHub uses `connected`/`subject`, not `cross-referenced`/`source`, for that specific line).
+/// `cross-referenced` is its own separate event kind, included for "X mentioned this in N
+/// issues" — it fires for any plain `#123` mention (not just a closing keyword), so the frontend
+/// groups adjacent same-actor occurrences into one row rather than listing each individually.
 const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
     "labeled",
     "unlabeled",
@@ -2933,6 +2987,7 @@ const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
     "reopened",
     "merged",
     "connected",
+    "cross-referenced",
 ];
 
 /// Label/assignee/reviewer-request/close/reopen/merge events for the Conversation tab's
@@ -3594,6 +3649,55 @@ mod tests {
     }
 
     #[test]
+    fn timeline_event_maps_cross_referenced_source_fields() {
+        let json = r#"{
+            "event": "cross-referenced",
+            "actor": {"login": "alice", "avatar_url": "https://a"},
+            "source": {
+                "issue": {
+                    "number": 48,
+                    "title": "Issues tab: manage GitLab issues in-app",
+                    "state": "open",
+                    "html_url": "https://github.com/Daanieeel/gitbud/issues/48",
+                    "repository": {"full_name": "Daanieeel/gitbud", "html_url": "https://github.com/Daanieeel/gitbud"}
+                }
+            }
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.source_issue_number, Some(48));
+        assert_eq!(
+            event.source_issue_title,
+            Some("Issues tab: manage GitLab issues in-app".to_string())
+        );
+        assert_eq!(event.source_issue_state, Some("open".to_string()));
+        assert_eq!(
+            event.source_issue_html_url,
+            Some("https://github.com/Daanieeel/gitbud/issues/48".to_string())
+        );
+        assert_eq!(event.source_issue_is_pull_request, Some(false));
+    }
+
+    #[test]
+    fn timeline_event_marks_cross_referenced_pull_request_source() {
+        let json = r#"{
+            "event": "cross-referenced",
+            "source": {
+                "issue": {
+                    "number": 49,
+                    "title": "Issues tab: manage Bitbucket issues in-app",
+                    "state": "open",
+                    "html_url": "https://github.com/Daanieeel/gitbud/pull/49",
+                    "pull_request": {"url": "https://api.github.com/repos/Daanieeel/gitbud/pulls/49"}
+                }
+            }
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.source_issue_is_pull_request, Some(true));
+    }
+
+    #[test]
     fn timeline_event_leaves_source_issue_fields_none_for_other_event_kinds() {
         let json = r#"{"event": "labeled", "label": {"name": "bug", "color": "d73a4a"}}"#;
         let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
@@ -3611,5 +3715,6 @@ mod tests {
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"labeled"));
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"merged"));
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"connected"));
+        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"cross-referenced"));
     }
 }

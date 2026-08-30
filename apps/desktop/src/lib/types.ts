@@ -462,4 +462,7 @@ export interface IssueTimelineEvent {
   source_issue_state: string | null;
   source_issue_html_url: string | null;
   source_issue_repo_full_name: string | null;
+  /** Only set for a `cross-referenced` event — whether the mentioning item is a pull request
+   * (vs. a plain issue), so grouped mentions can say "N pull requests" vs "N issues". */
+  source_issue_is_pull_request: boolean | null;
 }

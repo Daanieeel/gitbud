@@ -1,6 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   CheckCircle2Icon,
+  ExternalLinkIcon,
   GitCommitHorizontalIcon,
   GitMergeIcon,
   GitPullRequestArrowIcon,
@@ -171,6 +172,79 @@ export function PRTimelineEvent({
           {review.body && <Markdown content={review.body} />}
         </div>
       </TimelineRow>
+    );
+  }
+
+  if (event.kind === "cross_referenced_group") {
+    const { refs, actorLogin, actorAvatarUrl } = event;
+    const prCount = refs.filter((r) => r.isPullRequest).length;
+    const issueCount = refs.length - prCount;
+    const noun =
+      issueCount === 0
+        ? prCount === 1
+          ? "pull request"
+          : "pull requests"
+        : prCount === 0
+          ? issueCount === 1
+            ? "issue"
+            : "issues"
+          : "issues and pull requests";
+    // Rendered as two stacked pieces rather than one `TimelineRow` with tall multi-line content:
+    // `TimelineRow`'s icon-centering math (see its own doc comment) assumes the content is a
+    // single line plus a trailing `pb-4` gap — it aligns correctly only because a one-line row's
+    // total height reduces to exactly that. Feeding it the whole header+list block here would
+    // center the icon over the *entire* height (title + every ref row), dragging it down well
+    // below the title as the list grows. Splitting the title into its own `TimelineRow` gets the
+    // proven single-line alignment for free; the ref list continues the same rail manually below
+    // it, only as far down as `showBottomLine` (whether another timeline row follows).
+    return (
+      <>
+        <TimelineRow
+          icon={<ExternalLinkIcon className="size-3.5 text-muted-foreground" />}
+          showTopLine={showTopLine}
+          showBottomLine
+        >
+          <div className="flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground">
+            {actorAvatarUrl && (
+              <Avatar src={actorAvatarUrl} alt={actorLogin ?? ""} className="size-4" />
+            )}
+            <span className="font-medium text-foreground">{actorLogin ?? "someone"}</span>
+            <span>
+              mentioned this in {refs.length} {noun}
+            </span>
+            {event.timestamp && <RelativeTime iso={event.timestamp} className="ml-auto shrink-0" />}
+          </div>
+        </TimelineRow>
+        <div className="flex gap-3">
+          <div className="flex w-6 shrink-0 flex-col items-center">
+            {showBottomLine && <div className="w-px flex-1 bg-border" />}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5 pb-4 text-xs">
+            {refs.map((ref) => {
+              const closed = ref.state === "closed" || ref.state === "merged";
+              return (
+                <div key={ref.number} className="flex items-center gap-2 pl-1">
+                  <span
+                    className={`size-2 shrink-0 rounded-full border-2 ${
+                      closed ? "border-accent-purple" : "border-accent-green"
+                    }`}
+                  />
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (ref.htmlUrl) void openUrl(ref.htmlUrl);
+                    }}
+                    className="min-w-0 truncate text-foreground underline hover:text-primary"
+                  >
+                    {ref.title} <span className="text-muted-foreground">#{ref.number}</span>
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </>
     );
   }
 

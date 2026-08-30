@@ -11,16 +11,17 @@ interface LabelChipProps {
   onRemove?: () => void;
 }
 
-/** GitHub-style label chip — background/text/border all derived from the label's own color at
- * different alpha levels, rather than a fixed palette, since a repo's labels are user-defined. */
+/** GitHub-style label chip — background/border derived from the label's own color at different
+ * alpha levels, rather than a fixed palette, since a repo's labels are user-defined. Text is
+ * always white rather than the raw hex — using the hex itself as text color was unreadable
+ * whenever a label's color happened to be dark. */
 export function LabelChip({ name, color, onRemove }: LabelChipProps) {
   const hex = color ?? "6e7781";
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
+      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white"
       style={{
         backgroundColor: `#${hex}26`,
-        color: `#${hex}`,
         border: `1px solid #${hex}66`,
       }}
     >
