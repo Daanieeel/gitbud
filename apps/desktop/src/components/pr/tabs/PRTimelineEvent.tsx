@@ -19,6 +19,7 @@ import { TimelineCommentMenu } from "./TimelineCommentMenu";
 import { RelativeTime } from "../RelativeTime";
 import { CIBadge } from "../CIBadge";
 import { CommitVerificationBadge } from "../CommitVerificationBadge";
+import { LabelChip } from "../LabelChip";
 import type { TimelineEvent } from "@/lib/prTimeline";
 import type { IssueTimelineEvent } from "@/lib/types";
 
@@ -34,8 +35,8 @@ const REVIEW_VERDICT = {
 } satisfies Record<string, { label: string; Icon: typeof CheckCircle2Icon; color: string }>;
 
 const GITHUB_EVENT_LABEL = {
-  labeled: (e: IssueTimelineEvent) => `added the ${e.label_name ?? "?"} label`,
-  unlabeled: (e: IssueTimelineEvent) => `removed the ${e.label_name ?? "?"} label`,
+  // `labeled`/`unlabeled` are rendered as their own branch below (a colored `LabelChip`, not
+  // plain text) so they never reach this table's generic string rendering.
   assigned: (e: IssueTimelineEvent) => `assigned ${e.assignee_login ?? "someone"}`,
   unassigned: (e: IssueTimelineEvent) => `unassigned ${e.assignee_login ?? "someone"}`,
   review_requested: (e: IssueTimelineEvent) =>
@@ -218,6 +219,31 @@ export function PRTimelineEvent({
                 {closed ? "Closed" : "Open"}
               </span>
             </div>
+          </div>
+        </TimelineRow>
+      );
+    }
+
+    if (ghEvent.event === "labeled" || ghEvent.event === "unlabeled") {
+      const added = ghEvent.event === "labeled";
+      return (
+        <TimelineRow
+          icon={<TagIcon className="size-3.5 text-muted-foreground" />}
+          showTopLine={showTopLine}
+          showBottomLine={showBottomLine}
+        >
+          <div className="flex flex-wrap items-center gap-1.5 py-0.5 text-xs text-muted-foreground">
+            {ghEvent.actor_avatar_url && (
+              <Avatar
+                src={ghEvent.actor_avatar_url}
+                alt={ghEvent.actor_login ?? ""}
+                className="size-4"
+              />
+            )}
+            <span className="font-medium text-foreground">{ghEvent.actor_login ?? "someone"}</span>
+            <span>{added ? "added label" : "removed label"}</span>
+            <LabelChip name={ghEvent.label_name ?? "?"} color={ghEvent.label_color ?? undefined} />
+            {event.timestamp && <RelativeTime iso={event.timestamp} className="ml-auto shrink-0" />}
           </div>
         </TimelineRow>
       );
