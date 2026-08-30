@@ -26,7 +26,7 @@ export function PRSidebarLock({ repoPath, login, pr }: PRSidebarLockProps) {
 
   if (pr.locked) {
     return (
-      <div className="flex items-center justify-between gap-2 border-t border-border pt-3 text-sm">
+      <div className="flex flex-col gap-2 border-t border-border pt-3 text-sm">
         <span className="flex items-center gap-1.5 text-muted-foreground">
           <LockIcon className="size-3.5 shrink-0" />
           Conversation locked
@@ -35,6 +35,7 @@ export function PRSidebarLock({ repoPath, login, pr }: PRSidebarLockProps) {
         <Button
           size="sm"
           variant="ghost"
+          className="w-full justify-start"
           disabled={setLocked.isPending}
           onClick={() => setLocked.mutate({ locked: false, lockReason: null })}
         >
