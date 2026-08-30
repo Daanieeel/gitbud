@@ -1,4 +1,3 @@
-import { CheckCircle2Icon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { PRDescription } from "./PRDescription";
 import { PRTimeline } from "./PRTimeline";
@@ -82,12 +81,6 @@ export function ConversationTab({ repoPath, login, pr }: ConversationTabProps) {
         quotedReplyText={quotedReplyText}
         onConsumeQuotedReply={clearQuotedReply}
       />
-      {pr.merged && (
-        <div className="flex items-center gap-2 rounded-md bg-accent-purple/15 p-3 text-sm font-medium text-accent-purple">
-          <CheckCircle2Icon className="size-4 shrink-0" />
-          Pull request successfully merged and closed
-        </div>
-      )}
     </div>
   );
 }

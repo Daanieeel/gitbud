@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  CheckCircle2Icon,
   ExternalLinkIcon,
   GitBranchIcon,
   GitMergeIcon,
@@ -66,6 +67,12 @@ export function PRDetailHeader({ repoPath, login, pr, onMergeClick }: PRDetailHe
         sha={pr.head_sha}
         pollIntervalMs={prPollIntervalMs(pr, isPrTabActive, true)}
       />
+      {pr.merged && (
+        <span className="flex shrink-0 items-center gap-1 rounded-md bg-accent-purple/15 px-2 py-1 text-xs font-medium text-accent-purple">
+          <CheckCircle2Icon className="size-3.5 shrink-0" />
+          Merged
+        </span>
+      )}
       <div className="flex items-center gap-3">
         <Tooltip>
           <TooltipTrigger asChild>
