@@ -1695,6 +1695,60 @@ pub async fn create_issue(
     Ok(raw.into())
 }
 
+#[derive(Deserialize)]
+struct RawRepoId {
+    id: u64,
+}
+
+/// Uploads an image and returns its `https://github.com/user-attachments/assets/<uuid>` markdown-
+/// embeddable URL — GitHub's own drag-and-drop-into-a-textbox upload flow, reverse-engineered
+/// since it has no documented public API (`uploads.github.com/user-attachments/assets` isn't
+/// listed in either the REST or GraphQL reference). Verified live: the returned URL 404s until
+/// it's actually referenced in saved content (a comment/issue/PR body), then resolves via a
+/// redirect to a signed S3 object — an anti-orphan mechanism, not a bug, so callers shouldn't be
+/// surprised the URL doesn't "work" until the body/comment containing it is actually saved.
+/// dotcom-only: GHES has no confirmed equivalent `uploads.` host, so this errors outright for any
+/// other host rather than guess at one; callers should fall back to a plain `data:` URI embed.
+pub async fn upload_attachment(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    filename: &str,
+    content_type: &str,
+    data: Vec<u8>,
+) -> Result<String, String> {
+    if host != "github.com" {
+        return Err("Attachment upload is only available on github.com".to_string());
+    }
+    let gh = GhClient::new(host, token)?;
+    let res = send_checked(gh.get(&format!("/repos/{owner}/{repo}"))).await?;
+    let repo_info: RawRepoId = res.json().await.map_err(|e| e.to_string())?;
+
+    let mut url = reqwest::Url::parse("https://uploads.github.com/user-attachments/assets")
+        .map_err(|e| e.to_string())?;
+    url.query_pairs_mut()
+        .append_pair("name", filename)
+        .append_pair("content_type", content_type)
+        .append_pair("repository_id", &repo_info.id.to_string());
+
+    #[derive(Deserialize)]
+    struct UploadResponse {
+        url: String,
+    }
+    // This endpoint wants a plain `application/json` Accept, not the `application/vnd.github+json`
+    // GhClient's shared client sets by default — a per-request header override wins over it.
+    let res = send_checked(
+        gh.http
+            .post(url)
+            .header(reqwest::header::ACCEPT, "application/json")
+            .body(data),
+    )
+    .await?;
+    let parsed: UploadResponse = res.json().await.map_err(|e| e.to_string())?;
+    Ok(parsed.url)
+}
+
 #[derive(Debug, Serialize)]
 struct UpdateIssueTitleBody<'a> {
     title: &'a str,

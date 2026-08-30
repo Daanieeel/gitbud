@@ -13,6 +13,7 @@
     "version:bump": "bun run scripts/bump-version.ts"
   },
   "dependencies": {
+    "@gitbud/markdown": "workspace:*",
     "@gitbud/ui": "workspace:*",
     "@react-symbols/icons": "^1.4.1",
     "@tanstack/react-query": "^5.102.1",

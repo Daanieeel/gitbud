@@ -1,0 +1,41 @@
+{
+  "name": "@gitbud/markdown",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./editor": "./src/editor/MarkdownEditor.tsx"
+  },
+  "scripts": {
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@gitbud/ui": "workspace:*",
+    "@tiptap/core": "^3.30.5",
+    "@tiptap/extension-bubble-menu": "^3.30.5",
+    "@tiptap/extension-code-block-lowlight": "^3.30.5",
+    "@tiptap/extension-image": "^3.30.5",
+    "@tiptap/extension-link": "^3.30.5",
+    "@tiptap/extension-placeholder": "^3.30.5",
+    "@tiptap/extension-task-item": "^3.30.5",
+    "@tiptap/extension-task-list": "^3.30.5",
+    "@tiptap/pm": "^3.30.5",
+    "@tiptap/react": "^3.30.5",
+    "@tiptap/starter-kit": "^3.30.5",
+    "@tiptap/suggestion": "^3.30.5",
+    "@types/markdown-it": "^14.0.0",
+    "highlight.js": "catalog:",
+    "lowlight": "^3.3.0",
+    "lucide-react": "catalog:",
+    "markdown-it": "^14.0.0",
+    "prosemirror-markdown": "^1.13.6",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@gitbud/config": "workspace:*",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "typescript": "catalog:"
+  }
+}

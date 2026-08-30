@@ -2304,6 +2304,19 @@ async fn github_create_issue(
 }
 
 #[tauri::command]
+async fn github_upload_attachment(
+    repo_path: String,
+    login: String,
+    filename: String,
+    content_type: String,
+    data: Vec<u8>,
+) -> Result<String, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::upload_attachment(&host, &token, &owner, &repo, &filename, &content_type, data)
+        .await
+}
+
+#[tauri::command]
 async fn github_update_issue_title(
     repo_path: String,
     login: String,
@@ -2938,6 +2951,7 @@ pub fn run() {
             get_cached_issues,
             github_get_issue,
             github_create_issue,
+            github_upload_attachment,
             github_update_issue_title,
             github_update_issue_body,
             github_close_issue,

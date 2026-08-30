@@ -498,6 +498,13 @@ export const api = {
       assignees,
       milestone,
     }),
+  githubUploadAttachment: (
+    repoPath: string,
+    login: string,
+    filename: string,
+    contentType: string,
+    data: number[],
+  ) => invoke<string>("github_upload_attachment", { repoPath, login, filename, contentType, data }),
   githubUpdateIssueTitle: (repoPath: string, login: string, number: number, title: string) =>
     invoke<void>("github_update_issue_title", { repoPath, login, number, title }),
   githubUpdateIssueBody: (repoPath: string, login: string, number: number, body: string) =>
