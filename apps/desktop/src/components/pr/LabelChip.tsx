@@ -1,4 +1,5 @@
 import { XIcon } from "lucide-react";
+import { cn } from "@gitbud/ui/utils";
 
 interface LabelChipProps {
   name: string;
@@ -9,17 +10,23 @@ interface LabelChipProps {
    * `MultiSelectField`'s selected-chips row, which clones this element in with the toggle
    * handler rather than wrapping it in its own generic chip styling. */
   onRemove?: () => void;
+  /** Overrides sizing (padding/font-size) for denser contexts like a list row's label row —
+   * the color/background/border styling itself always comes from `color`, never from here. */
+  className?: string;
 }
 
 /** GitHub-style label chip — background/border derived from the label's own color at different
  * alpha levels, rather than a fixed palette, since a repo's labels are user-defined. Text is
  * always white rather than the raw hex — using the hex itself as text color was unreadable
  * whenever a label's color happened to be dark. */
-export function LabelChip({ name, color, onRemove }: LabelChipProps) {
+export function LabelChip({ name, color, onRemove, className }: LabelChipProps) {
   const hex = color ?? "6e7781";
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white"
+      className={cn(
+        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white",
+        className,
+      )}
       style={{
         backgroundColor: `#${hex}26`,
         border: `1px solid #${hex}66`,

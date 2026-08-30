@@ -195,6 +195,8 @@ export function IssueTab() {
         <div className="min-h-0 flex-1">
           <IssueList
             loading={loading}
+            repoPath={repoPath}
+            login={currentLogin}
             issues={issues}
             selectedNumber={selectedNumber}
             hasMore={hasMore}

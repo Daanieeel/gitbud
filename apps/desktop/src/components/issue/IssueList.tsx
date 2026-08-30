@@ -14,6 +14,8 @@ import { Skeleton } from "@gitbud/ui/skeleton";
 import { cn } from "@gitbud/ui/utils";
 import { useArrowKeyFileNav } from "@/hooks/useArrowKeyFileNav";
 import { copyToClipboard } from "@/lib/clipboard";
+import { useLabels } from "@/hooks/queries/usePRMetadataOptions";
+import { LabelChip } from "@/components/pr/LabelChip";
 import type { Issue } from "@/lib/types";
 
 // Just a starting guess (see `measureElement` below) — most rows are this tall, but one with
@@ -22,6 +24,8 @@ const ROW_HEIGHT_ESTIMATE = 52;
 
 interface IssueListProps {
   loading: boolean;
+  repoPath: string;
+  login: string | null;
   issues: Issue[];
   selectedNumber: number | null;
   hasMore: boolean;
@@ -32,6 +36,8 @@ interface IssueListProps {
 
 export function IssueList({
   loading,
+  repoPath,
+  login,
   issues,
   selectedNumber,
   hasMore,
@@ -40,6 +46,12 @@ export function IssueList({
   onSelect,
 }: IssueListProps) {
   const [filter, setFilter] = useState("");
+  const { data: labelOptions } = useLabels(repoPath, login);
+  const labelColors = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const l of labelOptions ?? []) map[l.name] = l.color;
+    return map;
+  }, [labelOptions]);
 
   const filtered = useMemo(() => {
     if (!filter.trim()) return issues;
@@ -164,12 +176,12 @@ export function IssueList({
                           {issue.labels.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {issue.labels.map((label) => (
-                                <span
+                                <LabelChip
                                   key={label}
-                                  className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground"
-                                >
-                                  {label}
-                                </span>
+                                  name={label}
+                                  color={labelColors[label]}
+                                  className="px-1.5 py-0.5 text-[10px]"
+                                />
                               ))}
                             </div>
                           )}

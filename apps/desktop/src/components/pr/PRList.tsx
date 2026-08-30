@@ -27,7 +27,9 @@ import { copyToClipboard } from "@/lib/clipboard";
 import { api } from "@/lib/tauri";
 import type { PullRequest } from "@/lib/types";
 import { prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
+import { useLabels } from "@/hooks/queries/usePRMetadataOptions";
 import { CIBadge } from "./CIBadge";
+import { LabelChip } from "./LabelChip";
 import { MergePRDialog } from "./MergePRDialog";
 import { Skeleton } from "@gitbud/ui/skeleton";
 
@@ -85,6 +87,12 @@ export function PRList({
   const isPrTabActive = useIsPrTabActive();
   const [checkingOutNumber, setCheckingOutNumber] = useState<number | null>(null);
   const [mergingPr, setMergingPr] = useState<PullRequest | null>(null);
+  const { data: labelOptions } = useLabels(repoPath, login);
+  const labelColors = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const l of labelOptions ?? []) map[l.name] = l.color;
+    return map;
+  }, [labelOptions]);
 
   const checkoutPr = async (pr: PullRequest) => {
     setCheckingOutNumber(pr.number);
@@ -236,12 +244,12 @@ export function PRList({
                           {pr.labels.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {pr.labels.map((label) => (
-                                <span
+                                <LabelChip
                                   key={label}
-                                  className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground"
-                                >
-                                  {label}
-                                </span>
+                                  name={label}
+                                  color={labelColors[label]}
+                                  className="px-1.5 py-0.5 text-[10px]"
+                                />
                               ))}
                             </div>
                           )}
