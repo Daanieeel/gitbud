@@ -80,4 +80,6 @@ export const queryKeys = {
     ["issue-list", repoPath, login, filter] as const,
   issueMeta: (repoPath: string, login: string, number: number) =>
     ["issue-meta", repoPath, login, number] as const,
+  issueRelationships: (repoPath: string, login: string, number: number) =>
+    ["issue-relationships", repoPath, login, number] as const,
 };

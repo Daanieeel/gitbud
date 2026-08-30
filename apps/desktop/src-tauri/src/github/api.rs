@@ -1843,6 +1843,369 @@ pub async fn add_issue_to_project(
     Ok(())
 }
 
+/// A lightweight issue reference for relationship chips (parent/blocked-by/blocking) — distinct
+/// from `IssueSummary` only in that it's sourced from GraphQL rather than REST, same three fields.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueRef {
+    pub number: u64,
+    pub title: String,
+    pub state: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinkedBranch {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueRelationships {
+    pub parent: Option<IssueRef>,
+    pub blocked_by: Vec<IssueRef>,
+    pub blocking: Vec<IssueRef>,
+    pub linked_branches: Vec<LinkedBranch>,
+}
+
+const ISSUE_RELATIONSHIPS_QUERY: &str = r#"
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    issue(number: $number) {
+      parent { number title state }
+      blockedBy(first: 25) { nodes { number title state } }
+      blocking(first: 25) { nodes { number title state } }
+      linkedBranches(first: 25) { nodes { id ref { name } } }
+    }
+  }
+}
+"#;
+
+/// GitHub's issue-relationships surface (sub-issues' `parent`, and the newer `blockedBy`/
+/// `blocking` dependency edges) plus the Development panel's linked branches — all GraphQL-only,
+/// no REST equivalent exists for any of these as of this writing.
+pub async fn get_issue_relationships(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<IssueRelationships, String> {
+    #[derive(Deserialize)]
+    struct RawIssueRef {
+        number: u64,
+        title: String,
+        state: String,
+    }
+    #[derive(Deserialize)]
+    struct RawRefName {
+        name: String,
+    }
+    #[derive(Deserialize)]
+    struct RawLinkedBranchNode {
+        id: String,
+        // Null when the underlying git ref has since been deleted — GitHub keeps the linked-
+        // branch record around as a tombstone rather than removing it outright.
+        #[serde(rename = "ref")]
+        ref_: Option<RawRefName>,
+    }
+    #[derive(Deserialize)]
+    struct Nodes<T> {
+        nodes: Vec<T>,
+    }
+    #[derive(Deserialize)]
+    struct RawIssueDetail {
+        parent: Option<RawIssueRef>,
+        #[serde(rename = "blockedBy")]
+        blocked_by: Nodes<RawIssueRef>,
+        blocking: Nodes<RawIssueRef>,
+        #[serde(rename = "linkedBranches")]
+        linked_branches: Nodes<RawLinkedBranchNode>,
+    }
+    #[derive(Deserialize)]
+    struct RepositoryData {
+        issue: Option<RawIssueDetail>,
+    }
+    #[derive(Deserialize)]
+    struct Data {
+        repository: RepositoryData,
+    }
+
+    let gh = GhClient::new(host, token)?;
+    let data: Data = gh
+        .graphql(
+            ISSUE_RELATIONSHIPS_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "number": number }),
+        )
+        .await?;
+    let detail = data.repository.issue.ok_or("issue not found")?;
+    let to_ref = |r: RawIssueRef| IssueRef {
+        number: r.number,
+        title: r.title,
+        state: r.state,
+    };
+    Ok(IssueRelationships {
+        parent: detail.parent.map(to_ref),
+        blocked_by: detail.blocked_by.nodes.into_iter().map(to_ref).collect(),
+        blocking: detail.blocking.nodes.into_iter().map(to_ref).collect(),
+        linked_branches: detail
+            .linked_branches
+            .nodes
+            .into_iter()
+            .filter_map(|n| {
+                n.ref_.map(|r| LinkedBranch {
+                    id: n.id,
+                    name: r.name,
+                })
+            })
+            .collect(),
+    })
+}
+
+const ADD_SUB_ISSUE_MUTATION: &str = r#"
+mutation($issueId: ID!, $subIssueId: ID!) {
+  addSubIssue(input: { issueId: $issueId, subIssueId: $subIssueId, replaceParent: true }) {
+    issue { id }
+  }
+}
+"#;
+
+const REMOVE_SUB_ISSUE_MUTATION: &str = r#"
+mutation($issueId: ID!, $subIssueId: ID!) {
+  removeSubIssue(input: { issueId: $issueId, subIssueId: $subIssueId }) {
+    issue { id }
+  }
+}
+"#;
+
+#[derive(Deserialize)]
+struct IssueMutationPayload {
+    #[allow(dead_code)]
+    issue: serde_json::Value,
+}
+
+/// Makes `child_number` a sub-issue of `parent_number` — from the child's own sidebar this is
+/// "Add parent" (picking which issue becomes the parent); `replaceParent: true` so re-parenting
+/// an issue that already has one just moves it rather than erroring.
+pub async fn add_sub_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    parent_number: u64,
+    child_number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let parent_id = issue_node_id(&gh, owner, repo, parent_number).await?;
+    let child_id = issue_node_id(&gh, owner, repo, child_number).await?;
+    let _: IssueMutationPayload = gh
+        .graphql(
+            ADD_SUB_ISSUE_MUTATION,
+            serde_json::json!({ "issueId": parent_id, "subIssueId": child_id }),
+        )
+        .await?;
+    Ok(())
+}
+
+/// Unlinks `child_number` from its parent `parent_number` — the sidebar's "x" on the parent chip.
+pub async fn remove_sub_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    parent_number: u64,
+    child_number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let parent_id = issue_node_id(&gh, owner, repo, parent_number).await?;
+    let child_id = issue_node_id(&gh, owner, repo, child_number).await?;
+    let _: IssueMutationPayload = gh
+        .graphql(
+            REMOVE_SUB_ISSUE_MUTATION,
+            serde_json::json!({ "issueId": parent_id, "subIssueId": child_id }),
+        )
+        .await?;
+    Ok(())
+}
+
+const ADD_BLOCKED_BY_MUTATION: &str = r#"
+mutation($issueId: ID!, $blockingIssueId: ID!) {
+  addBlockedBy(input: { issueId: $issueId, blockingIssueId: $blockingIssueId }) {
+    issue { id }
+  }
+}
+"#;
+
+const REMOVE_BLOCKED_BY_MUTATION: &str = r#"
+mutation($issueId: ID!, $blockingIssueId: ID!) {
+  removeBlockedBy(input: { issueId: $issueId, blockingIssueId: $blockingIssueId }) {
+    issue { id }
+  }
+}
+"#;
+
+/// Marks `number` as blocked by `blocking_number` — "Mark as blocked by" from `number`'s own
+/// sidebar. "Mark as blocking" (this issue blocks another) is the same relationship viewed from
+/// the other side, so the frontend calls this with the two numbers swapped rather than needing a
+/// second function.
+pub async fn add_blocked_by(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    blocking_number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let issue_id = issue_node_id(&gh, owner, repo, number).await?;
+    let blocking_id = issue_node_id(&gh, owner, repo, blocking_number).await?;
+    let _: IssueMutationPayload = gh
+        .graphql(
+            ADD_BLOCKED_BY_MUTATION,
+            serde_json::json!({ "issueId": issue_id, "blockingIssueId": blocking_id }),
+        )
+        .await?;
+    Ok(())
+}
+
+pub async fn remove_blocked_by(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    blocking_number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let issue_id = issue_node_id(&gh, owner, repo, number).await?;
+    let blocking_id = issue_node_id(&gh, owner, repo, blocking_number).await?;
+    let _: IssueMutationPayload = gh
+        .graphql(
+            REMOVE_BLOCKED_BY_MUTATION,
+            serde_json::json!({ "issueId": issue_id, "blockingIssueId": blocking_id }),
+        )
+        .await?;
+    Ok(())
+}
+
+const BRANCH_OID_QUERY: &str = r#"
+query($owner: String!, $repo: String!, $qualifiedName: String!) {
+  repository(owner: $owner, name: $repo) {
+    ref(qualifiedName: $qualifiedName) { target { oid } }
+  }
+}
+"#;
+
+const CREATE_LINKED_BRANCH_MUTATION: &str = r#"
+mutation($issueId: ID!, $oid: GitObjectID!, $name: String) {
+  createLinkedBranch(input: { issueId: $issueId, oid: $oid, name: $name }) {
+    linkedBranch { id ref { name } }
+  }
+}
+"#;
+
+/// Creates a new branch off `base_branch`'s current tip and links it to `number`'s Development
+/// panel in one call — GitHub's `createLinkedBranch` mutation both creates the git ref server-
+/// side and records the link, unlike a plain local branch (which has no such link at all until a
+/// PR referencing the issue is opened).
+pub async fn create_linked_branch(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    base_branch: &str,
+    name: &str,
+) -> Result<LinkedBranch, String> {
+    #[derive(Deserialize)]
+    struct RefTarget {
+        oid: String,
+    }
+    #[derive(Deserialize)]
+    struct RawRefQuery {
+        target: Option<RefTarget>,
+    }
+    #[derive(Deserialize)]
+    struct RefRepositoryData {
+        #[serde(rename = "ref")]
+        ref_: Option<RawRefQuery>,
+    }
+    #[derive(Deserialize)]
+    struct RefData {
+        repository: RefRepositoryData,
+    }
+    #[derive(Deserialize)]
+    struct RawRefName {
+        name: String,
+    }
+    #[derive(Deserialize)]
+    struct LinkedBranchNode {
+        id: String,
+        #[serde(rename = "ref")]
+        ref_: RawRefName,
+    }
+    #[derive(Deserialize)]
+    struct CreateLinkedBranchPayload {
+        #[serde(rename = "linkedBranch")]
+        linked_branch: LinkedBranchNode,
+    }
+
+    let gh = GhClient::new(host, token)?;
+    let issue_id = issue_node_id(&gh, owner, repo, number).await?;
+    let qualified_name = format!("refs/heads/{base_branch}");
+    let ref_data: RefData = gh
+        .graphql(
+            BRANCH_OID_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "qualifiedName": qualified_name }),
+        )
+        .await?;
+    let oid = ref_data
+        .repository
+        .ref_
+        .and_then(|r| r.target)
+        .map(|t| t.oid)
+        .ok_or_else(|| format!("Branch '{base_branch}' not found"))?;
+    let payload: CreateLinkedBranchPayload = gh
+        .graphql(
+            CREATE_LINKED_BRANCH_MUTATION,
+            serde_json::json!({ "issueId": issue_id, "oid": oid, "name": name }),
+        )
+        .await?;
+    Ok(LinkedBranch {
+        id: payload.linked_branch.id,
+        name: payload.linked_branch.ref_.name,
+    })
+}
+
+const DELETE_LINKED_BRANCH_MUTATION: &str = r#"
+mutation($linkedBranchId: ID!) {
+  deleteLinkedBranch(input: { linkedBranchId: $linkedBranchId }) {
+    clientMutationId
+  }
+}
+"#;
+
+/// Unlinks a branch from the Development panel — doesn't delete the git ref itself, mirroring
+/// GitHub's own "Unlink" action (as opposed to the separate "Delete branch" one).
+pub async fn delete_linked_branch(
+    host: &str,
+    token: &str,
+    linked_branch_id: &str,
+) -> Result<(), String> {
+    #[derive(Deserialize)]
+    struct DeleteLinkedBranchPayload {
+        #[allow(dead_code)]
+        #[serde(rename = "clientMutationId")]
+        client_mutation_id: Option<String>,
+    }
+    let gh = GhClient::new(host, token)?;
+    let _: DeleteLinkedBranchPayload = gh
+        .graphql(
+            DELETE_LINKED_BRANCH_MUTATION,
+            serde_json::json!({ "linkedBranchId": linked_branch_id }),
+        )
+        .await?;
+    Ok(())
+}
+
 #[derive(Debug, Serialize)]
 struct MergeBody<'a> {
     merge_method: &'a str,

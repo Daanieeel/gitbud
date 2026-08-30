@@ -67,7 +67,7 @@ export function SingleSelectField({
           <button
             type="button"
             className={cn(
-              "flex h-7 w-full min-w-0 max-w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-transparent px-2 text-left text-sm whitespace-nowrap hover:bg-accent focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-2 outline-none",
+              "flex h-7 w-full min-w-0 max-w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-accent px-2 text-left text-sm whitespace-nowrap hover:bg-accent/80 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-2 outline-none",
               triggerClassName,
             )}
           >
@@ -77,7 +77,7 @@ export function SingleSelectField({
                   {selectedOption.slotLeft && (
                     <span className="flex shrink-0 items-center">{selectedOption.slotLeft}</span>
                   )}
-                  <span className="truncate">{selectedOption.label}</span>
+                  <span className="min-w-0 truncate">{selectedOption.label}</span>
                 </div>
                 {selectedOption.slotRight && (
                   <span className="flex shrink-0 items-center text-xs text-muted-foreground">
@@ -153,7 +153,7 @@ export function SingleSelectField({
                       {o.slotLeft && (
                         <span className="flex shrink-0 items-center">{o.slotLeft}</span>
                       )}
-                      <span className="truncate text-left">{o.label}</span>
+                      <span className="min-w-0 truncate text-left">{o.label}</span>
                     </div>
                     {o.slotRight && (
                       <span className="flex shrink-0 items-center text-xs text-muted-foreground">

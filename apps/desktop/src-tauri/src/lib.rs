@@ -2382,6 +2382,83 @@ async fn github_add_issue_to_project(
     github::api::add_issue_to_project(&host, &token, &owner, &repo, number, &project_id).await
 }
 
+#[tauri::command]
+async fn github_get_issue_relationships(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<github::api::IssueRelationships, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_issue_relationships(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_add_sub_issue(
+    repo_path: String,
+    login: String,
+    parent_number: u64,
+    child_number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::add_sub_issue(&host, &token, &owner, &repo, parent_number, child_number).await
+}
+
+#[tauri::command]
+async fn github_remove_sub_issue(
+    repo_path: String,
+    login: String,
+    parent_number: u64,
+    child_number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::remove_sub_issue(&host, &token, &owner, &repo, parent_number, child_number).await
+}
+
+#[tauri::command]
+async fn github_add_blocked_by(
+    repo_path: String,
+    login: String,
+    number: u64,
+    blocking_number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::add_blocked_by(&host, &token, &owner, &repo, number, blocking_number).await
+}
+
+#[tauri::command]
+async fn github_remove_blocked_by(
+    repo_path: String,
+    login: String,
+    number: u64,
+    blocking_number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::remove_blocked_by(&host, &token, &owner, &repo, number, blocking_number).await
+}
+
+#[tauri::command]
+async fn github_create_linked_branch(
+    repo_path: String,
+    login: String,
+    number: u64,
+    base_branch: String,
+    name: String,
+) -> Result<github::api::LinkedBranch, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::create_linked_branch(&host, &token, &owner, &repo, number, &base_branch, &name)
+        .await
+}
+
+#[tauri::command]
+async fn github_delete_linked_branch(
+    login: String,
+    linked_branch_id: String,
+) -> Result<(), String> {
+    let host = github::auth::get_host()?;
+    let token = github::auth::get_token(&login)?;
+    github::api::delete_linked_branch(&host, &token, &linked_branch_id).await
+}
+
 /// Whether `path` currently exists on disk — used to hide filesystem-dependent context menu
 /// actions (Reveal in Finder, Open in Editor) for a file from an old commit, PR, or stash that's
 /// since been renamed or deleted, rather than let the user hit a dead action.
@@ -2866,6 +2943,13 @@ pub fn run() {
             github_close_issue,
             github_reopen_issue,
             github_add_issue_to_project,
+            github_get_issue_relationships,
+            github_add_sub_issue,
+            github_remove_sub_issue,
+            github_add_blocked_by,
+            github_remove_blocked_by,
+            github_create_linked_branch,
+            github_delete_linked_branch,
             github_list_labels,
             github_list_assignable_users,
             github_add_labels,

@@ -420,6 +420,26 @@ export interface Issue {
   created_at: string;
 }
 
+/** A lightweight issue reference for relationship chips — same three fields as `IssueSummary`,
+ * just sourced from `github_get_issue_relationships`'s GraphQL response. */
+export interface IssueRef {
+  number: number;
+  title: string;
+  state: string;
+}
+
+export interface LinkedBranch {
+  id: string;
+  name: string;
+}
+
+export interface IssueRelationships {
+  parent: IssueRef | null;
+  blocked_by: IssueRef[];
+  blocking: IssueRef[];
+  linked_branches: LinkedBranch[];
+}
+
 export interface BranchProtectionRequirements {
   required_contexts: string[];
   required_approving_review_count: number | null;

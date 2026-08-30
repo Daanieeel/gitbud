@@ -27,6 +27,7 @@ const REPO_SCOPED_PR_PREFIXES = [
   "issue-states",
   "issue-list",
   "issue-meta",
+  "issue-relationships",
 ] as const;
 
 /** Frees every PR-related query cached for `repoPath` — called when the Pulls tab is left
@@ -66,6 +67,7 @@ export function evictSelectedIssueQueries(
   number: number,
 ): void {
   queryClient.removeQueries({ queryKey: queryKeys.issueMeta(repoPath, login, number) });
+  queryClient.removeQueries({ queryKey: queryKeys.issueRelationships(repoPath, login, number) });
   queryClient.removeQueries({ queryKey: queryKeys.prIssueComments(repoPath, login, number) });
   queryClient.removeQueries({ queryKey: queryKeys.prTimelineEvents(repoPath, login, number) });
   queryClient.removeQueries({ queryKey: queryKeys.prArchived(repoPath, number) });

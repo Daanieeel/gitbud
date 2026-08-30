@@ -4,6 +4,8 @@ import { IssueSidebarAssignees } from "./IssueSidebarAssignees";
 import { IssueSidebarLabels } from "./IssueSidebarLabels";
 import { IssueSidebarMilestone } from "./IssueSidebarMilestone";
 import { IssueSidebarProjects } from "./IssueSidebarProjects";
+import { IssueSidebarBranches } from "./IssueSidebarBranches";
+import { IssueSidebarRelationships } from "./IssueSidebarRelationships";
 import { IssueSidebarLock } from "./IssueSidebarLock";
 import { IssueSidebarArchive } from "./IssueSidebarArchive";
 import type { Issue } from "@/lib/types";
@@ -33,6 +35,8 @@ export function IssueSidebar({ repoPath, login, issue }: IssueSidebarProps) {
         <IssueSidebarLabels repoPath={repoPath} login={login} issue={issue} />
         <IssueSidebarMilestone repoPath={repoPath} login={login} issue={issue} />
         <IssueSidebarProjects repoPath={repoPath} login={login} issue={issue} />
+        <IssueSidebarBranches repoPath={repoPath} login={login} issue={issue} />
+        <IssueSidebarRelationships repoPath={repoPath} login={login} issue={issue} />
         <div className="flex flex-col gap-1">
           <IssueSidebarLock repoPath={repoPath} login={login} issue={issue} />
           <IssueSidebarArchive repoPath={repoPath} issue={issue} />

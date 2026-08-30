@@ -57,7 +57,7 @@ export function MultiSelectField({
         <PopoverTrigger asChild>
           <button
             type="button"
-            className="flex min-h-7 w-full flex-wrap items-center gap-1 rounded-md border border-input bg-transparent px-2 py-1 text-left text-sm hover:bg-accent"
+            className="flex min-h-7 w-full flex-wrap items-center gap-1 rounded-md border border-input bg-accent px-2 py-1 text-left text-sm hover:bg-accent/80 hover:text-accent-foreground"
           >
             {selected.length === 0 || hideChips ? (
               <span className="text-muted-foreground">{placeholder ?? "None"}</span>

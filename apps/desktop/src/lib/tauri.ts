@@ -20,9 +20,11 @@ import type {
   ImageDiff,
   Issue,
   IssueComment,
+  IssueRelationships,
   IssueSummary,
   IssueTimelineEvent,
   Label,
+  LinkedBranch,
   Milestone,
   Project,
   LfsFileInfo,
@@ -506,6 +508,40 @@ export const api = {
     invoke<void>("github_reopen_issue", { repoPath, login, number }),
   githubAddIssueToProject: (repoPath: string, login: string, number: number, projectId: string) =>
     invoke<void>("github_add_issue_to_project", { repoPath, login, number, projectId }),
+  githubGetIssueRelationships: (repoPath: string, login: string, number: number) =>
+    invoke<IssueRelationships>("github_get_issue_relationships", { repoPath, login, number }),
+  githubAddSubIssue: (repoPath: string, login: string, parentNumber: number, childNumber: number) =>
+    invoke<void>("github_add_sub_issue", { repoPath, login, parentNumber, childNumber }),
+  githubRemoveSubIssue: (
+    repoPath: string,
+    login: string,
+    parentNumber: number,
+    childNumber: number,
+  ) => invoke<void>("github_remove_sub_issue", { repoPath, login, parentNumber, childNumber }),
+  githubAddBlockedBy: (repoPath: string, login: string, number: number, blockingNumber: number) =>
+    invoke<void>("github_add_blocked_by", { repoPath, login, number, blockingNumber }),
+  githubRemoveBlockedBy: (
+    repoPath: string,
+    login: string,
+    number: number,
+    blockingNumber: number,
+  ) => invoke<void>("github_remove_blocked_by", { repoPath, login, number, blockingNumber }),
+  githubCreateLinkedBranch: (
+    repoPath: string,
+    login: string,
+    number: number,
+    baseBranch: string,
+    name: string,
+  ) =>
+    invoke<LinkedBranch>("github_create_linked_branch", {
+      repoPath,
+      login,
+      number,
+      baseBranch,
+      name,
+    }),
+  githubDeleteLinkedBranch: (login: string, linkedBranchId: string) =>
+    invoke<void>("github_delete_linked_branch", { login, linkedBranchId }),
   githubMergePullRequest: (
     repoPath: string,
     login: string,
