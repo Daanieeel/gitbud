@@ -17,6 +17,7 @@ import { CreateIssueDialog } from "./CreateIssueDialog";
 import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { api } from "@/lib/tauri";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 
 const FILTERS: { key: IssueFilter; label: string }[] = [
   { key: "open", label: "Open" },
@@ -160,10 +161,14 @@ export function IssueTab() {
             </button>
           ))}
           <div className="flex-1" />
-          <Button size="sm" variant="secondary" onClick={() => setCreateOpen(true)}>
-            <PlusIcon className="size-3.5" />
-            New issue
-          </Button>
+          <Tooltip>
+            <TooltipTrigger>
+              <Button size="iconSm" variant="secondary" onClick={() => setCreateOpen(true)}>
+                <PlusIcon className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Create Issue</TooltipContent>
+          </Tooltip>
         </div>
         <div className="border-b border-border px-2 py-1 text-xs text-muted-foreground">
           {loading && issues.length === 0 ? "Loading…" : `${issues.length} ${filter}`}

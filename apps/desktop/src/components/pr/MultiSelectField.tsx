@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { cloneElement, isValidElement, useState, type ReactElement } from "react";
 import { ChevronDownIcon, XIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
 import { Input } from "@gitbud/ui/input";
@@ -64,6 +64,20 @@ export function MultiSelectField({
             ) : (
               selected.map((key) => {
                 const opt = options.find((o) => o.key === key);
+                // A label's own `LabelChip` already renders as a complete, self-colored pill —
+                // clone it in with the remove handler instead of wrapping it in another layer of
+                // (visually redundant) generic chip styling. Anything else (plain-string labels,
+                // e.g. assignees/reviewers) falls through to the generic wrapper below unchanged.
+                if (opt && isValidElement(opt.label)) {
+                  // SAFETY: `cloneElement` only ever merges `onRemove` into whatever props the
+                  // element already accepts — an element that ignores an unknown prop (nothing
+                  // else passes an element `label` besides `LabelChip`, which does accept it) is
+                  // exactly as safe as passing it none at all.
+                  return cloneElement(opt.label as ReactElement<{ onRemove?: () => void }>, {
+                    key,
+                    onRemove: () => toggle(key),
+                  });
+                }
                 return (
                   <span
                     key={key}
