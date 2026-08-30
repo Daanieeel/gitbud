@@ -127,10 +127,10 @@ export function IssueSidebarBranches({ repoPath, login, issue }: IssueSidebarBra
 
   return (
     <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-muted-foreground">Development</span>
+      <span className="text-xs font-medium text-muted-foreground">Linked branch</span>
 
       {branches.map((branch) => (
-        <div key={branch.id} className="group flex items-center gap-1.5">
+        <div key={branch.id} className="flex items-center gap-1.5">
           <BranchName className="h-6 min-w-0 flex-1 px-1.5 text-xs">{branch.name}</BranchName>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -168,7 +168,7 @@ export function IssueSidebarBranches({ repoPath, login, issue }: IssueSidebarBra
             type="button"
             disabled={deleteLinkedBranch.isPending}
             onClick={() => deleteLinkedBranch.mutate(branch.id)}
-            className="shrink-0 text-muted-foreground opacity-0 hover:text-destructive group-hover:opacity-100"
+            className="shrink-0 text-muted-foreground hover:text-destructive"
           >
             <XIcon className="size-3.5" />
           </button>
@@ -178,6 +178,7 @@ export function IssueSidebarBranches({ repoPath, login, issue }: IssueSidebarBra
       <SingleSelectField
         placeholder="Link or create a branch…"
         selected=""
+        contentClassName="w-[250px]"
         options={[
           {
             key: CREATE_KEY,
