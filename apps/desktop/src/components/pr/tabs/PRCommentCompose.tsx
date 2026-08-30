@@ -2,26 +2,31 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@gitbud/ui/button";
 import { Textarea } from "@gitbud/ui/textarea";
 import { useAddIssueComment } from "@/hooks/queries/usePRConversation";
-import { usePRStore } from "@/store/usePRStore";
 
 interface PRCommentComposeProps {
   repoPath: string;
   login: string;
   number: number;
+  /** A timeline comment's "Quote reply" action queues text through the caller's own store
+   * (`usePRStore`/`useIssueStore`, whichever tab this is rendered in) rather than calling into
+   * this component directly — picked up once, quoted as markdown, then cleared via
+   * `onConsumeQuotedReply` so it doesn't reappear on the next unrelated render. */
+  quotedReplyText: string | null;
+  onConsumeQuotedReply: () => void;
 }
 
 /** A top-level issue comment box — deliberately separate from `DiffView`'s line-anchored
  * comment composer in `@gitbud/ui` (a different concept: this isn't tied to a diff line at
  * all), so it lives here rather than being threaded into the shared diff package. */
-export function PRCommentCompose({ repoPath, login, number }: PRCommentComposeProps) {
+export function PRCommentCompose({
+  repoPath,
+  login,
+  number,
+  quotedReplyText,
+  onConsumeQuotedReply,
+}: PRCommentComposeProps) {
   const [body, setBody] = useState("");
   const addComment = useAddIssueComment(repoPath, login, number);
-
-  // A timeline comment's "Quote reply" action queues text here rather than calling into this
-  // component directly — picked up once, quoted as markdown, then cleared so it doesn't
-  // reappear on the next unrelated render.
-  const quotedReplyText = usePRStore((s) => s.quotedReplyText);
-  const clearQuotedReply = usePRStore((s) => s.clearQuotedReply);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -31,9 +36,9 @@ export function PRCommentCompose({ repoPath, login, number }: PRCommentComposePr
       .map((line) => `> ${line}`)
       .join("\n");
     setBody((prev) => (prev ? `${prev}\n\n${quoted}\n\n` : `${quoted}\n\n`));
-    clearQuotedReply();
+    onConsumeQuotedReply();
     textareaRef.current?.focus();
-  }, [quotedReplyText, clearQuotedReply]);
+  }, [quotedReplyText, onConsumeQuotedReply]);
 
   const submit = async () => {
     if (!body.trim()) return;

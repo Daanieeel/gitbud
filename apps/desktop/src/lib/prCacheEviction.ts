@@ -25,6 +25,8 @@ const REPO_SCOPED_PR_PREFIXES = [
   "milestones",
   "projects",
   "issue-states",
+  "issue-list",
+  "issue-meta",
 ] as const;
 
 /** Frees every PR-related query cached for `repoPath` — called when the Pulls tab is left
@@ -52,5 +54,19 @@ export function evictSelectedPrQueries(
   queryClient.removeQueries({ queryKey: queryKeys.prReviews(repoPath, login, number) });
   queryClient.removeQueries({ queryKey: queryKeys.reviewThreads(repoPath, login, number) });
   queryClient.removeQueries({ queryKey: queryKeys.viewedFiles(repoPath, login, number) });
+  queryClient.removeQueries({ queryKey: queryKeys.prArchived(repoPath, number) });
+}
+
+/** Frees every query scoped to one specific issue number — mirrors `evictSelectedPrQueries`,
+ * called the moment a different issue is selected. */
+export function evictSelectedIssueQueries(
+  queryClient: QueryClient,
+  repoPath: string,
+  login: string,
+  number: number,
+): void {
+  queryClient.removeQueries({ queryKey: queryKeys.issueMeta(repoPath, login, number) });
+  queryClient.removeQueries({ queryKey: queryKeys.prIssueComments(repoPath, login, number) });
+  queryClient.removeQueries({ queryKey: queryKeys.prTimelineEvents(repoPath, login, number) });
   queryClient.removeQueries({ queryKey: queryKeys.prArchived(repoPath, number) });
 }

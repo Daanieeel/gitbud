@@ -400,6 +400,26 @@ export interface IssueSummary {
   state: string;
 }
 
+/** A full GitHub issue, for the Issues tab — `IssueSummary` above stays lean, for the PR
+ * sidebar's "link an issue" picker only. */
+export interface Issue {
+  number: number;
+  title: string;
+  body: string | null;
+  state: string;
+  state_reason: string | null;
+  html_url: string;
+  author_login: string;
+  author_avatar_url: string;
+  labels: string[];
+  assignees: AssignableUser[];
+  milestone: Milestone | null;
+  locked: boolean;
+  active_lock_reason: string | null;
+  comments: number;
+  created_at: string;
+}
+
 export interface BranchProtectionRequirements {
   required_contexts: string[];
   required_approving_review_count: number | null;

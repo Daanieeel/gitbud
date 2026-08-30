@@ -19,7 +19,6 @@ import { TimelineCommentMenu } from "./TimelineCommentMenu";
 import { RelativeTime } from "../RelativeTime";
 import { CIBadge } from "../CIBadge";
 import { CommitVerificationBadge } from "../CommitVerificationBadge";
-import { usePRStore } from "@/store/usePRStore";
 import type { TimelineEvent } from "@/lib/prTimeline";
 import type { IssueTimelineEvent } from "@/lib/types";
 
@@ -43,10 +42,12 @@ const GITHUB_EVENT_LABEL = {
     `requested review from ${e.requested_reviewer_login ?? "someone"}`,
   review_request_removed: (e: IssueTimelineEvent) =>
     `removed the review request for ${e.requested_reviewer_login ?? "someone"}`,
-  closed: () => "closed this pull request",
-  reopened: () => "reopened this pull request",
+  // `closed`/`reopened` fire for both PRs and issues (issues never produce `merged`) — the noun
+  // is parameterized so this table is shared between both tabs' timelines.
+  closed: (_e: IssueTimelineEvent, noun: string) => `closed this ${noun}`,
+  reopened: (_e: IssueTimelineEvent, noun: string) => `reopened this ${noun}`,
   merged: () => "merged this pull request",
-} satisfies Record<string, (e: IssueTimelineEvent) => string>;
+} satisfies Record<string, (e: IssueTimelineEvent, noun: string) => string>;
 
 const GITHUB_EVENT_ICON = {
   labeled: TagIcon,
@@ -89,6 +90,13 @@ interface PRTimelineEventProps {
    * only the live-current one (PR closed and not merged, with no later reopen) gets the
    * destructive emphasis + line-stop treatment. */
   isTerminalClosed: boolean;
+  /** Jumps to the Commits tab with this sha selected — only ever invoked by the `commit` branch
+   * below, which never renders for an issue timeline (issues have no commits). */
+  onSelectCommit: (sha: string) => void;
+  onQuoteReply: (text: string) => void;
+  /** "pull request" or "issue" — parameterizes the `closed`/`reopened` event wording so this
+   * component is shared between both tabs' timelines. */
+  entityNoun: "pull request" | "issue";
 }
 
 export function PRTimelineEvent({
@@ -99,9 +107,10 @@ export function PRTimelineEvent({
   showBottomLine,
   onDeleteComment,
   isTerminalClosed,
+  onSelectCommit,
+  onQuoteReply,
+  entityNoun,
 }: PRTimelineEventProps) {
-  const selectCommit = usePRStore((s) => s.selectCommit);
-
   if (event.kind === "commit") {
     const { commit } = event;
     return (
@@ -124,7 +133,7 @@ export function PRTimelineEvent({
           <CommitVerificationBadge repoPath={repoPath} login={login} sha={commit.sha} />
           <button
             type="button"
-            onClick={() => selectCommit(commit.sha)}
+            onClick={() => onSelectCommit(commit.sha)}
             className="shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-secondary-foreground hover:text-foreground"
           >
             {commit.sha.slice(0, 7)}
@@ -151,7 +160,11 @@ export function PRTimelineEvent({
             <span className="text-muted-foreground">{verdict.label}</span>
             <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground">
               {event.timestamp && <RelativeTime iso={event.timestamp} />}
-              <TimelineCommentMenu htmlUrl={review.html_url} body={review.body} />
+              <TimelineCommentMenu
+                htmlUrl={review.html_url}
+                body={review.body}
+                onQuoteReply={onQuoteReply}
+              />
             </span>
           </div>
           {review.body && <Markdown content={review.body} />}
@@ -213,7 +226,11 @@ export function PRTimelineEvent({
     const isMerged = ghEvent.event === "merged";
     const isEmphasized = isMerged || isTerminalClosed;
     const iconColor = lookup(GITHUB_EVENT_COLOR, ghEvent.event, "text-muted-foreground");
-    const label = lookup(GITHUB_EVENT_LABEL, ghEvent.event, () => ghEvent.event)(ghEvent);
+    const label = lookup(
+      GITHUB_EVENT_LABEL,
+      ghEvent.event,
+      () => ghEvent.event,
+    )(ghEvent, entityNoun);
     const Icon = lookup(GITHUB_EVENT_ICON, ghEvent.event, MessageSquareIcon);
     return (
       <TimelineRow
@@ -264,6 +281,7 @@ export function PRTimelineEvent({
               onDelete={
                 comment.user_login === login ? () => onDeleteComment(comment.id) : undefined
               }
+              onQuoteReply={onQuoteReply}
             />
           </span>
         </div>

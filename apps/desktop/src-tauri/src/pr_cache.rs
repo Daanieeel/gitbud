@@ -8,7 +8,7 @@ use std::sync::OnceLock;
 
 use crate::diff::PrFileEntry;
 use crate::github::api::{
-    CheckRun, IssueComment, PullRequest, PullRequestCommit, Review, ReviewComment,
+    CheckRun, Issue, IssueComment, PullRequest, PullRequestCommit, Review, ReviewComment,
 };
 
 /// Rows older than this are opportunistically pruned on each write, so a long-lived app session
@@ -87,6 +87,11 @@ fn pool() -> Result<&'static Pool<SqliteConnectionManager>, String> {
                 CREATE TABLE IF NOT EXISTS pr_archived (
                     repo_key TEXT NOT NULL, number INTEGER NOT NULL,
                     archived_at INTEGER NOT NULL,
+                    PRIMARY KEY (repo_key, number)
+                );
+                CREATE TABLE IF NOT EXISTS issue_list (
+                    repo_key TEXT NOT NULL, number INTEGER NOT NULL,
+                    data TEXT NOT NULL, synced_at INTEGER NOT NULL,
                     PRIMARY KEY (repo_key, number)
                 );
                 ",
@@ -487,6 +492,59 @@ pub fn set_pr_archived(repo_key: &str, number: u64, archived: bool) -> Result<()
     Ok(())
 }
 
+/// Mirrors GitHub's list-issues `state` semantics: "open"/"closed"/anything else means "all".
+fn matches_issue_state(issue: &Issue, state: &str) -> bool {
+    match state {
+        "open" => issue.state == "open",
+        "closed" => issue.state == "closed",
+        _ => true,
+    }
+}
+
+pub fn get_cached_issue_list(repo_key: &str, state: &str) -> Result<Vec<Issue>, String> {
+    let conn = conn()?;
+    let mut stmt = conn
+        .prepare("SELECT data FROM issue_list WHERE repo_key = ?1 ORDER BY number DESC")
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map(params![repo_key], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for row in rows {
+        let json = row.map_err(|e| e.to_string())?;
+        if let Ok(issue) = serde_json::from_str::<Issue>(&json) {
+            if matches_issue_state(&issue, state) {
+                out.push(issue);
+            }
+        }
+    }
+    Ok(out)
+}
+
+pub fn upsert_issue_list(repo_key: &str, issues: &[Issue]) -> Result<(), String> {
+    let mut conn = conn()?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let synced_at = now();
+    for issue in issues {
+        let data = serde_json::to_string(issue).map_err(|e| e.to_string())?;
+        tx.execute(
+            "INSERT INTO issue_list (repo_key, number, data, synced_at) VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT(repo_key, number) DO UPDATE SET data = excluded.data, synced_at = excluded.synced_at",
+            params![repo_key, issue.number as i64, data, synced_at],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    prune(&tx, "issue_list", repo_key);
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Write-through for a single issue, e.g. after close/reopen flips `state` without waiting for
+/// the next full list refetch.
+pub fn upsert_issue(repo_key: &str, issue: &Issue) -> Result<(), String> {
+    upsert_issue_list(repo_key, std::slice::from_ref(issue))
+}
+
 /// Directory the mirror's SQLite file lives in, for the "Open" button in Settings that reveals
 /// it in the OS file manager. Always exists (`config_dir()` creates it), even before anything's
 /// actually been cached.
@@ -507,7 +565,7 @@ pub fn cache_sizes() -> Result<(u64, u64), String> {
     let conn = conn()?;
     let repo_bytes: i64 = conn
         .query_row(
-            "SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name IN ('pr_list', 'pr_files', 'pr_comments', 'check_runs', 'pr_commits', 'pr_issue_comments', 'pr_reviews')",
+            "SELECT COALESCE(SUM(pgsize), 0) FROM dbstat WHERE name IN ('pr_list', 'pr_files', 'pr_comments', 'check_runs', 'pr_commits', 'pr_issue_comments', 'pr_reviews', 'issue_list')",
             [],
             |row| row.get(0),
         )
@@ -537,6 +595,7 @@ pub fn clear_repo_data() -> Result<(), String> {
         DELETE FROM pr_commits;
         DELETE FROM pr_issue_comments;
         DELETE FROM pr_reviews;
+        DELETE FROM issue_list;
         VACUUM;
         ",
     )

@@ -11,6 +11,7 @@ import {
 } from "@/hooks/queries/usePRConversation";
 import { usePullRequestCommits } from "@/hooks/queries/usePRCommits";
 import { prPollIntervalMs, useIsPrTabActive } from "@/hooks/queries/useCheckRuns";
+import { usePRStore } from "@/store/usePRStore";
 import type { PullRequest } from "@/lib/types";
 
 interface ConversationTabProps {
@@ -27,6 +28,10 @@ export function ConversationTab({ repoPath, login, pr }: ConversationTabProps) {
   const commits = usePullRequestCommits(repoPath, login, pr.number, pr.head_sha);
   const { data: ghEvents = [] } = useTimelineEvents(repoPath, login, pr.number, pollIntervalMs);
   const deleteComment = useDeleteIssueComment(repoPath, login, pr.number);
+  const selectCommit = usePRStore((s) => s.selectCommit);
+  const setQuotedReply = usePRStore((s) => s.setQuotedReply);
+  const quotedReplyText = usePRStore((s) => s.quotedReplyText);
+  const clearQuotedReply = usePRStore((s) => s.clearQuotedReply);
 
   // Comments/reviews/commits each page independently (see usePRConversation.ts/usePRCommits.ts)
   // but the timeline merges them into one feed, so "load more" has to mean "load whichever of
@@ -53,6 +58,9 @@ export function ConversationTab({ repoPath, login, pr }: ConversationTabProps) {
         onDeleteComment={(id) => deleteComment.mutate(id)}
         isMerged={pr.merged}
         isClosedNotMerged={!pr.merged && pr.state !== "open"}
+        onSelectCommit={selectCommit}
+        onQuoteReply={setQuotedReply}
+        entityNoun="pull request"
       />
       {hasMoreActivity && (
         // GitHub's comment/review/commit list endpoints return oldest-first, so the *next* page
@@ -67,7 +75,13 @@ export function ConversationTab({ repoPath, login, pr }: ConversationTabProps) {
           {loadingMoreActivity ? "Loading…" : "Load more activity"}
         </Button>
       )}
-      <PRCommentCompose repoPath={repoPath} login={login} number={pr.number} />
+      <PRCommentCompose
+        repoPath={repoPath}
+        login={login}
+        number={pr.number}
+        quotedReplyText={quotedReplyText}
+        onConsumeQuotedReply={clearQuotedReply}
+      />
       {pr.merged && (
         <div className="flex items-center gap-2 rounded-md bg-accent-purple/15 p-3 text-sm font-medium text-accent-purple">
           <CheckCircle2Icon className="size-4 shrink-0" />

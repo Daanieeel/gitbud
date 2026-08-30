@@ -28,14 +28,14 @@ interface RepoState {
   commitDescription: string;
   amending: boolean;
 
-  activeTab: "changes" | "history" | "pulls";
+  activeTab: "changes" | "history" | "pulls" | "issues";
 
   globalListenersReady: boolean;
 
   initGlobalListeners: () => Promise<void>;
   loadRepos: () => Promise<void>;
   selectRepo: (path: string) => Promise<void>;
-  setActiveTab: (tab: "changes" | "history" | "pulls") => void;
+  setActiveTab: (tab: "changes" | "history" | "pulls" | "issues") => void;
 
   selectFile: (path: string | null) => void;
   setCommitSummary: (value: string) => void;

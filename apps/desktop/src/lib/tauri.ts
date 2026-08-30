@@ -18,6 +18,7 @@ import type {
   GitHubAccount,
   GitHubRepo,
   ImageDiff,
+  Issue,
   IssueComment,
   IssueSummary,
   IssueTimelineEvent,
@@ -467,6 +468,44 @@ export const api = {
     number: number,
     projectId: string,
   ) => invoke<void>("github_add_pull_request_to_project", { repoPath, login, number, projectId }),
+  githubListIssues: (
+    repoPath: string,
+    login: string,
+    state: "open" | "closed" | "all",
+    page: number,
+  ) => invoke<Issue[]>("github_list_issues", { repoPath, login, state, page }),
+  getCachedIssues: (repoPath: string, state: "open" | "closed" | "all") =>
+    invoke<Issue[]>("get_cached_issues", { repoPath, state }),
+  githubGetIssue: (repoPath: string, login: string, number: number) =>
+    invoke<Issue>("github_get_issue", { repoPath, login, number }),
+  githubCreateIssue: (
+    repoPath: string,
+    login: string,
+    title: string,
+    body: string,
+    labels: string[],
+    assignees: string[],
+    milestone: number | null,
+  ) =>
+    invoke<Issue>("github_create_issue", {
+      repoPath,
+      login,
+      title,
+      body,
+      labels,
+      assignees,
+      milestone,
+    }),
+  githubUpdateIssueTitle: (repoPath: string, login: string, number: number, title: string) =>
+    invoke<void>("github_update_issue_title", { repoPath, login, number, title }),
+  githubUpdateIssueBody: (repoPath: string, login: string, number: number, body: string) =>
+    invoke<void>("github_update_issue_body", { repoPath, login, number, body }),
+  githubCloseIssue: (repoPath: string, login: string, number: number, stateReason: string | null) =>
+    invoke<void>("github_close_issue", { repoPath, login, number, stateReason }),
+  githubReopenIssue: (repoPath: string, login: string, number: number) =>
+    invoke<void>("github_reopen_issue", { repoPath, login, number }),
+  githubAddIssueToProject: (repoPath: string, login: string, number: number, projectId: string) =>
+    invoke<void>("github_add_issue_to_project", { repoPath, login, number, projectId }),
   githubMergePullRequest: (
     repoPath: string,
     login: string,

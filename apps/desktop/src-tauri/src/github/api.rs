@@ -1566,6 +1566,283 @@ pub async fn list_issue_states(
     Ok(result)
 }
 
+/// A full GitHub issue, for the Issues tab — distinct from the lean `IssueSummary` above, which
+/// exists only for the PR sidebar's "link an issue" picker.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Issue {
+    pub number: u64,
+    pub title: String,
+    pub body: Option<String>,
+    pub state: String,
+    pub state_reason: Option<String>,
+    pub html_url: String,
+    pub author_login: String,
+    pub author_avatar_url: String,
+    pub labels: Vec<String>,
+    pub assignees: Vec<AssignableUser>,
+    pub milestone: Option<Milestone>,
+    pub locked: bool,
+    pub active_lock_reason: Option<String>,
+    pub comments: u64,
+    pub created_at: String,
+}
+
+#[derive(Deserialize)]
+struct RawIssue {
+    number: u64,
+    title: String,
+    body: Option<String>,
+    state: String,
+    #[serde(default)]
+    state_reason: Option<String>,
+    html_url: String,
+    user: RawUser,
+    #[serde(default)]
+    labels: Vec<RawLabel>,
+    #[serde(default)]
+    assignees: Vec<AssignableUser>,
+    #[serde(default)]
+    milestone: Option<Milestone>,
+    #[serde(default)]
+    locked: bool,
+    #[serde(default)]
+    active_lock_reason: Option<String>,
+    #[serde(default)]
+    comments: u64,
+    created_at: String,
+    // Present (non-null) only when this "issue" is actually a pull request — see
+    // `RawIssueSummary`'s identical field, same reason.
+    #[serde(default)]
+    pull_request: Option<serde_json::Value>,
+}
+
+impl From<RawIssue> for Issue {
+    fn from(raw: RawIssue) -> Self {
+        Issue {
+            number: raw.number,
+            title: raw.title,
+            body: raw.body,
+            state: raw.state,
+            state_reason: raw.state_reason,
+            html_url: raw.html_url,
+            author_login: raw.user.login,
+            author_avatar_url: raw.user.avatar_url,
+            labels: raw.labels.into_iter().map(|l| l.name).collect(),
+            assignees: raw.assignees,
+            milestone: raw.milestone,
+            locked: raw.locked,
+            active_lock_reason: raw.active_lock_reason,
+            comments: raw.comments,
+            created_at: raw.created_at,
+        }
+    }
+}
+
+/// `state` is "open" | "closed" | "all", same convention as `list_pull_requests`. GitHub's
+/// issues-list endpoint returns PRs too (see `RawIssue::pull_request`) — filtered out here so
+/// callers never see them.
+pub async fn list_issues(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    state: &str,
+    page: u32,
+) -> Result<Vec<Issue>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues?state={state}&per_page=50&page={page}");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: Vec<RawIssue> = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw
+        .into_iter()
+        .filter(|i| i.pull_request.is_none())
+        .map(Issue::from)
+        .collect())
+}
+
+pub async fn get_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<Issue, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: RawIssue = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw.into())
+}
+
+#[derive(Debug, Serialize)]
+struct CreateIssueBody<'a> {
+    title: &'a str,
+    body: &'a str,
+}
+
+pub async fn create_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    title: &str,
+    body: &str,
+) -> Result<Issue, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues");
+    let res = send_checked(gh.post(&path).json(&CreateIssueBody { title, body })).await?;
+    let raw: RawIssue = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw.into())
+}
+
+#[derive(Debug, Serialize)]
+struct UpdateIssueTitleBody<'a> {
+    title: &'a str,
+}
+
+pub async fn update_issue_title(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    title: &str,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}");
+    send_checked(gh.patch(&path).json(&UpdateIssueTitleBody { title })).await?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct UpdateIssueBodyBody<'a> {
+    body: &'a str,
+}
+
+/// Edits an issue's description — the author-only editing action, mirrors
+/// `update_pull_request_body`.
+pub async fn update_issue_body(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    body: &str,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}");
+    send_checked(gh.patch(&path).json(&UpdateIssueBodyBody { body })).await?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct CloseIssueBody<'a> {
+    state: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    state_reason: Option<&'a str>,
+}
+
+/// Closes an open issue — `state_reason` is one of GitHub's "completed"/"not_planned", or `None`
+/// to let GitHub default it (defaults to "completed").
+pub async fn close_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    state_reason: Option<&str>,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}");
+    send_checked(gh.patch(&path).json(&CloseIssueBody {
+        state: "closed",
+        state_reason,
+    }))
+    .await?;
+    Ok(())
+}
+
+/// Reopens a closed issue — the symmetric counterpart to `close_issue`.
+pub async fn reopen_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}");
+    send_checked(gh.patch(&path).json(&CloseIssueBody {
+        state: "open",
+        state_reason: None,
+    }))
+    .await?;
+    Ok(())
+}
+
+const ISSUE_NODE_ID_QUERY: &str = r#"
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    issue(number: $number) { id }
+  }
+}
+"#;
+
+/// An issue's GraphQL node id — mirrors `pull_request_node_id`, needed only for Projects v2
+/// (issues have no other GraphQL-only surface to reach).
+async fn issue_node_id(
+    gh: &GhClient,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<String, String> {
+    #[derive(Deserialize)]
+    struct IssueId {
+        id: String,
+    }
+    #[derive(Deserialize)]
+    struct RepositoryData {
+        issue: IssueId,
+    }
+    #[derive(Deserialize)]
+    struct NodeIdData {
+        repository: RepositoryData,
+    }
+    let data: NodeIdData = gh
+        .graphql(
+            ISSUE_NODE_ID_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "number": number }),
+        )
+        .await?;
+    Ok(data.repository.issue.id)
+}
+
+pub async fn add_issue_to_project(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    project_id: &str,
+) -> Result<(), String> {
+    #[derive(Deserialize)]
+    struct MutationData {
+        #[allow(dead_code)]
+        #[serde(rename = "addProjectV2ItemById")]
+        add_project_v2_item_by_id: serde_json::Value,
+    }
+
+    let gh = GhClient::new(host, token)?;
+    let content_id = issue_node_id(&gh, owner, repo, number).await?;
+    let _: MutationData = gh
+        .graphql(
+            ADD_PROJECT_ITEM_MUTATION,
+            serde_json::json!({ "projectId": project_id, "contentId": content_id }),
+        )
+        .await?;
+    Ok(())
+}
+
 #[derive(Debug, Serialize)]
 struct MergeBody<'a> {
     merge_method: &'a str,

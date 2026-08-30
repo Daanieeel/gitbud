@@ -13,6 +13,9 @@ interface PRTimelineProps {
   onDeleteComment: (commentId: number) => void;
   isMerged: boolean;
   isClosedNotMerged: boolean;
+  onSelectCommit: (sha: string) => void;
+  onQuoteReply: (text: string) => void;
+  entityNoun: "pull request" | "issue";
 }
 
 export function PRTimeline({
@@ -25,6 +28,9 @@ export function PRTimeline({
   onDeleteComment,
   isMerged,
   isClosedNotMerged,
+  onSelectCommit,
+  onQuoteReply,
+  entityNoun,
 }: PRTimelineProps) {
   const events = useMemo(
     () => mergeTimeline(comments, reviews, commits, ghEvents),
@@ -73,6 +79,9 @@ export function PRTimeline({
               showBottomLine={showBottomLine}
               onDeleteComment={onDeleteComment}
               isTerminalClosed={i === terminalIndex && terminalKind === "closed"}
+              onSelectCommit={onSelectCommit}
+              onQuoteReply={onQuoteReply}
+              entityNoun={entityNoun}
             />
             {i === terminalIndex && i < events.length - 1 && (
               <div

@@ -2238,6 +2238,150 @@ async fn github_list_issue_states(
     github::api::list_issue_states(&host, &token, &owner, &repo, &numbers).await
 }
 
+// --- github: issues (Issues tab) ---
+
+#[tauri::command]
+async fn github_list_issues(
+    repo_path: String,
+    login: String,
+    state: String,
+    page: u32,
+) -> Result<Vec<github::api::Issue>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    let issues = github::api::list_issues(&host, &token, &owner, &repo, &state, page).await?;
+    if let Ok(key) = cache_key(&repo_path) {
+        let list = issues.clone();
+        cache_write(move || pr_cache::upsert_issue_list(&key, &list)).await;
+    }
+    Ok(issues)
+}
+
+#[tauri::command]
+async fn get_cached_issues(repo_path: String, state: String) -> Vec<github::api::Issue> {
+    let Ok(key) = cache_key(&repo_path) else {
+        return Vec::new();
+    };
+    tauri::async_runtime::spawn_blocking(move || pr_cache::get_cached_issue_list(&key, &state))
+        .await
+        .unwrap_or(Ok(Vec::new()))
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+async fn github_get_issue(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<github::api::Issue, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_issue(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_create_issue(
+    repo_path: String,
+    login: String,
+    title: String,
+    body: String,
+    labels: Vec<String>,
+    assignees: Vec<String>,
+    milestone: Option<u64>,
+) -> Result<github::api::Issue, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    let issue = github::api::create_issue(&host, &token, &owner, &repo, &title, &body).await?;
+    if !labels.is_empty() {
+        github::api::add_labels(&host, &token, &owner, &repo, issue.number, &labels).await?;
+    }
+    if !assignees.is_empty() {
+        github::api::add_assignees(&host, &token, &owner, &repo, issue.number, &assignees).await?;
+    }
+    if let Some(m) = milestone {
+        github::api::set_milestone(&host, &token, &owner, &repo, issue.number, m).await?;
+    }
+    // Re-fetch so the returned issue reflects labels/assignees/milestone just attached, mirroring
+    // `github_create_pull_request`'s callers re-fetching a single PR after related follow-up calls.
+    github::api::get_issue(&host, &token, &owner, &repo, issue.number).await
+}
+
+#[tauri::command]
+async fn github_update_issue_title(
+    repo_path: String,
+    login: String,
+    number: u64,
+    title: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::update_issue_title(&host, &token, &owner, &repo, number, &title).await
+}
+
+#[tauri::command]
+async fn github_update_issue_body(
+    repo_path: String,
+    login: String,
+    number: u64,
+    body: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::update_issue_body(&host, &token, &owner, &repo, number, &body).await
+}
+
+/// Writes an issue's freshly-changed state through to the cache immediately rather than waiting
+/// for the next full list refetch — mirrors `github_merge_pull_request`'s equivalent write-through.
+async fn cache_write_issue(
+    repo_path: &str,
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) {
+    if let Ok(issue) = github::api::get_issue(host, token, owner, repo, number).await {
+        if let Ok(key) = cache_key(repo_path) {
+            cache_write(move || pr_cache::upsert_issue(&key, &issue)).await;
+        }
+    }
+}
+
+#[tauri::command]
+async fn github_close_issue(
+    repo_path: String,
+    login: String,
+    number: u64,
+    state_reason: Option<String>,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::close_issue(
+        &host,
+        &token,
+        &owner,
+        &repo,
+        number,
+        state_reason.as_deref(),
+    )
+    .await?;
+    cache_write_issue(&repo_path, &host, &token, &owner, &repo, number).await;
+    Ok(())
+}
+
+#[tauri::command]
+async fn github_reopen_issue(repo_path: String, login: String, number: u64) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::reopen_issue(&host, &token, &owner, &repo, number).await?;
+    cache_write_issue(&repo_path, &host, &token, &owner, &repo, number).await;
+    Ok(())
+}
+
+#[tauri::command]
+async fn github_add_issue_to_project(
+    repo_path: String,
+    login: String,
+    number: u64,
+    project_id: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::add_issue_to_project(&host, &token, &owner, &repo, number, &project_id).await
+}
+
 /// Whether `path` currently exists on disk — used to hide filesystem-dependent context menu
 /// actions (Reveal in Finder, Open in Editor) for a file from an old commit, PR, or stash that's
 /// since been renamed or deleted, rather than let the user hit a dead action.
@@ -2713,6 +2857,15 @@ pub fn run() {
             github_unmark_file_viewed,
             github_list_repo_issues,
             github_list_issue_states,
+            github_list_issues,
+            get_cached_issues,
+            github_get_issue,
+            github_create_issue,
+            github_update_issue_title,
+            github_update_issue_body,
+            github_close_issue,
+            github_reopen_issue,
+            github_add_issue_to_project,
             github_list_labels,
             github_list_assignable_users,
             github_add_labels,

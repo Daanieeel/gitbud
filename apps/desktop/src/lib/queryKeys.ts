@@ -48,6 +48,8 @@ export const queryKeys = {
     ["pr-commits", repoPath, login, number, headSha] as const,
   commitDiffFiles: (repoPath: string, login: string, sha: string) =>
     ["pr-commit-diff-files", repoPath, login, sha] as const,
+  // Shared with the Issues tab too (an issue and PR number are the same GitHub "issue" object
+  // for comments/timeline purposes, and never collide since they share one per-repo counter).
   prIssueComments: (repoPath: string, login: string, number: number) =>
     ["pr-issue-comments", repoPath, login, number] as const,
   prTimelineEvents: (repoPath: string, login: string, number: number) =>
@@ -72,4 +74,10 @@ export const queryKeys = {
   prArchived: (repoPath: string, number: number) => ["pr-archived", repoPath, number] as const,
   compare: (repoPath: string, login: string, base: string, head: string) =>
     ["pr-compare", repoPath, login, base, head] as const,
+
+  // Issues tab.
+  issueList: (repoPath: string, login: string, filter: string) =>
+    ["issue-list", repoPath, login, filter] as const,
+  issueMeta: (repoPath: string, login: string, number: number) =>
+    ["issue-meta", repoPath, login, number] as const,
 };
