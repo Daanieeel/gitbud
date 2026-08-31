@@ -73,11 +73,11 @@ export function useRepoIssues(repoPath: string | null, login: string | null) {
   });
 }
 
-export function useIssueStates(repoPath: string | null, login: string | null, numbers: number[]) {
+export function useClosingIssues(repoPath: string | null, login: string | null, number: number) {
   return useQuery({
-    queryKey: queryKeys.issueStates(repoPath ?? "", login ?? "", numbers),
-    queryFn: () => api.githubListIssueStates(repoPath!, login!, numbers),
-    enabled: !!repoPath && !!login && numbers.length > 0,
+    queryKey: queryKeys.closingIssues(repoPath ?? "", login ?? "", number),
+    queryFn: () => api.githubListClosingIssues(repoPath!, login!, number),
+    enabled: !!repoPath && !!login,
   });
 }
 

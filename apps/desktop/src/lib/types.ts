@@ -413,6 +413,17 @@ export interface IssueSummary {
   state: string;
 }
 
+/** An issue this PR will close on merge, as GitHub itself computes it (`closingIssuesReferences`)
+ * — includes issues linked purely via a branch-to-issue connection with no closing keyword
+ * anywhere in the PR body, which `IssueSummary`-based body-text parsing alone can't detect. */
+export interface ClosingIssueRef {
+  number: number;
+  title: string;
+  state: string;
+  repo_owner: string;
+  repo_name: string;
+}
+
 /** A full GitHub issue, for the Issues tab — `IssueSummary` above stays lean, for the PR
  * sidebar's "link an issue" picker only. */
 export interface Issue {

@@ -1474,9 +1474,7 @@ pub async fn unmark_file_as_viewed(
     Ok(())
 }
 
-/// Open/closed state for a batch of issue numbers in one request (aliased per-number, since
-/// GraphQL has no "issue by number, list of numbers" batch field) — feeds the sidebar's linked-
-/// issues chips ("Closes #123" parsed out of the PR body).
+/// A lean issue (no body/labels/etc) — just enough for a picker option.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssueSummary {
     pub number: u64,
@@ -1520,50 +1518,103 @@ pub async fn list_repo_issues(
         .collect())
 }
 
-pub async fn list_issue_states(
+const CLOSING_ISSUES_QUERY: &str = r#"
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      closingIssuesReferences(first: 25) {
+        nodes {
+          number
+          title
+          state
+          repository { name owner { login } }
+        }
+      }
+    }
+  }
+}
+"#;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClosingIssueRef {
+    pub number: u64,
+    pub title: String,
+    pub state: String,
+    pub repo_owner: String,
+    pub repo_name: String,
+}
+
+/// The issues this PR will close on merge, exactly as GitHub itself computes it for its own PR
+/// sidebar — covers both a "Closes #N"/"Fixes #N" keyword in the body *and* a PR opened from a
+/// branch GitHub's own "Create a branch" flow (from an issue's "Development" panel) already
+/// linked to an issue, which carries no such keyword in the body at all. The old body-text-only
+/// regex heuristic (`parseLinkedIssues` on the frontend) missed exactly that second case.
+pub async fn list_closing_issues(
     host: &str,
     token: &str,
     owner: &str,
     repo: &str,
-    numbers: &[u64],
-) -> Result<std::collections::HashMap<u64, String>, String> {
-    if numbers.is_empty() {
-        return Ok(std::collections::HashMap::new());
+    number: u64,
+) -> Result<Vec<ClosingIssueRef>, String> {
+    #[derive(Deserialize)]
+    struct OwnerNode {
+        login: String,
     }
-    let fields: Vec<String> = numbers
-        .iter()
-        .map(|n| format!(r#"i{n}: issue(number: {n}) {{ number state }}"#))
-        .collect();
-    let query = format!(
-        r#"query($owner: String!, $repo: String!) {{
-          repository(owner: $owner, name: $repo) {{ {} }}
-        }}"#,
-        fields.join("\n")
-    );
-
+    #[derive(Deserialize)]
+    struct RepoNode {
+        name: String,
+        owner: OwnerNode,
+    }
     #[derive(Deserialize)]
     struct IssueNode {
         number: u64,
+        title: String,
         state: String,
+        repository: RepoNode,
+    }
+    #[derive(Deserialize)]
+    struct Nodes {
+        nodes: Vec<IssueNode>,
+    }
+    #[derive(Deserialize)]
+    struct PullRequestNode {
+        #[serde(rename = "closingIssuesReferences")]
+        closing_issues_references: Nodes,
+    }
+    #[derive(Deserialize)]
+    struct RepositoryData {
+        #[serde(rename = "pullRequest")]
+        pull_request: Option<PullRequestNode>,
+    }
+    #[derive(Deserialize)]
+    struct Data {
+        repository: RepositoryData,
     }
 
     let gh = GhClient::new(host, token)?;
-    let data: serde_json::Value = gh
-        .graphql(&query, serde_json::json!({ "owner": owner, "repo": repo }))
+    let data: Data = gh
+        .graphql(
+            CLOSING_ISSUES_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "number": number }),
+        )
         .await?;
-    let repository = data.get("repository").cloned().unwrap_or_default();
-    let mut result = std::collections::HashMap::new();
-    if let serde_json::Value::Object(fields) = repository {
-        for (_, value) in fields {
-            if value.is_null() {
-                continue;
-            }
-            if let Ok(node) = serde_json::from_value::<IssueNode>(value) {
-                result.insert(node.number, node.state);
-            }
-        }
-    }
-    Ok(result)
+    Ok(data
+        .repository
+        .pull_request
+        .map(|pr| {
+            pr.closing_issues_references
+                .nodes
+                .into_iter()
+                .map(|n| ClosingIssueRef {
+                    number: n.number,
+                    title: n.title,
+                    state: n.state,
+                    repo_owner: n.repository.owner.login,
+                    repo_name: n.repository.name,
+                })
+                .collect()
+        })
+        .unwrap_or_default())
 }
 
 /// A full GitHub issue, for the Issues tab — distinct from the lean `IssueSummary` above, which
@@ -1747,25 +1798,6 @@ pub async fn upload_attachment(
     .await?;
     let parsed: UploadResponse = res.json().await.map_err(|e| e.to_string())?;
     Ok(parsed.url)
-}
-
-#[derive(Debug, Serialize)]
-struct UpdateIssueTitleBody<'a> {
-    title: &'a str,
-}
-
-pub async fn update_issue_title(
-    host: &str,
-    token: &str,
-    owner: &str,
-    repo: &str,
-    number: u64,
-    title: &str,
-) -> Result<(), String> {
-    let gh = GhClient::new(host, token)?;
-    let path = format!("/repos/{owner}/{repo}/issues/{number}");
-    send_checked(gh.patch(&path).json(&UpdateIssueTitleBody { title })).await?;
-    Ok(())
 }
 
 #[derive(Debug, Serialize)]

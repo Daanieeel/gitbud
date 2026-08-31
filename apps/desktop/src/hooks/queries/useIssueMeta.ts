@@ -40,31 +40,6 @@ export function useIssueMeta(
   });
 }
 
-export function useUpdateIssueTitle(
-  repoPath: string | null,
-  login: string | null,
-  number: number | null,
-) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (title: string) => {
-      if (!repoPath || !login || number === null) {
-        throw new Error("useUpdateIssueTitle: repoPath/login/number not set");
-      }
-      return api.githubUpdateIssueTitle(repoPath, login, number, title);
-    },
-    onSuccess: (_void, title) => {
-      if (!repoPath || !login || number === null) return;
-      queryClient.setQueryData<Issue | undefined>(
-        queryKeys.issueMeta(repoPath, login, number),
-        (prev) => (prev ? { ...prev, title } : prev),
-      );
-      void queryClient.invalidateQueries({ queryKey: ["issue-list", repoPath, login] });
-    },
-    onError: (err) => toast.error(String(err)),
-  });
-}
-
 export function useUpdateIssueBody(
   repoPath: string | null,
   login: string | null,

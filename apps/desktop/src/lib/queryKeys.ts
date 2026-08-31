@@ -67,8 +67,8 @@ export const queryKeys = {
   repoIssues: (repoPath: string, login: string) => ["repo-issues", repoPath, login] as const,
   milestones: (repoPath: string, login: string) => ["milestones", repoPath, login] as const,
   projects: (repoPath: string, login: string) => ["projects", repoPath, login] as const,
-  issueStates: (repoPath: string, login: string, numbers: number[]) =>
-    ["issue-states", repoPath, login, numbers] as const,
+  closingIssues: (repoPath: string, login: string, number: number) =>
+    ["closing-issues", repoPath, login, number] as const,
   branchProtection: (repoPath: string, login: string, branch: string) =>
     ["branch-protection", repoPath, login, branch] as const,
   prArchived: (repoPath: string, number: number) => ["pr-archived", repoPath, number] as const,

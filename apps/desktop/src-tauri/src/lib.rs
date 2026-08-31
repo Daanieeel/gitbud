@@ -2242,13 +2242,13 @@ async fn github_list_repo_issues(
 }
 
 #[tauri::command]
-async fn github_list_issue_states(
+async fn github_list_closing_issues(
     repo_path: String,
     login: String,
-    numbers: Vec<u64>,
-) -> Result<std::collections::HashMap<u64, String>, String> {
+    number: u64,
+) -> Result<Vec<github::api::ClosingIssueRef>, String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::list_issue_states(&host, &token, &owner, &repo, &numbers).await
+    github::api::list_closing_issues(&host, &token, &owner, &repo, number).await
 }
 
 // --- github: issues (Issues tab) ---
@@ -2327,17 +2327,6 @@ async fn github_upload_attachment(
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
     github::api::upload_attachment(&host, &token, &owner, &repo, &filename, &content_type, data)
         .await
-}
-
-#[tauri::command]
-async fn github_update_issue_title(
-    repo_path: String,
-    login: String,
-    number: u64,
-    title: String,
-) -> Result<(), String> {
-    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::update_issue_title(&host, &token, &owner, &repo, number, &title).await
 }
 
 #[tauri::command]
@@ -2960,13 +2949,12 @@ pub fn run() {
             github_mark_file_viewed,
             github_unmark_file_viewed,
             github_list_repo_issues,
-            github_list_issue_states,
+            github_list_closing_issues,
             github_list_issues,
             get_cached_issues,
             github_get_issue,
             github_create_issue,
             github_upload_attachment,
-            github_update_issue_title,
             github_update_issue_body,
             github_close_issue,
             github_reopen_issue,

@@ -73,6 +73,7 @@
   },
   "overrides": {
     "fsevents": "^2.3.3",
+    "highlight.js": "^11.12.0",
     "postcss": "8.5.23",
     "semver": "^7.8.5"
   },

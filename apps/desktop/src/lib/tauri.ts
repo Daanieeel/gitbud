@@ -7,6 +7,7 @@ import type {
   BranchProtectionRequirements,
   CheckRun,
   CherryPickResult,
+  ClosingIssueRef,
   CommitDetail,
   CommitEntry,
   ConflictSides,
@@ -419,8 +420,8 @@ export const api = {
     invoke<void>("github_mark_file_viewed", { repoPath, login, number, path }),
   githubUnmarkFileViewed: (repoPath: string, login: string, number: number, path: string) =>
     invoke<void>("github_unmark_file_viewed", { repoPath, login, number, path }),
-  githubListIssueStates: (repoPath: string, login: string, numbers: number[]) =>
-    invoke<Record<number, string>>("github_list_issue_states", { repoPath, login, numbers }),
+  githubListClosingIssues: (repoPath: string, login: string, number: number) =>
+    invoke<ClosingIssueRef[]>("github_list_closing_issues", { repoPath, login, number }),
   githubListLabels: (repoPath: string, login: string) =>
     invoke<Label[]>("github_list_labels", { repoPath, login }),
   githubListAssignableUsers: (repoPath: string, login: string) =>
@@ -508,8 +509,6 @@ export const api = {
     contentType: string,
     data: number[],
   ) => invoke<string>("github_upload_attachment", { repoPath, login, filename, contentType, data }),
-  githubUpdateIssueTitle: (repoPath: string, login: string, number: number, title: string) =>
-    invoke<void>("github_update_issue_title", { repoPath, login, number, title }),
   githubUpdateIssueBody: (repoPath: string, login: string, number: number, body: string) =>
     invoke<void>("github_update_issue_body", { repoPath, login, number, body }),
   githubCloseIssue: (repoPath: string, login: string, number: number, stateReason: string | null) =>
