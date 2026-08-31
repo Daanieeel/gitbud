@@ -195,9 +195,22 @@ export type DiffAlgorithm = "myers" | "minimal" | "patience";
 export type SidebarSort = "name" | "recent" | "group" | "manual";
 export type OpenPrAfterCreation = "in-app" | "provider";
 export type CacheLevel = "none" | "minimal" | "balanced" | "relaxed";
+/** "european"/"american" are explicit, translation-free numeric conventions (dd.MM.yyyy vs
+ * MM/dd/yyyy, or 24-hour vs 12-hour) — the displayed words stay in English regardless of which
+ * time zone is selected. "timezone" instead derives the convention (and the actual language —
+ * e.g. German month names for a German zone) from the selected time zone's own country, via
+ * `localeForTimezone`. Independent per axis: date and time formatting don't have to agree. */
+export type DateFormatMode = "european" | "american" | "timezone";
+export type TimeFormatMode = "european" | "american" | "timezone";
 
 export interface Settings {
   theme: ThemeMode;
+  /** An IANA time zone name (e.g. "America/New_York"), or the sentinel `"system"` meaning
+   * "whatever the OS/browser resolves as local" — the latter is the default so a fresh install
+   * needs no explicit machine-specific value written to disk. */
+  timezone: string;
+  date_format: DateFormatMode;
+  time_format: TimeFormatMode;
   default_clone_dir: string | null;
   git_name: string | null;
   git_email: string | null;

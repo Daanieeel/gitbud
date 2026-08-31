@@ -64,37 +64,55 @@ export function PRDescription({ repoPath, login, pr }: PRDescriptionProps) {
               onUploadImage={uploadImage}
               className="min-h-[160px]"
             />
-            <div className="flex items-center justify-between">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={() => fileInputRef.current?.click()}
-                className="text-muted-foreground"
-              >
-                <PaperclipIcon className="size-3.5" />
-                Paste, drop or click to add files
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                multiple
-                hidden
-                onChange={(e) => {
-                  for (const file of Array.from(e.target.files ?? [])) {
-                    void editorRef.current?.insertImage(file);
-                  }
-                  e.target.value = "";
-                }}
-              />
-              <div className="flex gap-2">
-                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
-                  Cancel
+            {/* `@container`/`@[480px]:` (Tailwind v4's native container queries) rather than a
+                viewport breakpoint or a fixed always-stacked layout — this row's *own* available
+                width is what matters (e.g. a wide window with the sidebar open still leaves this
+                narrow), and 480px is roughly the combined width all three buttons need side by
+                side (long "Paste, drop or click to add files" label included) before Save's own
+                width gets squeezed down to the point of overflowing/clipping. */}
+            <div className="@container">
+              <div className="flex flex-col gap-2 @[480px]:flex-row @[480px]:items-center @[480px]:justify-between">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full text-muted-foreground @[480px]:w-auto"
+                >
+                  <PaperclipIcon className="size-3.5" />
+                  Paste, drop or click to add files
                 </Button>
-                <Button size="sm" disabled={updateBody.isPending} onClick={() => void save()}>
-                  {updateBody.isPending ? "Saving…" : "Save"}
-                </Button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={(e) => {
+                    for (const file of Array.from(e.target.files ?? [])) {
+                      void editorRef.current?.insertImage(file);
+                    }
+                    e.target.value = "";
+                  }}
+                />
+                <div className="flex flex-col gap-2 @[480px]:flex-row">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="w-full @[480px]:w-auto"
+                    onClick={() => setEditing(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="w-full @[480px]:w-auto"
+                    disabled={updateBody.isPending}
+                    onClick={() => void save()}
+                  >
+                    {updateBody.isPending ? "Saving…" : "Save"}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

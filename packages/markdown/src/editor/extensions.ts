@@ -9,6 +9,7 @@ import { lowlight } from "./lowlight";
 import { buildSlashCommands, createSlashCommandExtension } from "./slashCommand";
 import { createSlashMenuRenderer } from "./SlashMenu";
 import { EmptyCodeIndicator } from "./emptyCodeIndicator";
+import { HtmlBlock } from "./htmlBlock";
 
 export function buildExtensions(options: {
   placeholder?: string;
@@ -29,6 +30,7 @@ export function buildExtensions(options: {
     Image.configure({ inline: true }),
     CodeBlockLowlight.configure({ lowlight }),
     EmptyCodeIndicator,
+    HtmlBlock,
     createSlashCommandExtension(
       buildSlashCommands(options.onRequestImage),
       createSlashMenuRenderer(),

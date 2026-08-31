@@ -24,6 +24,7 @@
     "@tiptap/starter-kit": "^3.30.5",
     "@tiptap/suggestion": "^3.30.5",
     "@types/markdown-it": "^14.0.0",
+    "dompurify": "^3.4.14",
     "highlight.js": "catalog:",
     "lowlight": "^3.3.0",
     "lucide-react": "catalog:",

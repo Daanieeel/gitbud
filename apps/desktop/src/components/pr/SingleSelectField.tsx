@@ -10,6 +10,12 @@ export interface SingleSelectOption {
   searchText?: string;
   slotLeft?: React.ReactNode;
   slotRight?: React.ReactNode;
+  /** Renders a divider line above this option — for a caller that puts a handful of "common"
+   * choices first (e.g. the time zone picker's nearby/well-known zones) followed by the full
+   * list. Ignored while actively filtering: once the list is search-narrowed, "the first N are
+   * the common ones" no longer holds, and a divider placed by original-list position would land
+   * somewhere arbitrary in the filtered results instead. */
+  separatorBefore?: boolean;
 }
 
 interface SingleSelectFieldProps {
@@ -136,33 +142,35 @@ export function SingleSelectField({
             {filtered.map((o) => {
               const isSelected = selected === o.key;
               return (
-                <button
-                  key={o.key}
-                  type="button"
-                  className={cn(
-                    "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1 text-sm hover:bg-accent",
-                    isSelected && "bg-accent/50 font-medium",
-                  )}
-                  onClick={() => {
-                    onChange(isSelected && canClear ? "" : o.key);
-                    setOpen(false);
-                  }}
-                >
-                  <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-1.5 truncate">
-                      {o.slotLeft && (
-                        <span className="flex shrink-0 items-center">{o.slotLeft}</span>
-                      )}
-                      <span className="min-w-0 truncate text-left">{o.label}</span>
-                    </div>
-                    {o.slotRight && (
-                      <span className="flex shrink-0 items-center text-xs text-muted-foreground">
-                        {o.slotRight}
-                      </span>
+                <div key={o.key}>
+                  {o.separatorBefore && !filter.trim() && <div className="my-1 h-px bg-border" />}
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1 text-sm hover:bg-accent",
+                      isSelected && "bg-accent/50 font-medium",
                     )}
-                  </div>
-                  {isSelected && <CheckIcon className="size-3.5 shrink-0 text-primary" />}
-                </button>
+                    onClick={() => {
+                      onChange(isSelected && canClear ? "" : o.key);
+                      setOpen(false);
+                    }}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-1.5 truncate">
+                        {o.slotLeft && (
+                          <span className="flex shrink-0 items-center">{o.slotLeft}</span>
+                        )}
+                        <span className="min-w-0 truncate text-left">{o.label}</span>
+                      </div>
+                      {o.slotRight && (
+                        <span className="flex shrink-0 items-center text-xs text-muted-foreground">
+                          {o.slotRight}
+                        </span>
+                      )}
+                    </div>
+                    {isSelected && <CheckIcon className="size-3.5 shrink-0 text-primary" />}
+                  </button>
+                </div>
               );
             })}
           </div>

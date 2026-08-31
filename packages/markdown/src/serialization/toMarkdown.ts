@@ -105,6 +105,12 @@ export const markdownSerializer = new MarkdownSerializer(
         : "";
       state.write(`![${alt}](${src}${title})`);
     },
+    htmlBlock(state, node) {
+      // SAFETY: `html` is this node's own attr, set only from the parser's raw `html_block` token
+      // content (see `htmlBlock.ts`/`fromMarkdown.ts`) — always a string.
+      state.write((node.attrs.html as string).replace(/\n+$/, ""));
+      state.closeBlock(node);
+    },
   },
   {
     bold: { open: "**", close: "**", mixable: true, expelEnclosingWhitespace: true },

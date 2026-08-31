@@ -9,6 +9,9 @@ import { cn } from "@gitbud/ui/utils";
 interface LinkPopoverProps {
   editor: Editor;
   active: boolean;
+  /** "icon" (default) is the compact toolbar-row button; "row" is a full-width icon+label row,
+   * for when this is shown inside `Toolbar`'s overflow popover instead of the toolbar itself. */
+  variant?: "icon" | "row";
 }
 
 /** The toolbar/bubble-menu "Link" action — a proper popover (separate link-text and URL fields)
@@ -16,7 +19,7 @@ interface LinkPopoverProps {
  * all, it's a silent no-op with no visible dialog, which is exactly why a `window.prompt`-based
  * version "didn't work." Handles both adding a brand-new link (nothing selected — the typed text
  * is inserted fresh at the cursor) and editing text that's already selected or already a link. */
-export function LinkPopover({ editor, active }: LinkPopoverProps) {
+export function LinkPopover({ editor, active, variant = "icon" }: LinkPopoverProps) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [url, setUrl] = useState("");
@@ -63,17 +66,31 @@ export function LinkPopover({ editor, active }: LinkPopoverProps) {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          title="Link"
-          onClick={openPopover}
-          className={cn(
-            "flex size-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground",
-            active && "bg-accent text-foreground",
-          )}
-        >
-          <LinkIcon className="size-3.5" />
-        </button>
+        {variant === "row" ? (
+          <button
+            type="button"
+            onClick={openPopover}
+            className={cn(
+              "flex w-full items-center gap-2 rounded-sm px-2 py-1 text-sm text-foreground hover:bg-accent",
+              active && "bg-accent/50 font-medium",
+            )}
+          >
+            <LinkIcon className="size-3.5 shrink-0" />
+            Link
+          </button>
+        ) : (
+          <button
+            type="button"
+            title="Link"
+            onClick={openPopover}
+            className={cn(
+              "flex size-6 items-center justify-center rounded-sm text-muted-foreground hover:bg-accent hover:text-foreground",
+              active && "bg-accent text-foreground",
+            )}
+          >
+            <LinkIcon className="size-3.5" />
+          </button>
+        )}
       </PopoverTrigger>
       <PopoverContent align="start" className="flex w-64 flex-col gap-2 p-2">
         <Input

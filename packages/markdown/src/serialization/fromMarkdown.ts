@@ -2,21 +2,21 @@ import MarkdownIt from "markdown-it";
 import { MarkdownParser } from "prosemirror-markdown";
 import type { Node, Schema } from "@tiptap/pm/model";
 import { taskListPlugin } from "./taskListPlugin";
-import { underlinePlugin } from "./underlinePlugin";
+import { htmlInlineMarksPlugin } from "./htmlInlineMarksPlugin";
 
 /** GitHub renders issue/PR bodies GFM-flavored, not strict CommonMark — markdown-it's own
  * "default" preset (tables, strikethrough, autolinking) is the closer match, unlike
  * `prosemirror-markdown`'s own `defaultMarkdownParser`, which deliberately uses the stricter
  * "commonmark" preset (whose fixed inline-rule whitelist excludes strikethrough entirely). `html:
  * true` is required for `<u>`/`</u>` to tokenize as `html_inline` at all (the rule bails out
- * immediately otherwise) — see `underlinePlugin`'s doc comment for why that's safe here. `linkify:
+ * immediately otherwise) — see `htmlInlineMarksPlugin`'s doc comment for why that's safe here. `linkify:
  * true` recognizes bare URLs already present in existing content (e.g. editing an issue body
  * someone wrote before this editor existed) as real `link` marks rather than plain text — they
  * still serialize back out through the bracketed `[url](url)` form (see `toMarkdown.ts`), not
  * reproduced as a bare autolink, which is a normalization, not a fidelity loss. */
 const tokenizer = MarkdownIt("default", { html: true, linkify: true })
   .use(taskListPlugin)
-  .use(underlinePlugin);
+  .use(htmlInlineMarksPlugin);
 
 function listIsTight(tokens: readonly { type: string; hidden: boolean }[], i: number): boolean {
   while (++i < tokens.length) {
@@ -87,18 +87,35 @@ export function createMarkdownParser(schema: Schema): MarkdownParser {
     // Unlike the table tokens above, `html_block` is a single self-contained token (like
     // `code_block`/`fence`), not an `_open`/`_close` pair — needs `noCloseToken` too, or the
     // factory registers handlers for `html_block_open`/`_close`, which markdown-it never emits,
-    // leaving the actual `html_block` token type unhandled and the parse throws.
-    html_block: { ignore: true, noCloseToken: true },
+    // leaving the actual `html_block` token type unhandled and the parse throws. Rather than
+    // dropping the content (this editor's schema has no *generic* HTML node), it becomes a real
+    // `htmlBlock` atom that stores the raw markup verbatim and renders it sanitized — see
+    // `htmlBlock.ts`'s doc comment for why (GitHub App comments commonly post badge buttons this
+    // way, and dropping them meant losing them for good the next time the body got edited).
+    html_block: {
+      node: "htmlBlock",
+      getAttrs: (tok) => ({ html: tok.content }),
+      noCloseToken: true,
+    },
 
     em: { mark: "italic" },
     strong: { mark: "bold" },
     s: { mark: "strike" },
     link: { mark: "link", getAttrs: (tok) => ({ href: tok.attrGet("href") }) },
     code_inline: { mark: "code", noCloseToken: true },
-    // `underlinePlugin` retags a literal `<u>`/`</u>` pair's tokens to this type; any other raw
-    // HTML markdown-it tokenizes stays plain `html_inline` and is ignored (dropped) below.
+    // `htmlInlineMarksPlugin` retags literal `<u>`/`</u>` and `<code>`/`</code>` pairs to these
+    // types; any other raw HTML markdown-it tokenizes stays plain `html_inline` and is ignored
+    // (dropped) below — this editor has no *inline* passthrough (unlike `html_block` above),
+    // since an arbitrary inline tag pair doesn't nest into this schema's marks as cleanly as a
+    // block-level one drops into a node.
     underline: { mark: "underline" },
-    html_inline: { ignore: true },
+    html_code: { mark: "code" },
+    // Same `noCloseToken` requirement as `html_block` above, for the same reason: markdown-it
+    // emits one self-contained `html_inline` token per tag (open or close, standalone), never an
+    // `_open`/`_close` pair — any raw inline HTML tag markdown-it doesn't split out some other
+    // way (e.g. anything other than `<u>`/`</u>`/`<code>`/`</code>`, which `htmlInlineMarksPlugin`
+    // claims first) crashed the parser without this.
+    html_inline: { ignore: true, noCloseToken: true },
   });
 }
 
