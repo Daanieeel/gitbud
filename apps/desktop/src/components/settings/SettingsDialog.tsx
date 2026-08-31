@@ -6,12 +6,15 @@ import {
   FolderOpenIcon,
   GitBranchIcon,
   GlobeIcon,
+  MonitorIcon,
+  MoonIcon,
   PanelLeftIcon,
   SaveIcon,
   SettingsIcon,
   ShieldCheckIcon,
   ShieldOffIcon,
   SlidersHorizontalIcon,
+  SunIcon,
   Trash2Icon,
   UploadIcon,
 } from "lucide-react";
@@ -196,6 +199,24 @@ const TIME_FORMAT_OPTIONS: SingleSelectOption[] = [
     key: "timezone",
     label: "According to time zone",
     slotLeft: TIMEZONE_FORMAT_ICON,
+  },
+];
+
+const THEME_OPTIONS: SingleSelectOption[] = [
+  {
+    key: "light",
+    label: "Light",
+    slotLeft: <SunIcon className="size-3.5 text-muted-foreground" />,
+  },
+  {
+    key: "dark",
+    label: "Dark",
+    slotLeft: <MoonIcon className="size-3.5 text-muted-foreground" />,
+  },
+  {
+    key: "system",
+    label: "System",
+    slotLeft: <MonitorIcon className="size-3.5 text-muted-foreground" />,
   },
 ];
 
@@ -409,10 +430,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               {section === "General" && (
                 <>
                   <Row label="Theme">
-                    <Select
-                      value={settings.theme}
-                      options={["dark", "light", "system"] satisfies ThemeMode[]}
-                      onChange={(theme) => void update({ theme })}
+                    <SingleSelectField
+                      options={THEME_OPTIONS}
+                      selected={settings.theme}
+                      onChange={(value) =>
+                        // SAFETY: `value` is always one of `THEME_OPTIONS`'s own literal keys
+                        // ("light"/"dark"/"system") — this field has no clear option, so
+                        // `onChange` can't be called with anything else.
+                        void update({ theme: value as ThemeMode })
+                      }
+                      triggerClassName="h-8 w-32"
+                      searchable={false}
                     />
                   </Row>
                   <Row label="Time zone">
@@ -434,6 +462,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         void update({ date_format: value as DateFormatMode })
                       }
                       triggerClassName="h-8 w-64"
+                      searchable={false}
                     />
                   </Row>
                   <Row label="Time format">
@@ -447,6 +476,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                         void update({ time_format: value as TimeFormatMode })
                       }
                       triggerClassName="h-8 w-64"
+                      searchable={false}
                     />
                   </Row>
                   <Row label="Default clone directory">

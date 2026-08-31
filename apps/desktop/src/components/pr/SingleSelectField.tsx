@@ -29,6 +29,9 @@ interface SingleSelectFieldProps {
   className?: string;
   triggerClassName?: string;
   contentClassName?: string;
+  /** Shows the filter input above the option list. Defaults to `true`; set `false` for a short,
+   * fixed option list (e.g. a theme picker) where filtering just adds clutter. */
+  searchable?: boolean;
 }
 
 /** A filterable single-select list behind a trigger button, matching the popover UX of MultiSelectField. */
@@ -43,19 +46,22 @@ export function SingleSelectField({
   className,
   triggerClassName,
   contentClassName,
+  searchable = true,
 }: SingleSelectFieldProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
 
   const canClear = clearable ?? Boolean(clearLabel);
 
-  const filtered = options.filter((o) => {
-    const text = o.searchText ?? o.key;
-    return (
-      text.toLowerCase().includes(filter.toLowerCase()) ||
-      o.key.toLowerCase().includes(filter.toLowerCase())
-    );
-  });
+  const filtered = !searchable
+    ? options
+    : options.filter((o) => {
+        const text = o.searchText ?? o.key;
+        return (
+          text.toLowerCase().includes(filter.toLowerCase()) ||
+          o.key.toLowerCase().includes(filter.toLowerCase())
+        );
+      });
 
   const selectedOption = options.find((o) => o.key === selected);
 
@@ -102,13 +108,15 @@ export function SingleSelectField({
           </button>
         </PopoverTrigger>
         <PopoverContent align="start" className={cn("w-56 p-1", contentClassName)}>
-          <Input
-            autoFocus
-            placeholder="Filter…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="mb-1 h-7"
-          />
+          {searchable && (
+            <Input
+              autoFocus
+              placeholder="Filter…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="mb-1 h-7"
+            />
+          )}
           <div
             className="max-h-48 overflow-auto"
             // Portalled straight to `body`, a DOM sibling of the enclosing Dialog rather than a
