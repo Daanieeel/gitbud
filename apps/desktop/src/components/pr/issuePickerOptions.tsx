@@ -10,7 +10,13 @@ export function buildIssuePickerOptions(
   issues: IssueSummary[],
   repoFullName: string,
 ): SingleSelectOption[] {
-  return issues.map((issue) => ({
+  const sorted = [...issues].sort((a, b) => {
+    if (a.state !== b.state) {
+      return a.state === "closed" ? 1 : -1;
+    }
+    return b.number - a.number;
+  });
+  return sorted.map((issue) => ({
     key: String(issue.number),
     searchText: issue.title,
     slotLeft:
