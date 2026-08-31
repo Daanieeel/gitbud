@@ -1,14 +1,24 @@
 import { useEffect, useState } from "react";
 import {
+  ArrowDownAZIcon,
   ColumnsIcon,
   CodeIcon,
   DownloadIcon,
+  FastForwardIcon,
+  FolderIcon,
   FolderOpenIcon,
+  FolderTreeIcon,
   GitBranchIcon,
+  GitMergeIcon,
   GlobeIcon,
+  GripVerticalIcon,
+  HistoryIcon,
+  HourglassIcon,
+  Minimize2Icon,
   MonitorIcon,
   MoonIcon,
   PanelLeftIcon,
+  RowsIcon,
   SaveIcon,
   SettingsIcon,
   ShieldCheckIcon,
@@ -17,11 +27,13 @@ import {
   SunIcon,
   Trash2Icon,
   UploadIcon,
+  ZapIcon,
 } from "lucide-react";
 import { save, open as openFileDialog } from "@tauri-apps/plugin-dialog";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
+import { NumberInput } from "@gitbud/ui/number-input";
 import { Checkbox } from "@gitbud/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
@@ -220,39 +232,97 @@ const THEME_OPTIONS: SingleSelectOption[] = [
   },
 ];
 
+const GIT_SCOPE_OPTIONS: SingleSelectOption[] = [
+  {
+    key: "global",
+    label: "Global (all repos)",
+    slotLeft: <GlobeIcon className="size-3.5 text-muted-foreground" />,
+  },
+  {
+    key: "repo",
+    label: "This repo only",
+    slotLeft: <FolderIcon className="size-3.5 text-muted-foreground" />,
+  },
+];
+
+const PULL_STRATEGY_OPTIONS: SingleSelectOption[] = [
+  {
+    key: "merge",
+    label: "Merge",
+    slotLeft: <GitMergeIcon className="size-3.5 text-muted-foreground" />,
+  },
+  {
+    key: "rebase",
+    label: "Rebase",
+    slotLeft: <GitBranchIcon className="size-3.5 text-muted-foreground" />,
+  },
+  {
+    key: "ff-only",
+    label: "Fast-forward only",
+    slotLeft: <FastForwardIcon className="size-3.5 text-muted-foreground" />,
+  },
+];
+
+const DIFF_VIEW_OPTIONS: SingleSelectOption[] = [
+  {
+    key: "unified",
+    label: "Unified",
+    slotLeft: <RowsIcon className="size-3.5 text-muted-foreground" />,
+  },
+  {
+    key: "split",
+    label: "Split",
+    slotLeft: <ColumnsIcon className="size-3.5 text-muted-foreground" />,
+  },
+];
+
+const DIFF_ALGORITHM_OPTIONS: SingleSelectOption[] = [
+  {
+    key: "myers",
+    label: "Myers",
+    slotLeft: <ZapIcon className="size-3.5 text-muted-foreground" />,
+  },
+  {
+    key: "minimal",
+    label: "Minimal",
+    slotLeft: <Minimize2Icon className="size-3.5 text-muted-foreground" />,
+  },
+  {
+    key: "patience",
+    label: "Patience",
+    slotLeft: <HourglassIcon className="size-3.5 text-muted-foreground" />,
+  },
+];
+
+const SIDEBAR_SORT_OPTIONS: SingleSelectOption[] = [
+  {
+    key: "group",
+    label: "Grouped by owner",
+    slotLeft: <FolderTreeIcon className="size-3.5 text-muted-foreground" />,
+  },
+  {
+    key: "name",
+    label: "Name",
+    slotLeft: <ArrowDownAZIcon className="size-3.5 text-muted-foreground" />,
+  },
+  {
+    key: "recent",
+    label: "Recently used",
+    slotLeft: <HistoryIcon className="size-3.5 text-muted-foreground" />,
+  },
+  {
+    key: "manual",
+    label: "Manual order",
+    slotLeft: <GripVerticalIcon className="size-3.5 text-muted-foreground" />,
+  },
+];
+
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-4 py-1.5">
       <span className="text-sm text-muted-foreground">{label}</span>
       {children}
     </div>
-  );
-}
-
-function Select<T extends string>({
-  value,
-  options,
-  onChange,
-}: {
-  value: T;
-  options: readonly T[];
-  onChange: (v: T) => void;
-}) {
-  return (
-    <select
-      value={value}
-      onChange={(e) => {
-        const next = options.find((o) => o === e.target.value);
-        if (next !== undefined) onChange(next);
-      }}
-      className="h-8 rounded-md border border-input bg-transparent px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      {options.map((o) => (
-        <option key={o} value={o}>
-          {o}
-        </option>
-      ))}
-    </select>
   );
 }
 
@@ -660,10 +730,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     />
                   </Row>
                   <Row label="Apply to">
-                    <Select
-                      value={gitScope}
-                      options={["global", "repo"] as const}
-                      onChange={setGitScope}
+                    <SingleSelectField
+                      options={GIT_SCOPE_OPTIONS}
+                      selected={gitScope}
+                      onChange={(value) =>
+                        // SAFETY: `value` is always one of `GIT_SCOPE_OPTIONS`'s own literal
+                        // keys ("global"/"repo") — this field has no clear option, so `onChange`
+                        // can't be called with anything else.
+                        setGitScope(value as "global" | "repo")
+                      }
+                      triggerClassName="h-8 w-40"
+                      searchable={false}
                     />
                   </Row>
                   <div className="flex justify-end py-2">
@@ -714,10 +791,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     />
                   </Row>
                   <Row label="Pull strategy">
-                    <Select
-                      value={settings.pull_strategy}
-                      options={["merge", "rebase", "ff-only"] satisfies PullStrategy[]}
-                      onChange={(pull_strategy) => void update({ pull_strategy })}
+                    <SingleSelectField
+                      options={PULL_STRATEGY_OPTIONS}
+                      selected={settings.pull_strategy}
+                      onChange={(value) =>
+                        // SAFETY: `value` is always one of `PULL_STRATEGY_OPTIONS`'s own literal
+                        // keys ("merge"/"rebase"/"ff-only") — this field has no clear option, so
+                        // `onChange` can't be called with anything else.
+                        void update({ pull_strategy: value as PullStrategy })
+                      }
+                      triggerClassName="h-8 w-40"
+                      searchable={false}
                     />
                   </Row>
                 </>
@@ -726,10 +810,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               {section === "Diff" && (
                 <>
                   <Row label="View">
-                    <Select
-                      value={settings.diff_view}
-                      options={["unified", "split"] satisfies DiffViewMode[]}
-                      onChange={(diff_view) => void update({ diff_view })}
+                    <SingleSelectField
+                      options={DIFF_VIEW_OPTIONS}
+                      selected={settings.diff_view}
+                      onChange={(value) =>
+                        // SAFETY: `value` is always one of `DIFF_VIEW_OPTIONS`'s own literal
+                        // keys ("unified"/"split") — this field has no clear option, so
+                        // `onChange` can't be called with anything else.
+                        void update({ diff_view: value as DiffViewMode })
+                      }
+                      triggerClassName="h-8 w-32"
+                      searchable={false}
                     />
                   </Row>
                   <Row label="Ignore whitespace">
@@ -741,20 +832,26 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     />
                   </Row>
                   <Row label="Diff algorithm">
-                    <Select
-                      value={settings.diff_algorithm}
-                      options={["myers", "minimal", "patience"] satisfies DiffAlgorithm[]}
-                      onChange={(diff_algorithm) => void update({ diff_algorithm })}
+                    <SingleSelectField
+                      options={DIFF_ALGORITHM_OPTIONS}
+                      selected={settings.diff_algorithm}
+                      onChange={(value) =>
+                        // SAFETY: `value` is always one of `DIFF_ALGORITHM_OPTIONS`'s own literal
+                        // keys ("myers"/"minimal"/"patience") — this field has no clear option,
+                        // so `onChange` can't be called with anything else.
+                        void update({ diff_algorithm: value as DiffAlgorithm })
+                      }
+                      triggerClassName="h-8 w-32"
+                      searchable={false}
                     />
                   </Row>
                   <Row label="Font size">
-                    <Input
-                      type="number"
-                      className="h-8 w-20"
+                    <NumberInput
                       value={settings.diff_font_size}
-                      onChange={(e) =>
-                        void update({ diff_font_size: Number(e.target.value) || 12 })
-                      }
+                      onChange={(diff_font_size) => void update({ diff_font_size })}
+                      min={8}
+                      max={24}
+                      className="w-28"
                     />
                   </Row>
                 </>
@@ -771,10 +868,17 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                     />
                   </Row>
                   <Row label="Sort repos by">
-                    <Select
-                      value={settings.sidebar_sort}
-                      options={["group", "name", "recent", "manual"] satisfies SidebarSort[]}
-                      onChange={(sidebar_sort) => void update({ sidebar_sort })}
+                    <SingleSelectField
+                      options={SIDEBAR_SORT_OPTIONS}
+                      selected={settings.sidebar_sort}
+                      onChange={(value) =>
+                        // SAFETY: `value` is always one of `SIDEBAR_SORT_OPTIONS`'s own literal
+                        // keys ("group"/"name"/"recent"/"manual") — this field has no clear
+                        // option, so `onChange` can't be called with anything else.
+                        void update({ sidebar_sort: value as SidebarSort })
+                      }
+                      triggerClassName="h-8 w-44"
+                      searchable={false}
                     />
                   </Row>
                 </>

@@ -19,6 +19,7 @@
     "./dropdown-menu": "./src/components/ui/dropdown-menu.tsx",
     "./input": "./src/components/ui/input.tsx",
     "./logo-multi-select": "./src/components/ui/logo-multi-select.tsx",
+    "./number-input": "./src/components/ui/number-input.tsx",
     "./popover": "./src/components/ui/popover.tsx",
     "./progress-circle": "./src/components/ui/progress-circle.tsx",
     "./provider-picker": "./src/components/ui/provider-picker.tsx",
