@@ -533,6 +533,26 @@ pub fn get_branch_diff_files(
     Ok(files)
 }
 
+/// Total insertions/deletions across a `base...head` comparison — cheap (no hunk/line content
+/// built, unlike `get_branch_diff_file`) since `get_branch_diff_files` itself carries no stats
+/// and fetching every file's full diff just to sum line counts would be needlessly expensive for
+/// what the create-PR dialog's sidebar shows as a single "+N -M" summary.
+pub fn get_branch_diff_stats(
+    repo_path: &str,
+    base: &str,
+    head: &str,
+) -> Result<(usize, usize), String> {
+    let repo = Repository::open(repo_path).map_err(|e| e.message().to_string())?;
+    let (base_tree, head_tree) = branch_diff_trees(&repo, base, head)?;
+
+    let diff = repo
+        .diff_tree_to_tree(Some(&base_tree), Some(&head_tree), None)
+        .map_err(|e| e.message().to_string())?;
+    let stats = diff.stats().map_err(|e| e.message().to_string())?;
+
+    Ok((stats.insertions(), stats.deletions()))
+}
+
 /// Diff a single file as part of a `base...head` branch comparison (see `get_branch_diff_files`).
 pub fn get_branch_diff_file(
     repo_path: &str,

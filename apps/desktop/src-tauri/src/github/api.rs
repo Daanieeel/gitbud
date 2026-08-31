@@ -2982,9 +2982,10 @@ impl From<RawTimelineEvent> for IssueTimelineEvent {
         let cross_ref_repo_full_name = cross_ref_repo.map(|r| r.full_name.clone());
         let cross_ref_is_pr = cross_ref_issue.as_ref().map(|i| i.pull_request.is_some());
 
-        let source_issue_number = subject.as_ref().map(|s| s.number).or(cross_ref_issue
+        let source_issue_number = subject
             .as_ref()
-            .map(|i| i.number));
+            .map(|s| s.number)
+            .or(cross_ref_issue.as_ref().map(|i| i.number));
         let source_issue_title = subject
             .as_ref()
             .map(|s| s.title.clone())
@@ -2993,8 +2994,8 @@ impl From<RawTimelineEvent> for IssueTimelineEvent {
             .as_ref()
             .map(|s| s.state.clone())
             .or(cross_ref_issue.as_ref().map(|i| i.state.clone()));
-        let source_issue_html_url = subject_html_url
-            .or(cross_ref_issue.as_ref().map(|i| i.html_url.clone()));
+        let source_issue_html_url =
+            subject_html_url.or(cross_ref_issue.as_ref().map(|i| i.html_url.clone()));
         let source_issue_repo_full_name = subject_repo
             .map(|r| r.full_name.clone())
             .or(cross_ref_repo_full_name);

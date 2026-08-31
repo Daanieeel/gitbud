@@ -387,6 +387,19 @@ async fn get_branch_diff_files(
 }
 
 #[tauri::command]
+async fn get_branch_diff_stats(
+    repo_path: String,
+    base: String,
+    head: String,
+) -> Result<(usize, usize), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        diff::get_branch_diff_stats(&repo_path, &base, &head)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn get_branch_diff_file(
     repo_path: String,
     base: String,
@@ -2813,6 +2826,7 @@ pub fn run() {
             get_commit_files,
             get_commit_file_diff,
             get_branch_diff_files,
+            get_branch_diff_stats,
             get_branch_diff_file,
             get_branch_image_diff,
             get_image_diff,

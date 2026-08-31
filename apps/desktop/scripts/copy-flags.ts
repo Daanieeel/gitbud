@@ -6,9 +6,18 @@
 // subset into `public/flags/s` instead. Run via the `postinstall` script in package.json, same
 // as react-flagpack's own README recommends for its CLI.
 
-import { existsSync, mkdirSync, readdirSync, rmSync, copyFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, copyFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+// react-flagpack ships no European Union flag at all (there's no ISO 3166-1 code for it to hang
+// off of) — "DEU.svg"/"REU.svg" only coincidentally contain "EU" as a substring (Germany, and
+// Réunion). This is Twemoji's own EU flag artwork instead (real 5-pointed stars, not a
+// simplified approximation) — its own 36x36 viewBox/intrinsic size doesn't need to match the
+// other flags' 16x12: `Flag`'s `<img>` is sized by CSS (`width/height:100%` of its `.flag`
+// container) with `object-fit: cover`, so any source SVG scales/crops to fit automatically.
+const EU_FLAG_SVG = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="800px" height="800px" viewBox="0 0 36 36" aria-hidden="true" role="img" class="iconify iconify--twemoji" preserveAspectRatio="xMidYMid meet"><path fill="#039" d="M32 5H4a4 4 0 0 0-4 4v18a4 4 0 0 0 4 4h28a4 4 0 0 0 4-4V9a4 4 0 0 0-4-4z"/><path d="M18.539 9.705l.849-.617h-1.049l-.325-.998l-.324.998h-1.049l.849.617l-.325.998l.849-.617l.849.617zm0 17.333l.849-.617h-1.049l-.325-.998l-.324.998h-1.049l.849.617l-.325.998l.849-.617l.849.617zm-8.666-8.667l.849-.617h-1.05l-.324-.998l-.325.998H7.974l.849.617l-.324.998l.849-.617l.849.617zm1.107-4.285l.849-.617h-1.05l-.324-.998l-.324.998h-1.05l.849.617l-.324.998l.849-.617l.849.617zm0 8.619l.849-.617h-1.05l-.324-.998l-.324.998h-1.05l.849.617l-.324.998l.849-.617l.849.617zm3.226-11.839l.849-.617h-1.05l-.324-.998l-.324.998h-1.05l.849.617l-.324.998l.849-.617l.849.617zm0 15.067l.849-.617h-1.05l-.324-.998l-.324.998h-1.05l.849.617l-.324.998l.849-.616l.849.616zm11.921-7.562l-.849-.617h1.05l.324-.998l.325.998h1.049l-.849.617l.324.998l-.849-.617l-.849.617zm-1.107-4.285l-.849-.617h1.05l.324-.998l.324.998h1.05l-.849.617l.324.998l-.849-.617l-.849.617zm0 8.619l-.849-.617h1.05l.324-.998l.324.998h1.05l-.849.617l.324.998l-.849-.617l-.849.617zm-3.226-11.839l-.849-.617h1.05l.324-.998l.324.998h1.05l-.849.617l.324.998l-.849-.617l-.849.617zm0 15.067l-.849-.617h1.05l.324-.998l.324.998h1.05l-.849.617l.324.998l-.849-.616l-.849.616z" fill="#FC0"/></svg>
+`;
 
 const projectRoot = path.resolve(import.meta.dir, "..");
 const destDir = path.join(projectRoot, "public", "flags", "s");
@@ -33,6 +42,9 @@ for (const entry of readdirSync(sourceDir)) {
 // both the same Union Jack) — copied under its real alpha-3 name here, requested via that name
 // through `flagAssetCode()` (src/lib/timezoneCountries.ts) rather than pretending it's "GB.svg".
 copyFileSync(path.join(sourceDir, "GBR.svg"), path.join(destDir, "GBR.svg"));
+copied++;
+
+writeFileSync(path.join(destDir, "EU.svg"), EU_FLAG_SVG);
 copied++;
 
 if (!existsSync(destDir) || copied === 0) {

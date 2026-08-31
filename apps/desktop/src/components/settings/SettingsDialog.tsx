@@ -172,7 +172,7 @@ const DATE_FORMAT_OPTIONS: SingleSelectOption[] = [
   {
     key: "european",
     label: "European (dd.MM.yyyy)",
-    slotLeft: <Flag code={flagAssetCode("DE")} size="s" hasBorder={false} />,
+    slotLeft: <Flag code="EU" size="s" hasBorder={false} />,
   },
   {
     key: "timezone",
@@ -190,7 +190,7 @@ const TIME_FORMAT_OPTIONS: SingleSelectOption[] = [
   {
     key: "european",
     label: "European (24-hour)",
-    slotLeft: <Flag code={flagAssetCode("DE")} size="s" hasBorder={false} />,
+    slotLeft: <Flag code="EU" size="s" hasBorder={false} />,
   },
   {
     key: "timezone",

@@ -97,6 +97,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const [mainView, setMainView] = useState<"files" | "commits">("files");
   const [diffFiles, setDiffFiles] = useState<[string, string][]>([]);
   const [diffLoading, setDiffLoading] = useState(false);
+  const [diffStats, setDiffStats] = useState<[number, number] | null>(null);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [selectedDiff, setSelectedDiff] = useState<FileDiff | null>(null);
   const [selectedImageDiff, setSelectedImageDiff] = useState<ImageDiff | null>(null);
@@ -161,6 +162,12 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
       .then(setDiffFiles)
       .catch(() => setDiffFiles([]))
       .finally(() => setDiffLoading(false));
+
+    setDiffStats(null);
+    void api
+      .getBranchDiffStats(repoPath, base, branch)
+      .then(setDiffStats)
+      .catch(() => setDiffStats(null));
 
     setBranchCommitsLoading(true);
     void api
@@ -377,6 +384,12 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
             )}
           </div>
           <div className="flex w-56 shrink-0 flex-col gap-4 overflow-auto border-l border-border pl-4">
+            {diffStats && (diffStats[0] > 0 || diffStats[1] > 0) && (
+              <div className="flex shrink-0 items-center gap-2 font-mono text-xs">
+                <span className="text-accent-green">+{diffStats[0].toLocaleString()}</span>
+                <span className="text-accent-pink">-{diffStats[1].toLocaleString()}</span>
+              </div>
+            )}
             <MultiSelectField
               label="Labels"
               placeholder="No labels"

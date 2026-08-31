@@ -161,6 +161,9 @@ export const api = {
     invoke<FileDiff>("get_commit_file_diff", { repoPath, oid, path }),
   getBranchDiffFiles: (repoPath: string, base: string, head: string) =>
     invoke<[string, string][]>("get_branch_diff_files", { repoPath, base, head }),
+  /** `[insertions, deletions]` totals across the whole `base...head` comparison. */
+  getBranchDiffStats: (repoPath: string, base: string, head: string) =>
+    invoke<[number, number]>("get_branch_diff_stats", { repoPath, base, head }),
   getBranchDiffFile: (repoPath: string, base: string, head: string, path: string) =>
     invoke<FileDiff>("get_branch_diff_file", { repoPath, base, head, path }),
   getBranchImageDiff: (repoPath: string, base: string, head: string, path: string) =>
