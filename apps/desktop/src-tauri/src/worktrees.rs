@@ -1,3 +1,4 @@
+use crate::process_ext::NoWindowExt;
 use git2::{Repository, WorktreeLockStatus};
 use serde::{Deserialize, Serialize};
 
@@ -64,7 +65,7 @@ pub fn add_worktree(
     create_branch: bool,
 ) -> Result<(), String> {
     let mut command = std::process::Command::new(crate::settings::git_binary());
-    command.current_dir(repo_path);
+    command.current_dir(repo_path).no_window();
     if create_branch {
         command.args(["worktree", "add", "-b", branch, path]);
     } else {
@@ -88,6 +89,7 @@ pub fn remove_worktree(repo_path: &str, worktree_path: &str, force: bool) -> Res
     let output = std::process::Command::new(crate::settings::git_binary())
         .current_dir(repo_path)
         .args(&args)
+        .no_window()
         .output()
         .map_err(|e| e.to_string())?;
     if output.status.success() {

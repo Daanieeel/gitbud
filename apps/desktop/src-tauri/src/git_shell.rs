@@ -1,3 +1,4 @@
+use crate::process_ext::NoWindowExt;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -80,6 +81,7 @@ pub fn cancel(event_id: &str) -> Result<(), String> {
 fn kill_pid(pid: u32) {
     let _ = Command::new("taskkill")
         .args(["/PID", &pid.to_string(), "/T", "/F"])
+        .no_window()
         .status();
 }
 
@@ -177,7 +179,8 @@ fn run_streaming(
         .env("GIT_TERMINAL_PROMPT", "0")
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
+        .stderr(Stdio::piped())
+        .no_window();
     if let Some(cwd) = cwd {
         command.current_dir(cwd);
     }

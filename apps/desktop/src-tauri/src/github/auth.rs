@@ -1,3 +1,4 @@
+use crate::process_ext::NoWindowExt;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -215,7 +216,7 @@ async fn complete_login(host: &str, token: &str) -> Result<Account, String> {
 pub async fn detect_gh_cli() -> Result<Option<Account>, String> {
     let host = get_host()?;
     let mut cmd = std::process::Command::new("gh");
-    cmd.args(["auth", "token"]);
+    cmd.args(["auth", "token"]).no_window();
     if host != "github.com" {
         cmd.args(["--hostname", &host]);
     }
