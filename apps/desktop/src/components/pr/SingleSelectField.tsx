@@ -10,6 +10,12 @@ export interface SingleSelectOption {
   searchText?: string;
   slotLeft?: React.ReactNode;
   slotRight?: React.ReactNode;
+  /** Renders a divider line above this option — for a caller that puts a handful of "common"
+   * choices first (e.g. the time zone picker's nearby/well-known zones) followed by the full
+   * list. Ignored while actively filtering: once the list is search-narrowed, "the first N are
+   * the common ones" no longer holds, and a divider placed by original-list position would land
+   * somewhere arbitrary in the filtered results instead. */
+  separatorBefore?: boolean;
 }
 
 interface SingleSelectFieldProps {
@@ -23,6 +29,9 @@ interface SingleSelectFieldProps {
   className?: string;
   triggerClassName?: string;
   contentClassName?: string;
+  /** Shows the filter input above the option list. Defaults to `true`; set `false` for a short,
+   * fixed option list (e.g. a theme picker) where filtering just adds clutter. */
+  searchable?: boolean;
 }
 
 /** A filterable single-select list behind a trigger button, matching the popover UX of MultiSelectField. */
@@ -37,19 +46,22 @@ export function SingleSelectField({
   className,
   triggerClassName,
   contentClassName,
+  searchable = true,
 }: SingleSelectFieldProps) {
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
 
   const canClear = clearable ?? Boolean(clearLabel);
 
-  const filtered = options.filter((o) => {
-    const text = o.searchText ?? o.key;
-    return (
-      text.toLowerCase().includes(filter.toLowerCase()) ||
-      o.key.toLowerCase().includes(filter.toLowerCase())
-    );
-  });
+  const filtered = !searchable
+    ? options
+    : options.filter((o) => {
+        const text = o.searchText ?? o.key;
+        return (
+          text.toLowerCase().includes(filter.toLowerCase()) ||
+          o.key.toLowerCase().includes(filter.toLowerCase())
+        );
+      });
 
   const selectedOption = options.find((o) => o.key === selected);
 
@@ -67,7 +79,7 @@ export function SingleSelectField({
           <button
             type="button"
             className={cn(
-              "flex h-7 w-full min-w-0 max-w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-transparent px-2 text-left text-sm whitespace-nowrap hover:bg-accent focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-2 outline-none",
+              "flex h-7 w-full min-w-0 max-w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-accent px-2 text-left text-sm whitespace-nowrap hover:bg-accent/80 hover:text-accent-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-2 outline-none",
               triggerClassName,
             )}
           >
@@ -77,7 +89,7 @@ export function SingleSelectField({
                   {selectedOption.slotLeft && (
                     <span className="flex shrink-0 items-center">{selectedOption.slotLeft}</span>
                   )}
-                  <span className="truncate">{selectedOption.label}</span>
+                  <span className="min-w-0 truncate">{selectedOption.label}</span>
                 </div>
                 {selectedOption.slotRight && (
                   <span className="flex shrink-0 items-center text-xs text-muted-foreground">
@@ -96,13 +108,15 @@ export function SingleSelectField({
           </button>
         </PopoverTrigger>
         <PopoverContent align="start" className={cn("w-56 p-1", contentClassName)}>
-          <Input
-            autoFocus
-            placeholder="Filter…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="mb-1 h-7"
-          />
+          {searchable && (
+            <Input
+              autoFocus
+              placeholder="Filter…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="mb-1 h-7"
+            />
+          )}
           <div
             className="max-h-48 overflow-auto"
             // Portalled straight to `body`, a DOM sibling of the enclosing Dialog rather than a
@@ -136,33 +150,35 @@ export function SingleSelectField({
             {filtered.map((o) => {
               const isSelected = selected === o.key;
               return (
-                <button
-                  key={o.key}
-                  type="button"
-                  className={cn(
-                    "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1 text-sm hover:bg-accent",
-                    isSelected && "bg-accent/50 font-medium",
-                  )}
-                  onClick={() => {
-                    onChange(isSelected && canClear ? "" : o.key);
-                    setOpen(false);
-                  }}
-                >
-                  <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-1.5 truncate">
-                      {o.slotLeft && (
-                        <span className="flex shrink-0 items-center">{o.slotLeft}</span>
-                      )}
-                      <span className="truncate text-left">{o.label}</span>
-                    </div>
-                    {o.slotRight && (
-                      <span className="flex shrink-0 items-center text-xs text-muted-foreground">
-                        {o.slotRight}
-                      </span>
+                <div key={o.key}>
+                  {o.separatorBefore && !filter.trim() && <div className="my-1 h-px bg-border" />}
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1 text-sm hover:bg-accent",
+                      isSelected && "bg-accent/50 font-medium",
                     )}
-                  </div>
-                  {isSelected && <CheckIcon className="size-3.5 shrink-0 text-primary" />}
-                </button>
+                    onClick={() => {
+                      onChange(isSelected && canClear ? "" : o.key);
+                      setOpen(false);
+                    }}
+                  >
+                    <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-1.5 truncate">
+                        {o.slotLeft && (
+                          <span className="flex shrink-0 items-center">{o.slotLeft}</span>
+                        )}
+                        <span className="min-w-0 truncate text-left">{o.label}</span>
+                      </div>
+                      {o.slotRight && (
+                        <span className="flex shrink-0 items-center text-xs text-muted-foreground">
+                          {o.slotRight}
+                        </span>
+                      )}
+                    </div>
+                    {isSelected && <CheckIcon className="size-3.5 shrink-0 text-primary" />}
+                  </button>
+                </div>
               );
             })}
           </div>

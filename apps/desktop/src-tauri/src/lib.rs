@@ -387,6 +387,19 @@ async fn get_branch_diff_files(
 }
 
 #[tauri::command]
+async fn get_branch_diff_stats(
+    repo_path: String,
+    base: String,
+    head: String,
+) -> Result<(usize, usize), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        diff::get_branch_diff_stats(&repo_path, &base, &head)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 async fn get_branch_diff_file(
     repo_path: String,
     base: String,
@@ -2229,13 +2242,236 @@ async fn github_list_repo_issues(
 }
 
 #[tauri::command]
-async fn github_list_issue_states(
+async fn github_list_closing_issues(
     repo_path: String,
     login: String,
-    numbers: Vec<u64>,
-) -> Result<std::collections::HashMap<u64, String>, String> {
+    number: u64,
+) -> Result<Vec<github::api::ClosingIssueRef>, String> {
     let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
-    github::api::list_issue_states(&host, &token, &owner, &repo, &numbers).await
+    github::api::list_closing_issues(&host, &token, &owner, &repo, number).await
+}
+
+// --- github: issues (Issues tab) ---
+
+#[tauri::command]
+async fn github_list_issues(
+    repo_path: String,
+    login: String,
+    state: String,
+    page: u32,
+) -> Result<Vec<github::api::Issue>, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    let issues = github::api::list_issues(&host, &token, &owner, &repo, &state, page).await?;
+    if let Ok(key) = cache_key(&repo_path) {
+        let list = issues.clone();
+        cache_write(move || pr_cache::upsert_issue_list(&key, &list)).await;
+    }
+    Ok(issues)
+}
+
+#[tauri::command]
+async fn get_cached_issues(repo_path: String, state: String) -> Vec<github::api::Issue> {
+    let Ok(key) = cache_key(&repo_path) else {
+        return Vec::new();
+    };
+    tauri::async_runtime::spawn_blocking(move || pr_cache::get_cached_issue_list(&key, &state))
+        .await
+        .unwrap_or(Ok(Vec::new()))
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+async fn github_get_issue(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<github::api::Issue, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_issue(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_create_issue(
+    repo_path: String,
+    login: String,
+    title: String,
+    body: String,
+    labels: Vec<String>,
+    assignees: Vec<String>,
+    milestone: Option<u64>,
+) -> Result<github::api::Issue, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    let issue = github::api::create_issue(&host, &token, &owner, &repo, &title, &body).await?;
+    if !labels.is_empty() {
+        github::api::add_labels(&host, &token, &owner, &repo, issue.number, &labels).await?;
+    }
+    if !assignees.is_empty() {
+        github::api::add_assignees(&host, &token, &owner, &repo, issue.number, &assignees).await?;
+    }
+    if let Some(m) = milestone {
+        github::api::set_milestone(&host, &token, &owner, &repo, issue.number, m).await?;
+    }
+    // Re-fetch so the returned issue reflects labels/assignees/milestone just attached, mirroring
+    // `github_create_pull_request`'s callers re-fetching a single PR after related follow-up calls.
+    github::api::get_issue(&host, &token, &owner, &repo, issue.number).await
+}
+
+#[tauri::command]
+async fn github_upload_attachment(
+    repo_path: String,
+    login: String,
+    filename: String,
+    content_type: String,
+    data: Vec<u8>,
+) -> Result<String, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::upload_attachment(&host, &token, &owner, &repo, &filename, &content_type, data)
+        .await
+}
+
+#[tauri::command]
+async fn github_update_issue_body(
+    repo_path: String,
+    login: String,
+    number: u64,
+    body: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::update_issue_body(&host, &token, &owner, &repo, number, &body).await
+}
+
+/// Writes an issue's freshly-changed state through to the cache immediately rather than waiting
+/// for the next full list refetch — mirrors `github_merge_pull_request`'s equivalent write-through.
+async fn cache_write_issue(
+    repo_path: &str,
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) {
+    if let Ok(issue) = github::api::get_issue(host, token, owner, repo, number).await {
+        if let Ok(key) = cache_key(repo_path) {
+            cache_write(move || pr_cache::upsert_issue(&key, &issue)).await;
+        }
+    }
+}
+
+#[tauri::command]
+async fn github_close_issue(
+    repo_path: String,
+    login: String,
+    number: u64,
+    state_reason: Option<String>,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::close_issue(
+        &host,
+        &token,
+        &owner,
+        &repo,
+        number,
+        state_reason.as_deref(),
+    )
+    .await?;
+    cache_write_issue(&repo_path, &host, &token, &owner, &repo, number).await;
+    Ok(())
+}
+
+#[tauri::command]
+async fn github_reopen_issue(repo_path: String, login: String, number: u64) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::reopen_issue(&host, &token, &owner, &repo, number).await?;
+    cache_write_issue(&repo_path, &host, &token, &owner, &repo, number).await;
+    Ok(())
+}
+
+#[tauri::command]
+async fn github_add_issue_to_project(
+    repo_path: String,
+    login: String,
+    number: u64,
+    project_id: String,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::add_issue_to_project(&host, &token, &owner, &repo, number, &project_id).await
+}
+
+#[tauri::command]
+async fn github_get_issue_relationships(
+    repo_path: String,
+    login: String,
+    number: u64,
+) -> Result<github::api::IssueRelationships, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::get_issue_relationships(&host, &token, &owner, &repo, number).await
+}
+
+#[tauri::command]
+async fn github_add_sub_issue(
+    repo_path: String,
+    login: String,
+    parent_number: u64,
+    child_number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::add_sub_issue(&host, &token, &owner, &repo, parent_number, child_number).await
+}
+
+#[tauri::command]
+async fn github_remove_sub_issue(
+    repo_path: String,
+    login: String,
+    parent_number: u64,
+    child_number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::remove_sub_issue(&host, &token, &owner, &repo, parent_number, child_number).await
+}
+
+#[tauri::command]
+async fn github_add_blocked_by(
+    repo_path: String,
+    login: String,
+    number: u64,
+    blocking_number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::add_blocked_by(&host, &token, &owner, &repo, number, blocking_number).await
+}
+
+#[tauri::command]
+async fn github_remove_blocked_by(
+    repo_path: String,
+    login: String,
+    number: u64,
+    blocking_number: u64,
+) -> Result<(), String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::remove_blocked_by(&host, &token, &owner, &repo, number, blocking_number).await
+}
+
+#[tauri::command]
+async fn github_create_linked_branch(
+    repo_path: String,
+    login: String,
+    number: u64,
+    base_branch: String,
+    name: String,
+) -> Result<github::api::LinkedBranch, String> {
+    let (host, token, owner, repo) = github_resolve(&repo_path, &login)?;
+    github::api::create_linked_branch(&host, &token, &owner, &repo, number, &base_branch, &name)
+        .await
+}
+
+#[tauri::command]
+async fn github_delete_linked_branch(
+    login: String,
+    linked_branch_id: String,
+) -> Result<(), String> {
+    let host = github::auth::get_host()?;
+    let token = github::auth::get_token(&login)?;
+    github::api::delete_linked_branch(&host, &token, &linked_branch_id).await
 }
 
 /// Whether `path` currently exists on disk — used to hide filesystem-dependent context menu
@@ -2579,6 +2815,7 @@ pub fn run() {
             get_commit_files,
             get_commit_file_diff,
             get_branch_diff_files,
+            get_branch_diff_stats,
             get_branch_diff_file,
             get_branch_image_diff,
             get_image_diff,
@@ -2712,7 +2949,23 @@ pub fn run() {
             github_mark_file_viewed,
             github_unmark_file_viewed,
             github_list_repo_issues,
-            github_list_issue_states,
+            github_list_closing_issues,
+            github_list_issues,
+            get_cached_issues,
+            github_get_issue,
+            github_create_issue,
+            github_upload_attachment,
+            github_update_issue_body,
+            github_close_issue,
+            github_reopen_issue,
+            github_add_issue_to_project,
+            github_get_issue_relationships,
+            github_add_sub_issue,
+            github_remove_sub_issue,
+            github_add_blocked_by,
+            github_remove_blocked_by,
+            github_create_linked_branch,
+            github_delete_linked_branch,
             github_list_labels,
             github_list_assignable_users,
             github_add_labels,

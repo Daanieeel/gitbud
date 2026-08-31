@@ -18,6 +18,24 @@ pub enum PullStrategy {
     FfOnly,
 }
 
+/// Opaque to the Rust side, same as `Settings::timezone` — only the frontend interprets these
+/// (see the matching `DateFormatMode`/`TimeFormatMode` doc comment in `src/lib/types.ts`).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum DateFormatMode {
+    European,
+    American,
+    Timezone,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum TimeFormatMode {
+    European,
+    American,
+    Timezone,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum DiffViewMode {
@@ -75,6 +93,13 @@ pub enum CacheLevel {
 pub struct Settings {
     // General
     pub theme: ThemeMode,
+    /// An IANA time zone name, or the sentinel `"system"` — see the matching frontend
+    /// `Settings.timezone` doc comment. Opaque to the Rust side: no timezone conversion happens
+    /// here, this is just round-tripped to disk for the frontend (the only place that formats
+    /// timestamps) to read back.
+    pub timezone: String,
+    pub date_format: DateFormatMode,
+    pub time_format: TimeFormatMode,
     pub default_clone_dir: Option<String>,
 
     // Git
@@ -137,6 +162,9 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: ThemeMode::System,
+            timezone: "system".to_string(),
+            date_format: DateFormatMode::American,
+            time_format: TimeFormatMode::American,
             default_clone_dir: None,
             git_name: None,
             git_email: None,

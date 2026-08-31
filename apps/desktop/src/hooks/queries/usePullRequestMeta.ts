@@ -90,6 +90,12 @@ export function useUpdatePullRequestBody(
         queryKeys.prMeta(repoPath, login, number),
         (prev) => (prev ? { ...prev, body } : prev),
       );
+      // GitHub computes `closingIssuesReferences` from the PR's current body at query time (no
+      // server-side caching lag) — any body edit can add/remove a "Closes #N" keyword, so this
+      // always refetches rather than trying to detect whether one actually changed.
+      void queryClient.invalidateQueries({
+        queryKey: queryKeys.closingIssues(repoPath, login, number),
+      });
     },
     onError: (err) => toast.error(String(err)),
   });

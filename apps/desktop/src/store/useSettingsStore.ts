@@ -4,6 +4,9 @@ import type { Settings } from "@/lib/types";
 
 const DEFAULT_SETTINGS: Settings = {
   theme: "system",
+  timezone: "system",
+  date_format: "american",
+  time_format: "american",
   default_clone_dir: null,
   git_name: null,
   git_email: null,

@@ -1474,9 +1474,7 @@ pub async fn unmark_file_as_viewed(
     Ok(())
 }
 
-/// Open/closed state for a batch of issue numbers in one request (aliased per-number, since
-/// GraphQL has no "issue by number, list of numbers" batch field) — feeds the sidebar's linked-
-/// issues chips ("Closes #123" parsed out of the PR body).
+/// A lean issue (no body/labels/etc) — just enough for a picker option.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IssueSummary {
     pub number: u64,
@@ -1520,50 +1518,778 @@ pub async fn list_repo_issues(
         .collect())
 }
 
-pub async fn list_issue_states(
+const CLOSING_ISSUES_QUERY: &str = r#"
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      closingIssuesReferences(first: 25) {
+        nodes {
+          number
+          title
+          state
+          repository { name owner { login } }
+        }
+      }
+    }
+  }
+}
+"#;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ClosingIssueRef {
+    pub number: u64,
+    pub title: String,
+    pub state: String,
+    pub repo_owner: String,
+    pub repo_name: String,
+}
+
+/// The issues this PR will close on merge, exactly as GitHub itself computes it for its own PR
+/// sidebar — covers both a "Closes #N"/"Fixes #N" keyword in the body *and* a PR opened from a
+/// branch GitHub's own "Create a branch" flow (from an issue's "Development" panel) already
+/// linked to an issue, which carries no such keyword in the body at all. The old body-text-only
+/// regex heuristic (`parseLinkedIssues` on the frontend) missed exactly that second case.
+pub async fn list_closing_issues(
     host: &str,
     token: &str,
     owner: &str,
     repo: &str,
-    numbers: &[u64],
-) -> Result<std::collections::HashMap<u64, String>, String> {
-    if numbers.is_empty() {
-        return Ok(std::collections::HashMap::new());
+    number: u64,
+) -> Result<Vec<ClosingIssueRef>, String> {
+    #[derive(Deserialize)]
+    struct OwnerNode {
+        login: String,
     }
-    let fields: Vec<String> = numbers
-        .iter()
-        .map(|n| format!(r#"i{n}: issue(number: {n}) {{ number state }}"#))
-        .collect();
-    let query = format!(
-        r#"query($owner: String!, $repo: String!) {{
-          repository(owner: $owner, name: $repo) {{ {} }}
-        }}"#,
-        fields.join("\n")
-    );
-
+    #[derive(Deserialize)]
+    struct RepoNode {
+        name: String,
+        owner: OwnerNode,
+    }
     #[derive(Deserialize)]
     struct IssueNode {
         number: u64,
+        title: String,
         state: String,
+        repository: RepoNode,
+    }
+    #[derive(Deserialize)]
+    struct Nodes {
+        nodes: Vec<IssueNode>,
+    }
+    #[derive(Deserialize)]
+    struct PullRequestNode {
+        #[serde(rename = "closingIssuesReferences")]
+        closing_issues_references: Nodes,
+    }
+    #[derive(Deserialize)]
+    struct RepositoryData {
+        #[serde(rename = "pullRequest")]
+        pull_request: Option<PullRequestNode>,
+    }
+    #[derive(Deserialize)]
+    struct Data {
+        repository: RepositoryData,
     }
 
     let gh = GhClient::new(host, token)?;
-    let data: serde_json::Value = gh
-        .graphql(&query, serde_json::json!({ "owner": owner, "repo": repo }))
+    let data: Data = gh
+        .graphql(
+            CLOSING_ISSUES_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "number": number }),
+        )
         .await?;
-    let repository = data.get("repository").cloned().unwrap_or_default();
-    let mut result = std::collections::HashMap::new();
-    if let serde_json::Value::Object(fields) = repository {
-        for (_, value) in fields {
-            if value.is_null() {
-                continue;
-            }
-            if let Ok(node) = serde_json::from_value::<IssueNode>(value) {
-                result.insert(node.number, node.state);
-            }
+    Ok(data
+        .repository
+        .pull_request
+        .map(|pr| {
+            pr.closing_issues_references
+                .nodes
+                .into_iter()
+                .map(|n| ClosingIssueRef {
+                    number: n.number,
+                    title: n.title,
+                    state: n.state,
+                    repo_owner: n.repository.owner.login,
+                    repo_name: n.repository.name,
+                })
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+/// A full GitHub issue, for the Issues tab — distinct from the lean `IssueSummary` above, which
+/// exists only for the PR sidebar's "link an issue" picker.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Issue {
+    pub number: u64,
+    pub title: String,
+    pub body: Option<String>,
+    pub state: String,
+    pub state_reason: Option<String>,
+    pub html_url: String,
+    pub author_login: String,
+    pub author_avatar_url: String,
+    pub labels: Vec<String>,
+    pub assignees: Vec<AssignableUser>,
+    pub milestone: Option<Milestone>,
+    pub locked: bool,
+    pub active_lock_reason: Option<String>,
+    pub comments: u64,
+    pub created_at: String,
+}
+
+#[derive(Deserialize)]
+struct RawIssue {
+    number: u64,
+    title: String,
+    body: Option<String>,
+    state: String,
+    #[serde(default)]
+    state_reason: Option<String>,
+    html_url: String,
+    user: RawUser,
+    #[serde(default)]
+    labels: Vec<RawLabel>,
+    #[serde(default)]
+    assignees: Vec<AssignableUser>,
+    #[serde(default)]
+    milestone: Option<Milestone>,
+    #[serde(default)]
+    locked: bool,
+    #[serde(default)]
+    active_lock_reason: Option<String>,
+    #[serde(default)]
+    comments: u64,
+    created_at: String,
+    // Present (non-null) only when this "issue" is actually a pull request — see
+    // `RawIssueSummary`'s identical field, same reason.
+    #[serde(default)]
+    pull_request: Option<serde_json::Value>,
+}
+
+impl From<RawIssue> for Issue {
+    fn from(raw: RawIssue) -> Self {
+        Issue {
+            number: raw.number,
+            title: raw.title,
+            body: raw.body,
+            state: raw.state,
+            state_reason: raw.state_reason,
+            html_url: raw.html_url,
+            author_login: raw.user.login,
+            author_avatar_url: raw.user.avatar_url,
+            labels: raw.labels.into_iter().map(|l| l.name).collect(),
+            assignees: raw.assignees,
+            milestone: raw.milestone,
+            locked: raw.locked,
+            active_lock_reason: raw.active_lock_reason,
+            comments: raw.comments,
+            created_at: raw.created_at,
         }
     }
-    Ok(result)
+}
+
+/// `state` is "open" | "closed" | "all", same convention as `list_pull_requests`. GitHub's
+/// issues-list endpoint returns PRs too (see `RawIssue::pull_request`) — filtered out here so
+/// callers never see them.
+pub async fn list_issues(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    state: &str,
+    page: u32,
+) -> Result<Vec<Issue>, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues?state={state}&per_page=50&page={page}");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: Vec<RawIssue> = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw
+        .into_iter()
+        .filter(|i| i.pull_request.is_none())
+        .map(Issue::from)
+        .collect())
+}
+
+pub async fn get_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<Issue, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}");
+    let res = send_checked(gh.get(&path)).await?;
+    let raw: RawIssue = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw.into())
+}
+
+#[derive(Debug, Serialize)]
+struct CreateIssueBody<'a> {
+    title: &'a str,
+    body: &'a str,
+}
+
+pub async fn create_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    title: &str,
+    body: &str,
+) -> Result<Issue, String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues");
+    let res = send_checked(gh.post(&path).json(&CreateIssueBody { title, body })).await?;
+    let raw: RawIssue = res.json().await.map_err(|e| e.to_string())?;
+    Ok(raw.into())
+}
+
+#[derive(Deserialize)]
+struct RawRepoId {
+    id: u64,
+}
+
+/// Uploads an image and returns its `https://github.com/user-attachments/assets/<uuid>` markdown-
+/// embeddable URL — GitHub's own drag-and-drop-into-a-textbox upload flow, reverse-engineered
+/// since it has no documented public API (`uploads.github.com/user-attachments/assets` isn't
+/// listed in either the REST or GraphQL reference). Verified live: the returned URL 404s until
+/// it's actually referenced in saved content (a comment/issue/PR body), then resolves via a
+/// redirect to a signed S3 object — an anti-orphan mechanism, not a bug, so callers shouldn't be
+/// surprised the URL doesn't "work" until the body/comment containing it is actually saved.
+/// dotcom-only: GHES has no confirmed equivalent `uploads.` host, so this errors outright for any
+/// other host rather than guess at one; callers should fall back to a plain `data:` URI embed.
+pub async fn upload_attachment(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    filename: &str,
+    content_type: &str,
+    data: Vec<u8>,
+) -> Result<String, String> {
+    if host != "github.com" {
+        return Err("Attachment upload is only available on github.com".to_string());
+    }
+    let gh = GhClient::new(host, token)?;
+    let res = send_checked(gh.get(&format!("/repos/{owner}/{repo}"))).await?;
+    let repo_info: RawRepoId = res.json().await.map_err(|e| e.to_string())?;
+
+    let mut url = reqwest::Url::parse("https://uploads.github.com/user-attachments/assets")
+        .map_err(|e| e.to_string())?;
+    url.query_pairs_mut()
+        .append_pair("name", filename)
+        .append_pair("content_type", content_type)
+        .append_pair("repository_id", &repo_info.id.to_string());
+
+    #[derive(Deserialize)]
+    struct UploadResponse {
+        url: String,
+    }
+    // This endpoint wants a plain `application/json` Accept, not the `application/vnd.github+json`
+    // GhClient's shared client sets by default — a per-request header override wins over it.
+    let res = send_checked(
+        gh.http
+            .post(url)
+            .header(reqwest::header::ACCEPT, "application/json")
+            .body(data),
+    )
+    .await?;
+    let parsed: UploadResponse = res.json().await.map_err(|e| e.to_string())?;
+    Ok(parsed.url)
+}
+
+#[derive(Debug, Serialize)]
+struct UpdateIssueBodyBody<'a> {
+    body: &'a str,
+}
+
+/// Edits an issue's description — the author-only editing action, mirrors
+/// `update_pull_request_body`.
+pub async fn update_issue_body(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    body: &str,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}");
+    send_checked(gh.patch(&path).json(&UpdateIssueBodyBody { body })).await?;
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+struct CloseIssueBody<'a> {
+    state: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    state_reason: Option<&'a str>,
+}
+
+/// Closes an open issue — `state_reason` is one of GitHub's "completed"/"not_planned", or `None`
+/// to let GitHub default it (defaults to "completed").
+pub async fn close_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    state_reason: Option<&str>,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}");
+    send_checked(gh.patch(&path).json(&CloseIssueBody {
+        state: "closed",
+        state_reason,
+    }))
+    .await?;
+    Ok(())
+}
+
+/// Reopens a closed issue — the symmetric counterpart to `close_issue`.
+pub async fn reopen_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let path = format!("/repos/{owner}/{repo}/issues/{number}");
+    send_checked(gh.patch(&path).json(&CloseIssueBody {
+        state: "open",
+        state_reason: None,
+    }))
+    .await?;
+    Ok(())
+}
+
+const ISSUE_NODE_ID_QUERY: &str = r#"
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    issue(number: $number) { id }
+  }
+}
+"#;
+
+/// An issue's GraphQL node id — mirrors `pull_request_node_id`, needed only for Projects v2
+/// (issues have no other GraphQL-only surface to reach).
+async fn issue_node_id(
+    gh: &GhClient,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<String, String> {
+    #[derive(Deserialize)]
+    struct IssueId {
+        id: String,
+    }
+    #[derive(Deserialize)]
+    struct RepositoryData {
+        issue: IssueId,
+    }
+    #[derive(Deserialize)]
+    struct NodeIdData {
+        repository: RepositoryData,
+    }
+    let data: NodeIdData = gh
+        .graphql(
+            ISSUE_NODE_ID_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "number": number }),
+        )
+        .await?;
+    Ok(data.repository.issue.id)
+}
+
+pub async fn add_issue_to_project(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    project_id: &str,
+) -> Result<(), String> {
+    #[derive(Deserialize)]
+    struct MutationData {
+        #[allow(dead_code)]
+        #[serde(rename = "addProjectV2ItemById")]
+        add_project_v2_item_by_id: serde_json::Value,
+    }
+
+    let gh = GhClient::new(host, token)?;
+    let content_id = issue_node_id(&gh, owner, repo, number).await?;
+    let _: MutationData = gh
+        .graphql(
+            ADD_PROJECT_ITEM_MUTATION,
+            serde_json::json!({ "projectId": project_id, "contentId": content_id }),
+        )
+        .await?;
+    Ok(())
+}
+
+/// A lightweight issue reference for relationship chips (parent/blocked-by/blocking) — distinct
+/// from `IssueSummary` only in that it's sourced from GraphQL rather than REST, same three fields.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueRef {
+    pub number: u64,
+    pub title: String,
+    pub state: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinkedBranch {
+    pub id: String,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IssueRelationships {
+    pub parent: Option<IssueRef>,
+    pub blocked_by: Vec<IssueRef>,
+    pub blocking: Vec<IssueRef>,
+    pub linked_branches: Vec<LinkedBranch>,
+}
+
+const ISSUE_RELATIONSHIPS_QUERY: &str = r#"
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    issue(number: $number) {
+      parent { number title state }
+      blockedBy(first: 25) { nodes { number title state } }
+      blocking(first: 25) { nodes { number title state } }
+      linkedBranches(first: 25) { nodes { id ref { name } } }
+    }
+  }
+}
+"#;
+
+/// GitHub's issue-relationships surface (sub-issues' `parent`, and the newer `blockedBy`/
+/// `blocking` dependency edges) plus the Development panel's linked branches — all GraphQL-only,
+/// no REST equivalent exists for any of these as of this writing.
+pub async fn get_issue_relationships(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+) -> Result<IssueRelationships, String> {
+    #[derive(Deserialize)]
+    struct RawIssueRef {
+        number: u64,
+        title: String,
+        state: String,
+    }
+    #[derive(Deserialize)]
+    struct RawRefName {
+        name: String,
+    }
+    #[derive(Deserialize)]
+    struct RawLinkedBranchNode {
+        id: String,
+        // Null when the underlying git ref has since been deleted — GitHub keeps the linked-
+        // branch record around as a tombstone rather than removing it outright.
+        #[serde(rename = "ref")]
+        ref_: Option<RawRefName>,
+    }
+    #[derive(Deserialize)]
+    struct Nodes<T> {
+        nodes: Vec<T>,
+    }
+    #[derive(Deserialize)]
+    struct RawIssueDetail {
+        parent: Option<RawIssueRef>,
+        #[serde(rename = "blockedBy")]
+        blocked_by: Nodes<RawIssueRef>,
+        blocking: Nodes<RawIssueRef>,
+        #[serde(rename = "linkedBranches")]
+        linked_branches: Nodes<RawLinkedBranchNode>,
+    }
+    #[derive(Deserialize)]
+    struct RepositoryData {
+        issue: Option<RawIssueDetail>,
+    }
+    #[derive(Deserialize)]
+    struct Data {
+        repository: RepositoryData,
+    }
+
+    let gh = GhClient::new(host, token)?;
+    let data: Data = gh
+        .graphql(
+            ISSUE_RELATIONSHIPS_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "number": number }),
+        )
+        .await?;
+    let detail = data.repository.issue.ok_or("issue not found")?;
+    let to_ref = |r: RawIssueRef| IssueRef {
+        number: r.number,
+        title: r.title,
+        state: r.state,
+    };
+    Ok(IssueRelationships {
+        parent: detail.parent.map(to_ref),
+        blocked_by: detail.blocked_by.nodes.into_iter().map(to_ref).collect(),
+        blocking: detail.blocking.nodes.into_iter().map(to_ref).collect(),
+        linked_branches: detail
+            .linked_branches
+            .nodes
+            .into_iter()
+            .filter_map(|n| {
+                n.ref_.map(|r| LinkedBranch {
+                    id: n.id,
+                    name: r.name,
+                })
+            })
+            .collect(),
+    })
+}
+
+const ADD_SUB_ISSUE_MUTATION: &str = r#"
+mutation($issueId: ID!, $subIssueId: ID!) {
+  addSubIssue(input: { issueId: $issueId, subIssueId: $subIssueId, replaceParent: true }) {
+    issue { id }
+  }
+}
+"#;
+
+const REMOVE_SUB_ISSUE_MUTATION: &str = r#"
+mutation($issueId: ID!, $subIssueId: ID!) {
+  removeSubIssue(input: { issueId: $issueId, subIssueId: $subIssueId }) {
+    issue { id }
+  }
+}
+"#;
+
+#[derive(Deserialize)]
+struct IssueMutationPayload {
+    #[allow(dead_code)]
+    issue: serde_json::Value,
+}
+
+/// Makes `child_number` a sub-issue of `parent_number` — from the child's own sidebar this is
+/// "Add parent" (picking which issue becomes the parent); `replaceParent: true` so re-parenting
+/// an issue that already has one just moves it rather than erroring.
+pub async fn add_sub_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    parent_number: u64,
+    child_number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let parent_id = issue_node_id(&gh, owner, repo, parent_number).await?;
+    let child_id = issue_node_id(&gh, owner, repo, child_number).await?;
+    let _: IssueMutationPayload = gh
+        .graphql(
+            ADD_SUB_ISSUE_MUTATION,
+            serde_json::json!({ "issueId": parent_id, "subIssueId": child_id }),
+        )
+        .await?;
+    Ok(())
+}
+
+/// Unlinks `child_number` from its parent `parent_number` — the sidebar's "x" on the parent chip.
+pub async fn remove_sub_issue(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    parent_number: u64,
+    child_number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let parent_id = issue_node_id(&gh, owner, repo, parent_number).await?;
+    let child_id = issue_node_id(&gh, owner, repo, child_number).await?;
+    let _: IssueMutationPayload = gh
+        .graphql(
+            REMOVE_SUB_ISSUE_MUTATION,
+            serde_json::json!({ "issueId": parent_id, "subIssueId": child_id }),
+        )
+        .await?;
+    Ok(())
+}
+
+const ADD_BLOCKED_BY_MUTATION: &str = r#"
+mutation($issueId: ID!, $blockingIssueId: ID!) {
+  addBlockedBy(input: { issueId: $issueId, blockingIssueId: $blockingIssueId }) {
+    issue { id }
+  }
+}
+"#;
+
+const REMOVE_BLOCKED_BY_MUTATION: &str = r#"
+mutation($issueId: ID!, $blockingIssueId: ID!) {
+  removeBlockedBy(input: { issueId: $issueId, blockingIssueId: $blockingIssueId }) {
+    issue { id }
+  }
+}
+"#;
+
+/// Marks `number` as blocked by `blocking_number` — "Mark as blocked by" from `number`'s own
+/// sidebar. "Mark as blocking" (this issue blocks another) is the same relationship viewed from
+/// the other side, so the frontend calls this with the two numbers swapped rather than needing a
+/// second function.
+pub async fn add_blocked_by(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    blocking_number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let issue_id = issue_node_id(&gh, owner, repo, number).await?;
+    let blocking_id = issue_node_id(&gh, owner, repo, blocking_number).await?;
+    let _: IssueMutationPayload = gh
+        .graphql(
+            ADD_BLOCKED_BY_MUTATION,
+            serde_json::json!({ "issueId": issue_id, "blockingIssueId": blocking_id }),
+        )
+        .await?;
+    Ok(())
+}
+
+pub async fn remove_blocked_by(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    blocking_number: u64,
+) -> Result<(), String> {
+    let gh = GhClient::new(host, token)?;
+    let issue_id = issue_node_id(&gh, owner, repo, number).await?;
+    let blocking_id = issue_node_id(&gh, owner, repo, blocking_number).await?;
+    let _: IssueMutationPayload = gh
+        .graphql(
+            REMOVE_BLOCKED_BY_MUTATION,
+            serde_json::json!({ "issueId": issue_id, "blockingIssueId": blocking_id }),
+        )
+        .await?;
+    Ok(())
+}
+
+const BRANCH_OID_QUERY: &str = r#"
+query($owner: String!, $repo: String!, $qualifiedName: String!) {
+  repository(owner: $owner, name: $repo) {
+    ref(qualifiedName: $qualifiedName) { target { oid } }
+  }
+}
+"#;
+
+const CREATE_LINKED_BRANCH_MUTATION: &str = r#"
+mutation($issueId: ID!, $oid: GitObjectID!, $name: String) {
+  createLinkedBranch(input: { issueId: $issueId, oid: $oid, name: $name }) {
+    linkedBranch { id ref { name } }
+  }
+}
+"#;
+
+/// Creates a new branch off `base_branch`'s current tip and links it to `number`'s Development
+/// panel in one call — GitHub's `createLinkedBranch` mutation both creates the git ref server-
+/// side and records the link, unlike a plain local branch (which has no such link at all until a
+/// PR referencing the issue is opened).
+pub async fn create_linked_branch(
+    host: &str,
+    token: &str,
+    owner: &str,
+    repo: &str,
+    number: u64,
+    base_branch: &str,
+    name: &str,
+) -> Result<LinkedBranch, String> {
+    #[derive(Deserialize)]
+    struct RefTarget {
+        oid: String,
+    }
+    #[derive(Deserialize)]
+    struct RawRefQuery {
+        target: Option<RefTarget>,
+    }
+    #[derive(Deserialize)]
+    struct RefRepositoryData {
+        #[serde(rename = "ref")]
+        ref_: Option<RawRefQuery>,
+    }
+    #[derive(Deserialize)]
+    struct RefData {
+        repository: RefRepositoryData,
+    }
+    #[derive(Deserialize)]
+    struct RawRefName {
+        name: String,
+    }
+    #[derive(Deserialize)]
+    struct LinkedBranchNode {
+        id: String,
+        #[serde(rename = "ref")]
+        ref_: RawRefName,
+    }
+    #[derive(Deserialize)]
+    struct CreateLinkedBranchPayload {
+        #[serde(rename = "linkedBranch")]
+        linked_branch: LinkedBranchNode,
+    }
+
+    let gh = GhClient::new(host, token)?;
+    let issue_id = issue_node_id(&gh, owner, repo, number).await?;
+    let qualified_name = format!("refs/heads/{base_branch}");
+    let ref_data: RefData = gh
+        .graphql(
+            BRANCH_OID_QUERY,
+            serde_json::json!({ "owner": owner, "repo": repo, "qualifiedName": qualified_name }),
+        )
+        .await?;
+    let oid = ref_data
+        .repository
+        .ref_
+        .and_then(|r| r.target)
+        .map(|t| t.oid)
+        .ok_or_else(|| format!("Branch '{base_branch}' not found"))?;
+    let payload: CreateLinkedBranchPayload = gh
+        .graphql(
+            CREATE_LINKED_BRANCH_MUTATION,
+            serde_json::json!({ "issueId": issue_id, "oid": oid, "name": name }),
+        )
+        .await?;
+    Ok(LinkedBranch {
+        id: payload.linked_branch.id,
+        name: payload.linked_branch.ref_.name,
+    })
+}
+
+const DELETE_LINKED_BRANCH_MUTATION: &str = r#"
+mutation($linkedBranchId: ID!) {
+  deleteLinkedBranch(input: { linkedBranchId: $linkedBranchId }) {
+    clientMutationId
+  }
+}
+"#;
+
+/// Unlinks a branch from the Development panel — doesn't delete the git ref itself, mirroring
+/// GitHub's own "Unlink" action (as opposed to the separate "Delete branch" one).
+pub async fn delete_linked_branch(
+    host: &str,
+    token: &str,
+    linked_branch_id: &str,
+) -> Result<(), String> {
+    #[derive(Deserialize)]
+    struct DeleteLinkedBranchPayload {
+        #[allow(dead_code)]
+        #[serde(rename = "clientMutationId")]
+        client_mutation_id: Option<String>,
+    }
+    let gh = GhClient::new(host, token)?;
+    let _: DeleteLinkedBranchPayload = gh
+        .graphql(
+            DELETE_LINKED_BRANCH_MUTATION,
+            serde_json::json!({ "linkedBranchId": linked_branch_id }),
+        )
+        .await?;
+    Ok(())
 }
 
 #[derive(Debug, Serialize)]
@@ -2198,12 +2924,15 @@ struct RawTimelineEvent {
     #[serde(default)]
     requested_reviewer: Option<RawUser>,
     /// Only present on a `connected` event — GitHub's real field name for the linked issue/PR
-    /// is `subject`, not `source` (that name, and the `cross-referenced` event kind, describe a
-    /// different, far noisier concept: "something else mentions this issue/PR", which fires for
-    /// any plain mention, not a closing keyword). Verified against a live `connected` event's
-    /// JSON shape on this repo's own PR #81 (linked to issue #38 via `Closes #38`).
+    /// is `subject`, not `source` (that's the field `cross-referenced` uses, for a different
+    /// concept: "something else mentions this issue/PR"). Verified against a live `connected`
+    /// event's JSON shape on this repo's own PR #81 (linked to issue #38 via `Closes #38`).
     #[serde(default)]
     subject: Option<RawConnectedSubject>,
+    /// Only present on a `cross-referenced` event — the issue/PR that mentioned this one
+    /// (via a plain `#123` reference, not necessarily a closing keyword).
+    #[serde(default)]
+    source: Option<RawCrossReferenceSource>,
 }
 
 #[derive(Deserialize)]
@@ -2213,6 +2942,27 @@ struct RawConnectedSubject {
     state: String,
     #[serde(default)]
     repository: Option<RawRepoRef>,
+}
+
+#[derive(Deserialize)]
+struct RawCrossReferenceSource {
+    #[serde(default)]
+    issue: Option<RawCrossReferenceIssue>,
+}
+
+#[derive(Deserialize)]
+struct RawCrossReferenceIssue {
+    number: u64,
+    title: String,
+    state: String,
+    #[serde(default)]
+    html_url: String,
+    #[serde(default)]
+    repository: Option<RawRepoRef>,
+    /// Present (as an object) only when the mentioning item is a pull request — GitHub's issue
+    /// timeline represents PRs as issues, this field is the only way to tell them apart.
+    #[serde(default)]
+    pull_request: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -2244,16 +2994,44 @@ pub struct IssueTimelineEvent {
     pub source_issue_state: Option<String>,
     pub source_issue_html_url: Option<String>,
     pub source_issue_repo_full_name: Option<String>,
+    /// Populated only for a `cross-referenced` event — set when the mentioning item is itself
+    /// a pull request, so the UI can say "N pull requests" vs "N issues" when grouping several
+    /// of these together.
+    pub source_issue_is_pull_request: Option<bool>,
 }
 
 impl From<RawTimelineEvent> for IssueTimelineEvent {
     fn from(raw: RawTimelineEvent) -> Self {
         let subject = raw.subject;
-        let repo = subject.as_ref().and_then(|s| s.repository.as_ref());
-        let html_url = subject
+        let subject_repo = subject.as_ref().and_then(|s| s.repository.as_ref());
+        let subject_html_url = subject
             .as_ref()
-            .zip(repo)
+            .zip(subject_repo)
             .map(|(s, r)| format!("{}/issues/{}", r.html_url, s.number));
+
+        let cross_ref_issue = raw.source.and_then(|s| s.issue);
+        let cross_ref_repo = cross_ref_issue.as_ref().and_then(|i| i.repository.as_ref());
+        let cross_ref_repo_full_name = cross_ref_repo.map(|r| r.full_name.clone());
+        let cross_ref_is_pr = cross_ref_issue.as_ref().map(|i| i.pull_request.is_some());
+
+        let source_issue_number = subject
+            .as_ref()
+            .map(|s| s.number)
+            .or(cross_ref_issue.as_ref().map(|i| i.number));
+        let source_issue_title = subject
+            .as_ref()
+            .map(|s| s.title.clone())
+            .or(cross_ref_issue.as_ref().map(|i| i.title.clone()));
+        let source_issue_state = subject
+            .as_ref()
+            .map(|s| s.state.clone())
+            .or(cross_ref_issue.as_ref().map(|i| i.state.clone()));
+        let source_issue_html_url =
+            subject_html_url.or(cross_ref_issue.as_ref().map(|i| i.html_url.clone()));
+        let source_issue_repo_full_name = subject_repo
+            .map(|r| r.full_name.clone())
+            .or(cross_ref_repo_full_name);
+
         IssueTimelineEvent {
             id: raw.id,
             event: raw.event,
@@ -2266,11 +3044,12 @@ impl From<RawTimelineEvent> for IssueTimelineEvent {
             assignee_avatar_url: raw.assignee.map(|a| a.avatar_url),
             requested_reviewer_login: raw.requested_reviewer.as_ref().map(|a| a.login.clone()),
             requested_reviewer_avatar_url: raw.requested_reviewer.map(|a| a.avatar_url),
-            source_issue_number: subject.as_ref().map(|s| s.number),
-            source_issue_title: subject.as_ref().map(|s| s.title.clone()),
-            source_issue_state: subject.as_ref().map(|s| s.state.clone()),
-            source_issue_html_url: html_url,
-            source_issue_repo_full_name: repo.map(|r| r.full_name.clone()),
+            source_issue_number,
+            source_issue_title,
+            source_issue_state,
+            source_issue_html_url,
+            source_issue_repo_full_name,
+            source_issue_is_pull_request: cross_ref_is_pr,
         }
     }
 }
@@ -2278,10 +3057,12 @@ impl From<RawTimelineEvent> for IssueTimelineEvent {
 /// The event kinds the Conversation tab's timeline renders — everything else GitHub's timeline
 /// API returns (commented/committed/reviewed/etc.) is already covered by our own issue-
 /// comments/reviews/commits fetches, so including them here would just duplicate entries rather
-/// than add information. `connected` is the exception: it's the only way to get "X linked an
-/// issue that may be closed by this pull request" (verified against a live event on this repo's
-/// own PR #81 — GitHub uses `connected`/`subject`, not the more commonly-guessed
-/// `cross-referenced`/`source`, for this specific line).
+/// than add information. `connected` is the only way to get "X linked an issue that may be
+/// closed by this pull request" (verified against a live event on this repo's own PR #81 —
+/// GitHub uses `connected`/`subject`, not `cross-referenced`/`source`, for that specific line).
+/// `cross-referenced` is its own separate event kind, included for "X mentioned this in N
+/// issues" — it fires for any plain `#123` mention (not just a closing keyword), so the frontend
+/// groups adjacent same-actor occurrences into one row rather than listing each individually.
 const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
     "labeled",
     "unlabeled",
@@ -2293,6 +3074,7 @@ const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
     "reopened",
     "merged",
     "connected",
+    "cross-referenced",
 ];
 
 /// Label/assignee/reviewer-request/close/reopen/merge events for the Conversation tab's
@@ -2954,6 +3736,55 @@ mod tests {
     }
 
     #[test]
+    fn timeline_event_maps_cross_referenced_source_fields() {
+        let json = r#"{
+            "event": "cross-referenced",
+            "actor": {"login": "alice", "avatar_url": "https://a"},
+            "source": {
+                "issue": {
+                    "number": 48,
+                    "title": "Issues tab: manage GitLab issues in-app",
+                    "state": "open",
+                    "html_url": "https://github.com/Daanieeel/gitbud/issues/48",
+                    "repository": {"full_name": "Daanieeel/gitbud", "html_url": "https://github.com/Daanieeel/gitbud"}
+                }
+            }
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.source_issue_number, Some(48));
+        assert_eq!(
+            event.source_issue_title,
+            Some("Issues tab: manage GitLab issues in-app".to_string())
+        );
+        assert_eq!(event.source_issue_state, Some("open".to_string()));
+        assert_eq!(
+            event.source_issue_html_url,
+            Some("https://github.com/Daanieeel/gitbud/issues/48".to_string())
+        );
+        assert_eq!(event.source_issue_is_pull_request, Some(false));
+    }
+
+    #[test]
+    fn timeline_event_marks_cross_referenced_pull_request_source() {
+        let json = r#"{
+            "event": "cross-referenced",
+            "source": {
+                "issue": {
+                    "number": 49,
+                    "title": "Issues tab: manage Bitbucket issues in-app",
+                    "state": "open",
+                    "html_url": "https://github.com/Daanieeel/gitbud/pull/49",
+                    "pull_request": {"url": "https://api.github.com/repos/Daanieeel/gitbud/pulls/49"}
+                }
+            }
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.source_issue_is_pull_request, Some(true));
+    }
+
+    #[test]
     fn timeline_event_leaves_source_issue_fields_none_for_other_event_kinds() {
         let json = r#"{"event": "labeled", "label": {"name": "bug", "color": "d73a4a"}}"#;
         let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
@@ -2971,5 +3802,6 @@ mod tests {
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"labeled"));
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"merged"));
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"connected"));
+        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"cross-referenced"));
     }
 }

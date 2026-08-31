@@ -4,7 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { GitPullRequestCreateArrow, GitPullRequestDraftIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
-import { Textarea } from "@gitbud/ui/textarea";
+import { MarkdownEditor } from "@gitbud/markdown/editor";
 import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
@@ -76,6 +76,11 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const [base, setBase] = useState(defaultBase);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const uploadImage = async (file: File): Promise<string> => {
+    if (!repoPath || !currentLogin) throw new Error("no repo/login");
+    const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
+    return api.githubUploadAttachment(repoPath, currentLogin, file.name, file.type, bytes);
+  };
   const [draft, setDraft] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -92,6 +97,7 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
   const [mainView, setMainView] = useState<"files" | "commits">("files");
   const [diffFiles, setDiffFiles] = useState<[string, string][]>([]);
   const [diffLoading, setDiffLoading] = useState(false);
+  const [diffStats, setDiffStats] = useState<[number, number] | null>(null);
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [selectedDiff, setSelectedDiff] = useState<FileDiff | null>(null);
   const [selectedImageDiff, setSelectedImageDiff] = useState<ImageDiff | null>(null);
@@ -156,6 +162,12 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
       .then(setDiffFiles)
       .catch(() => setDiffFiles([]))
       .finally(() => setDiffLoading(false));
+
+    setDiffStats(null);
+    void api
+      .getBranchDiffStats(repoPath, base, branch)
+      .then(setDiffStats)
+      .catch(() => setDiffStats(null));
 
     setBranchCommitsLoading(true);
     void api
@@ -269,12 +281,12 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
               onChange={(e) => setTitle(e.target.value)}
               className="shrink-0"
             />
-            <Textarea
+            <MarkdownEditor
               placeholder="Description"
               value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={4}
-              className="shrink-0"
+              onChange={setBody}
+              onUploadImage={uploadImage}
+              className="min-h-[140px] shrink-0"
             />
             <div className="flex shrink-0 gap-1 border-b border-border text-sm">
               <button
@@ -372,6 +384,12 @@ export function CreatePRDialog({ open, onOpenChange }: CreatePRDialogProps) {
             )}
           </div>
           <div className="flex w-56 shrink-0 flex-col gap-4 overflow-auto border-l border-border pl-4">
+            {diffStats && (diffStats[0] > 0 || diffStats[1] > 0) && (
+              <div className="flex shrink-0 items-center gap-2 font-mono text-xs">
+                <span className="text-accent-green">+{diffStats[0].toLocaleString()}</span>
+                <span className="text-accent-pink">-{diffStats[1].toLocaleString()}</span>
+              </div>
+            )}
             <MultiSelectField
               label="Labels"
               placeholder="No labels"

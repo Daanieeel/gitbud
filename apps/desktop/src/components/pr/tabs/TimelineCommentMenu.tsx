@@ -6,7 +6,6 @@ import {
   DropdownMenuTrigger,
 } from "@gitbud/ui/dropdown-menu";
 import { copyToClipboard } from "@/lib/clipboard";
-import { usePRStore } from "@/store/usePRStore";
 
 interface TimelineCommentMenuProps {
   htmlUrl: string;
@@ -15,14 +14,19 @@ interface TimelineCommentMenuProps {
    * review or someone else's comment through this app, so the menu item is simply omitted
    * rather than shown disabled. */
   onDelete?: () => void;
+  /** Hands the comment body off to whatever compose box lives elsewhere in this tab (a PR's
+   * `PRCommentCompose` or an issue's) — shared between both the PR and Issues tabs, which each
+   * keep their own quoted-reply state (`usePRStore`/`useIssueStore`). */
+  onQuoteReply: (text: string) => void;
 }
 
-/** The three-dot menu on every comment/review card in the timeline. "Quote reply" hands the
- * body off through `usePRStore`'s `quotedReplyText` rather than needing a direct reference to
- * `PRCommentCompose`, which lives in a completely different part of the tab. */
-export function TimelineCommentMenu({ htmlUrl, body, onDelete }: TimelineCommentMenuProps) {
-  const setQuotedReply = usePRStore((s) => s.setQuotedReply);
-
+/** The three-dot menu on every comment/review card in the timeline. */
+export function TimelineCommentMenu({
+  htmlUrl,
+  body,
+  onDelete,
+  onQuoteReply,
+}: TimelineCommentMenuProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -39,7 +43,7 @@ export function TimelineCommentMenu({ htmlUrl, body, onDelete }: TimelineComment
         <DropdownMenuItem onClick={() => void copyToClipboard(body)}>
           Copy Markdown
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => setQuotedReply(body)}>Quote reply</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onQuoteReply(body)}>Quote reply</DropdownMenuItem>
         {onDelete && (
           <DropdownMenuItem variant="destructive" onClick={onDelete}>
             Delete

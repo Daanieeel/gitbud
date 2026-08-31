@@ -4,7 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
-import { Textarea } from "@gitbud/ui/textarea";
+import { MarkdownEditor } from "@gitbud/markdown/editor";
 import { CheckboxGroup } from "@gitbud/ui/checkbox-group";
 import { Skeleton } from "@gitbud/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
@@ -64,6 +64,10 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
   const [method, setMethod] = useState<"merge" | "squash" | "rebase">("squash");
   const [commitTitle, setCommitTitle] = useState("");
   const [commitMessage, setCommitMessage] = useState("");
+  const uploadImage = async (file: File): Promise<string> => {
+    const bytes = Array.from(new Uint8Array(await file.arrayBuffer()));
+    return api.githubUploadAttachment(repoPath, login, file.name, file.type, bytes);
+  };
   const [deleteBranch, setDeleteBranch] = useState(false);
   const [merging, setMerging] = useState(false);
   const [targetBase, setTargetBase] = useState(pr.base_ref);
@@ -316,12 +320,12 @@ export function MergePRDialog({ open, onOpenChange, repoPath, login, pr }: Merge
             onChange={(e) => setCommitTitle(e.target.value)}
             autoComplete="off"
           />
-          <Textarea
+          <MarkdownEditor
             placeholder="Description"
             value={commitMessage}
-            onChange={(e) => setCommitMessage(e.target.value)}
-            rows={3}
-            autoComplete="off"
+            onChange={setCommitMessage}
+            onUploadImage={uploadImage}
+            className="min-h-[120px]"
           />
         </div>
         <DialogFooter className="sm:items-center sm:gap-4">

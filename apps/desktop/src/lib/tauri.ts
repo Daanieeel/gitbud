@@ -7,6 +7,7 @@ import type {
   BranchProtectionRequirements,
   CheckRun,
   CherryPickResult,
+  ClosingIssueRef,
   CommitDetail,
   CommitEntry,
   ConflictSides,
@@ -18,10 +19,13 @@ import type {
   GitHubAccount,
   GitHubRepo,
   ImageDiff,
+  Issue,
   IssueComment,
+  IssueRelationships,
   IssueSummary,
   IssueTimelineEvent,
   Label,
+  LinkedBranch,
   Milestone,
   Project,
   LfsFileInfo,
@@ -158,6 +162,9 @@ export const api = {
     invoke<FileDiff>("get_commit_file_diff", { repoPath, oid, path }),
   getBranchDiffFiles: (repoPath: string, base: string, head: string) =>
     invoke<[string, string][]>("get_branch_diff_files", { repoPath, base, head }),
+  /** `[insertions, deletions]` totals across the whole `base...head` comparison. */
+  getBranchDiffStats: (repoPath: string, base: string, head: string) =>
+    invoke<[number, number]>("get_branch_diff_stats", { repoPath, base, head }),
   getBranchDiffFile: (repoPath: string, base: string, head: string, path: string) =>
     invoke<FileDiff>("get_branch_diff_file", { repoPath, base, head, path }),
   getBranchImageDiff: (repoPath: string, base: string, head: string, path: string) =>
@@ -413,8 +420,8 @@ export const api = {
     invoke<void>("github_mark_file_viewed", { repoPath, login, number, path }),
   githubUnmarkFileViewed: (repoPath: string, login: string, number: number, path: string) =>
     invoke<void>("github_unmark_file_viewed", { repoPath, login, number, path }),
-  githubListIssueStates: (repoPath: string, login: string, numbers: number[]) =>
-    invoke<Record<number, string>>("github_list_issue_states", { repoPath, login, numbers }),
+  githubListClosingIssues: (repoPath: string, login: string, number: number) =>
+    invoke<ClosingIssueRef[]>("github_list_closing_issues", { repoPath, login, number }),
   githubListLabels: (repoPath: string, login: string) =>
     invoke<Label[]>("github_list_labels", { repoPath, login }),
   githubListAssignableUsers: (repoPath: string, login: string) =>
@@ -467,6 +474,83 @@ export const api = {
     number: number,
     projectId: string,
   ) => invoke<void>("github_add_pull_request_to_project", { repoPath, login, number, projectId }),
+  githubListIssues: (
+    repoPath: string,
+    login: string,
+    state: "open" | "closed" | "all",
+    page: number,
+  ) => invoke<Issue[]>("github_list_issues", { repoPath, login, state, page }),
+  getCachedIssues: (repoPath: string, state: "open" | "closed" | "all") =>
+    invoke<Issue[]>("get_cached_issues", { repoPath, state }),
+  githubGetIssue: (repoPath: string, login: string, number: number) =>
+    invoke<Issue>("github_get_issue", { repoPath, login, number }),
+  githubCreateIssue: (
+    repoPath: string,
+    login: string,
+    title: string,
+    body: string,
+    labels: string[],
+    assignees: string[],
+    milestone: number | null,
+  ) =>
+    invoke<Issue>("github_create_issue", {
+      repoPath,
+      login,
+      title,
+      body,
+      labels,
+      assignees,
+      milestone,
+    }),
+  githubUploadAttachment: (
+    repoPath: string,
+    login: string,
+    filename: string,
+    contentType: string,
+    data: number[],
+  ) => invoke<string>("github_upload_attachment", { repoPath, login, filename, contentType, data }),
+  githubUpdateIssueBody: (repoPath: string, login: string, number: number, body: string) =>
+    invoke<void>("github_update_issue_body", { repoPath, login, number, body }),
+  githubCloseIssue: (repoPath: string, login: string, number: number, stateReason: string | null) =>
+    invoke<void>("github_close_issue", { repoPath, login, number, stateReason }),
+  githubReopenIssue: (repoPath: string, login: string, number: number) =>
+    invoke<void>("github_reopen_issue", { repoPath, login, number }),
+  githubAddIssueToProject: (repoPath: string, login: string, number: number, projectId: string) =>
+    invoke<void>("github_add_issue_to_project", { repoPath, login, number, projectId }),
+  githubGetIssueRelationships: (repoPath: string, login: string, number: number) =>
+    invoke<IssueRelationships>("github_get_issue_relationships", { repoPath, login, number }),
+  githubAddSubIssue: (repoPath: string, login: string, parentNumber: number, childNumber: number) =>
+    invoke<void>("github_add_sub_issue", { repoPath, login, parentNumber, childNumber }),
+  githubRemoveSubIssue: (
+    repoPath: string,
+    login: string,
+    parentNumber: number,
+    childNumber: number,
+  ) => invoke<void>("github_remove_sub_issue", { repoPath, login, parentNumber, childNumber }),
+  githubAddBlockedBy: (repoPath: string, login: string, number: number, blockingNumber: number) =>
+    invoke<void>("github_add_blocked_by", { repoPath, login, number, blockingNumber }),
+  githubRemoveBlockedBy: (
+    repoPath: string,
+    login: string,
+    number: number,
+    blockingNumber: number,
+  ) => invoke<void>("github_remove_blocked_by", { repoPath, login, number, blockingNumber }),
+  githubCreateLinkedBranch: (
+    repoPath: string,
+    login: string,
+    number: number,
+    baseBranch: string,
+    name: string,
+  ) =>
+    invoke<LinkedBranch>("github_create_linked_branch", {
+      repoPath,
+      login,
+      number,
+      baseBranch,
+      name,
+    }),
+  githubDeleteLinkedBranch: (login: string, linkedBranchId: string) =>
+    invoke<void>("github_delete_linked_branch", { login, linkedBranchId }),
   githubMergePullRequest: (
     repoPath: string,
     login: string,

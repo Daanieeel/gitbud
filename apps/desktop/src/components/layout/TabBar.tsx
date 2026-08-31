@@ -1,4 +1,4 @@
-import { FileDiffIcon, GitPullRequestIcon, HistoryIcon } from "lucide-react";
+import { CircleDotIcon, FileDiffIcon, GitPullRequestIcon, HistoryIcon } from "lucide-react";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useStatus } from "@/hooks/queries/useRepoStatus";
 import { StashPanel } from "@/components/changes/StashPanel";
@@ -8,6 +8,7 @@ const TABS = [
   { key: "changes", label: "Changes", icon: FileDiffIcon },
   { key: "history", label: "History", icon: HistoryIcon },
   { key: "pulls", label: "Pull Requests", icon: GitPullRequestIcon },
+  { key: "issues", label: "Issues", icon: CircleDotIcon },
 ] as const;
 
 export function TabBar() {

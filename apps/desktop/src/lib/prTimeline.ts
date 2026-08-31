@@ -4,7 +4,23 @@ export type TimelineEvent =
   | { kind: "comment"; timestamp: string; comment: IssueComment }
   | { kind: "review"; timestamp: string; review: Review }
   | { kind: "commit"; timestamp: string; commit: PullRequestCommit }
-  | { kind: "github_event"; timestamp: string; ghEvent: IssueTimelineEvent };
+  | { kind: "github_event"; timestamp: string; ghEvent: IssueTimelineEvent }
+  | {
+      kind: "cross_referenced_group";
+      timestamp: string;
+      actorLogin: string | null;
+      actorAvatarUrl: string | null;
+      refs: CrossReferencedRef[];
+    };
+
+/** One issue/PR that mentioned this one — the per-row payload inside a `cross_referenced_group`. */
+export interface CrossReferencedRef {
+  number: number;
+  title: string;
+  state: string;
+  isPullRequest: boolean;
+  htmlUrl: string | null;
+}
 
 /** Merges issue comments, review submissions, commits, and GitHub's own label/assignee/
  * reviewer-request/close/reopen/merge events into one chronologically-sorted feed for the
@@ -45,7 +61,47 @@ export function mergeTimeline(
     })),
   ];
   events.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-  return events;
+  return groupCrossReferences(events);
+}
+
+/** Collapses consecutive `cross-referenced` events from the same actor into one
+ * `cross_referenced_group` row — GitHub fires one raw event per mentioning issue/PR, but the
+ * web UI (and this one) shows "X mentioned this in N issues" followed by the list, not N
+ * separate rows. Only adjacent same-actor runs are merged, matching how GitHub's own timeline
+ * groups them (one PR/issue body can `#123` several other issues at once, all in the same burst). */
+function groupCrossReferences(events: TimelineEvent[]): TimelineEvent[] {
+  const result: TimelineEvent[] = [];
+  for (const event of events) {
+    const isCrossRef = event.kind === "github_event" && event.ghEvent.event === "cross-referenced";
+    const prev = result[result.length - 1];
+    if (isCrossRef && event.kind === "github_event") {
+      const ref: CrossReferencedRef = {
+        number: event.ghEvent.source_issue_number ?? 0,
+        title: event.ghEvent.source_issue_title ?? "",
+        state: event.ghEvent.source_issue_state ?? "open",
+        isPullRequest: event.ghEvent.source_issue_is_pull_request ?? false,
+        htmlUrl: event.ghEvent.source_issue_html_url,
+      };
+      if (
+        prev?.kind === "cross_referenced_group" &&
+        prev.actorLogin === event.ghEvent.actor_login
+      ) {
+        prev.refs.push(ref);
+        prev.timestamp = event.timestamp;
+        continue;
+      }
+      result.push({
+        kind: "cross_referenced_group",
+        timestamp: event.timestamp,
+        actorLogin: event.ghEvent.actor_login,
+        actorAvatarUrl: event.ghEvent.actor_avatar_url,
+        refs: [ref],
+      });
+      continue;
+    }
+    result.push(event);
+  }
+  return result;
 }
 
 /** Index of the "merged" event in a chronologically-sorted event list, or -1 if there isn't

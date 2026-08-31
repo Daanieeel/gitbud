@@ -195,9 +195,22 @@ export type DiffAlgorithm = "myers" | "minimal" | "patience";
 export type SidebarSort = "name" | "recent" | "group" | "manual";
 export type OpenPrAfterCreation = "in-app" | "provider";
 export type CacheLevel = "none" | "minimal" | "balanced" | "relaxed";
+/** "european"/"american" are explicit, translation-free numeric conventions (dd.MM.yyyy vs
+ * MM/dd/yyyy, or 24-hour vs 12-hour) — the displayed words stay in English regardless of which
+ * time zone is selected. "timezone" instead derives the convention (and the actual language —
+ * e.g. German month names for a German zone) from the selected time zone's own country, via
+ * `localeForTimezone`. Independent per axis: date and time formatting don't have to agree. */
+export type DateFormatMode = "european" | "american" | "timezone";
+export type TimeFormatMode = "european" | "american" | "timezone";
 
 export interface Settings {
   theme: ThemeMode;
+  /** An IANA time zone name (e.g. "America/New_York"), or the sentinel `"system"` meaning
+   * "whatever the OS/browser resolves as local" — the latter is the default so a fresh install
+   * needs no explicit machine-specific value written to disk. */
+  timezone: string;
+  date_format: DateFormatMode;
+  time_format: TimeFormatMode;
   default_clone_dir: string | null;
   git_name: string | null;
   git_email: string | null;
@@ -400,6 +413,57 @@ export interface IssueSummary {
   state: string;
 }
 
+/** An issue this PR will close on merge, as GitHub itself computes it (`closingIssuesReferences`)
+ * — includes issues linked purely via a branch-to-issue connection with no closing keyword
+ * anywhere in the PR body, which `IssueSummary`-based body-text parsing alone can't detect. */
+export interface ClosingIssueRef {
+  number: number;
+  title: string;
+  state: string;
+  repo_owner: string;
+  repo_name: string;
+}
+
+/** A full GitHub issue, for the Issues tab — `IssueSummary` above stays lean, for the PR
+ * sidebar's "link an issue" picker only. */
+export interface Issue {
+  number: number;
+  title: string;
+  body: string | null;
+  state: string;
+  state_reason: string | null;
+  html_url: string;
+  author_login: string;
+  author_avatar_url: string;
+  labels: string[];
+  assignees: AssignableUser[];
+  milestone: Milestone | null;
+  locked: boolean;
+  active_lock_reason: string | null;
+  comments: number;
+  created_at: string;
+}
+
+/** A lightweight issue reference for relationship chips — same three fields as `IssueSummary`,
+ * just sourced from `github_get_issue_relationships`'s GraphQL response. */
+export interface IssueRef {
+  number: number;
+  title: string;
+  state: string;
+}
+
+export interface LinkedBranch {
+  id: string;
+  name: string;
+}
+
+export interface IssueRelationships {
+  parent: IssueRef | null;
+  blocked_by: IssueRef[];
+  blocking: IssueRef[];
+  linked_branches: LinkedBranch[];
+}
+
 export interface BranchProtectionRequirements {
   required_contexts: string[];
   required_approving_review_count: number | null;
@@ -422,4 +486,7 @@ export interface IssueTimelineEvent {
   source_issue_state: string | null;
   source_issue_html_url: string | null;
   source_issue_repo_full_name: string | null;
+  /** Only set for a `cross-referenced` event — whether the mentioning item is a pull request
+   * (vs. a plain issue), so grouped mentions can say "N pull requests" vs "N issues". */
+  source_issue_is_pull_request: boolean | null;
 }

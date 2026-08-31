@@ -48,6 +48,8 @@ export const queryKeys = {
     ["pr-commits", repoPath, login, number, headSha] as const,
   commitDiffFiles: (repoPath: string, login: string, sha: string) =>
     ["pr-commit-diff-files", repoPath, login, sha] as const,
+  // Shared with the Issues tab too (an issue and PR number are the same GitHub "issue" object
+  // for comments/timeline purposes, and never collide since they share one per-repo counter).
   prIssueComments: (repoPath: string, login: string, number: number) =>
     ["pr-issue-comments", repoPath, login, number] as const,
   prTimelineEvents: (repoPath: string, login: string, number: number) =>
@@ -65,11 +67,19 @@ export const queryKeys = {
   repoIssues: (repoPath: string, login: string) => ["repo-issues", repoPath, login] as const,
   milestones: (repoPath: string, login: string) => ["milestones", repoPath, login] as const,
   projects: (repoPath: string, login: string) => ["projects", repoPath, login] as const,
-  issueStates: (repoPath: string, login: string, numbers: number[]) =>
-    ["issue-states", repoPath, login, numbers] as const,
+  closingIssues: (repoPath: string, login: string, number: number) =>
+    ["closing-issues", repoPath, login, number] as const,
   branchProtection: (repoPath: string, login: string, branch: string) =>
     ["branch-protection", repoPath, login, branch] as const,
   prArchived: (repoPath: string, number: number) => ["pr-archived", repoPath, number] as const,
   compare: (repoPath: string, login: string, base: string, head: string) =>
     ["pr-compare", repoPath, login, base, head] as const,
+
+  // Issues tab.
+  issueList: (repoPath: string, login: string, filter: string) =>
+    ["issue-list", repoPath, login, filter] as const,
+  issueMeta: (repoPath: string, login: string, number: number) =>
+    ["issue-meta", repoPath, login, number] as const,
+  issueRelationships: (repoPath: string, login: string, number: number) =>
+    ["issue-relationships", repoPath, login, number] as const,
 };

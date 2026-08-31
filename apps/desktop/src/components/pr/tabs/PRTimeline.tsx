@@ -13,6 +13,9 @@ interface PRTimelineProps {
   onDeleteComment: (commentId: number) => void;
   isMerged: boolean;
   isClosedNotMerged: boolean;
+  onSelectCommit: (sha: string) => void;
+  onQuoteReply: (text: string) => void;
+  entityNoun: "pull request" | "issue";
 }
 
 export function PRTimeline({
@@ -25,6 +28,9 @@ export function PRTimeline({
   onDeleteComment,
   isMerged,
   isClosedNotMerged,
+  onSelectCommit,
+  onQuoteReply,
+  entityNoun,
 }: PRTimelineProps) {
   const events = useMemo(
     () => mergeTimeline(comments, reviews, commits, ghEvents),
@@ -57,7 +63,9 @@ export function PRTimeline({
               ? `review:${event.review.id}`
               : event.kind === "github_event"
                 ? `gh:${event.ghEvent.id ?? `${event.ghEvent.event}:${event.timestamp}`}`
-                : `comment:${event.comment.id}`;
+                : event.kind === "cross_referenced_group"
+                  ? `xref:${event.actorLogin}:${event.timestamp}`
+                  : `comment:${event.comment.id}`;
         // The connecting line runs normally up through (and into) the terminal row (merged, or
         // closed-without-merging), then stops — a thicker separator takes its place right after
         // that row instead, and nothing after it is connected to anything.
@@ -73,6 +81,9 @@ export function PRTimeline({
               showBottomLine={showBottomLine}
               onDeleteComment={onDeleteComment}
               isTerminalClosed={i === terminalIndex && terminalKind === "closed"}
+              onSelectCommit={onSelectCommit}
+              onQuoteReply={onQuoteReply}
+              entityNoun={entityNoun}
             />
             {i === terminalIndex && i < events.length - 1 && (
               <div

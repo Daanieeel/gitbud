@@ -6,6 +6,7 @@ import { TabBar } from "@/components/layout/TabBar";
 import { ChangesTab } from "@/components/changes/ChangesTab";
 import { HistoryTab } from "@/components/history/HistoryTab";
 import { PRTab } from "@/components/pr/PRTab";
+import { IssueTab } from "@/components/issue/IssueTab";
 import { UpstreamBanner } from "@/components/pr/UpstreamBanner";
 import { CommandPalette } from "@/components/palette/CommandPalette";
 import { ResolveDivergedPullDialog } from "@/components/repo/ResolveDivergedPullDialog";
@@ -176,6 +177,7 @@ function App() {
                       {activeTab === "changes" && <ChangesTab />}
                       {activeTab === "history" && <HistoryTab />}
                       {activeTab === "pulls" && <PRTab />}
+                      {activeTab === "issues" && <IssueTab />}
                     </div>
                   </>
                 ) : (

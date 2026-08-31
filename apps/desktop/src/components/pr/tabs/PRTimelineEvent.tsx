@@ -1,6 +1,7 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   CheckCircle2Icon,
+  ExternalLinkIcon,
   GitCommitHorizontalIcon,
   GitMergeIcon,
   GitPullRequestArrowIcon,
@@ -19,7 +20,7 @@ import { TimelineCommentMenu } from "./TimelineCommentMenu";
 import { RelativeTime } from "../RelativeTime";
 import { CIBadge } from "../CIBadge";
 import { CommitVerificationBadge } from "../CommitVerificationBadge";
-import { usePRStore } from "@/store/usePRStore";
+import { LabelChip } from "../LabelChip";
 import type { TimelineEvent } from "@/lib/prTimeline";
 import type { IssueTimelineEvent } from "@/lib/types";
 
@@ -35,18 +36,20 @@ const REVIEW_VERDICT = {
 } satisfies Record<string, { label: string; Icon: typeof CheckCircle2Icon; color: string }>;
 
 const GITHUB_EVENT_LABEL = {
-  labeled: (e: IssueTimelineEvent) => `added the ${e.label_name ?? "?"} label`,
-  unlabeled: (e: IssueTimelineEvent) => `removed the ${e.label_name ?? "?"} label`,
+  // `labeled`/`unlabeled` are rendered as their own branch below (a colored `LabelChip`, not
+  // plain text) so they never reach this table's generic string rendering.
   assigned: (e: IssueTimelineEvent) => `assigned ${e.assignee_login ?? "someone"}`,
   unassigned: (e: IssueTimelineEvent) => `unassigned ${e.assignee_login ?? "someone"}`,
   review_requested: (e: IssueTimelineEvent) =>
     `requested review from ${e.requested_reviewer_login ?? "someone"}`,
   review_request_removed: (e: IssueTimelineEvent) =>
     `removed the review request for ${e.requested_reviewer_login ?? "someone"}`,
-  closed: () => "closed this pull request",
-  reopened: () => "reopened this pull request",
+  // `closed`/`reopened` fire for both PRs and issues (issues never produce `merged`) — the noun
+  // is parameterized so this table is shared between both tabs' timelines.
+  closed: (_e: IssueTimelineEvent, noun: string) => `closed this ${noun}`,
+  reopened: (_e: IssueTimelineEvent, noun: string) => `reopened this ${noun}`,
   merged: () => "merged this pull request",
-} satisfies Record<string, (e: IssueTimelineEvent) => string>;
+} satisfies Record<string, (e: IssueTimelineEvent, noun: string) => string>;
 
 const GITHUB_EVENT_ICON = {
   labeled: TagIcon,
@@ -89,6 +92,13 @@ interface PRTimelineEventProps {
    * only the live-current one (PR closed and not merged, with no later reopen) gets the
    * destructive emphasis + line-stop treatment. */
   isTerminalClosed: boolean;
+  /** Jumps to the Commits tab with this sha selected — only ever invoked by the `commit` branch
+   * below, which never renders for an issue timeline (issues have no commits). */
+  onSelectCommit: (sha: string) => void;
+  onQuoteReply: (text: string) => void;
+  /** "pull request" or "issue" — parameterizes the `closed`/`reopened` event wording so this
+   * component is shared between both tabs' timelines. */
+  entityNoun: "pull request" | "issue";
 }
 
 export function PRTimelineEvent({
@@ -99,9 +109,10 @@ export function PRTimelineEvent({
   showBottomLine,
   onDeleteComment,
   isTerminalClosed,
+  onSelectCommit,
+  onQuoteReply,
+  entityNoun,
 }: PRTimelineEventProps) {
-  const selectCommit = usePRStore((s) => s.selectCommit);
-
   if (event.kind === "commit") {
     const { commit } = event;
     return (
@@ -124,7 +135,7 @@ export function PRTimelineEvent({
           <CommitVerificationBadge repoPath={repoPath} login={login} sha={commit.sha} />
           <button
             type="button"
-            onClick={() => selectCommit(commit.sha)}
+            onClick={() => onSelectCommit(commit.sha)}
             className="shrink-0 rounded bg-secondary px-1.5 py-0.5 font-mono text-secondary-foreground hover:text-foreground"
           >
             {commit.sha.slice(0, 7)}
@@ -151,12 +162,89 @@ export function PRTimelineEvent({
             <span className="text-muted-foreground">{verdict.label}</span>
             <span className="ml-auto flex shrink-0 items-center gap-2 text-muted-foreground">
               {event.timestamp && <RelativeTime iso={event.timestamp} />}
-              <TimelineCommentMenu htmlUrl={review.html_url} body={review.body} />
+              <TimelineCommentMenu
+                htmlUrl={review.html_url}
+                body={review.body}
+                onQuoteReply={onQuoteReply}
+              />
             </span>
           </div>
           {review.body && <Markdown content={review.body} />}
         </div>
       </TimelineRow>
+    );
+  }
+
+  if (event.kind === "cross_referenced_group") {
+    const { refs, actorLogin, actorAvatarUrl } = event;
+    const prCount = refs.filter((r) => r.isPullRequest).length;
+    const issueCount = refs.length - prCount;
+    const noun =
+      issueCount === 0
+        ? prCount === 1
+          ? "pull request"
+          : "pull requests"
+        : prCount === 0
+          ? issueCount === 1
+            ? "issue"
+            : "issues"
+          : "issues and pull requests";
+    // Rendered as two stacked pieces rather than one `TimelineRow` with tall multi-line content:
+    // `TimelineRow`'s icon-centering math (see its own doc comment) assumes the content is a
+    // single line plus a trailing `pb-4` gap — it aligns correctly only because a one-line row's
+    // total height reduces to exactly that. Feeding it the whole header+list block here would
+    // center the icon over the *entire* height (title + every ref row), dragging it down well
+    // below the title as the list grows. Splitting the title into its own `TimelineRow` gets the
+    // proven single-line alignment for free; the ref list continues the same rail manually below
+    // it, only as far down as `showBottomLine` (whether another timeline row follows).
+    return (
+      <>
+        <TimelineRow
+          icon={<ExternalLinkIcon className="size-3.5 text-muted-foreground" />}
+          showTopLine={showTopLine}
+          showBottomLine
+        >
+          <div className="flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground">
+            {actorAvatarUrl && (
+              <Avatar src={actorAvatarUrl} alt={actorLogin ?? ""} className="size-4" />
+            )}
+            <span className="font-medium text-foreground">{actorLogin ?? "someone"}</span>
+            <span>
+              mentioned this in {refs.length} {noun}
+            </span>
+            {event.timestamp && <RelativeTime iso={event.timestamp} className="ml-auto shrink-0" />}
+          </div>
+        </TimelineRow>
+        <div className="flex gap-3">
+          <div className="flex w-6 shrink-0 flex-col items-center">
+            {showBottomLine && <div className="w-px flex-1 bg-border" />}
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5 pb-4 text-xs">
+            {refs.map((ref) => {
+              const closed = ref.state === "closed" || ref.state === "merged";
+              return (
+                <div key={ref.number} className="flex items-center gap-2 pl-1">
+                  <span
+                    className={`size-2 shrink-0 rounded-full border-2 ${
+                      closed ? "border-accent-purple" : "border-accent-green"
+                    }`}
+                  />
+                  <a
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (ref.htmlUrl) void openUrl(ref.htmlUrl);
+                    }}
+                    className="min-w-0 truncate text-foreground underline hover:text-primary"
+                  >
+                    {ref.title} <span className="text-muted-foreground">#{ref.number}</span>
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </>
     );
   }
 
@@ -210,10 +298,39 @@ export function PRTimelineEvent({
       );
     }
 
+    if (ghEvent.event === "labeled" || ghEvent.event === "unlabeled") {
+      const added = ghEvent.event === "labeled";
+      return (
+        <TimelineRow
+          icon={<TagIcon className="size-3.5 text-muted-foreground" />}
+          showTopLine={showTopLine}
+          showBottomLine={showBottomLine}
+        >
+          <div className="flex flex-wrap items-center gap-1.5 py-0.5 text-xs text-muted-foreground">
+            {ghEvent.actor_avatar_url && (
+              <Avatar
+                src={ghEvent.actor_avatar_url}
+                alt={ghEvent.actor_login ?? ""}
+                className="size-4"
+              />
+            )}
+            <span className="font-medium text-foreground">{ghEvent.actor_login ?? "someone"}</span>
+            <span>{added ? "added label" : "removed label"}</span>
+            <LabelChip name={ghEvent.label_name ?? "?"} color={ghEvent.label_color ?? undefined} />
+            {event.timestamp && <RelativeTime iso={event.timestamp} className="ml-auto shrink-0" />}
+          </div>
+        </TimelineRow>
+      );
+    }
+
     const isMerged = ghEvent.event === "merged";
     const isEmphasized = isMerged || isTerminalClosed;
     const iconColor = lookup(GITHUB_EVENT_COLOR, ghEvent.event, "text-muted-foreground");
-    const label = lookup(GITHUB_EVENT_LABEL, ghEvent.event, () => ghEvent.event)(ghEvent);
+    const label = lookup(
+      GITHUB_EVENT_LABEL,
+      ghEvent.event,
+      () => ghEvent.event,
+    )(ghEvent, entityNoun);
     const Icon = lookup(GITHUB_EVENT_ICON, ghEvent.event, MessageSquareIcon);
     return (
       <TimelineRow
@@ -264,6 +381,7 @@ export function PRTimelineEvent({
               onDelete={
                 comment.user_login === login ? () => onDeleteComment(comment.id) : undefined
               }
+              onQuoteReply={onQuoteReply}
             />
           </span>
         </div>
