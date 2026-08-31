@@ -1,3 +1,4 @@
+use crate::process_ext::NoWindowExt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::Path;
@@ -54,6 +55,7 @@ pub fn check_lfs_files(repo_path: &str, paths: &[String]) -> Result<Vec<LfsFileI
         .arg("filter")
         .arg("--")
         .args(paths)
+        .no_window()
         .output()
         .map_err(|e| e.to_string())?;
     let text = String::from_utf8_lossy(&output.stdout);

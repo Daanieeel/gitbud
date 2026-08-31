@@ -10,6 +10,7 @@ mod image_diff;
 mod lfs;
 mod merge3;
 mod pr_cache;
+mod process_ext;
 mod rebase;
 mod reflog;
 mod repo;

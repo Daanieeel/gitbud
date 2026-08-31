@@ -1,3 +1,4 @@
+use crate::process_ext::NoWindowExt;
 use git2::{Repository, StashFlags};
 use serde::{Deserialize, Serialize};
 
@@ -77,6 +78,7 @@ pub fn stash_apply_file(repo_path: &str, index: usize, path: &str) -> Result<(),
     let output = std::process::Command::new(crate::settings::git_binary())
         .args(["checkout", &format!("stash@{{{index}}}"), "--", path])
         .current_dir(repo_path)
+        .no_window()
         .output()
         .map_err(|e| e.to_string())?;
     if output.status.success() {

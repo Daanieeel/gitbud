@@ -1,3 +1,4 @@
+use crate::process_ext::NoWindowExt;
 use git2::{Config, Repository};
 use std::process::{Command, Output};
 
@@ -51,7 +52,7 @@ fn augmented_path() -> std::ffi::OsString {
 /// Homebrew-installed tools regardless of how GitBud itself was launched.
 pub(crate) fn command_with_path(program: &str) -> Command {
     let mut cmd = Command::new(program);
-    cmd.env("PATH", augmented_path());
+    cmd.env("PATH", augmented_path()).no_window();
     cmd
 }
 
