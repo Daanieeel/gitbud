@@ -17,7 +17,15 @@ export type UnifiedIdentity =
       email: string;
       avatarUrl: string;
     }
-  | { id: string; kind: "ssh"; label: string; host: string; keyPath: string };
+  | {
+      id: string;
+      kind: "ssh";
+      label: string;
+      host: string;
+      keyPath: string;
+      name: string;
+      email: string;
+    };
 
 export function githubIdentityId(login: string): string {
   return `github:${login}`;
@@ -37,7 +45,21 @@ interface IdentityState {
   sshIdentities: SshIdentity[];
   init: () => Promise<void>;
   list: () => UnifiedIdentity[];
-  addSshIdentity: (label: string, host: string, keyPath: string) => Promise<void>;
+  addSshIdentity: (
+    label: string,
+    host: string,
+    keyPath: string,
+    name: string,
+    email: string,
+  ) => Promise<void>;
+  updateSshIdentity: (
+    id: string,
+    label: string,
+    host: string,
+    keyPath: string,
+    name: string,
+    email: string,
+  ) => Promise<void>;
   removeSshIdentity: (id: string) => Promise<void>;
   /** Sets the active identity, either globally (default for repos with no override) or for
    * one specific repo. */
@@ -71,12 +93,19 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
       label: i.label,
       host: i.host,
       keyPath: i.key_path,
+      name: i.name,
+      email: i.email,
     }));
     return [...github, ...ssh];
   },
 
-  addSshIdentity: async (label, host, keyPath) => {
-    const sshIdentities = await api.addSshIdentity(label, host, keyPath);
+  addSshIdentity: async (label, host, keyPath, name, email) => {
+    const sshIdentities = await api.addSshIdentity(label, host, keyPath, name, email);
+    set({ sshIdentities });
+  },
+
+  updateSshIdentity: async (id, label, host, keyPath, name, email) => {
+    const sshIdentities = await api.updateSshIdentity(id, label, host, keyPath, name, email);
     set({ sshIdentities });
   },
 
@@ -142,6 +171,10 @@ export const useIdentityStore = create<IdentityState>((set, get) => ({
         githubEmail(identity),
         override === null,
       );
+    } else if (identity?.kind === "ssh" && identity.name.trim() && identity.email.trim()) {
+      // Identities saved before name/email existed have both blank — leave `user.name`/
+      // `user.email` as whatever they already were rather than overwriting with blanks.
+      await api.setGitIdentity(repoPath, identity.name, identity.email, override === null);
     }
   },
 }));

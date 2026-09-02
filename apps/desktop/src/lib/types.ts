@@ -267,6 +267,11 @@ export interface SshIdentity {
   label: string;
   host: string;
   key_path: string;
+  /** Commit-attributable name/email applied alongside the key when this identity is active.
+   * Empty for identities saved before these fields existed — the app leaves `user.name`/
+   * `user.email` untouched in that case rather than writing blanks. */
+  name: string;
+  email: string;
 }
 
 export interface PullRequest {

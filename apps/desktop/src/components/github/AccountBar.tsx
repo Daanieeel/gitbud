@@ -4,6 +4,7 @@ import {
   KeyRoundIcon,
   LogInIcon,
   MapPinIcon,
+  PencilIcon,
   PlusIcon,
   SettingsIcon,
   TriangleAlertIcon,
@@ -35,7 +36,9 @@ import {
 import { useSettingsStore } from "@/store/useSettingsStore";
 import { useRepoStore } from "@/store/useRepoStore";
 import { useUpdateStore } from "@/store/useUpdateStore";
+import type { SshIdentity } from "@/lib/types";
 import { AddSshIdentityDialog } from "./AddSshIdentityDialog";
+import { EditGitHubIdentityDialog } from "./EditGitHubIdentityDialog";
 import { DeviceFlowDialog } from "./DeviceFlowDialog";
 import { cn } from "@gitbud/ui/utils";
 
@@ -85,6 +88,8 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
         label: i.label,
         host: i.host,
         keyPath: i.key_path,
+        name: i.name,
+        email: i.email,
       })),
     ],
     [accounts, sshIdentities],
@@ -106,6 +111,8 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [reauthing, setReauthing] = useState(false);
+  const [editingSsh, setEditingSsh] = useState<SshIdentity | null>(null);
+  const [editingGithubLogin, setEditingGithubLogin] = useState<string | null>(null);
 
   useEffect(() => {
     void init();
@@ -140,6 +147,15 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
   };
 
   const brokenIdentity = identities.find((i) => i.kind === "github" && i.login === brokenLogin);
+
+  const openEdit = (identity: UnifiedIdentity) => {
+    if (identity.kind === "github") {
+      setEditingGithubLogin(identity.login);
+    } else {
+      const raw = sshIdentities.find((i) => sshIdentityId(i.id) === identity.id);
+      if (raw) setEditingSsh(raw);
+    }
+  };
 
   return (
     <div className="flex shrink-0 flex-col gap-2 border-t border-border p-2">
@@ -315,6 +331,32 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
                     )}
                   </span>
                   <div className="flex shrink-0 items-center gap-1">
+                    {identity.kind === "ssh" && (!identity.name.trim() || !identity.email.trim()) && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="flex shrink-0 items-center justify-center rounded-md bg-accent-yellow/10 p-1.5 text-accent-yellow">
+                            <TriangleAlertIcon className="size-4" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          No commit name/email set — edit to fix commit attribution
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(identity);
+                          }}
+                        >
+                          <PencilIcon className="size-4" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{`Edit ${identityLabel(identity)}`}</TooltipContent>
+                    </Tooltip>
                     {selectedRepo && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -422,6 +464,20 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
         </Tooltip>
       </div>
       <AddSshIdentityDialog open={sshDialogOpen} onOpenChange={setSshDialogOpen} />
+      <AddSshIdentityDialog
+        open={editingSsh !== null}
+        onOpenChange={(next) => {
+          if (!next) setEditingSsh(null);
+        }}
+        identity={editingSsh ?? undefined}
+      />
+      <EditGitHubIdentityDialog
+        open={editingGithubLogin !== null}
+        onOpenChange={(next) => {
+          if (!next) setEditingGithubLogin(null);
+        }}
+        account={accounts.find((a) => a.login === editingGithubLogin)}
+      />
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
       <DeviceFlowDialog />
     </div>

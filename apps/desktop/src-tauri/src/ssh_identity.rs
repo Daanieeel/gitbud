@@ -5,12 +5,21 @@ use std::path::PathBuf;
 /// A plain SSH-key-based git identity: no hosted-provider API, just a host + key pair used
 /// to authenticate git operations over SSH. Complements GitHub accounts in the account
 /// switcher for people who push over SSH to GitHub, GitLab, Bitbucket, or a bare host.
+///
+/// `name`/`email` are the commit-attributable identity to apply alongside the SSH key when
+/// this identity becomes active — empty (the default for identities saved before these fields
+/// existed) means "don't touch `user.name`/`user.email`", since writing blanks would silently
+/// break commit authorship rather than just leaving whatever was there before.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SshIdentity {
     pub id: String,
     pub label: String,
     pub host: String,
     pub key_path: String,
+    #[serde(default)]
+    pub name: String,
+    #[serde(default)]
+    pub email: String,
 }
 
 fn config_dir() -> Result<PathBuf, String> {
@@ -38,7 +47,13 @@ fn save(identities: &[SshIdentity]) -> Result<(), String> {
     fs::write(identities_file()?, contents).map_err(|e| e.to_string())
 }
 
-pub fn add(label: &str, host: &str, key_path: &str) -> Result<Vec<SshIdentity>, String> {
+pub fn add(
+    label: &str,
+    host: &str,
+    key_path: &str,
+    name: &str,
+    email: &str,
+) -> Result<Vec<SshIdentity>, String> {
     let host = host.trim().to_string();
     let key_path = key_path.trim().to_string();
     if host.is_empty() {
@@ -60,6 +75,8 @@ pub fn add(label: &str, host: &str, key_path: &str) -> Result<Vec<SshIdentity>, 
         label,
         host,
         key_path,
+        name: name.trim().to_string(),
+        email: email.trim().to_string(),
     });
     save(&identities)?;
     Ok(identities)
@@ -68,6 +85,42 @@ pub fn add(label: &str, host: &str, key_path: &str) -> Result<Vec<SshIdentity>, 
 pub fn remove(id: &str) -> Result<Vec<SshIdentity>, String> {
     let mut identities = list()?;
     identities.retain(|i| i.id != id);
+    save(&identities)?;
+    Ok(identities)
+}
+
+#[allow(clippy::too_many_arguments)]
+pub fn update(
+    id: &str,
+    label: &str,
+    host: &str,
+    key_path: &str,
+    name: &str,
+    email: &str,
+) -> Result<Vec<SshIdentity>, String> {
+    let host = host.trim().to_string();
+    let key_path = key_path.trim().to_string();
+    if host.is_empty() {
+        return Err("Host is required".to_string());
+    }
+    if key_path.is_empty() {
+        return Err("SSH key path is required".to_string());
+    }
+
+    let mut identities = list()?;
+    let entry = identities
+        .iter_mut()
+        .find(|i| i.id == id)
+        .ok_or_else(|| "SSH identity not found".to_string())?;
+    entry.label = if label.trim().is_empty() {
+        host.clone()
+    } else {
+        label.trim().to_string()
+    };
+    entry.host = host;
+    entry.key_path = key_path;
+    entry.name = name.trim().to_string();
+    entry.email = email.trim().to_string();
     save(&identities)?;
     Ok(identities)
 }

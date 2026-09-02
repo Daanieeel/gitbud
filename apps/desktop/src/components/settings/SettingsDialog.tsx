@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDownAZIcon,
   ColumnsIcon,
@@ -14,10 +14,13 @@ import {
   GripVerticalIcon,
   HistoryIcon,
   HourglassIcon,
+  KeyRoundIcon,
   Minimize2Icon,
   MonitorIcon,
   MoonIcon,
   PanelLeftIcon,
+  PencilIcon,
+  PlusIcon,
   RowsIcon,
   SaveIcon,
   SettingsIcon,
@@ -26,7 +29,10 @@ import {
   SlidersHorizontalIcon,
   SunIcon,
   Trash2Icon,
+  TriangleAlertIcon,
   UploadIcon,
+  UsersRoundIcon,
+  XIcon,
   ZapIcon,
 } from "lucide-react";
 import { save, open as openFileDialog } from "@tauri-apps/plugin-dialog";
@@ -38,10 +44,22 @@ import { Checkbox } from "@gitbud/ui/checkbox";
 import { Popover, PopoverContent, PopoverTrigger } from "@gitbud/ui/popover";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@gitbud/ui/dialog";
 import { relaunch } from "@tauri-apps/plugin-process";
-import { GitHubMark } from "@gitbud/ui/brand-logo";
+import { GitHubMark, GitLabMark, BitbucketMark } from "@gitbud/ui/brand-logo";
+import { Badge } from "@gitbud/ui/badge";
+import { Avatar } from "@gitbud/ui/avatar";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@gitbud/ui/dropdown-menu";
 import { UpdateChecker } from "./UpdateChecker";
 import { SigningSetupDialog } from "./SigningSetupDialog";
 import { EditorPicker } from "./EditorPicker";
+import { AddSshIdentityDialog } from "@/components/github/AddSshIdentityDialog";
+import { EditGitHubIdentityDialog } from "@/components/github/EditGitHubIdentityDialog";
 import { CUSTOM_EDITOR_ID, customEditorName, findEditor } from "@/lib/editors";
 import { useCustomEditorIcon } from "@/hooks/queries/useCustomEditorIcon";
 import Flag from "react-flagpack";
@@ -52,6 +70,12 @@ import { countryForTimezone, countryNameForTimezone, flagAssetCode } from "@/lib
 import { SingleSelectField, type SingleSelectOption } from "@/components/pr/SingleSelectField";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useRepoStore } from "@/store/useRepoStore";
+import {
+  useIdentityStore,
+  githubIdentityId,
+  sshIdentityId,
+  type UnifiedIdentity,
+} from "@/store/useIdentityStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@gitbud/ui/utils";
 import { Slider } from "@gitbud/ui/slider";
@@ -65,12 +89,14 @@ import type {
   PullStrategy,
   SidebarSort,
   SigningStatus,
+  SshIdentity,
   ThemeMode,
   TimeFormatMode,
 } from "@/lib/types";
 
 const SECTIONS = [
   { key: "General", icon: SettingsIcon },
+  { key: "Profiles", icon: UsersRoundIcon },
   { key: "Git", icon: GitBranchIcon },
   { key: "Diff", icon: ColumnsIcon },
   { key: "Sidebar", icon: PanelLeftIcon },
@@ -394,6 +420,61 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
   const [signingStatus, setSigningStatus] = useState<SigningStatus | null>(null);
   const [signingDialogOpen, setSigningDialogOpen] = useState(false);
 
+  const accounts = useGitHubStore((s) => s.accounts);
+  const brokenLogin = useGitHubStore((s) => s.brokenLogin);
+  const removeAccount = useGitHubStore((s) => s.removeAccount);
+  const reauth = useGitHubStore((s) => s.reauth);
+  const sshIdentities = useIdentityStore((s) => s.sshIdentities);
+  const removeSshIdentity = useIdentityStore((s) => s.removeSshIdentity);
+  const setActiveIdentity = useIdentityStore((s) => s.setActive);
+  const defaultIdentityId = useSettingsStore((s) => s.settings.default_identity_id);
+  const identities = useMemo<UnifiedIdentity[]>(
+    () => [
+      ...accounts.map((a) => ({
+        id: githubIdentityId(a.login),
+        kind: "github" as const,
+        login: a.login,
+        name: a.name,
+        email: a.email,
+        avatarUrl: a.avatar_url,
+      })),
+      ...sshIdentities.map((i) => ({
+        id: sshIdentityId(i.id),
+        kind: "ssh" as const,
+        label: i.label,
+        host: i.host,
+        keyPath: i.key_path,
+        name: i.name,
+        email: i.email,
+      })),
+    ],
+    [accounts, sshIdentities],
+  );
+  const [profileSshDialogOpen, setProfileSshDialogOpen] = useState(false);
+  const [editingSsh, setEditingSsh] = useState<SshIdentity | null>(null);
+  const [editingGithubLogin, setEditingGithubLogin] = useState<string | null>(null);
+  const [removingIdentityId, setRemovingIdentityId] = useState<string | null>(null);
+  const [reauthingLogin, setReauthingLogin] = useState<string | null>(null);
+
+  const openEditIdentity = (identity: UnifiedIdentity) => {
+    if (identity.kind === "github") {
+      setEditingGithubLogin(identity.login);
+    } else {
+      const raw = sshIdentities.find((i) => sshIdentityId(i.id) === identity.id);
+      if (raw) setEditingSsh(raw);
+    }
+  };
+
+  const removeIdentity = async (identity: UnifiedIdentity) => {
+    setRemovingIdentityId(identity.id);
+    try {
+      if (identity.kind === "github") await removeAccount(identity.login);
+      else await removeSshIdentity(identity.id.replace(/^ssh:/, ""));
+    } finally {
+      setRemovingIdentityId(null);
+    }
+  };
+
   useEffect(() => {
     if (!open) return;
     void api.githubGetHost().then(setHost);
@@ -710,6 +791,193 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       </div>
                     </div>
                   </div>
+                </>
+              )}
+
+              {section === "Profiles" && (
+                <>
+                  <p className="pb-2 text-xs text-muted-foreground">
+                    Each profile is a git identity — a GitHub account or a plain SSH key — with
+                    its own commit name and email. Switch between them from the account switcher
+                    in the sidebar, or set a default here for people with multiple git profiles
+                    (work, private, a second job, …) on the same machine.
+                  </p>
+                  {identities.length === 0 && (
+                    <p className="pb-2 text-xs text-muted-foreground">No profiles yet.</p>
+                  )}
+                  <div className="flex flex-col gap-1.5">
+                    {identities.map((identity) => {
+                      const isDefault = defaultIdentityId === identity.id;
+                      const isBroken =
+                        identity.kind === "github" && identity.login === brokenLogin;
+                      const missingCommitIdentity =
+                        identity.kind === "ssh" &&
+                        (!identity.name.trim() || !identity.email.trim());
+                      return (
+                        <div
+                          key={identity.id}
+                          className={cn(
+                            "flex items-center gap-2.5 rounded-md border border-border px-2.5 py-2 text-sm",
+                            isDefault && "border-accent-blue/40 bg-accent-blue/5",
+                          )}
+                        >
+                          {identity.kind === "github" ? (
+                            <Avatar src={identity.avatarUrl} alt="" className="size-7" />
+                          ) : (
+                            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-yellow/20 text-accent-yellow">
+                              <KeyRoundIcon className="size-3.5" />
+                            </span>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="truncate font-medium">
+                                {identity.kind === "github" ? identity.login : identity.label}
+                              </span>
+                              {isDefault && <Badge className="shrink-0">Default</Badge>}
+                            </div>
+                            <div className="truncate text-xs text-muted-foreground">
+                              {identity.kind === "github"
+                                ? (identity.email || `${identity.login}@users.noreply.github.com`)
+                                : `${identity.host} · ${identity.name.trim() || "no commit name set"} <${identity.email.trim() || "no email set"}>`}
+                            </div>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            {isBroken ? (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    disabled={reauthingLogin === identity.login}
+                                    onClick={() => {
+                                      setReauthingLogin(identity.login);
+                                      void reauth(identity.login).finally(() =>
+                                        setReauthingLogin(null),
+                                      );
+                                    }}
+                                  >
+                                    <TriangleAlertIcon className="size-3.5 text-destructive" />
+                                    Reconnect
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  Token missing from the system keychain
+                                </TooltipContent>
+                              </Tooltip>
+                            ) : (
+                              <>
+                                {missingCommitIdentity && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="flex shrink-0 items-center justify-center rounded-md bg-accent-yellow/10 p-1.5 text-accent-yellow">
+                                        <TriangleAlertIcon className="size-4" />
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      No commit name/email set — edit to fix commit attribution
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                                {!isDefault && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        className="shrink-0 rounded-md px-2 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                                        onClick={() => void setActiveIdentity(identity.id)}
+                                      >
+                                        Set as default
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      Use as the default identity for repos with no per-repo
+                                      override
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                                      onClick={() => openEditIdentity(identity)}
+                                    >
+                                      <PencilIcon className="size-4" />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Edit</TooltipContent>
+                                </Tooltip>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <button
+                                      className="shrink-0 rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                                      disabled={removingIdentityId !== null}
+                                      onClick={() => void removeIdentity(identity)}
+                                    >
+                                      <XIcon
+                                        className={cn(
+                                          "size-4",
+                                          removingIdentityId === identity.id && "animate-spin",
+                                        )}
+                                      />
+                                    </button>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Remove</TooltipContent>
+                                </Tooltip>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="pt-2">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="secondary" size="sm">
+                          <PlusIcon className="size-3.5" />
+                          Add profile
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start">
+                        <DropdownMenuItem disabled>
+                          <BitbucketMark className="size-3.5" />
+                          Bitbucket
+                          <Badge className="ml-auto">Coming soon</Badge>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => void useGitHubStore.getState().startSignIn()}>
+                          <GitHubMark className="size-3.5" />
+                          GitHub
+                        </DropdownMenuItem>
+                        <DropdownMenuItem disabled>
+                          <GitLabMark className="size-3.5" />
+                          GitLab
+                          <Badge className="ml-auto">Coming soon</Badge>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => setProfileSshDialogOpen(true)}>
+                          <KeyRoundIcon className="size-3.5" />
+                          SSH identity
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <AddSshIdentityDialog
+                    open={profileSshDialogOpen}
+                    onOpenChange={setProfileSshDialogOpen}
+                  />
+                  <AddSshIdentityDialog
+                    open={editingSsh !== null}
+                    onOpenChange={(next) => {
+                      if (!next) setEditingSsh(null);
+                    }}
+                    identity={editingSsh ?? undefined}
+                  />
+                  <EditGitHubIdentityDialog
+                    open={editingGithubLogin !== null}
+                    onOpenChange={(next) => {
+                      if (!next) setEditingGithubLogin(null);
+                    }}
+                    account={accounts.find((a) => a.login === editingGithubLogin)}
+                  />
                 </>
               )}
 
