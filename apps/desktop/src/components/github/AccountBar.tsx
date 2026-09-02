@@ -331,18 +331,19 @@ export function AccountBar({ collapsed }: { collapsed?: boolean } = {}) {
                     )}
                   </span>
                   <div className="flex shrink-0 items-center gap-1">
-                    {identity.kind === "ssh" && (!identity.name.trim() || !identity.email.trim()) && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span className="flex shrink-0 items-center justify-center rounded-md bg-accent-yellow/10 p-1.5 text-accent-yellow">
-                            <TriangleAlertIcon className="size-4" />
-                          </span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          No commit name/email set — edit to fix commit attribution
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
+                    {identity.kind === "ssh" &&
+                      (!identity.name.trim() || !identity.email.trim()) && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="flex shrink-0 items-center justify-center rounded-md bg-accent-yellow/10 p-1.5 text-accent-yellow">
+                              <TriangleAlertIcon className="size-4" />
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            No commit name/email set — edit to fix commit attribution
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button

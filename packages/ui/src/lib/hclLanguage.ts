@@ -46,8 +46,7 @@ export default function hcl(hljs: HLJSApi): Language {
         className: "title.function",
         begin: new RegExp(`^[ \\t]*${IDENTIFIER.source}(?=\\s+"|\\s*\\{)`),
         keywords: {
-          keyword:
-            "resource data variable output module provider terraform locals dynamic",
+          keyword: "resource data variable output module provider terraform locals dynamic",
         },
       },
       {

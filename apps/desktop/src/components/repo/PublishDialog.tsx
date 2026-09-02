@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type ComponentProps,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { CloudUploadIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
@@ -20,13 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@gitbud/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@gitbud/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@gitbud/ui/select";
 import { cn } from "@gitbud/ui/utils";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { api } from "@/lib/tauri";
@@ -164,14 +152,10 @@ export function PublishDialog({
         description.trim() || null,
         isPrivate,
       );
-      await runGitSync(
-        repoPath,
-        () => api.gitPublish(repoPath, created.clone_url),
-        {
-          description: `Publishing to ${created.full_name}…`,
-          doneMessage: `Published to ${created.full_name}`,
-        },
-      );
+      await runGitSync(repoPath, () => api.gitPublish(repoPath, created.clone_url), {
+        description: `Publishing to ${created.full_name}…`,
+        doneMessage: `Published to ${created.full_name}`,
+      });
       queryClient.invalidateQueries({ queryKey: queryKeys.repo(repoPath) });
       onPublished();
     } catch (e) {
@@ -181,8 +165,7 @@ export function PublishDialog({
     }
   };
 
-  const submit = () =>
-    useExistingUrl ? submitExisting() : submitNewGithubRepo();
+  const submit = () => (useExistingUrl ? submitExisting() : submitNewGithubRepo());
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -209,10 +192,9 @@ export function PublishDialog({
                   autoFocus
                 />
                 <span className="text-xs text-muted-foreground">
-                  Adds this as the "origin" remote and pushes the current
-                  branch. The remote repository must already exist — works with
-                  any host (GitLab, Bitbucket, Codeberg/Forgejo, self-hosted,
-                  …).
+                  Adds this as the "origin" remote and pushes the current branch. The remote
+                  repository must already exist — works with any host (GitLab, Bitbucket,
+                  Codeberg/Forgejo, self-hosted, …).
                 </span>
               </div>
               <button
@@ -226,17 +208,11 @@ export function PublishDialog({
             </>
           ) : (
             <>
-              <ProviderPicker
-                value={provider}
-                onChange={setProvider}
-                options={PROVIDER_OPTIONS}
-              />
+              <ProviderPicker value={provider} onChange={setProvider} options={PROVIDER_OPTIONS} />
 
               {accounts.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 rounded-md border border-border p-4 text-center">
-                  <p className="text-sm text-muted-foreground">
-                    Not signed in to GitHub.
-                  </p>
+                  <p className="text-sm text-muted-foreground">Not signed in to GitHub.</p>
                   <Button size="sm" variant="secondary" onClick={openSignIn}>
                     Sign in to GitHub
                   </Button>
@@ -245,13 +221,8 @@ export function PublishDialog({
                 <>
                   {accounts.length > 1 && (
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-xs font-medium text-muted-foreground">
-                        Account
-                      </span>
-                      <Select
-                        value={login ?? undefined}
-                        onValueChange={setLogin}
-                      >
+                      <span className="text-xs font-medium text-muted-foreground">Account</span>
+                      <Select value={login ?? undefined} onValueChange={setLogin}>
                         <SelectTrigger className="w-full border-input bg-accent font-normal hover:bg-accent/80 hover:text-accent-foreground">
                           <SelectValue placeholder="Choose an account" />
                         </SelectTrigger>
@@ -268,20 +239,13 @@ export function PublishDialog({
 
                   <div className="flex flex-col gap-1.5">
                     <span className="text-xs font-medium text-muted-foreground">
-                      Repository name{" "}
-                      <span className="text-destructive">*</span>
+                      Repository name <span className="text-destructive">*</span>
                     </span>
-                    <Input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      autoFocus
-                    />
+                    <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Description
-                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">Description</span>
                     <AutoGrowTextarea
                       placeholder="What's this repository about?"
                       value={description}
@@ -291,9 +255,7 @@ export function PublishDialog({
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Visibility
-                    </span>
+                    <span className="text-xs font-medium text-muted-foreground">Visibility</span>
                     <CardPicker
                       value={isPrivate ? "private" : "public"}
                       onChange={(v) => setIsPrivate(v === "private")}

@@ -39,9 +39,7 @@ const pendingLoads = new Map<string, Promise<void>>();
  * promise that resolves once `highlightLine` can actually use it, or `undefined` if it's already
  * loaded/unsupported. Callers re-render once the promise resolves; `highlightLine` itself stays
  * synchronous and just renders plain (unhighlighted) text until then. */
-export function ensureLanguageLoaded(
-  language: string | undefined,
-): Promise<void> | undefined {
+export function ensureLanguageLoaded(language: string | undefined): Promise<void> | undefined {
   if (!language || loadedLanguages.has(language)) return undefined;
   const existing = pendingLoads.get(language);
   if (existing) return existing;
@@ -50,10 +48,7 @@ export function ensureLanguageLoaded(
   const pending = loader().then((mod) => {
     // SAFETY: every entry in LANGUAGE_LOADERS is a highlight.js language grammar module (see the
     // list above) — hljs guarantees each one's `default` export is a LanguageFn.
-    hljs.registerLanguage(
-      language,
-      mod.default as Parameters<typeof hljs.registerLanguage>[1],
-    );
+    hljs.registerLanguage(language, mod.default as Parameters<typeof hljs.registerLanguage>[1]);
     loadedLanguages.add(language);
   });
   pendingLoads.set(language, pending);
@@ -114,32 +109,21 @@ export function languageForPath(path: string): string | undefined {
  * extensions, so this reuses the same lookup table `languageForPath` does, falling back to the
  * token itself when it already names one of `LANGUAGE_LOADERS`' keys directly (e.g. "typescript",
  * "python" — markdown fences commonly spell out the full name instead of the short extension). */
-export function languageForToken(
-  token: string | undefined,
-): string | undefined {
+export function languageForToken(token: string | undefined): string | undefined {
   if (!token) return undefined;
   const lowered = token.toLowerCase();
-  return (
-    lookup(EXT_TO_LANG, lowered) ??
-    (lowered in LANGUAGE_LOADERS ? lowered : undefined)
-  );
+  return lookup(EXT_TO_LANG, lowered) ?? (lowered in LANGUAGE_LOADERS ? lowered : undefined);
 }
 
 function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 /** Highlights a single line in isolation — loses cross-line grammar state (e.g. mid
  * multi-line comment/string) like most diff viewers' per-line highlighting does. Renders as
  * plain escaped text if `language`'s grammar hasn't finished loading yet (see
  * `ensureLanguageLoaded`); callers trigger that and re-render once it resolves. */
-export function highlightLine(
-  content: string,
-  language: string | undefined,
-): string {
+export function highlightLine(content: string, language: string | undefined): string {
   if (!language || !loadedLanguages.has(language)) return escapeHtml(content);
   try {
     return hljs.highlight(content, { language, ignoreIllegals: true }).value;
@@ -151,10 +135,7 @@ export function highlightLine(
 /** Same idea as `highlightLine`, but for a whole fenced code block at once (markdown rendering)
  * rather than one diff line in isolation — keeps cross-line grammar state, unlike the per-line
  * version. Renders as plain escaped text until `language`'s grammar finishes loading. */
-export function highlightBlock(
-  code: string,
-  language: string | undefined,
-): string {
+export function highlightBlock(code: string, language: string | undefined): string {
   if (!language || !loadedLanguages.has(language)) return escapeHtml(code);
   try {
     return hljs.highlight(code, { language, ignoreIllegals: true }).value;
@@ -192,12 +173,9 @@ export function applyHighlightRanges(
   let i = 0;
 
   const isInRange = () => {
-    while (rangeIdx < sorted.length && sorted[rangeIdx][1] <= textPos)
-      rangeIdx++;
+    while (rangeIdx < sorted.length && sorted[rangeIdx][1] <= textPos) rangeIdx++;
     return (
-      rangeIdx < sorted.length &&
-      sorted[rangeIdx][0] <= textPos &&
-      textPos < sorted[rangeIdx][1]
+      rangeIdx < sorted.length && sorted[rangeIdx][0] <= textPos && textPos < sorted[rangeIdx][1]
     );
   };
 

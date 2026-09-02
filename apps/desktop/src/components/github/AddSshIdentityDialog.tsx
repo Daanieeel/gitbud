@@ -146,12 +146,12 @@ export function AddSshIdentityDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <KeyRoundIcon className="size-5" /> {isEditing ? "Edit SSH Identity" : "Add SSH Identity"}
+            <KeyRoundIcon className="size-5" />{" "}
+            {isEditing ? "Edit SSH Identity" : "Add SSH Identity"}
           </DialogTitle>
           <DialogDescription>
             A plain git identity authenticated by an SSH key. No hosted-provider account or API
-            access — just this host, key, and commit name/email used when this identity is
-            active.
+            access — just this host, key, and commit name/email used when this identity is active.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">

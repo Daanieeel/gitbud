@@ -797,10 +797,10 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
               {section === "Profiles" && (
                 <>
                   <p className="pb-2 text-xs text-muted-foreground">
-                    Each profile is a git identity — a GitHub account or a plain SSH key — with
-                    its own commit name and email. Switch between them from the account switcher
-                    in the sidebar, or set a default here for people with multiple git profiles
-                    (work, private, a second job, …) on the same machine.
+                    Each profile is a git identity — a GitHub account or a plain SSH key — with its
+                    own commit name and email. Switch between them from the account switcher in the
+                    sidebar, or set a default here for people with multiple git profiles (work,
+                    private, a second job, …) on the same machine.
                   </p>
                   {identities.length === 0 && (
                     <p className="pb-2 text-xs text-muted-foreground">No profiles yet.</p>
@@ -808,8 +808,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                   <div className="flex flex-col gap-1.5">
                     {identities.map((identity) => {
                       const isDefault = defaultIdentityId === identity.id;
-                      const isBroken =
-                        identity.kind === "github" && identity.login === brokenLogin;
+                      const isBroken = identity.kind === "github" && identity.login === brokenLogin;
                       const missingCommitIdentity =
                         identity.kind === "ssh" &&
                         (!identity.name.trim() || !identity.email.trim());
@@ -837,7 +836,7 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                             </div>
                             <div className="truncate text-xs text-muted-foreground">
                               {identity.kind === "github"
-                                ? (identity.email || `${identity.login}@users.noreply.github.com`)
+                                ? identity.email || `${identity.login}@users.noreply.github.com`
                                 : `${identity.host} · ${identity.name.trim() || "no commit name set"} <${identity.email.trim() || "no email set"}>`}
                             </div>
                           </div>
@@ -943,7 +942,9 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                           Bitbucket
                           <Badge className="ml-auto">Coming soon</Badge>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => void useGitHubStore.getState().startSignIn()}>
+                        <DropdownMenuItem
+                          onSelect={() => void useGitHubStore.getState().startSignIn()}
+                        >
                           <GitHubMark className="size-3.5" />
                           GitHub
                         </DropdownMenuItem>

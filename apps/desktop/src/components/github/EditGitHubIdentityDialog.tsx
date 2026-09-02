@@ -62,8 +62,8 @@ export function EditGitHubIdentityDialog({
           </DialogTitle>
           <DialogDescription>
             Overrides the commit name/email used for this account — its GitHub profile isn't
-            changed, only what gitbud writes to <code>user.name</code>/<code>user.email</code>{" "}
-            when this account is the active identity.
+            changed, only what gitbud writes to <code>user.name</code>/<code>user.email</code> when
+            this account is the active identity.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
