@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FolderOpenIcon, KeyRoundIcon, SparklesIcon } from "lucide-react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { homeDir } from "@tauri-apps/api/path";
@@ -19,31 +19,52 @@ import { useIdentityStore } from "@/store/useIdentityStore";
 import { api } from "@/lib/tauri";
 import { cn } from "@gitbud/ui/utils";
 import { isSinglePath } from "@/lib/dialogPaths";
+import type { SshIdentity } from "@/lib/types";
 
 interface AddSshIdentityDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** When set, edits this identity instead of creating a new one. */
+  identity?: SshIdentity;
 }
 
-export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdentityDialogProps) {
+export function AddSshIdentityDialog({
+  open: isOpen,
+  onOpenChange,
+  identity,
+}: AddSshIdentityDialogProps) {
   const addSshIdentity = useIdentityStore((s) => s.addSshIdentity);
-  const [mode, setMode] = useState<"quick" | "advanced">("quick");
+  const updateSshIdentity = useIdentityStore((s) => s.updateSshIdentity);
+  const isEditing = identity !== undefined;
+  const [mode, setMode] = useState<"quick" | "advanced">("advanced");
   const [label, setLabel] = useState("");
   const [host, setHost] = useState("");
   const [keyPath, setKeyPath] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [pubkey, setPubkey] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reset = () => {
-    setMode("quick");
-    setLabel("");
-    setHost("");
-    setKeyPath("");
+    setMode(isEditing ? "advanced" : "quick");
+    setLabel(identity?.label ?? "");
+    setHost(identity?.host ?? "");
+    setKeyPath(identity?.key_path ?? "");
+    setName(identity?.name ?? "");
+    setEmail(identity?.email ?? "");
     setPubkey(null);
     setError(null);
   };
+
+  // Re-seed the form whenever the dialog opens (fresh blank form for "add", or this identity's
+  // current values for "edit") — not on every `identity` change, so editing doesn't reset the
+  // form mid-edit if the underlying store happens to re-render.
+  useEffect(() => {
+    if (isOpen) reset();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const pickKey = async () => {
     const defaultDir = await homeDir()
@@ -78,14 +99,37 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
     }
   };
 
-  const canSave = host.trim().length > 0 && keyPath.trim().length > 0;
+  const canSave =
+    host.trim().length > 0 &&
+    keyPath.trim().length > 0 &&
+    name.trim().length > 0 &&
+    email.trim().length > 0;
 
   const save = async () => {
     setSaving(true);
+    setError(null);
     try {
-      await addSshIdentity(label.trim() || host.trim(), host.trim(), keyPath.trim());
-      reset();
+      if (isEditing) {
+        await updateSshIdentity(
+          identity.id,
+          label.trim() || host.trim(),
+          host.trim(),
+          keyPath.trim(),
+          name.trim(),
+          email.trim(),
+        );
+      } else {
+        await addSshIdentity(
+          label.trim() || host.trim(),
+          host.trim(),
+          keyPath.trim(),
+          name.trim(),
+          email.trim(),
+        );
+      }
       onOpenChange(false);
+    } catch (e) {
+      setError(String(e));
     } finally {
       setSaving(false);
     }
@@ -102,11 +146,12 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
       <DialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <KeyRoundIcon className="size-5" /> Add SSH Identity
+            <KeyRoundIcon className="size-5" />{" "}
+            {isEditing ? "Edit SSH Identity" : "Add SSH Identity"}
           </DialogTitle>
           <DialogDescription>
             A plain git identity authenticated by an SSH key. No hosted-provider account or API
-            access, just this host and key used when pushing/pulling.
+            access — just this host, key, and commit name/email used when this identity is active.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
@@ -126,6 +171,28 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
               onChange={(e) => setHost(e.target.value)}
             />
           </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1 text-sm">
+              Commit name
+              <Input
+                placeholder="Jane Doe"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              Commit email
+              <Input
+                placeholder="jane@work.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </label>
+          </div>
+          <p className="-mt-1.5 text-xs text-muted-foreground">
+            Applied to <code>user.name</code>/<code>user.email</code> whenever this identity is
+            active, so commits are correctly attributed.
+          </p>
           <CardPicker
             value={mode}
             onChange={setMode}
@@ -183,7 +250,6 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
                   </p>
                 </>
               )}
-              {error && <p className="text-xs text-destructive">{error}</p>}
             </div>
           ) : (
             <label className="flex flex-col gap-1 text-sm">
@@ -202,10 +268,11 @@ export function AddSshIdentityDialog({ open: isOpen, onOpenChange }: AddSshIdent
               </div>
             </label>
           )}
+          {error && <p className="text-xs text-destructive">{error}</p>}
         </div>
         <DialogFooter>
           <Button disabled={!canSave || saving} onClick={() => void save()}>
-            {saving ? "Adding…" : "Add Identity"}
+            {saving ? "Saving…" : isEditing ? "Save Changes" : "Add Identity"}
           </Button>
         </DialogFooter>
       </DialogContent>

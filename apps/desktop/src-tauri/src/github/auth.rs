@@ -168,6 +168,33 @@ pub fn remove_account(login: &str) -> Result<Vec<Account>, String> {
     Ok(accounts)
 }
 
+/// Overrides the commit-attributable name/email stored for an account — the same fields
+/// `Account.name`/`Account.email` already feed into `user.name`/`user.email` when this account
+/// is the active identity, so editing them here is all "editing the profile" needs to do; no
+/// separate override field. Doesn't touch the keychain token.
+pub fn update_commit_identity(
+    login: &str,
+    name: &str,
+    email: &str,
+) -> Result<Vec<Account>, String> {
+    let mut accounts = list_accounts()?;
+    let account = accounts
+        .iter_mut()
+        .find(|a| a.login == login)
+        .ok_or_else(|| format!("No account for {login}"))?;
+    account.name = {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        }
+    };
+    account.email = email.trim().to_string();
+    save_accounts(&accounts)?;
+    Ok(accounts)
+}
+
 fn save_account(account: Account, token: &str) -> Result<Vec<Account>, String> {
     keyring::Entry::new(KEYRING_SERVICE, &account.login)
         .and_then(|entry| entry.set_password(token))

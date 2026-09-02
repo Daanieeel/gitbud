@@ -2933,6 +2933,14 @@ struct RawTimelineEvent {
     /// (via a plain `#123` reference, not necessarily a closing keyword).
     #[serde(default)]
     source: Option<RawCrossReferenceSource>,
+    /// Only present on a `sub_issue_added` event — the child issue that was added as a
+    /// sub-issue of this one (fires on the parent's own timeline).
+    #[serde(default)]
+    sub_issue: Option<RawConnectedSubject>,
+    /// Only present on a `parent_issue_added` event — the issue this one was added under as a
+    /// sub-issue (fires on the child's own timeline).
+    #[serde(default)]
+    parent_issue: Option<RawConnectedSubject>,
 }
 
 #[derive(Deserialize)]
@@ -3014,23 +3022,52 @@ impl From<RawTimelineEvent> for IssueTimelineEvent {
         let cross_ref_repo_full_name = cross_ref_repo.map(|r| r.full_name.clone());
         let cross_ref_is_pr = cross_ref_issue.as_ref().map(|i| i.pull_request.is_some());
 
+        // `sub_issue`/`parent_issue` mirror `subject`'s shape (unofficial — like `connected`,
+        // GitHub's timeline API returns these for the sub-issues feature ahead of its published
+        // OpenAPI schema). Only one of subject/cross_ref_issue/sub_issue/parent_issue is ever
+        // populated per event, so folding them into the same `source_issue_*` output fields
+        // keeps the frontend's grouping logic (and this struct) from needing a parallel set.
+        let sub_issue = raw.sub_issue;
+        let sub_issue_repo = sub_issue.as_ref().and_then(|s| s.repository.as_ref());
+        let sub_issue_html_url = sub_issue
+            .as_ref()
+            .zip(sub_issue_repo)
+            .map(|(s, r)| format!("{}/issues/{}", r.html_url, s.number));
+
+        let parent_issue = raw.parent_issue;
+        let parent_issue_repo = parent_issue.as_ref().and_then(|s| s.repository.as_ref());
+        let parent_issue_html_url = parent_issue
+            .as_ref()
+            .zip(parent_issue_repo)
+            .map(|(s, r)| format!("{}/issues/{}", r.html_url, s.number));
+
         let source_issue_number = subject
             .as_ref()
             .map(|s| s.number)
-            .or(cross_ref_issue.as_ref().map(|i| i.number));
+            .or(cross_ref_issue.as_ref().map(|i| i.number))
+            .or(sub_issue.as_ref().map(|s| s.number))
+            .or(parent_issue.as_ref().map(|s| s.number));
         let source_issue_title = subject
             .as_ref()
             .map(|s| s.title.clone())
-            .or(cross_ref_issue.as_ref().map(|i| i.title.clone()));
+            .or(cross_ref_issue.as_ref().map(|i| i.title.clone()))
+            .or(sub_issue.as_ref().map(|s| s.title.clone()))
+            .or(parent_issue.as_ref().map(|s| s.title.clone()));
         let source_issue_state = subject
             .as_ref()
             .map(|s| s.state.clone())
-            .or(cross_ref_issue.as_ref().map(|i| i.state.clone()));
-        let source_issue_html_url =
-            subject_html_url.or(cross_ref_issue.as_ref().map(|i| i.html_url.clone()));
+            .or(cross_ref_issue.as_ref().map(|i| i.state.clone()))
+            .or(sub_issue.as_ref().map(|s| s.state.clone()))
+            .or(parent_issue.as_ref().map(|s| s.state.clone()));
+        let source_issue_html_url = subject_html_url
+            .or(cross_ref_issue.as_ref().map(|i| i.html_url.clone()))
+            .or(sub_issue_html_url)
+            .or(parent_issue_html_url);
         let source_issue_repo_full_name = subject_repo
             .map(|r| r.full_name.clone())
-            .or(cross_ref_repo_full_name);
+            .or(cross_ref_repo_full_name)
+            .or(sub_issue_repo.map(|r| r.full_name.clone()))
+            .or(parent_issue_repo.map(|r| r.full_name.clone()));
 
         IssueTimelineEvent {
             id: raw.id,
@@ -3063,6 +3100,10 @@ impl From<RawTimelineEvent> for IssueTimelineEvent {
 /// `cross-referenced` is its own separate event kind, included for "X mentioned this in N
 /// issues" — it fires for any plain `#123` mention (not just a closing keyword), so the frontend
 /// groups adjacent same-actor occurrences into one row rather than listing each individually.
+/// `sub_issue_added`/`parent_issue_added` are the sub-issues feature's own timeline events (an
+/// issue's parent added a sub-issue / an issue was added under a parent) — rendered the same
+/// grouped-list way as `cross-referenced`. Their `_removed` counterparts are deliberately left
+/// out for now (out of scope — nothing currently renders a removal here).
 const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
     "labeled",
     "unlabeled",
@@ -3075,6 +3116,8 @@ const RELEVANT_TIMELINE_EVENTS: &[&str] = &[
     "merged",
     "connected",
     "cross-referenced",
+    "sub_issue_added",
+    "parent_issue_added",
 ];
 
 /// Label/assignee/reviewer-request/close/reopen/merge events for the Conversation tab's
@@ -3785,6 +3828,61 @@ mod tests {
     }
 
     #[test]
+    fn timeline_event_maps_sub_issue_added_fields() {
+        let json = r#"{
+            "event": "sub_issue_added",
+            "actor": {"login": "alice", "avatar_url": "https://a"},
+            "sub_issue": {
+                "number": 52,
+                "title": "Add sub-issue picker",
+                "state": "open",
+                "repository": {"full_name": "Daanieeel/gitbud", "html_url": "https://github.com/Daanieeel/gitbud"}
+            }
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.source_issue_number, Some(52));
+        assert_eq!(
+            event.source_issue_title,
+            Some("Add sub-issue picker".to_string())
+        );
+        assert_eq!(event.source_issue_state, Some("open".to_string()));
+        assert_eq!(
+            event.source_issue_html_url,
+            Some("https://github.com/Daanieeel/gitbud/issues/52".to_string())
+        );
+        assert_eq!(
+            event.source_issue_repo_full_name,
+            Some("Daanieeel/gitbud".to_string())
+        );
+    }
+
+    #[test]
+    fn timeline_event_maps_parent_issue_added_fields() {
+        let json = r#"{
+            "event": "parent_issue_added",
+            "actor": {"login": "alice", "avatar_url": "https://a"},
+            "parent_issue": {
+                "number": 40,
+                "title": "GitLab/Bitbucket support",
+                "state": "open",
+                "repository": {"full_name": "Daanieeel/gitbud", "html_url": "https://github.com/Daanieeel/gitbud"}
+            }
+        }"#;
+        let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
+        let event: IssueTimelineEvent = raw.into();
+        assert_eq!(event.source_issue_number, Some(40));
+        assert_eq!(
+            event.source_issue_title,
+            Some("GitLab/Bitbucket support".to_string())
+        );
+        assert_eq!(
+            event.source_issue_html_url,
+            Some("https://github.com/Daanieeel/gitbud/issues/40".to_string())
+        );
+    }
+
+    #[test]
     fn timeline_event_leaves_source_issue_fields_none_for_other_event_kinds() {
         let json = r#"{"event": "labeled", "label": {"name": "bug", "color": "d73a4a"}}"#;
         let raw: RawTimelineEvent = serde_json::from_str(json).unwrap();
@@ -3803,5 +3901,7 @@ mod tests {
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"merged"));
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"connected"));
         assert!(RELEVANT_TIMELINE_EVENTS.contains(&"cross-referenced"));
+        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"sub_issue_added"));
+        assert!(RELEVANT_TIMELINE_EVENTS.contains(&"parent_issue_added"));
     }
 }

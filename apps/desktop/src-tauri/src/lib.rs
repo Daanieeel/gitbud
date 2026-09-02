@@ -940,10 +940,14 @@ async fn add_ssh_identity(
     label: String,
     host: String,
     key_path: String,
+    name: String,
+    email: String,
 ) -> Result<Vec<ssh_identity::SshIdentity>, String> {
-    tauri::async_runtime::spawn_blocking(move || ssh_identity::add(&label, &host, &key_path))
-        .await
-        .map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || {
+        ssh_identity::add(&label, &host, &key_path, &name, &email)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -951,6 +955,22 @@ async fn remove_ssh_identity(id: String) -> Result<Vec<ssh_identity::SshIdentity
     tauri::async_runtime::spawn_blocking(move || ssh_identity::remove(&id))
         .await
         .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn update_ssh_identity(
+    id: String,
+    label: String,
+    host: String,
+    key_path: String,
+    name: String,
+    email: String,
+) -> Result<Vec<ssh_identity::SshIdentity>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        ssh_identity::update(&id, &label, &host, &key_path, &name, &email)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -1254,6 +1274,19 @@ async fn github_remove_account(login: String) -> Result<Vec<github::auth::Accoun
     tauri::async_runtime::spawn_blocking(move || github::auth::remove_account(&login))
         .await
         .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn github_update_account_identity(
+    login: String,
+    name: String,
+    email: String,
+) -> Result<Vec<github::auth::Account>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        github::auth::update_commit_identity(&login, &name, &email)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -2875,6 +2908,7 @@ pub fn run() {
             list_ssh_identities,
             add_ssh_identity,
             remove_ssh_identity,
+            update_ssh_identity,
             apply_ssh_identity_to_repo,
             clear_ssh_identity_from_repo,
             init_repo,
@@ -2914,6 +2948,7 @@ pub fn run() {
             github_set_host,
             github_list_accounts,
             github_remove_account,
+            github_update_account_identity,
             github_has_token,
             github_detect_gh_cli,
             github_start_device_flow,

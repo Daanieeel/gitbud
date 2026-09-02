@@ -243,8 +243,16 @@ export const api = {
   getGlobalGitIdentity: () => invoke<[string | null, string | null]>("get_global_git_identity"),
 
   listSshIdentities: () => invoke<SshIdentity[]>("list_ssh_identities"),
-  addSshIdentity: (label: string, host: string, keyPath: string) =>
-    invoke<SshIdentity[]>("add_ssh_identity", { label, host, keyPath }),
+  addSshIdentity: (label: string, host: string, keyPath: string, name: string, email: string) =>
+    invoke<SshIdentity[]>("add_ssh_identity", { label, host, keyPath, name, email }),
+  updateSshIdentity: (
+    id: string,
+    label: string,
+    host: string,
+    keyPath: string,
+    name: string,
+    email: string,
+  ) => invoke<SshIdentity[]>("update_ssh_identity", { id, label, host, keyPath, name, email }),
   removeSshIdentity: (id: string) => invoke<SshIdentity[]>("remove_ssh_identity", { id }),
   applySshIdentityToRepo: (repoPath: string, keyPath: string) =>
     invoke<void>("apply_ssh_identity_to_repo", { repoPath, keyPath }),
@@ -299,6 +307,8 @@ export const api = {
   githubListAccounts: () => invoke<GitHubAccount[]>("github_list_accounts"),
   githubRemoveAccount: (login: string) =>
     invoke<GitHubAccount[]>("github_remove_account", { login }),
+  githubUpdateAccountIdentity: (login: string, name: string, email: string) =>
+    invoke<GitHubAccount[]>("github_update_account_identity", { login, name, email }),
   githubHasToken: (login: string) => invoke<boolean>("github_has_token", { login }),
   githubStartDeviceFlow: (clientId: string) =>
     invoke<DeviceCodeResponse>("github_start_device_flow", { clientId }),

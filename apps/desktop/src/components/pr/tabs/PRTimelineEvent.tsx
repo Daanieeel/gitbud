@@ -1,12 +1,14 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   CheckCircle2Icon,
+  CornerUpLeftIcon,
   ExternalLinkIcon,
   GitCommitHorizontalIcon,
   GitMergeIcon,
   GitPullRequestArrowIcon,
   GitPullRequestClosedIcon,
   LinkIcon,
+  ListTreeIcon,
   MessageSquareIcon,
   TagIcon,
   UserMinusIcon,
@@ -21,7 +23,7 @@ import { RelativeTime } from "../RelativeTime";
 import { CIBadge } from "../CIBadge";
 import { CommitVerificationBadge } from "../CommitVerificationBadge";
 import { LabelChip } from "../LabelChip";
-import type { TimelineEvent } from "@/lib/prTimeline";
+import type { CrossReferencedRef, TimelineEvent } from "@/lib/prTimeline";
 import type { IssueTimelineEvent } from "@/lib/types";
 
 const REVIEW_VERDICT = {
@@ -78,6 +80,51 @@ const GITHUB_EVENT_COLOR = {
  * only this generic boundary (not the table itself) admits an arbitrary `string` key. */
 function lookup<T>(map: Record<string, T>, key: string, fallback: T): T {
   return Object.hasOwn(map, key) ? map[key] : fallback;
+}
+
+/** The linked-issue list shared by `cross_referenced_group` and `related_issue_group` — a
+ * status dot + title/number link per ref, continuing the timeline rail only as far down as
+ * `showBottomLine` (whether another row follows). Kept out of `TimelineRow` itself: that
+ * component's icon-centering math assumes single-line content (see its own doc comment), so a
+ * tall multi-ref list has to live in its own block below the (single-line) title row instead. */
+function LinkedIssueRefList({
+  refs,
+  showBottomLine,
+}: {
+  refs: CrossReferencedRef[];
+  showBottomLine: boolean;
+}) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex w-6 shrink-0 flex-col items-center">
+        {showBottomLine && <div className="w-px flex-1 bg-border" />}
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 pb-4 text-xs">
+        {refs.map((ref) => {
+          const closed = ref.state === "closed" || ref.state === "merged";
+          return (
+            <div key={ref.number} className="flex items-center gap-2 pl-1">
+              <span
+                className={`size-2 shrink-0 rounded-full border-2 ${
+                  closed ? "border-accent-purple" : "border-accent-green"
+                }`}
+              />
+              <a
+                href="#"
+                onClick={(e) => {
+                  e.preventDefault();
+                  if (ref.htmlUrl) void openUrl(ref.htmlUrl);
+                }}
+                className="min-w-0 truncate text-foreground underline hover:text-primary"
+              >
+                {ref.title} <span className="text-muted-foreground">#{ref.number}</span>
+              </a>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 interface PRTimelineEventProps {
@@ -215,35 +262,41 @@ export function PRTimelineEvent({
             {event.timestamp && <RelativeTime iso={event.timestamp} className="ml-auto shrink-0" />}
           </div>
         </TimelineRow>
-        <div className="flex gap-3">
-          <div className="flex w-6 shrink-0 flex-col items-center">
-            {showBottomLine && <div className="w-px flex-1 bg-border" />}
+        <LinkedIssueRefList refs={refs} showBottomLine={showBottomLine} />
+      </>
+    );
+  }
+
+  if (event.kind === "related_issue_group") {
+    const { refs, actorLogin, actorAvatarUrl, relation } = event;
+    const isSubIssue = relation === "sub_issue_added";
+    const noun = isSubIssue
+      ? refs.length === 1
+        ? "sub-issue"
+        : "sub-issues"
+      : refs.length === 1
+        ? "parent issue"
+        : "parent issues";
+    const Icon = isSubIssue ? ListTreeIcon : CornerUpLeftIcon;
+    return (
+      <>
+        <TimelineRow
+          icon={<Icon className="size-3.5 text-muted-foreground" />}
+          showTopLine={showTopLine}
+          showBottomLine
+        >
+          <div className="flex items-center gap-1.5 py-0.5 text-xs text-muted-foreground">
+            {actorAvatarUrl && (
+              <Avatar src={actorAvatarUrl} alt={actorLogin ?? ""} className="size-4" />
+            )}
+            <span className="font-medium text-foreground">{actorLogin ?? "someone"}</span>
+            <span>
+              added {refs.length} {noun}
+            </span>
+            {event.timestamp && <RelativeTime iso={event.timestamp} className="ml-auto shrink-0" />}
           </div>
-          <div className="flex min-w-0 flex-1 flex-col gap-1.5 pb-4 text-xs">
-            {refs.map((ref) => {
-              const closed = ref.state === "closed" || ref.state === "merged";
-              return (
-                <div key={ref.number} className="flex items-center gap-2 pl-1">
-                  <span
-                    className={`size-2 shrink-0 rounded-full border-2 ${
-                      closed ? "border-accent-purple" : "border-accent-green"
-                    }`}
-                  />
-                  <a
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (ref.htmlUrl) void openUrl(ref.htmlUrl);
-                    }}
-                    className="min-w-0 truncate text-foreground underline hover:text-primary"
-                  >
-                    {ref.title} <span className="text-muted-foreground">#{ref.number}</span>
-                  </a>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        </TimelineRow>
+        <LinkedIssueRefList refs={refs} showBottomLine={showBottomLine} />
       </>
     );
   }

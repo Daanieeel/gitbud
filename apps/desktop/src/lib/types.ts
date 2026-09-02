@@ -231,6 +231,10 @@ export interface Settings {
   custom_editor_command: string | null;
   open_pr_after_creation: OpenPrAfterCreation;
   cache_level: CacheLevel;
+  /** Highly experimental: when true, the Pull Requests and Issues tabs skip the "is this a
+   * GitHub repo?" provider check and always attempt the GitHub-shaped API call, even against
+   * non-GitHub remotes (GitLab, Bitbucket, Codeberg/Forgejo, ...), where it will reliably fail. */
+  disable_provider_gating: boolean;
 }
 
 // --- GitHub ---
@@ -263,6 +267,11 @@ export interface SshIdentity {
   label: string;
   host: string;
   key_path: string;
+  /** Commit-attributable name/email applied alongside the key when this identity is active.
+   * Empty for identities saved before these fields existed — the app leaves `user.name`/
+   * `user.email` untouched in that case rather than writing blanks. */
+  name: string;
+  email: string;
 }
 
 export interface PullRequest {

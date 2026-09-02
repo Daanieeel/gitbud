@@ -29,6 +29,7 @@ const LANGUAGE_LOADERS = {
   markdown: () => import("highlight.js/lib/languages/markdown"),
   sql: () => import("highlight.js/lib/languages/sql"),
   ini: () => import("highlight.js/lib/languages/ini"),
+  hcl: () => import("./hclLanguage"),
 } satisfies Record<string, () => Promise<{ default: unknown }>>;
 
 const loadedLanguages = new Set<string>();
@@ -92,6 +93,10 @@ const EXT_TO_LANG = {
   toml: "ini",
   ini: "ini",
   cfg: "ini",
+  tf: "hcl",
+  tfvars: "hcl",
+  hcl: "hcl",
+  terraform: "hcl",
 } satisfies Record<string, string>;
 
 export function languageForPath(path: string): string | undefined {

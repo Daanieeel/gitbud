@@ -129,6 +129,11 @@ pub struct Settings {
     // Advanced
     pub git_binary_path: Option<String>,
     pub fs_watch_enabled: bool,
+    /// Highly experimental: when true, the Pull Requests and Issues tabs skip the "is this a
+    /// GitHub repo?" provider check and always attempt the GitHub-shaped API call, even against
+    /// non-GitHub remotes, where it will reliably fail.
+    #[serde(default)]
+    pub disable_provider_gating: bool,
 
     // Identity
     /// Opaque id of the globally-active git identity (a GitHub account or SSH identity),
@@ -180,6 +185,7 @@ impl Default for Settings {
             auto_stage_migrated: true,
             git_binary_path: None,
             fs_watch_enabled: true,
+            disable_provider_gating: false,
             default_identity_id: None,
             desktop_notifications: true,
             favorite_editor: None,

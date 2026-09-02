@@ -11,9 +11,21 @@ export type TimelineEvent =
       actorLogin: string | null;
       actorAvatarUrl: string | null;
       refs: CrossReferencedRef[];
+    }
+  | {
+      kind: "related_issue_group";
+      timestamp: string;
+      /** Which sub-issues relation this run of adjacent events represents — `sub_issue_added`
+       * fires on the parent's own timeline ("added N sub-issues"), `parent_issue_added` fires
+       * on the child's ("added this as a sub-issue of N issues"). */
+      relation: "sub_issue_added" | "parent_issue_added";
+      actorLogin: string | null;
+      actorAvatarUrl: string | null;
+      refs: CrossReferencedRef[];
     };
 
-/** One issue/PR that mentioned this one — the per-row payload inside a `cross_referenced_group`. */
+/** One issue/PR that mentioned this one — the per-row payload inside a `cross_referenced_group`
+ * or `related_issue_group`. */
 export interface CrossReferencedRef {
   number: number;
   title: string;
@@ -61,27 +73,41 @@ export function mergeTimeline(
     })),
   ];
   events.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-  return groupCrossReferences(events);
+  return groupRelatedEvents(events);
 }
 
-/** Collapses consecutive `cross-referenced` events from the same actor into one
- * `cross_referenced_group` row — GitHub fires one raw event per mentioning issue/PR, but the
- * web UI (and this one) shows "X mentioned this in N issues" followed by the list, not N
- * separate rows. Only adjacent same-actor runs are merged, matching how GitHub's own timeline
- * groups them (one PR/issue body can `#123` several other issues at once, all in the same burst). */
-function groupCrossReferences(events: TimelineEvent[]): TimelineEvent[] {
+/** Collapses consecutive `cross-referenced`/`sub_issue_added`/`parent_issue_added` events from
+ * the same actor into one grouped row — GitHub fires one raw event per referenced/related issue,
+ * but the web UI (and this one) shows "X mentioned this in N issues" (or "added N sub-issues")
+ * followed by the list, not N separate rows. Only adjacent same-actor-same-relation runs are
+ * merged, matching how GitHub's own timeline groups `cross-referenced` bursts (one PR/issue body
+ * can `#123` several others at once); the sub-issues events are grouped the same way for
+ * consistency, though in practice they rarely arrive back-to-back. */
+function groupRelatedEvents(events: TimelineEvent[]): TimelineEvent[] {
   const result: TimelineEvent[] = [];
   for (const event of events) {
-    const isCrossRef = event.kind === "github_event" && event.ghEvent.event === "cross-referenced";
+    if (event.kind !== "github_event") {
+      result.push(event);
+      continue;
+    }
+    const ghType = event.ghEvent.event;
+    if (
+      ghType !== "cross-referenced" &&
+      ghType !== "sub_issue_added" &&
+      ghType !== "parent_issue_added"
+    ) {
+      result.push(event);
+      continue;
+    }
+    const ref: CrossReferencedRef = {
+      number: event.ghEvent.source_issue_number ?? 0,
+      title: event.ghEvent.source_issue_title ?? "",
+      state: event.ghEvent.source_issue_state ?? "open",
+      isPullRequest: event.ghEvent.source_issue_is_pull_request ?? false,
+      htmlUrl: event.ghEvent.source_issue_html_url,
+    };
     const prev = result[result.length - 1];
-    if (isCrossRef && event.kind === "github_event") {
-      const ref: CrossReferencedRef = {
-        number: event.ghEvent.source_issue_number ?? 0,
-        title: event.ghEvent.source_issue_title ?? "",
-        state: event.ghEvent.source_issue_state ?? "open",
-        isPullRequest: event.ghEvent.source_issue_is_pull_request ?? false,
-        htmlUrl: event.ghEvent.source_issue_html_url,
-      };
+    if (ghType === "cross-referenced") {
       if (
         prev?.kind === "cross_referenced_group" &&
         prev.actorLogin === event.ghEvent.actor_login
@@ -99,7 +125,23 @@ function groupCrossReferences(events: TimelineEvent[]): TimelineEvent[] {
       });
       continue;
     }
-    result.push(event);
+    if (
+      prev?.kind === "related_issue_group" &&
+      prev.relation === ghType &&
+      prev.actorLogin === event.ghEvent.actor_login
+    ) {
+      prev.refs.push(ref);
+      prev.timestamp = event.timestamp;
+      continue;
+    }
+    result.push({
+      kind: "related_issue_group",
+      timestamp: event.timestamp,
+      relation: ghType,
+      actorLogin: event.ghEvent.actor_login,
+      actorAvatarUrl: event.ghEvent.actor_avatar_url,
+      refs: [ref],
+    });
   }
   return result;
 }

@@ -35,6 +35,9 @@ interface GitHubState {
   init: () => Promise<void>;
   setClientId: (clientId: string) => Promise<void>;
   removeAccount: (login: string) => Promise<void>;
+  /** Overrides the account's commit-attributable name/email — the same fields used to set
+   * `user.name`/`user.email` when this account is the active identity. */
+  updateAccountIdentity: (login: string, name: string, email: string) => Promise<void>;
   setCurrentLogin: (login: string | null) => void;
 
   startSignIn: () => Promise<void>;
@@ -91,6 +94,11 @@ export const useGitHubStore = create<GitHubState>((set, get) => ({
     if (get().currentLogin === login) {
       set({ currentLogin: accounts[0]?.login ?? null });
     }
+  },
+
+  updateAccountIdentity: async (login, name, email) => {
+    const accounts = await api.githubUpdateAccountIdentity(login, name, email);
+    set({ accounts });
   },
 
   setCurrentLogin: (login) => set({ currentLogin: login }),
