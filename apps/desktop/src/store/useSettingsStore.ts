@@ -21,6 +21,7 @@ const DEFAULT_SETTINGS: Settings = {
   auto_stage_new_changes: false,
   git_binary_path: null,
   fs_watch_enabled: true,
+  disable_provider_gating: false,
   default_identity_id: null,
   desktop_notifications: true,
   favorite_editor: null,

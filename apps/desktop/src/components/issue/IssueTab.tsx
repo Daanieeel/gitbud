@@ -9,6 +9,7 @@ import { useNetworkStore } from "@/store/useNetworkStore";
 import { useIssueStore, type IssueFilter } from "@/store/useIssueStore";
 import { useIssueList } from "@/hooks/queries/useIssues";
 import { useRemoteInfo } from "@/hooks/useRemoteInfo";
+import { useSettingsStore } from "@/store/useSettingsStore";
 import { queryKeys } from "@/lib/queryKeys";
 import { evictRepoScopedPrQueries, evictSelectedIssueQueries } from "@/lib/prCacheEviction";
 import { IssueList } from "./IssueList";
@@ -18,6 +19,7 @@ import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { api } from "@/lib/tauri";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
+import { ApiErrorCard } from "@/components/ApiErrorCard";
 
 const FILTERS: { key: IssueFilter; label: string }[] = [
   { key: "open", label: "Open" },
@@ -41,6 +43,8 @@ export function IssueTab() {
   const { width, onPointerDown } = useResizableWidth("panel-width:issue-list", 260, 240, 640);
   const queryClient = useQueryClient();
   const remoteInfo = useRemoteInfo(repoPath);
+  const gatingDisabled = useSettingsStore((s) => s.settings.disable_provider_gating);
+  const providerAllowed = gatingDisabled || remoteInfo?.provider === "github";
 
   useEffect(() => {
     if (!repoPath) return;
@@ -82,7 +86,7 @@ export function IssueTab() {
     isFetchingNextPage: loadingMore,
     fetchNextPage,
   } = useIssueList(
-    hasRemote && remoteInfo?.provider === "github" ? repoPath : null,
+    hasRemote && providerAllowed ? repoPath : null,
     currentLogin,
     filter,
   );
@@ -134,7 +138,8 @@ export function IssueTab() {
   // GitHub only for now — GitLab/Bitbucket have their own issue trackers with different APIs,
   // and a plain/self-hosted git remote has no issues concept at all. `remoteInfo` is `null`
   // briefly while `useRemoteInfo` is still resolving, so this only renders once it's settled.
-  if (remoteInfo && remoteInfo.provider !== "github") {
+  // Skippable via the "Disable provider gating" advanced setting.
+  if (!gatingDisabled && remoteInfo && remoteInfo.provider !== "github") {
     return (
       <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
         Issues are only available for GitHub repositories
@@ -186,12 +191,7 @@ export function IssueTab() {
             </p>
           </div>
         )}
-        {loadError && !offline && (
-          <div className="m-2 flex items-center gap-1.5 rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-            <TriangleAlertIcon className="size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1">{loadError}</span>
-          </div>
-        )}
+        {loadError && !offline && <ApiErrorCard message={loadError} />}
         <div className="min-h-0 flex-1">
           <IssueList
             loading={loading}

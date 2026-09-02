@@ -928,6 +928,19 @@ export function SettingsDialog({ open, onOpenChange }: SettingsDialogProps) {
                       }
                     />
                   </Row>
+                  <Row label="Disable provider gating">
+                    <Checkbox
+                      checked={settings.disable_provider_gating}
+                      onCheckedChange={(checked) =>
+                        void update({ disable_provider_gating: checked === true })
+                      }
+                    />
+                  </Row>
+                  <p className="pt-1 pb-1 text-xs text-destructive">
+                    Highly experimental. Always treats every repository as a GitHub repository in
+                    the Pull Requests and Issues tabs, even on other hosts (GitLab, Bitbucket,
+                    Codeberg/Forgejo, ...). Those requests will typically fail there.
+                  </p>
                   <Row label="Settings backup">
                     <div className="flex gap-2">
                       <Button size="sm" variant="secondary" onClick={() => void exportSettings()}>

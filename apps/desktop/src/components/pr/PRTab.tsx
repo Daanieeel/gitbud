@@ -7,7 +7,9 @@ import { useRepoStore } from "@/store/useRepoStore";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { useNetworkStore } from "@/store/useNetworkStore";
 import { usePRStore, type PRFilter } from "@/store/usePRStore";
+import { useSettingsStore } from "@/store/useSettingsStore";
 import { isBrokenTokenError, usePullRequestList } from "@/hooks/queries/usePullRequests";
+import { useRemoteInfo } from "@/hooks/useRemoteInfo";
 import { queryKeys } from "@/lib/queryKeys";
 import { evictRepoScopedPrQueries, evictSelectedPrQueries } from "@/lib/prCacheEviction";
 import { PRList } from "./PRList";
@@ -16,6 +18,7 @@ import { ResizeHandle } from "@/components/layout/ResizeHandle";
 import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { api } from "@/lib/tauri";
 import { prefetchMergeSettings } from "@/lib/mergeSettingsPrefetch";
+import { ApiErrorCard } from "@/components/ApiErrorCard";
 
 const FILTERS: { key: PRFilter; label: string }[] = [
   { key: "open", label: "Open" },
@@ -37,6 +40,9 @@ export function PRTab() {
   const [reauthing, setReauthing] = useState(false);
   const { width, onPointerDown } = useResizableWidth("panel-width:pr-list", 260, 240, 640);
   const queryClient = useQueryClient();
+  const remoteInfo = useRemoteInfo(repoPath);
+  const gatingDisabled = useSettingsStore((s) => s.settings.disable_provider_gating);
+  const providerAllowed = gatingDisabled || remoteInfo?.provider === "github";
 
   useEffect(() => {
     if (!repoPath) return;
@@ -88,7 +94,11 @@ export function PRTab() {
     hasNextPage,
     isFetchingNextPage: loadingMore,
     fetchNextPage,
-  } = usePullRequestList(hasRemote ? repoPath : null, currentLogin, filter);
+  } = usePullRequestList(
+    hasRemote && providerAllowed ? repoPath : null,
+    currentLogin,
+    filter,
+  );
   const offline = useNetworkStore((s) => s.offline);
   const loadError = loadErrorObj ? String(loadErrorObj) : null;
   const hasMore = hasNextPage ?? false;
@@ -143,6 +153,18 @@ export function PRTab() {
     );
   }
 
+  // GitHub only for now — other forges (Codeberg/Gitea, GitLab, Bitbucket) have their own PR/MR
+  // APIs, and gitbud only speaks GitHub's. `remoteInfo` is `null` briefly while `useRemoteInfo`
+  // is still resolving, so this only renders once it's settled. Skippable via the "Disable
+  // provider gating" advanced setting (mirrors IssueTab.tsx).
+  if (!gatingDisabled && remoteInfo && remoteInfo.provider !== "github") {
+    return (
+      <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
+        Pull requests are only available for GitHub repositories
+      </div>
+    );
+  }
+
   const selected = pulls.find((p) => p.number === selectedNumber);
 
   return (
@@ -178,12 +200,7 @@ export function PRTab() {
             </p>
           </div>
         )}
-        {loadError && !offline && (
-          <div className="m-2 flex items-center gap-1.5 rounded-md bg-destructive/10 p-2 text-xs text-destructive">
-            <TriangleAlertIcon className="size-3.5 shrink-0" />
-            <span className="min-w-0 flex-1">{loadError}</span>
-          </div>
-        )}
+        {loadError && !offline && <ApiErrorCard message={loadError} />}
         <div className="min-h-0 flex-1">
           <PRList
             loading={loading}
