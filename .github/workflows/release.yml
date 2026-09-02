@@ -92,12 +92,13 @@ jobs:
           upload_files=("SHA256SUMS")
 
           if [ -n "${GPG_SIGNING_KEY:-}" ]; then
-            echo "Importing GPG signing key..."
             mkdir -p ~/.gnupg
             chmod 700 ~/.gnupg
             echo "allow-loopback-pinentry" >> ~/.gnupg/gpg-agent.conf
             gpgconf --reload gpg-agent 2>/dev/null || true
-            python3 -c "import sys, textwrap; exec(textwrap.dedent(sys.stdin.read()))" <<'PY' | gpg --batch --import
+
+            gpg_key_file="$(mktemp)"
+            python3 -c "import sys, textwrap; exec(textwrap.dedent(sys.stdin.read()))" > "$gpg_key_file" <<'PY'
             import base64, os, sys
 
             key = os.environ.get("GPG_SIGNING_KEY", "").strip()
@@ -126,20 +127,30 @@ jobs:
                     sys.stdout.buffer.write(key.encode("utf-8") + b"\n")
           PY
 
-            gpg_opts=(--batch --yes)
-            if [ -n "${GPG_PASSPHRASE:-}" ]; then
-              gpg_opts+=(--pinentry-mode loopback --passphrase "$GPG_PASSPHRASE")
-            fi
-
-            gpg "${gpg_opts[@]}" --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
-            upload_files+=("SHA256SUMS.asc")
-
-            for file in release-assets/*.deb release-assets/*.rpm release-assets/*.AppImage; do
-              if [ -f "$file" ]; then
-                gpg "${gpg_opts[@]}" --armor --detach-sign --output "$file.asc" "$file"
-                upload_files+=("$file.asc")
+            # `gpg --import` sits inside this `if` test (not run standalone) specifically so a
+            # malformed/empty GPG_SIGNING_KEY secret — decoded above to a file that isn't a valid
+            # key, e.g. a secret set to a blank value — degrades to a skipped-signing warning
+            # instead of aborting the whole job under `set -e` (which used to also take down the
+            # unrelated "Build release notes" step that runs after this one).
+            if [ -s "$gpg_key_file" ] && gpg --batch --import "$gpg_key_file"; then
+              gpg_opts=(--batch --yes)
+              if [ -n "${GPG_PASSPHRASE:-}" ]; then
+                gpg_opts+=(--pinentry-mode loopback --passphrase "$GPG_PASSPHRASE")
               fi
-            done
+
+              gpg "${gpg_opts[@]}" --armor --detach-sign --output SHA256SUMS.asc SHA256SUMS
+              upload_files+=("SHA256SUMS.asc")
+
+              for file in release-assets/*.deb release-assets/*.rpm release-assets/*.AppImage; do
+                if [ -f "$file" ]; then
+                  gpg "${gpg_opts[@]}" --armor --detach-sign --output "$file.asc" "$file"
+                  upload_files+=("$file.asc")
+                fi
+              done
+            else
+              echo "GPG_SIGNING_KEY secret did not decode to a valid PGP key. Skipping GPG detached signature generation." >&2
+            fi
+            rm -f "$gpg_key_file"
           else
             echo "GPG_SIGNING_KEY secret is not configured. Skipping GPG detached signature generation."
           fi
