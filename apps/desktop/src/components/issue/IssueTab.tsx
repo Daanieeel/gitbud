@@ -88,11 +88,7 @@ export function IssueTab() {
     hasNextPage,
     isFetchingNextPage: loadingMore,
     fetchNextPage,
-  } = useIssueList(
-    hasRemote && providerAllowed ? repoPath : null,
-    currentLogin,
-    filter,
-  );
+  } = useIssueList(hasRemote && providerAllowed ? repoPath : null, currentLogin, filter);
   const offline = useNetworkStore((s) => s.offline);
   const loadError = loadErrorObj ? String(loadErrorObj) : null;
   const hasMore = hasNextPage ?? false;

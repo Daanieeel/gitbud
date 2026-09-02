@@ -97,11 +97,7 @@ export function PRTab() {
     hasNextPage,
     isFetchingNextPage: loadingMore,
     fetchNextPage,
-  } = usePullRequestList(
-    hasRemote && providerAllowed ? repoPath : null,
-    currentLogin,
-    filter,
-  );
+  } = usePullRequestList(hasRemote && providerAllowed ? repoPath : null, currentLogin, filter);
   const offline = useNetworkStore((s) => s.offline);
   const loadError = loadErrorObj ? String(loadErrorObj) : null;
   const hasMore = hasNextPage ?? false;
