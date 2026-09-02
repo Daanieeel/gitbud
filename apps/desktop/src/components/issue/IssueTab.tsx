@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PlusIcon, TriangleAlertIcon, WifiOffIcon } from "lucide-react";
+import { ExternalLinkIcon, PlusIcon, TriangleAlertIcon, WifiOffIcon } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@gitbud/ui/button";
 import { cn } from "@gitbud/ui/utils";
@@ -20,6 +20,9 @@ import { useResizableWidth } from "@/hooks/useResizableWidth";
 import { api } from "@/lib/tauri";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gitbud/ui/tooltip";
 import { ApiErrorCard } from "@/components/ApiErrorCard";
+import { openUrl } from "@tauri-apps/plugin-opener";
+
+const OTHER_FORGE_ISSUES_URL = "https://github.com/Daanieeel/gitbud/issues/40";
 
 const FILTERS: { key: IssueFilter; label: string }[] = [
   { key: "open", label: "Open" },
@@ -141,8 +144,12 @@ export function IssueTab() {
   // Skippable via the "Disable provider gating" advanced setting.
   if (!gatingDisabled && remoteInfo && remoteInfo.provider !== "github") {
     return (
-      <div className="flex h-full items-center justify-center bg-dot-grid text-sm text-muted-foreground">
-        Issues are only available for GitHub repositories
+      <div className="flex h-full flex-col items-center justify-center gap-3 bg-dot-grid text-center text-sm text-muted-foreground">
+        <p>Issues are currently only available for GitHub repositories</p>
+        <Button variant="secondary" onClick={() => void openUrl(OTHER_FORGE_ISSUES_URL)}>
+          <ExternalLinkIcon className="size-3.5" />
+          See implementation progress
+        </Button>
       </div>
     );
   }

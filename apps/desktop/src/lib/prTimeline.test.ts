@@ -32,7 +32,11 @@ function commit(sha: string, authored_at: string | null): PullRequestCommit {
   };
 }
 
-function ghEvent(event: string, created_at: string): IssueTimelineEvent {
+function ghEvent(
+  event: string,
+  created_at: string,
+  overrides: Partial<IssueTimelineEvent> = {},
+): IssueTimelineEvent {
   return {
     id: null,
     event,
@@ -50,6 +54,8 @@ function ghEvent(event: string, created_at: string): IssueTimelineEvent {
     source_issue_state: null,
     source_issue_html_url: null,
     source_issue_repo_full_name: null,
+    source_issue_is_pull_request: null,
+    ...overrides,
   };
 }
 
@@ -100,6 +106,76 @@ describe("mergeTimeline", () => {
 
   it("defaults ghEvents to empty when omitted", () => {
     expect(mergeTimeline([], [], [])).toEqual([]);
+  });
+});
+
+describe("mergeTimeline sub-issue/parent-issue grouping", () => {
+  it("groups adjacent sub_issue_added events from the same actor into one related_issue_group", () => {
+    const events = mergeTimeline(
+      [],
+      [],
+      [],
+      [
+        ghEvent("sub_issue_added", "2024-01-01T00:00:00Z", {
+          source_issue_number: 1,
+          source_issue_title: "First",
+          source_issue_state: "open",
+        }),
+        ghEvent("sub_issue_added", "2024-01-02T00:00:00Z", {
+          source_issue_number: 2,
+          source_issue_title: "Second",
+          source_issue_state: "closed",
+        }),
+      ],
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      kind: "related_issue_group",
+      relation: "sub_issue_added",
+      refs: [
+        { number: 1, title: "First", state: "open" },
+        { number: 2, title: "Second", state: "closed" },
+      ],
+    });
+  });
+
+  it("does not merge sub_issue_added and parent_issue_added events together", () => {
+    const events = mergeTimeline(
+      [],
+      [],
+      [],
+      [
+        ghEvent("sub_issue_added", "2024-01-01T00:00:00Z", { source_issue_number: 1 }),
+        ghEvent("parent_issue_added", "2024-01-02T00:00:00Z", { source_issue_number: 2 }),
+      ],
+    );
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({ kind: "related_issue_group", relation: "sub_issue_added" });
+    expect(events[1]).toMatchObject({
+      kind: "related_issue_group",
+      relation: "parent_issue_added",
+    });
+  });
+
+  it("starts a new group when the actor changes", () => {
+    const events = mergeTimeline(
+      [],
+      [],
+      [],
+      [
+        ghEvent("sub_issue_added", "2024-01-01T00:00:00Z", {
+          actor_login: "alice",
+          source_issue_number: 1,
+        }),
+        ghEvent("sub_issue_added", "2024-01-02T00:00:00Z", {
+          actor_login: "bob",
+          source_issue_number: 2,
+        }),
+      ],
+    );
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({ actorLogin: "alice" });
+    expect(events[1]).toMatchObject({ actorLogin: "bob" });
   });
 });
 
