@@ -1,4 +1,10 @@
-import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentProps,
+  type ReactNode,
+} from "react";
 import { CloudUploadIcon } from "lucide-react";
 import { Button } from "@gitbud/ui/button";
 import { Input } from "@gitbud/ui/input";
@@ -14,7 +20,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@gitbud/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@gitbud/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@gitbud/ui/select";
 import { cn } from "@gitbud/ui/utils";
 import { useGitHubStore } from "@/store/useGitHubStore";
 import { api } from "@/lib/tauri";
@@ -102,6 +114,8 @@ export function PublishDialog({
   const [isPrivate, setIsPrivate] = useState(true);
   const [publishing, setPublishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [useExistingUrl, setUseExistingUrl] = useState(false);
+  const [existingUrl, setExistingUrl] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -110,26 +124,25 @@ export function PublishDialog({
     setIsPrivate(true);
     setError(null);
     setLogin(currentLogin);
+    setUseExistingUrl(false);
+    setExistingUrl("");
     // Intentionally excludes `currentLogin` — only re-seed the picked account when the dialog
     // is freshly opened, not every time the global "current" GitHub account happens to change.
   }, [isOpen, repoPath]);
 
-  const disabled = !login || !name.trim() || publishing;
+  const disabled = useExistingUrl
+    ? !existingUrl.trim() || publishing
+    : !login || !name.trim() || publishing;
 
-  const submit = async () => {
-    if (!login || !name.trim()) return;
+  const submitExisting = async () => {
+    const url = existingUrl.trim();
+    if (!url) return;
     setPublishing(true);
     setError(null);
     try {
-      const created = await api.githubCreateRepo(
-        login,
-        name.trim(),
-        description.trim() || null,
-        isPrivate,
-      );
-      await runGitSync(repoPath, () => api.gitPublish(repoPath, created.clone_url), {
-        description: `Publishing to ${created.full_name}…`,
-        doneMessage: `Published to ${created.full_name}`,
+      await runGitSync(repoPath, () => api.gitPublish(repoPath, url), {
+        description: `Publishing to ${url}…`,
+        doneMessage: `Published to ${url}`,
       });
       queryClient.invalidateQueries({ queryKey: queryKeys.repo(repoPath) });
       onPublished();
@@ -140,77 +153,176 @@ export function PublishDialog({
     }
   };
 
+  const submitNewGithubRepo = async () => {
+    if (!login || !name.trim()) return;
+    setPublishing(true);
+    setError(null);
+    try {
+      const created = await api.githubCreateRepo(
+        login,
+        name.trim(),
+        description.trim() || null,
+        isPrivate,
+      );
+      await runGitSync(
+        repoPath,
+        () => api.gitPublish(repoPath, created.clone_url),
+        {
+          description: `Publishing to ${created.full_name}…`,
+          doneMessage: `Published to ${created.full_name}`,
+        },
+      );
+      queryClient.invalidateQueries({ queryKey: queryKeys.repo(repoPath) });
+      onPublished();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setPublishing(false);
+    }
+  };
+
+  const submit = () =>
+    useExistingUrl ? submitExisting() : submitNewGithubRepo();
+
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Publish Repository</DialogTitle>
-          <DialogDescription>Create a remote repo and push this repo to it.</DialogDescription>
+          <DialogDescription>
+            {useExistingUrl
+              ? "Push this repo to a remote you already created."
+              : "Create a remote repo and push this repo to it."}
+          </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
-          <ProviderPicker value={provider} onChange={setProvider} options={PROVIDER_OPTIONS} />
-
-          {accounts.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 rounded-md border border-border p-4 text-center">
-              <p className="text-sm text-muted-foreground">Not signed in to GitHub.</p>
-              <Button size="sm" variant="secondary" onClick={openSignIn}>
-                Sign in to GitHub
-              </Button>
-            </div>
-          ) : (
+          {useExistingUrl ? (
             <>
-              {accounts.length > 1 && (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-medium text-muted-foreground">Account</span>
-                  <Select value={login ?? undefined} onValueChange={setLogin}>
-                    <SelectTrigger className="w-full border-input bg-accent font-normal hover:bg-accent/80 hover:text-accent-foreground">
-                      <SelectValue placeholder="Choose an account" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {accounts.map((a) => (
-                        <SelectItem key={a.login} value={a.login}>
-                          {a.login}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-medium text-muted-foreground">
-                  Repository name <span className="text-destructive">*</span>
+                  Remote URL <span className="text-destructive">*</span>
                 </span>
-                <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Description</span>
-                <AutoGrowTextarea
-                  placeholder="What's this repository about?"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={1}
+                <Input
+                  value={existingUrl}
+                  onChange={(e) => setExistingUrl(e.target.value)}
+                  placeholder="git@gitlab.example.com:me/repo.git or https://…"
+                  autoFocus
                 />
+                <span className="text-xs text-muted-foreground">
+                  Adds this as the "origin" remote and pushes the current
+                  branch. The remote repository must already exist — works with
+                  any host (GitLab, Bitbucket, Codeberg/Forgejo, self-hosted,
+                  …).
+                </span>
               </div>
-
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-muted-foreground">Visibility</span>
-                <CardPicker
-                  value={isPrivate ? "private" : "public"}
-                  onChange={(v) => setIsPrivate(v === "private")}
-                  options={[
-                    { value: "private", label: "Private", description: "Only you can see it" },
-                    {
-                      value: "public",
-                      label: "Public",
-                      description: "Anyone on GitHub can see it",
-                    },
-                  ]}
-                />
-              </div>
-
+              <button
+                type="button"
+                className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
+                onClick={() => setUseExistingUrl(false)}
+              >
+                Create a new GitHub repository instead
+              </button>
               {error && <p className="text-xs text-destructive">{error}</p>}
+            </>
+          ) : (
+            <>
+              <ProviderPicker
+                value={provider}
+                onChange={setProvider}
+                options={PROVIDER_OPTIONS}
+              />
+
+              {accounts.length === 0 ? (
+                <div className="flex flex-col items-center gap-2 rounded-md border border-border p-4 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    Not signed in to GitHub.
+                  </p>
+                  <Button size="sm" variant="secondary" onClick={openSignIn}>
+                    Sign in to GitHub
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {accounts.length > 1 && (
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        Account
+                      </span>
+                      <Select
+                        value={login ?? undefined}
+                        onValueChange={setLogin}
+                      >
+                        <SelectTrigger className="w-full border-input bg-accent font-normal hover:bg-accent/80 hover:text-accent-foreground">
+                          <SelectValue placeholder="Choose an account" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {accounts.map((a) => (
+                            <SelectItem key={a.login} value={a.login}>
+                              {a.login}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Repository name{" "}
+                      <span className="text-destructive">*</span>
+                    </span>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Description
+                    </span>
+                    <AutoGrowTextarea
+                      placeholder="What's this repository about?"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={1}
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Visibility
+                    </span>
+                    <CardPicker
+                      value={isPrivate ? "private" : "public"}
+                      onChange={(v) => setIsPrivate(v === "private")}
+                      options={[
+                        {
+                          value: "private",
+                          label: "Private",
+                          description: "Only you can see it",
+                        },
+                        {
+                          value: "public",
+                          label: "Public",
+                          description: "Anyone on GitHub can see it",
+                        },
+                      ]}
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    className="self-start text-xs text-muted-foreground underline-offset-2 hover:underline"
+                    onClick={() => setUseExistingUrl(true)}
+                  >
+                    Already have a remote repository? Push to its URL instead
+                  </button>
+
+                  {error && <p className="text-xs text-destructive">{error}</p>}
+                </>
+              )}
             </>
           )}
         </div>
