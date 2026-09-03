@@ -1359,11 +1359,23 @@ where
     }
 }
 
+/// Returns the repo's `origin` owner/repo, but only when `origin` actually points at GitHub
+/// (github.com or the configured GitHub Enterprise Server host) — used by the frontend to
+/// distinguish GitHub remotes from other forges (Azure DevOps, GitLab, self-hosted, ...), which
+/// need an SSH identity instead. `config::remote_owner_repo`'s parse is purely structural and
+/// would otherwise match any host's `.../owner/repo`-shaped path.
 #[tauri::command]
 async fn github_remote_owner_repo(repo_path: String) -> Option<(String, String)> {
-    tauri::async_runtime::spawn_blocking(move || config::remote_owner_repo(&repo_path))
-        .await
-        .unwrap_or(None)
+    tauri::async_runtime::spawn_blocking(move || {
+        let host = config::remote_host(&repo_path)?;
+        let github_host = github::auth::get_host().ok()?;
+        if !host.eq_ignore_ascii_case(&github_host) {
+            return None;
+        }
+        config::remote_owner_repo(&repo_path)
+    })
+    .await
+    .unwrap_or(None)
 }
 
 #[tauri::command]

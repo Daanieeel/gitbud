@@ -126,6 +126,16 @@ pub fn remote_owner_repo(repo_path: &str) -> Option<(String, String)> {
     parse_owner_repo(&url)
 }
 
+/// The host of a repo's `origin` remote, e.g. "github.com", "dev.azure.com", or a GitHub
+/// Enterprise Server hostname. Used to check whether a remote actually points at GitHub before
+/// treating its owner/repo as GitHub-addressable — `remote_owner_repo`'s parse is structural and
+/// succeeds for any forge (Azure DevOps, GitLab, etc), not just GitHub.
+pub fn remote_host(repo_path: &str) -> Option<String> {
+    let repo = Repository::open(repo_path).ok()?;
+    let url = repo.find_remote("origin").ok()?.url()?.to_string();
+    parse_remote(&url).map(|(host, _, _)| host)
+}
+
 /// The host and best-effort web URL for a repo's `origin` remote, regardless of forge —
 /// works for any host that serves its web UI at the same `host/owner/repo` path as its git
 /// remote (GitHub, GitLab, Bitbucket, self-hosted Gitea/Forgejo, etc).
@@ -350,6 +360,29 @@ mod tests {
         assert_eq!(
             parse_owner_repo("https://git.company.com/owner/repo.git"),
             Some(("owner".to_string(), "repo".to_string()))
+        );
+    }
+
+    #[test]
+    fn parse_remote_azure_devops_is_structurally_owner_repo_shaped() {
+        // Azure DevOps URLs parse "successfully" here even though they aren't GitHub —
+        // callers that need to know a remote is actually GitHub must check the host
+        // themselves (see `remote_host` and `github_remote_owner_repo`).
+        assert_eq!(
+            parse_remote("https://dev.azure.com/org/project/_git/repo"),
+            Some((
+                "dev.azure.com".to_string(),
+                "org/project/_git".to_string(),
+                "repo".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn remote_host_strips_ssh_user_and_port() {
+        assert_eq!(
+            clean_host("git@ssh.dev.azure.com:22"),
+            "ssh.dev.azure.com".to_string()
         );
     }
 
