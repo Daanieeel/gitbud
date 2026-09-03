@@ -106,7 +106,8 @@ pub fn is_github_remote_host(remote_host: &str, configured_github_host: &str) ->
     if remote_host.eq_ignore_ascii_case(&configured) {
         return true;
     }
-    configured.eq_ignore_ascii_case("github.com") && remote_host.eq_ignore_ascii_case("ssh.github.com")
+    configured.eq_ignore_ascii_case("github.com")
+        && remote_host.eq_ignore_ascii_case("ssh.github.com")
 }
 
 /// Parses a git remote URL into (host, owner, repo), handling both
@@ -407,7 +408,10 @@ mod tests {
     #[test]
     fn is_github_remote_host_matches_exact_host() {
         assert!(is_github_remote_host("github.com", "github.com"));
-        assert!(is_github_remote_host("ghes.company.com", "ghes.company.com"));
+        assert!(is_github_remote_host(
+            "ghes.company.com",
+            "ghes.company.com"
+        ));
     }
 
     #[test]
