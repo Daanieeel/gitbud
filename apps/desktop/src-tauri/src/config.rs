@@ -128,7 +128,7 @@ pub fn remote_owner_repo(repo_path: &str) -> Option<(String, String)> {
 
 /// The host of a repo's `origin` remote, e.g. "github.com", "dev.azure.com", or a GitHub
 /// Enterprise Server hostname. Used to check whether a remote actually points at GitHub before
-/// treating its owner/repo as GitHub-addressable — `remote_owner_repo`'s parse is structural and
+/// treating its owner/repo as GitHub-addressable - `remote_owner_repo`'s parse is structural and
 /// succeeds for any forge (Azure DevOps, GitLab, etc), not just GitHub.
 pub fn remote_host(repo_path: &str) -> Option<String> {
     let repo = Repository::open(repo_path).ok()?;
