@@ -91,6 +91,25 @@ fn clean_host(raw: &str) -> String {
     after_at.split(':').next().unwrap_or(after_at).to_string()
 }
 
+/// Normalizes a configured GitHub host (e.g. from `github::auth::get_host`, which may carry a
+/// port such as a GHES instance on "ghes.example.com:8443") the same way `remote_host` normalizes
+/// a remote's host, so the two are comparable.
+pub fn normalize_host(raw: &str) -> String {
+    clean_host(raw)
+}
+
+/// Whether a repo's origin `remote_host` actually points at the configured GitHub host —
+/// exact match, or GitHub's `ssh.github.com` (SSH over port 443, used when port 22 is blocked)
+/// as an alias for "github.com".
+pub fn is_github_remote_host(remote_host: &str, configured_github_host: &str) -> bool {
+    let configured = normalize_host(configured_github_host);
+    if remote_host.eq_ignore_ascii_case(&configured) {
+        return true;
+    }
+    configured.eq_ignore_ascii_case("github.com")
+        && remote_host.eq_ignore_ascii_case("ssh.github.com")
+}
+
 /// Parses a git remote URL into (host, owner, repo), handling both
 /// "git@host:owner/repo.git" and "https://host/owner/repo.git" forms.
 fn parse_remote(url: &str) -> Option<(String, String, String)> {
@@ -124,6 +143,16 @@ pub fn remote_owner_repo(repo_path: &str) -> Option<(String, String)> {
     let repo = Repository::open(repo_path).ok()?;
     let url = repo.find_remote("origin").ok()?.url()?.to_string();
     parse_owner_repo(&url)
+}
+
+/// The host of a repo's `origin` remote, e.g. "github.com", "dev.azure.com", or a GitHub
+/// Enterprise Server hostname. Used to check whether a remote actually points at GitHub before
+/// treating its owner/repo as GitHub-addressable - `remote_owner_repo`'s parse is structural and
+/// succeeds for any forge (Azure DevOps, GitLab, etc), not just GitHub.
+pub fn remote_host(repo_path: &str) -> Option<String> {
+    let repo = Repository::open(repo_path).ok()?;
+    let url = repo.find_remote("origin").ok()?.url()?.to_string();
+    parse_remote(&url).map(|(host, _, _)| host)
 }
 
 /// The host and best-effort web URL for a repo's `origin` remote, regardless of forge —
@@ -351,6 +380,69 @@ mod tests {
             parse_owner_repo("https://git.company.com/owner/repo.git"),
             Some(("owner".to_string(), "repo".to_string()))
         );
+    }
+
+    #[test]
+    fn parse_remote_azure_devops_is_structurally_owner_repo_shaped() {
+        // Azure DevOps URLs parse "successfully" here even though they aren't GitHub —
+        // callers that need to know a remote is actually GitHub must check the host
+        // themselves (see `remote_host` and `github_remote_owner_repo`).
+        assert_eq!(
+            parse_remote("https://dev.azure.com/org/project/_git/repo"),
+            Some((
+                "dev.azure.com".to_string(),
+                "org/project/_git".to_string(),
+                "repo".to_string()
+            ))
+        );
+    }
+
+    #[test]
+    fn remote_host_strips_ssh_user_and_port() {
+        assert_eq!(
+            clean_host("git@ssh.dev.azure.com:22"),
+            "ssh.dev.azure.com".to_string()
+        );
+    }
+
+    #[test]
+    fn is_github_remote_host_matches_exact_host() {
+        assert!(is_github_remote_host("github.com", "github.com"));
+        assert!(is_github_remote_host(
+            "ghes.company.com",
+            "ghes.company.com"
+        ));
+    }
+
+    #[test]
+    fn is_github_remote_host_normalizes_configured_host_port() {
+        // A GHES host configured with a port (e.g. "ghes.company.com:8443") must still match
+        // the remote host, which `remote_host` already normalizes by stripping the port.
+        assert!(is_github_remote_host(
+            "ghes.company.com",
+            "ghes.company.com:8443"
+        ));
+    }
+
+    #[test]
+    fn is_github_remote_host_allows_ssh_github_com_alias() {
+        // ssh.github.com is GitHub's SSH-over-443 endpoint for github.com.
+        assert!(is_github_remote_host("ssh.github.com", "github.com"));
+    }
+
+    #[test]
+    fn is_github_remote_host_does_not_alias_ssh_github_com_for_ghes() {
+        // The ssh.github.com alias is specific to github.com — a GHES instance never gets it.
+        assert!(!is_github_remote_host("ssh.github.com", "ghes.company.com"));
+    }
+
+    #[test]
+    fn is_github_remote_host_rejects_other_forges() {
+        assert!(!is_github_remote_host("dev.azure.com", "github.com"));
+        assert!(!is_github_remote_host(
+            "ect.dmz.collab.tunme.de",
+            "github.com"
+        ));
     }
 
     #[test]
