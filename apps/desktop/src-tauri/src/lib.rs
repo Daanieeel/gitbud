@@ -1369,7 +1369,7 @@ async fn github_remote_owner_repo(repo_path: String) -> Option<(String, String)>
     tauri::async_runtime::spawn_blocking(move || {
         let host = config::remote_host(&repo_path)?;
         let github_host = github::auth::get_host().ok()?;
-        if !host.eq_ignore_ascii_case(&github_host) {
+        if !config::is_github_remote_host(&host, &github_host) {
             return None;
         }
         config::remote_owner_repo(&repo_path)
