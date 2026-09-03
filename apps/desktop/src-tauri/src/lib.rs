@@ -1360,7 +1360,7 @@ where
 }
 
 /// Returns the repo's `origin` owner/repo, but only when `origin` actually points at GitHub
-/// (github.com or the configured GitHub Enterprise Server host) — used by the frontend to
+/// (github.com or the configured GitHub Enterprise Server host) - used by the frontend to
 /// distinguish GitHub remotes from other forges (Azure DevOps, GitLab, self-hosted, ...), which
 /// need an SSH identity instead. `config::remote_owner_repo`'s parse is purely structural and
 /// would otherwise match any host's `.../owner/repo`-shaped path.
